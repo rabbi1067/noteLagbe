@@ -1,0 +1,321 @@
+package com.notelagbe.service;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.notelagbe.entity.Course;
+import com.notelagbe.entity.FacultyCategory;
+import com.notelagbe.entity.Teacher;
+import com.notelagbe.entity.TeacherCourse;
+import com.notelagbe.repository.CourseRepository;
+import com.notelagbe.repository.TeacherCourseRepository;
+import com.notelagbe.repository.TeacherRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.cache.CacheManager;
+import org.springframework.core.annotation.Order;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.io.InputStream;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Initializes the authentic Southeast University Academic Catalog (Curriculum & Faculty Directory).
+ * This component NEVER creates demo users, dummy reviews, fake resources, or dummy payments.
+ * It strictly ensures that Southeast University CSE courses and faculty members are available in the database.
+ */
+@Component
+@Order(1)
+@ConditionalOnProperty(name = "app.catalog.init-enabled", havingValue = "true", matchIfMissing = true)
+public class AcademicCatalogInitializer implements CommandLineRunner {
+
+    private static final Logger log = LoggerFactory.getLogger(AcademicCatalogInitializer.class);
+
+    private final CourseRepository courseRepository;
+    private final TeacherRepository teacherRepository;
+    private final TeacherCourseRepository teacherCourseRepository;
+    private final SeuFacultySyncService seuFacultySyncService;
+    private final ObjectMapper objectMapper;
+    private final CacheManager cacheManager;
+
+    public AcademicCatalogInitializer(CourseRepository courseRepository,
+                                      TeacherRepository teacherRepository,
+                                      TeacherCourseRepository teacherCourseRepository,
+                                      SeuFacultySyncService seuFacultySyncService,
+                                      ObjectMapper objectMapper,
+                                      CacheManager cacheManager) {
+        this.courseRepository = courseRepository;
+        this.teacherRepository = teacherRepository;
+        this.teacherCourseRepository = teacherCourseRepository;
+        this.seuFacultySyncService = seuFacultySyncService;
+        this.objectMapper = objectMapper;
+        this.cacheManager = cacheManager;
+    }
+
+    @Override
+    @Transactional
+    public void run(String... args) {
+        log.info(">>> Checking Southeast University Academic Catalog in database...");
+        seedCoursesIfEmpty();
+        seedTeachersIfEmpty();
+        ensureTeacherCourseMappings();
+        ensureAllTeachersHaveInitials();
+        
+        if (cacheManager != null) {
+            for (String cacheName : cacheManager.getCacheNames()) {
+                var c = cacheManager.getCache(cacheName);
+                if (c != null) c.clear();
+            }
+        }
+        log.info(">>> Southeast University Academic Catalog verified in database.");
+    }
+
+    private void seedCoursesIfEmpty() {
+        if (courseRepository.count() > 0) {
+            log.info("Courses table already populated ({} courses found). Skipping course init.", courseRepository.count());
+            return;
+        }
+
+        try {
+            ClassPathResource res = new ClassPathResource("data/courses_curriculum.json");
+            if (res.exists()) {
+                try (InputStream is = res.getInputStream()) {
+                    List<Map<String, Object>> courseList = objectMapper.readValue(is, new TypeReference<>() {});
+                    for (Map<String, Object> cMap : courseList) {
+                        Course c = new Course();
+                        String code = (String) cMap.get("code");
+                        c.setCode(code);
+                        c.setTitle((String) cMap.get("title"));
+                        c.setCredits(Double.parseDouble(cMap.get("credits").toString()));
+                        c.setSemester(Integer.parseInt(cMap.get("semester").toString()));
+                        c.setLab((Boolean) cMap.getOrDefault("isLab", false));
+                        c.setPrerequisite((String) cMap.getOrDefault("prerequisite", "Nil"));
+                        c.setElectiveGroup((String) cMap.get("electiveGroup"));
+
+                        String dept = (String) cMap.get("department");
+                        if (dept == null || dept.trim().isEmpty()) {
+                            dept = "CSE";
+                        }
+                        c.setDepartment(dept);
+                        courseRepository.save(c);
+                    }
+                    log.info("Initialized {} official courses for Southeast University CSE Curriculum.", courseList.size());
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to load courses_curriculum.json", e);
+        }
+    }
+
+    private void seedTeachersIfEmpty() {
+        if (teacherRepository.count() > 0) {
+            log.info("Teachers table already populated ({} teachers found).", teacherRepository.count());
+            return;
+        }
+
+        loadTeachersFromJson("data/full_time_faculty.json", FacultyCategory.FULL_TIME_FACULTY);
+        loadTeachersFromJson("data/adjunct_faculty.json", FacultyCategory.ADJUNCT_FACULTY);
+        loadTeachersFromJson("data/officers_staff.json", FacultyCategory.OFFICERS_AND_STAFF);
+
+        ensureTeacher("Md. Shakib Hasan", "MSH", "Senior Lecturer", FacultyCategory.FULL_TIME_FACULTY, "Room 528", "shakib.hasan@seu.edu.bd");
+        ensureTeacher("Belal Ahmed", "BA", "Assistant Professor", FacultyCategory.FULL_TIME_FACULTY, "Room 529", "belal.ahmed@seu.edu.bd");
+
+        syncTeachersFromRateMyFaculty();
+        try {
+            seuFacultySyncService.syncCseFaculties();
+        } catch (Exception e) {
+            log.warn("SEU Faculty live scrape skipped: {}", e.getMessage());
+        }
+    }
+
+    private void loadTeachersFromJson(String path, FacultyCategory category) {
+        try {
+            ClassPathResource res = new ClassPathResource(path);
+            if (!res.exists()) return;
+
+            try (InputStream is = res.getInputStream()) {
+                List<Map<String, Object>> list = objectMapper.readValue(is, new TypeReference<>() {});
+                for (Map<String, Object> map : list) {
+                    String name = (String) map.get("name");
+                    if (name == null || name.trim().isEmpty()) continue;
+
+                    String initial = (String) map.get("initial");
+                    if (initial == null && map.containsKey("initials")) {
+                        initial = (String) map.get("initials");
+                    }
+                    if (initial != null && initial.trim().isEmpty()) {
+                        initial = null;
+                    }
+
+                    if (teacherRepository.findByNameContainingIgnoreCaseOrInitialContainingIgnoreCase(name, initial != null ? initial : name).isEmpty()) {
+                        Teacher t = new Teacher();
+                        t.setName(name.trim());
+                        t.setInitial(initial != null ? initial.trim() : null);
+                        t.setDesignation((String) map.getOrDefault("designation", "Faculty Member"));
+                        t.setCategory(category);
+                        t.setRoom((String) map.getOrDefault("room", "Faculty Office"));
+                        t.setEmail((String) map.getOrDefault("email", ""));
+                        t.setPhone((String) map.getOrDefault("phone", ""));
+                        t.setImage((String) map.getOrDefault("image", ""));
+                        teacherRepository.save(t);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to load teachers from " + path, e);
+        }
+    }
+
+    private void ensureTeacher(String name, String initial, String desig, FacultyCategory cat, String room, String email) {
+        if (teacherRepository.findByNameContainingIgnoreCaseOrInitialContainingIgnoreCase(name, initial).isEmpty()) {
+            Teacher t = new Teacher();
+            t.setName(name);
+            t.setInitial(initial);
+            t.setDesignation(desig);
+            t.setCategory(cat);
+            t.setRoom(room);
+            t.setEmail(email);
+            teacherRepository.save(t);
+        }
+    }
+
+    private void syncTeachersFromRateMyFaculty() {
+        try {
+            ClassPathResource res = new ClassPathResource("data/seu_ratemyfaculty_teachers.json");
+            if (!res.exists()) return;
+
+            try (InputStream is = res.getInputStream()) {
+                List<Map<String, Object>> list = objectMapper.readValue(is, new TypeReference<>() {});
+                for (Map<String, Object> map : list) {
+                    String fullName = (String) map.get("fullName");
+                    if (fullName == null || fullName.trim().isEmpty()) continue;
+
+                    String name = fullName;
+                    String initial = null;
+
+                    Matcher m = Pattern.compile("^(.*?)\\s*\\[([A-Z0-9]+)\\]$").matcher(fullName.trim());
+                    if (m.matches()) {
+                        name = m.group(1).trim();
+                        initial = m.group(2).trim();
+                    }
+
+                    String photoUrl = (String) map.get("photoUrl");
+
+                    Teacher t = null;
+                    List<Teacher> byName = teacherRepository.findByNameIgnoreCase(name);
+                    if (!byName.isEmpty()) {
+                        t = byName.get(0);
+                    } else if (initial != null) {
+                        List<Teacher> byInit = teacherRepository.findByInitialIgnoreCase(initial);
+                        if (!byInit.isEmpty()) {
+                            t = byInit.get(0);
+                        } else {
+                            List<Teacher> bySub = teacherRepository.findByNameContainingIgnoreCase(name);
+                            if (!bySub.isEmpty()) {
+                                t = bySub.get(0);
+                            }
+                        }
+                    }
+
+                    if (t != null) {
+                        boolean modified = false;
+                        if (initial != null && (t.getInitial() == null || !t.getInitial().equalsIgnoreCase(initial))) {
+                            t.setInitial(initial);
+                            modified = true;
+                        }
+                        if (photoUrl != null && !photoUrl.contains("avatar_blue") && (t.getImage() == null || t.getImage().contains("avatar_blue") || t.getImage().startsWith("."))) {
+                            t.setImage(photoUrl);
+                            modified = true;
+                        }
+                        if (modified) {
+                            teacherRepository.save(t);
+                        }
+                    } else {
+                        t = new Teacher();
+                        t.setName(name);
+                        t.setInitial(initial);
+                        t.setDesignation("Faculty Member");
+                        t.setCategory(FacultyCategory.FULL_TIME_FACULTY);
+                        t.setRoom("Faculty Office, Level 6");
+                        t.setEmail(initial != null ? initial.toLowerCase() + "@seu.edu.bd" : "faculty@seu.edu.bd");
+                        t.setImage(photoUrl);
+                        teacherRepository.save(t);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to sync teachers from RateMyFaculty json", e);
+        }
+    }
+
+    private void ensureTeacherCourseMappings() {
+        if (teacherCourseRepository.count() > 0) return;
+
+        try {
+            ClassPathResource res = new ClassPathResource("data/teacher_course_offerings.json");
+            if (!res.exists()) return;
+
+            try (InputStream is = res.getInputStream()) {
+                List<Map<String, Object>> list = objectMapper.readValue(is, new TypeReference<>() {});
+                for (Map<String, Object> map : list) {
+                    String courseCode = (String) map.get("courseCode");
+                    String teacherInitial = (String) map.get("teacherInitial");
+                    String section = (String) map.getOrDefault("section", "Sec 1");
+                    String schedule = (String) map.getOrDefault("schedule", "TBA @ Southeast University");
+
+                    if (courseCode == null || teacherInitial == null) continue;
+
+                    Optional<Course> courseOpt = courseRepository.findByCodeIgnoreCase(courseCode.trim());
+                    List<Teacher> teachers = teacherRepository.findByInitialIgnoreCase(teacherInitial.trim());
+
+                    if (courseOpt.isPresent() && !teachers.isEmpty()) {
+                        Course course = courseOpt.get();
+                        Teacher teacher = teachers.get(0);
+                        if (!teacherCourseRepository.existsByCourseIdAndTeacherId(course.getId(), teacher.getId())) {
+                            TeacherCourse tc = new TeacherCourse();
+                            tc.setCourse(course);
+                            tc.setTeacher(teacher);
+                            tc.setSection(section);
+                            tc.setScheduleInfo(schedule);
+                            teacherCourseRepository.save(tc);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to load teacher_course_offerings.json", e);
+        }
+    }
+
+    private void ensureAllTeachersHaveInitials() {
+        List<Teacher> teachers = teacherRepository.findAll();
+        for (Teacher t : teachers) {
+            if (t.getInitial() == null || t.getInitial().trim().isEmpty() || t.getInitial().equalsIgnoreCase("N/A")) {
+                String genInit = generateFallbackInitials(t.getName());
+                if (genInit != null) {
+                    t.setInitial(genInit);
+                    teacherRepository.save(t);
+                }
+            }
+        }
+    }
+
+    private String generateFallbackInitials(String name) {
+        if (name == null || name.trim().isEmpty()) return "FAC";
+        String clean = name.replaceAll("(?i)\\b(Prof\\.?|Professor|Dr\\.?|Doctor|Engr\\.?|Md\\.?|Mohammad|Muhammad|Mrs\\.?|Mr\\.?|Ms\\.?)\\b", "").trim();
+        String[] parts = clean.split("[\\s.-]+");
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            if (!p.isEmpty() && Character.isLetter(p.charAt(0))) {
+                sb.append(Character.toUpperCase(p.charAt(0)));
+            }
+        }
+        String res = sb.toString();
+        return res.length() >= 2 ? res : (name.length() >= 3 ? name.substring(0, 3).toUpperCase() : "FAC");
+    }
+}

@@ -1,0 +1,90 @@
+# ===================================================================
+# NoteLagbe - Root Git Ignore Configuration
+# Strict Security: No YAML files, No Secrets, No Production Data
+# ===================================================================
+
+# STRICT SECURITY: No YAML/YML files
+*.yml
+*.yaml
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+*.env
+application-*.properties
+*.pem
+*.key
+*.p12
+*.cer
+*.crt
+
+# Backend: Maven / Java
+backend/target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+backend/uploads/
+uploads/
+*.log
+backend/notelagbedb.*
+*.mv.db
+*.trace.db
+
+# Frontend: Next.js / Node
+frontend/node_modules/
+node_modules/
+frontend/.next/
+.next/
+frontend/out/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+frontend/.env.local
+frontend/.env*.local
+
+# IDEs & System Files
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+.DS_Store
+Thumbs.db
+
+# Temporary Development & Scratch Files
+doc1_media/
+doc2_media/
+scratch_detailed_frames/
+scratch/
+tools/dev_scripts/
+scratch_*
+test-*.js
+patch_*.js
+update_*.py
+inspect_*.py
+extract_*.py
+build_curriculum_ts.py
+generate_curriculum_data.py
+expand_to_30_modern_templates.js
+implement_modern_themes.js
+apply_full_modern_themes.js
+apply_hydration_fixes.py
+find_sidebar.py
+share-online.*
+seu_programs_props.json
+*.tmp
+*.bak
+header_2020_*.png
+ref_*.png
+seu_official_header_*.png
+user_logo_preview.jpg
+
+tools/
+tools/**
+*.exe

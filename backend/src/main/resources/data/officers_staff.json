@@ -1,0 +1,57 @@
+[
+  {
+    "category": "OFFICERS_AND_STAFF",
+    "name": "Md. Abu Sayed",
+    "designation": "Senior Officer",
+    "room": "528, 5th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "abu.sayed@seu.edu.bd",
+    "image": "https://ums-local.seu.edu.bd/file-server/v/2.0.0/profile-picture/abu.sayed_3lid7oc7.jpg",
+    "initial": "MAS"
+  },
+  {
+    "category": "OFFICERS_AND_STAFF",
+    "name": "Md. Juboraj",
+    "designation": "Lab Officer",
+    "room": "612, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "md.juboraj@seu.edu.bd",
+    "image": "https://ums-local.seu.edu.bd/file-server/v/2.0.0/profile-picture/md.juboraj_kipooung.jpg",
+    "initial": "MJ"
+  },
+  {
+    "category": "OFFICERS_AND_STAFF",
+    "name": "Rajan Sarker",
+    "designation": "Lab Officer",
+    "room": "528, 5th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "rajan.sarker@seu.edu.bd",
+    "image": "https://ums-local.seu.edu.bd/file-server/v/2.0.0/profile-picture/rajan.sarker_zrlpsdqc.jpg",
+    "initial": "RS"
+  },
+  {
+    "category": "OFFICERS_AND_STAFF",
+    "name": "Md. Imran Hossen",
+    "designation": "Assistant Officer",
+    "room": "528, 5th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "md.imranhossen@seu.edu.bd",
+    "image": "https://ums-local.seu.edu.bd/file-server/v/2.0.0/profile-picture/md.imranhossen_d9xcvgmv.jpeg",
+    "initial": "MIH"
+  },
+  {
+    "category": "OFFICERS_AND_STAFF",
+    "name": "Rezia Parvin",
+    "designation": "Assistant Officer",
+    "room": "528, 5th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "rezia.parvin@seu.edu.bd",
+    "image": "https://cse.seu.edu.bd/assets/images/users/avatar_blue.png",
+    "initial": "RP"
+  }
+]

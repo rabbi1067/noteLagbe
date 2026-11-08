@@ -1,0 +1,1394 @@
+"use client";
+
+import React, { useState, useEffect, useCallback } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import { api } from "@/lib/api";
+import { useLanguage } from "@/context/LanguageContext";
+import { useDataSync } from "@/lib/sync";
+import { TeacherDetailSkeleton } from "@/components/skeletons/CardSkeletons";
+import { 
+  User, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  BookOpen, 
+  ArrowRight, 
+  Award, 
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  FileQuestion,
+  ExternalLink,
+  Upload,
+  Sparkles,
+  Star,
+  Smile,
+  ThumbsUp,
+  Info,
+  Lightbulb,
+  CheckCircle2,
+  Lock,
+  Layers,
+  GraduationCap,
+  MessageSquarePlus,
+  HelpCircle,
+  EyeOff,
+  X
+} from "lucide-react";
+import PDFViewerModal from "@/components/PDFViewerModal";
+import FacultyAvatar from "@/components/FacultyAvatar";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
+
+function sortTeacherCoursesNaturally(teacherCourses: any[]): any[] {
+  return [...teacherCourses].sort((a, b) => {
+    const codeA = (a.course?.code || a.code || "").toUpperCase().trim();
+    const codeB = (b.course?.code || b.code || "").toUpperCase().trim();
+
+    const matchA = codeA.match(/^([A-Z]+)(\d+)(.*)$/);
+    const matchB = codeB.match(/^([A-Z]+)(\d+)(.*)$/);
+
+    if (matchA && matchB) {
+      const deptA = matchA[1];
+      const deptB = matchB[1];
+      const numA = parseInt(matchA[2], 10);
+      const numB = parseInt(matchB[2], 10);
+      const suffixA = matchA[3];
+      const suffixB = matchB[3];
+
+      if (deptA === "CSE" && deptB !== "CSE") return -1;
+      if (deptA !== "CSE" && deptB === "CSE") return 1;
+      if (deptA !== deptB) return deptA.localeCompare(deptB);
+      if (numA !== numB) return numA - numB;
+      return suffixA.localeCompare(suffixB);
+    }
+    return codeA.localeCompare(codeB, undefined, { numeric: true });
+  });
+}
+
+export default function TeacherDetailPage() {
+  const params = useParams();
+  const id = Number(params?.id);
+  const { language, t } = useLanguage();
+  const { user, isAuthenticated, setShowAuthModal } = useAuth();
+
+  const [teacher, setTeacher] = useState<any>(null);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [resources, setResources] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [imageFailed, setImageFailed] = useState(false);
+
+  // Review & Rating Modal States
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showAllReviewsModal, setShowAllReviewsModal] = useState(false);
+  const [newRating, setNewRating] = useState(5);
+  const [newCourseCode, setNewCourseCode] = useState("");
+  const [newPersonality, setNewPersonality] = useState("Friendly");
+  const [newMarking, setNewMarking] = useState("Fair & Generous");
+  const [newDifficulty, setNewDifficulty] = useState("Medium");
+  const [newComment, setNewComment] = useState("");
+  const [newIsAnonymous, setNewIsAnonymous] = useState(true);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [hasReviewedCourse, setHasReviewedCourse] = useState(false);
+  const [checkingReviewStatus, setCheckingReviewStatus] = useState(false);
+
+  // Layout balance controls
+  const [showAllCourses, setShowAllCourses] = useState(true);
+  const [courseFilter, setCourseFilter] = useState<"ALL" | "THEORY" | "LAB" | "NOTE" | "QUIZ">("ALL");
+  const [expandedCourseMap, setExpandedCourseMap] = useState<Record<string, boolean>>({});
+
+  // PDF Preview Modal
+  const [activeResource, setActiveResource] = useState<any | null>(null);
+
+  const loadTeacherData = useCallback(() => {
+    if (!id) return;
+    Promise.all([
+      api.teachers.getById(id).catch(() => null),
+      api.teachers.getCourses(id).catch(() => []),
+      api.resources.getByTeacher(id).catch(() => []),
+      api.reviews.getByTeacher(id).catch(() => []),
+    ])
+      .then(([tData, cData, rData, revData]) => {
+        setTeacher(tData);
+        const sortedCourses = sortTeacherCoursesNaturally(cData || []);
+        setCourses(sortedCourses);
+        setResources(rData || []);
+        setReviews(revData || []);
+
+        // Auto-expand the first course with materials by default
+        if (sortedCourses.length > 0) {
+          const firstCode = sortedCourses[0].course?.code || sortedCourses[0].code || "";
+          setNewCourseCode((prev) => prev || firstCode);
+          const firstWithRes = sortedCourses.find((c: any) => 
+            rData?.some((r: any) => r.course?.code?.toLowerCase() === c.course?.code?.toLowerCase())
+          ) || sortedCourses[0];
+          if (firstWithRes?.course?.code) {
+            setExpandedCourseMap((prev) => Object.keys(prev).length > 0 ? prev : { [firstWithRes.course.code]: true });
+          }
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => {
+    loadTeacherData();
+  }, [loadTeacherData]);
+
+  // Enterprise Live Sync: Instantly updates teacher info, courses, and materials
+  useDataSync(() => {
+    loadTeacherData();
+  });
+
+  const toggleCourseExpand = (code: string) => {
+    setExpandedCourseMap((prev) => ({
+      ...prev,
+      [code]: !prev[code],
+    }));
+  };
+
+  const getMarkingColor = (marking?: string) => {
+    if (!marking) return "text-emerald-400";
+    const m = marking.toLowerCase();
+    if (m.includes("strict")) return "text-rose-400";
+    if (m.includes("fair") || m.includes("generous") || m.includes("lenient")) return "text-emerald-400";
+    if (m.includes("average") || m.includes("balanced")) return "text-sky-400";
+    return "text-emerald-400";
+  };
+
+  const getDifficultyColor = (diff?: string) => {
+    if (!diff) return "text-amber-400";
+    const d = diff.toLowerCase();
+    if (d.includes("easy") || d.includes("light")) return "text-emerald-400";
+    if (d.includes("hard") || d.includes("heavy")) return "text-rose-400";
+    return "text-amber-400";
+  };
+
+  // Duplicate Review Check per student per course
+  useEffect(() => {
+    if (isAuthenticated && newCourseCode && newCourseCode.trim()) {
+      setCheckingReviewStatus(true);
+      api.reviews.check(newCourseCode.trim())
+        .then((res) => {
+          setHasReviewedCourse(Boolean(res?.hasReviewed));
+        })
+        .catch(() => {
+          setHasReviewedCourse(false);
+        })
+        .finally(() => setCheckingReviewStatus(false));
+    } else {
+      setHasReviewedCourse(false);
+    }
+  }, [newCourseCode, isAuthenticated]);
+
+  // Dynamic Rating Calculations based exclusively on real student reviews
+  const reviewCount = reviews.length;
+  const avgRating = reviewCount > 0
+    ? (reviews.reduce((acc, r) => acc + (Number(r.rating) || 5), 0) / reviewCount).toFixed(1)
+    : null;
+
+  // Helper to dynamically calculate most frequent trait from student reviews
+  const getMode = (arr: (string | undefined | null)[]): string | null => {
+    const valid = arr.filter((x): x is string => Boolean(x && x.trim()));
+    if (valid.length === 0) return null;
+    const freq: Record<string, number> = {};
+    let max = 0;
+    let mode = valid[0];
+    for (const item of valid) {
+      freq[item] = (freq[item] || 0) + 1;
+      if (freq[item] > max) {
+        max = freq[item];
+        mode = item;
+      }
+    }
+    return mode;
+  };
+
+  const dynamicPersonality = getMode(reviews.map((r) => r.personality));
+  const dynamicMarking = getMode(reviews.map((r) => r.marking));
+  const dynamicDifficulty = getMode(reviews.map((r) => r.difficulty));
+  const dynamicCourse = getMode(reviews.map((r) => r.courseCode || r.course?.code));
+
+  // Date formatting matching M/D/YYYY (e.g. 4/16/2026)
+  const formatReviewDate = (dateStr?: string) => {
+    if (!dateStr) return "4/16/2026";
+    try {
+      const d = new Date(dateStr);
+      return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+    } catch {
+      return "4/16/2026";
+    }
+  };
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+    const cleanCode = newCourseCode.trim().toUpperCase();
+    if (!cleanCode) {
+      toast.error(language === "bn" ? "কোর্স কোড নির্বাচন করুন" : "Please select or enter the course code");
+      return;
+    }
+    if (hasReviewedCourse) {
+      toast.error(
+        language === "bn"
+          ? "আপনি ইতিমধ্যে এই কোর্সের জন্য রিভিউ দিয়েছেন। কোর্স প্রতি একজন শিক্ষার্থী কেবল একটি রিভিউ দিতে পারেন।"
+          : "You have already submitted an evaluation for this course. Only one review per course is allowed."
+      );
+      return;
+    }
+    const cleanComment = newComment.trim();
+    if (cleanComment.length < 10) {
+      toast.error(language === "bn" ? "কমপক্ষে ১০ অক্ষরের রিভিউ লিখুন" : "Please enter at least 10 characters in your review");
+      return;
+    }
+    if (cleanComment.length > 500) {
+      toast.error(language === "bn" ? "রিভিউ ৫০০ অক্ষরের বেশি হতে পারবে না" : "Review comment cannot exceed 500 characters");
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      await api.reviews.submit({
+        courseCode: cleanCode,
+        teacherId: id,
+        rating: newRating,
+        comment: cleanComment,
+        personality: newPersonality,
+        marking: newMarking,
+        difficulty: newDifficulty,
+        anonymous: newIsAnonymous,
+      });
+
+      toast.success(
+        language === "bn"
+          ? "রিভিউ সাবমিট হয়েছে! অ্যাডমিন যাচাই করার পর এটি প্রদর্শিত হবে।"
+          : "Review submitted! It will appear publicly once approved by an admin."
+      );
+      setShowReviewModal(false);
+      setNewComment("");
+      setNewRating(5);
+      setHasReviewedCourse(true);
+
+      // Re-fetch approved reviews
+      const revData = await api.reviews.getByTeacher(id);
+      setReviews(revData || []);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to submit review");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  if (loading) {
+    return <TeacherDetailSkeleton />;
+  }
+
+  if (!teacher) {
+    return (
+      <div className="py-32 text-center text-slate-400">
+        <p className="text-base font-bold">{t("faculty.notFound", "Faculty Profile Not Found")}</p>
+        <Link href="/teachers" className="text-xs text-blue-600 hover:underline mt-2 inline-block">
+          &larr; Back to Faculty Directory
+        </Link>
+      </div>
+    );
+  }
+
+  const isValidHttpImage = teacher.image && 
+    (teacher.image.startsWith("http://") || teacher.image.startsWith("https://")) && 
+    !teacher.image.includes("avatar_blue") && 
+    !imageFailed;
+
+  // Course filtering & slicing
+  const theoryCount = courses.filter((c) => !c.course?.lab).length;
+  const labCount = courses.filter((c) => c.course?.lab).length;
+
+  const noteCoursesCount = courses.filter((tc) => {
+    const code = tc.course?.code?.toLowerCase();
+    return resources.some(
+      (r) => r.course?.code?.toLowerCase() === code && (r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "DOC_NOTE")
+    );
+  }).length;
+
+  const quizCoursesCount = courses.filter((tc) => {
+    const code = tc.course?.code?.toLowerCase();
+    return resources.some(
+      (r) => r.course?.code?.toLowerCase() === code && (r.type === "QUIZ_CT" || r.type === "LAB_QUIZ")
+    );
+  }).length;
+
+  const filteredCourses = courses.filter((tc) => {
+    const code = tc.course?.code?.toLowerCase();
+    if (courseFilter === "THEORY") return !tc.course?.lab;
+    if (courseFilter === "LAB") return tc.course?.lab;
+    if (courseFilter === "NOTE") {
+      return resources.some(
+        (r) => r.course?.code?.toLowerCase() === code && (r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "DOC_NOTE")
+      );
+    }
+    if (courseFilter === "QUIZ") {
+      return resources.some(
+        (r) => r.course?.code?.toLowerCase() === code && (r.type === "QUIZ_CT" || r.type === "LAB_QUIZ")
+      );
+    }
+    return true;
+  });
+
+  const displayedCourses = showAllCourses ? filteredCourses : filteredCourses.slice(0, 3);
+  const remainingCount = filteredCourses.length - displayedCourses.length;
+
+  return (
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+      
+      {/* 1. FACULTY HEADER PROFILE CARD */}
+      <div className="p-8 sm:p-10 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">
+        
+        {/* Avatar with safe image handling and vector silhouette fallback */}
+        <FacultyAvatar
+          image={teacher.image}
+          name={teacher.name}
+          initial={teacher.initial}
+          designation={teacher.designation}
+          size="xl"
+        />
+
+        <div className="space-y-3 flex-1 min-w-0">
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+              {teacher.name}
+            </h1>
+            {teacher.initial && (
+              <span className="text-sm font-mono font-black text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950 px-2.5 py-0.5 rounded-lg border border-purple-200/60 dark:border-purple-800/60">
+                [{teacher.initial}]
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-xs">
+            <span className="font-extrabold px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+              CSE Department
+            </span>
+            <span className="font-semibold text-slate-500 dark:text-slate-400">
+              • Southeast University
+            </span>
+            <span className="font-semibold text-purple-600 dark:text-purple-400">
+              • {teacher.designation || "Faculty Member"}
+            </span>
+          </div>
+
+          {/* Quick Clickable Course Badges (Direct links to course pages) */}
+          {courses && courses.length > 0 && (
+            <div className="pt-1.5 space-y-1.5">
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                {language === "bn"
+                  ? "পাঠদানকৃত কোর্সসমূহ (কোর্স পেজ দেখতে ক্লিক করুন):"
+                  : "Conducted Courses (Click to open Course Page):"}
+              </p>
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-1.5">
+                {courses.map((tc) => (
+                  <Link
+                    key={tc.id || tc.course?.code}
+                    href={`/courses/${tc.course?.code}`}
+                    className="group inline-flex items-center gap-1 font-mono text-[11px] font-bold px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white transition-all border border-slate-200 dark:border-slate-700 shadow-sm"
+                    title={`View ${tc.course?.title} page`}
+                  >
+                    <span>{tc.course?.code}</span>
+                    <span className="font-sans font-medium text-slate-400 group-hover:text-blue-100">
+                      • {tc.course?.title}
+                    </span>
+                    <ChevronRight className="w-3 h-3 text-slate-400 group-hover:text-white" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Contact Details */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-300 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <p className="flex items-center gap-2 justify-center md:justify-start">
+              <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+              <span>{teacher.room || "Faculty Room, Level 6"}</span>
+            </p>
+            <p className="flex items-center gap-2 justify-center md:justify-start truncate">
+              <Mail className="w-4 h-4 text-slate-400 shrink-0" />
+              <span className="text-purple-600 dark:text-purple-400 truncate">{teacher.email || "faculty@seu.edu.bd"}</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. MAIN TWO-COLUMN LAYOUT (Sticky left column to eliminate blank space) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* ========================================================================= */}
+        {/* LEFT COLUMN: REVIEWS & STICKY SUMMARY CARD                                */}
+        {/* ========================================================================= */}
+        <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24 lg:self-start">
+          
+          {/* Quick Academic Summary Widget */}
+          <div className="p-5 rounded-3xl bg-gradient-to-br from-blue-50/60 to-purple-50/60 dark:from-slate-900/80 dark:to-slate-800/80 border border-blue-100 dark:border-slate-800 shadow-sm space-y-3">
+            <p className="text-[11px] font-black uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+              <GraduationCap className="w-4 h-4" />
+              <span>{language === "bn" ? "একাডেমিক তথ্য ও সংক্ষিপ্ত বিবরণ" : "Academic Teaching Overview"}</span>
+            </p>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="p-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80">
+                <span className="text-[10px] text-slate-400 font-bold block">
+                  {language === "bn" ? "কোর্সসমূহ" : "Courses"}
+                </span>
+                <span className="text-lg font-black text-slate-900 dark:text-white">{courses.length}</span>
+              </div>
+              <div className="p-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80">
+                <span className="text-[10px] text-slate-400 font-bold block">
+                  {language === "bn" ? "সংরক্ষিত প্রশ্ন" : "Archived Qs"}
+                </span>
+                <span className="text-lg font-black text-purple-600 dark:text-purple-400">{resources.length}</span>
+              </div>
+              <div className="p-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80">
+                <span className="text-[10px] text-slate-400 font-bold block">
+                  {language === "bn" ? "রেটিং" : "Rating"}
+                </span>
+                <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">
+                  {avgRating ? `${avgRating} ⭐` : "N/A"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Student Reviews & Evaluation Header */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+                <span>{language === "bn" ? "শিক্ষার্থীদের রিভিউ ও মূল্যায়ন" : "Student Reviews & Evaluation"}</span>
+              </h2>
+              <span className="text-xs font-semibold text-slate-500">
+                {reviewCount > 0 
+                  ? `${reviewCount} ${language === "bn" ? "টি রিভিউ" : (reviewCount === 1 ? "Review" : "Reviews")} • ${language === "bn" ? "গড়" : "Average"} ${avgRating} ⭐`
+                  : (language === "bn" ? "কোনো রিভিউ দেওয়া হয়নি" : "No reviews yet")}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                if (!isAuthenticated) {
+                  setShowAuthModal(true);
+                  return;
+                }
+                setShowReviewModal(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/20 hover:scale-105 transition-all"
+            >
+              <MessageSquarePlus className="w-3.5 h-3.5" />
+              <span>{language === "bn" ? "রিভিউ দিন" : "Write Review"}</span>
+            </button>
+          </div>
+
+          {/* Student Reviews Feed (Real approved reviews only, clean empty state when no reviews) */}
+          <div className="space-y-3">
+            {reviewCount === 0 ? (
+              <div className="p-8 rounded-3xl bg-slate-50 dark:bg-slate-900/60 border border-dashed border-slate-200 dark:border-slate-800 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-500 flex items-center justify-center mx-auto shadow-sm">
+                  <Star className="w-6 h-6 fill-amber-500/20" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">
+                    {language === "bn" ? "এখনও কোনো রিভিউ দেওয়া হয়নি" : "No Student Reviews Yet"}
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+                    {language === "bn"
+                      ? "এই শিক্ষকের জন্য প্রথম রিভিউ দিন! আপনার মূল্যায়ন সহপাঠীদের কোর্স নির্বাচন ও পরীক্ষার প্রস্তুতিতে সাহায্য করবে।"
+                      : "Be the first student to review this faculty member! Your evaluation helps peers choose courses and prepare for exams."}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      setShowAuthModal(true);
+                      return;
+                    }
+                    setShowReviewModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors"
+                >
+                  <MessageSquarePlus className="w-3.5 h-3.5" />
+                  <span>{language === "bn" ? "প্রথম রিভিউটি দিন" : "Be the First to Review"}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {reviews.slice(0, 2).map((rev) => (
+                  <div key={rev.id} className="space-y-2">
+                    {/* Trait badges with full text visibility and vivid coloring */}
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 px-0.5">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Course:</span>
+                        <span>{rev.courseCode || rev.courseTitle || rev.course?.code || "Course"}</span>
+                      </span>
+
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Personality:</span>
+                        <span>{rev.personality || "Friendly"}</span>
+                      </span>
+
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black border ${
+                        rev.marking?.toLowerCase().includes("strict")
+                          ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                          : rev.marking?.toLowerCase().includes("fair") || rev.marking?.toLowerCase().includes("generous") || rev.marking?.toLowerCase().includes("lenient")
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                          : "bg-sky-500/10 text-sky-400 border-sky-500/30"
+                      }`}>
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Marking:</span>
+                        <span className="whitespace-nowrap">{rev.marking || "Fair & Generous"}</span>
+                      </span>
+
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black border ${
+                        rev.difficulty?.toLowerCase().includes("hard")
+                          ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                          : rev.difficulty?.toLowerCase().includes("easy")
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                          : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                      }`}>
+                        <span className="text-[10px] uppercase font-bold text-slate-400">Difficulty:</span>
+                        <span>{rev.difficulty || "Medium"}</span>
+                      </span>
+                    </div>
+
+                    {/* Review Card Box */}
+                    <div className="p-5 sm:p-6 rounded-2xl bg-[#0d131f] border border-slate-800 text-white shadow-xl space-y-3.5">
+                      {/* Author Row with circular avatar, Name, Date, green Smiley face + star badge */}
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 text-blue-400">
+                            <User className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs sm:text-sm font-bold text-white truncate">
+                              {rev.anonymous
+                                ? (language === "bn" ? "অজ্ঞাতনামা শিক্ষার্থী" : "Anonymous Student")
+                                : (rev.authorName || rev.studentName || "Student")}
+                            </div>
+                            <p className="text-[11px] text-slate-400 font-mono">
+                              {formatReviewDate(rev.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Green Smiley Icon matching demo screenshot + star rating */}
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <div className="flex items-center text-amber-400">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`w-3 h-3 ${
+                                  star <= (rev.rating || 5)
+                                    ? "fill-amber-400 text-amber-400"
+                                    : "text-slate-700"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <Smile className="w-5 h-5 text-emerald-400 shrink-0" />
+                        </div>
+                      </div>
+
+                      {/* Quoted Feedback with Blue Left Border Accent */}
+                      <div className="border-l-2 border-blue-500 pl-3.5 sm:pl-4 py-0.5 text-xs sm:text-sm text-slate-200 leading-relaxed font-normal">
+                        &quot;{rev.comment}&quot;
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {reviewCount > 2 && (
+                  <button
+                    onClick={() => setShowAllReviewsModal(true)}
+                    className="w-full py-2.5 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <span>
+                      {language === "bn"
+                        ? `সকল রিভিউ দেখুন (${reviewCount})`
+                        : `View All Reviews (${reviewCount})`}
+                    </span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* RIGHT COLUMN: COURSES CONDUCTED & COMPACT BALANCED ARCHIVE               */}
+        {/* ========================================================================= */}
+        <div className="lg:col-span-7 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-blue-600" />
+                <span>{language === "bn" ? "পাঠদানকৃত কোর্স ও ম্যাটেরিয়াল আর্কাইভ" : "Courses Taught & Materials Archive"}</span>
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {language === "bn"
+                  ? "সম্পূর্ণ অ্যাকাডেমিক পেজ, হ্যান্ড নোট এবং পরীক্ষার প্রশ্ন দেখতে যেকোনো কোর্সে ক্লিক করুন।"
+                  : "Click any course to open its full academic page, notes, and exam questions."}
+              </p>
+            </div>
+            <Link
+              href="/contribute"
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 shadow-sm transition-all shrink-0"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>{language === "bn" ? "ম্যাটেরিয়াল যুক্ত করুন" : "Contribute Material"}</span>
+            </Link>
+          </div>
+
+          {/* Quick Filter Tabs: All, Theory, Lab */}
+          {courses.length > 0 && (
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="inline-flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 text-xs font-bold border border-slate-200 dark:border-slate-700">
+                <button
+                  onClick={() => setCourseFilter("ALL")}
+                  className={`px-3 py-1.5 rounded-xl transition-all ${
+                    courseFilter === "ALL"
+                      ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  {language === "bn" ? `সকল (${courses.length})` : `All (${courses.length})`}
+                </button>
+                <button
+                  onClick={() => setCourseFilter("THEORY")}
+                  className={`px-3 py-1.5 rounded-xl transition-all ${
+                    courseFilter === "THEORY"
+                      ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  {language === "bn" ? `থিওরি (${theoryCount})` : `Theory (${theoryCount})`}
+                </button>
+                <button
+                  onClick={() => setCourseFilter("LAB")}
+                  className={`px-3 py-1.5 rounded-xl transition-all ${
+                    courseFilter === "LAB"
+                      ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  {language === "bn" ? `ল্যাব (${labCount})` : `Lab (${labCount})`}
+                </button>
+                <button
+                  onClick={() => setCourseFilter("NOTE")}
+                  className={`px-3 py-1.5 rounded-xl transition-all ${
+                    courseFilter === "NOTE"
+                      ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm font-black"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  {language === "bn" ? `নোট (${noteCoursesCount})` : `Notes (${noteCoursesCount})`}
+                </button>
+                <button
+                  onClick={() => setCourseFilter("QUIZ")}
+                  className={`px-3 py-1.5 rounded-xl transition-all ${
+                    courseFilter === "QUIZ"
+                      ? "bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-sm font-black"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  {language === "bn" ? `কুইজ (${quizCoursesCount})` : `Quiz (${quizCoursesCount})`}
+                </button>
+              </div>
+
+              <span className="text-[11px] font-semibold text-slate-400">
+                {language === "bn"
+                  ? `${filteredCourses.length}টির মধ্যে ${displayedCourses.length}টি কোর্স দেখানো হচ্ছে`
+                  : `Showing ${displayedCourses.length} of ${filteredCourses.length} courses`}
+              </span>
+            </div>
+          )}
+
+          {/* Institutional Access Notice */}
+          {courses.length > 0 && (
+            <div className="p-3.5 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 flex items-start gap-2.5 text-xs">
+              <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <p className="text-blue-900 dark:text-blue-200 leading-relaxed text-[11px]">
+                {language === "bn" ? (
+                  <>একটি কোর্স আনলক করলে সেই কোর্সের <strong>সকল শিক্ষকের</strong> লেকচার হ্যান্ড নোট, মিডটার্ম ও ফাইনাল পরীক্ষার প্রশ্নের সম্পূর্ণ অ্যাক্সেস পাওয়া যায়।</>
+                ) : (
+                  <>Unlocking a course provides full access to lecture hand notes, midterm papers, and final questions across <strong>all instructors</strong> teaching that course.</>
+                )}
+              </p>
+            </div>
+          )}
+
+          {/* Grouped Course Cards List */}
+          <div className="space-y-3.5">
+            {displayedCourses.length > 0 ? (
+              displayedCourses.map((tc) => {
+                const courseCode = tc.course?.code;
+                const courseResources = resources.filter(
+                  (r) => r.course?.code?.toLowerCase() === courseCode?.toLowerCase()
+                );
+
+                const noteCount = courseResources.filter(
+                  (r) => r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "DOC_NOTE"
+                ).length;
+                const quizCount = courseResources.filter(
+                  (r) => r.type === "QUIZ_CT" || r.type === "LAB_QUIZ"
+                ).length;
+                const examCount = courseResources.filter(
+                  (r) => r.type === "MID_QUESTION" || r.type === "FINAL_QUESTION" || r.type === "LAB_FINAL"
+                ).length;
+
+                const isExpanded = Boolean(expandedCourseMap[courseCode]);
+
+                return (
+                  <div
+                    key={tc.id}
+                    className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3 hover:border-blue-300 dark:hover:border-blue-800 transition-all"
+                  >
+                    {/* Header Row */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-mono text-xs font-black px-2.5 py-0.5 rounded-lg bg-blue-600 text-white">
+                            {courseCode}
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                            {tc.course?.lab
+                              ? (language === "bn" ? "প্র্যাকটিক্যাল ল্যাব" : "Practical Lab")
+                              : (language === "bn" ? "থিওরি কোর্স" : "Theory Course")}
+                          </span>
+                          <span className="text-[10px] font-semibold text-slate-500">
+                            • {tc.course?.credits} {language === "bn" ? "ক্রেডিট" : "Credits"}
+                          </span>
+                          {tc.section && (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/50">
+                              {tc.section}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="font-black text-base text-slate-900 dark:text-white leading-tight">
+                          {tc.course?.title}
+                        </h3>
+                      </div>
+
+                      {/* Action Buttons: Direct Course Link & Materials Accordion */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {courseResources.length > 0 && (
+                          <button
+                            onClick={() => toggleCourseExpand(courseCode)}
+                            className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition-all"
+                            title={isExpanded ? "Collapse materials" : "Expand materials"}
+                          >
+                            <span>
+                              {courseResources.length} {language === "bn" ? "টি ফাইল" : "Materials"}
+                            </span>
+                            {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+
+                        <Link
+                          href={`/courses/${courseCode}`}
+                          className="inline-flex items-center justify-center gap-1 px-3.5 py-2 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-sm transition-all"
+                        >
+                          <span>{language === "bn" ? "কোর্স পেজ" : "Course Page"}</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    </div>
+
+                    {/* Material Count Summary Badges (Notes, Quiz, Past Exams) */}
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      {noteCount > 0 && (
+                        <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-500/20">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>{noteCount} {language === "bn" ? "হ্যান্ড নোট" : "Notes"}</span>
+                        </span>
+                      )}
+                      {quizCount > 0 && (
+                        <span className="inline-flex items-center gap-1 font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-lg border border-purple-500/20">
+                          <HelpCircle className="w-3 h-3" />
+                          <span>{quizCount} {language === "bn" ? "কুইজ" : "Quiz"}</span>
+                        </span>
+                      )}
+                      {examCount > 0 && (
+                        <span className="inline-flex items-center gap-1 font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-lg border border-blue-500/20">
+                          <FileQuestion className="w-3 h-3" />
+                          <span>{examCount} {language === "bn" ? "বিগত পরীক্ষা" : "Past Exams"}</span>
+                        </span>
+                      )}
+                      {noteCount === 0 && quizCount === 0 && examCount === 0 && (
+                        <span className="text-[11px] text-slate-400">
+                          {language === "bn" ? "কোনো মেটেরিয়াল আর্কাইভ পাওয়া যায়নি" : "No archived files yet"}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Expandable Materials Accordion */}
+                    {isExpanded && courseResources.length > 0 && (
+                      <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800 animate-in fade-in duration-200">
+                        {courseResources.map((res) => (
+                          <div
+                            key={res.id}
+                            className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs hover:border-purple-300 dark:hover:border-purple-800 transition-all"
+                          >
+                            <div className="space-y-0.5 pr-2">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`font-mono text-[9px] font-bold px-2 py-0.5 rounded ${
+                                    res.type === "NOTE" || res.type === "LAB_HAND_NOTE"
+                                      ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400"
+                                      : res.type === "QUIZ_CT" || res.type === "LAB_QUIZ"
+                                      ? "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400"
+                                      : res.type === "DOC_NOTE"
+                                      ? "bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-400"
+                                      : res.type === "PROJECT_LINK"
+                                      ? "bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-400"
+                                      : "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400"
+                                  }`}
+                                >
+                                  {res.type === "NOTE" || res.type === "LAB_HAND_NOTE"
+                                    ? (language === "bn" ? "হ্যান্ড নোট" : "Note")
+                                    : res.type === "QUIZ_CT" || res.type === "LAB_QUIZ"
+                                    ? (language === "bn" ? "কুইজ" : "Quiz")
+                                    : res.type === "MID_QUESTION"
+                                    ? (language === "bn" ? "মিড প্রশ্ন" : "Mid Exam")
+                                    : res.type === "FINAL_QUESTION"
+                                    ? (language === "bn" ? "ফাইনাল প্রশ্ন" : "Final Exam")
+                                    : res.type === "DOC_NOTE"
+                                    ? (language === "bn" ? "ডক নোট" : "Doc Note")
+                                    : res.type === "PROJECT_LINK"
+                                    ? (language === "bn" ? "প্রজেক্ট" : "Project")
+                                    : (language === "bn" ? "ল্যাব ফাইল" : "Lab Material")}
+                                </span>
+                                <span className="font-bold text-slate-900 dark:text-white truncate">
+                                  {res.title}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-400">
+                                {res.semesterName || "Fall 2026"} ({res.academicYear || 2026}) • {language === "bn" ? "ভেরিফাইড আর্কাইভ" : "Verified Archive"}
+                              </p>
+                            </div>
+
+                            <button
+                              onClick={() => setActiveResource(res)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl font-bold text-xs text-white bg-purple-600 hover:bg-purple-700 shadow-sm transition-all shrink-0"
+                            >
+                              <span>{language === "bn" ? "প্রিভিউ" : "Preview"}</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : courses.length === 0 ? (
+              <div className="p-10 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center space-y-3 shadow-sm">
+                <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto shadow-sm">
+                  <BookOpen className="w-7 h-7" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-black text-slate-900 dark:text-white text-base">
+                    {language === "bn" ? "বর্তমানে কোনো কোর্স নির্ধারিত নেই" : "No Courses Assigned Currently"}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+                    {language === "bn"
+                      ? "প্রশাসন কর্তৃক এই শিক্ষকের জন্য এখনো কোনো কোর্স অ্যাসাইন করা হয়নি। অ্যাডমিন কোর্স অ্যাসাইন করলে তা স্বয়ংক্রিয়ভাবে এখানে প্রদর্শিত হবে।"
+                      : "Administration has not assigned any active courses to this faculty member yet. When assigned by an admin, conducted course tags and archive materials will automatically appear here."}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 rounded-3xl bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 text-center space-y-3">
+                <BookOpen className="w-8 h-8 text-slate-400 mx-auto" />
+                <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm">
+                  {language === "bn" ? "এই ফিল্টারের অধীনে কোনো কোর্স পাওয়া যায়নি" : "No courses found under this filter"}
+                </h3>
+                <button
+                  onClick={() => setCourseFilter("ALL")}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-blue-600 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800"
+                >
+                  {language === "bn" ? `সকল কোর্স দেখুন (${courses.length})` : `View All Courses (${courses.length})`}
+                </button>
+              </div>
+            )}
+
+            {/* "See More Courses" / "Show Less" Expand Button */}
+            {filteredCourses.length > 3 && (
+              <div className="text-center pt-2">
+                <button
+                  onClick={() => setShowAllCourses(!showAllCourses)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl font-bold text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all shadow-sm active:scale-95"
+                >
+                  {showAllCourses ? (
+                    <>
+                      <span>{language === "bn" ? "কম কোর্স দেখান (শীর্ষ ৩টি)" : "Show Fewer Courses (Show Top 3)"}</span>
+                      <ChevronUp className="w-4 h-4" />
+                    </>
+                  ) : (
+                    <>
+                      <span>
+                        {language === "bn"
+                          ? `আরও কোর্স দেখুন (+${remainingCount}টি কোর্স)`
+                          : `See More Courses (+${remainingCount} more courses)`}
+                      </span>
+                      <ChevronDown className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Pro Tip Box (Mirroring seu-ratemyfaculty.onrender.com) */}
+          <div className="p-4 rounded-3xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 flex items-start gap-3 text-xs">
+            <Lightbulb className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-extrabold text-amber-900 dark:text-amber-200 text-xs">
+                {language === "bn" ? "পরীক্ষার প্রস্তুতির প্রো টিপ" : "Exam Prep Pro Tip"}
+              </p>
+              <p className="text-amber-800/90 dark:text-amber-300 mt-0.5 leading-relaxed text-[11px]">
+                {language === "bn"
+                  ? `${teacher.name}-এর পরীক্ষায় ভালো ফলাফলের জন্য সাউথইস্ট ইউনিভার্সিটির সিলেবাসের পাশাপাশি বিগত বছরের প্রশ্ন ও ক্লাসের গুরুত্বপূর্ণ টপিকগুলো ভালোভাবে অনুশীলন করুন।`
+                  : `Always check the Southeast University syllabus along with previous year questions to ensure you are studying relevant topics emphasized by ${teacher.name}.`}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* PDF Modal Viewer */}
+      {activeResource && (
+        <PDFViewerModal
+          isOpen={true}
+          onClose={() => setActiveResource(null)}
+          resource={activeResource}
+          courseCode={activeResource.course?.code || "CSE"}
+          isUnlocked={Boolean(activeResource.fileUrl)}
+          onUnlockedSuccess={() => {
+            if (id) {
+              api.resources.getByTeacher(id).then((rData) => setResources(rData || []));
+            }
+          }}
+        />
+      )}
+
+      {/* 3. SUBMIT REVIEW MODAL */}
+      {showReviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-5 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                  <Star className="w-5 h-5 fill-amber-500" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    {language === "bn" ? "শিক্ষক মূল্যায়ন ও রিভিউ" : "Faculty Review & Evaluation"}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    {teacher.name} {teacher.initial ? `[${teacher.initial}]` : ""}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowReviewModal(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitReview} className="space-y-4">
+              {/* Course Selection */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  {language === "bn" ? "কোর্স নির্বাচন করুন *" : "Which Course Did You Take? *"}
+                </label>
+                {courses.length > 0 ? (
+                  <select
+                    value={newCourseCode}
+                    onChange={(e) => setNewCourseCode(e.target.value)}
+                    className="w-full p-2.5 rounded-xl text-xs font-medium bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    {courses.map((c) => {
+                      const code = c.course?.code || c.code;
+                      const title = c.course?.title || c.title;
+                      return (
+                        <option key={code} value={code}>
+                          {code} - {title}
+                        </option>
+                      );
+                    })}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    maxLength={15}
+                    value={newCourseCode}
+                    onChange={(e) => setNewCourseCode(e.target.value)}
+                    placeholder="e.g. CSE241, CSE181"
+                    className="w-full p-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                )}
+              </div>
+
+              {/* Already Reviewed Warning Alert */}
+              {hasReviewedCourse && (
+                <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-300">
+                  <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold">
+                      {language === "bn" ? "ইতিমধ্যে মূল্যায়ন দেওয়া হয়েছে" : "Already Evaluated"}
+                    </p>
+                    <p className="text-[11px] mt-0.5 opacity-90 leading-relaxed">
+                      {language === "bn"
+                        ? "আপনি ইতিমধ্যে এই কোর্সের জন্য রিভিউ দিয়েছেন। কোর্স প্রতি একজন শিক্ষার্থী কেবল একটি রিভিউ দিতে পারেন।"
+                        : "You have already submitted an evaluation for this course. Each student can evaluate a course once."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Teaching Traits: Personality, Marking, Difficulty */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                    {language === "bn" ? "ব্যক্তিত্ব *" : "Personality *"}
+                  </label>
+                  <select
+                    value={newPersonality}
+                    onChange={(e) => setNewPersonality(e.target.value)}
+                    className="w-full p-2 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Friendly">{language === "bn" ? "বন্ধুত্বপূর্ণ (Friendly)" : "Friendly"}</option>
+                    <option value="Helpful">{language === "bn" ? "সহযোগিতাপূর্ণ (Helpful)" : "Helpful"}</option>
+                    <option value="Strict">{language === "bn" ? "কঠোর (Strict)" : "Strict"}</option>
+                    <option value="Supportive">{language === "bn" ? "সাপোর্টিভ (Supportive)" : "Supportive"}</option>
+                    <option value="Professional">{language === "bn" ? "পেশাদার (Professional)" : "Professional"}</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                    {language === "bn" ? "মার্কিং স্টাইল *" : "Marking *"}
+                  </label>
+                  <select
+                    value={newMarking}
+                    onChange={(e) => setNewMarking(e.target.value)}
+                    className="w-full p-2 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Fair & Generous">{language === "bn" ? "উদার ও চমৎকার (Fair & Generous)" : "Fair & Generous"}</option>
+                    <option value="Average">{language === "bn" ? "মাঝারি (Average)" : "Average"}</option>
+                    <option value="Strict">{language === "bn" ? "কঠিন (Strict)" : "Strict"}</option>
+                    <option value="Lenient">{language === "bn" ? "সহজ (Lenient)" : "Lenient"}</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                    {language === "bn" ? "কঠিনতা *" : "Difficulty *"}
+                  </label>
+                  <select
+                    value={newDifficulty}
+                    onChange={(e) => setNewDifficulty(e.target.value)}
+                    className="w-full p-2 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Easy">{language === "bn" ? "সহজ (Easy)" : "Easy"}</option>
+                    <option value="Medium">{language === "bn" ? "মাঝারি (Medium)" : "Medium"}</option>
+                    <option value="Hard">{language === "bn" ? "কঠিন (Hard)" : "Hard"}</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Mandatory Star Rating Picker */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                  <span>{language === "bn" ? "রেটিং দিন *" : "Overall Faculty Rating *"}</span>
+                  <span className="text-amber-500 font-extrabold text-xs">
+                    {newRating === 5 && (language === "bn" ? "৫/৫ - চমৎকার (Excellent)" : "5/5 - Excellent")}
+                    {newRating === 4 && (language === "bn" ? "৪/৫ - খুব ভালো (Very Good)" : "4/5 - Very Good")}
+                    {newRating === 3 && (language === "bn" ? "৩/৫ - ভালো (Good)" : "3/5 - Good")}
+                    {newRating === 2 && (language === "bn" ? "২/৫ - চলনসই (Fair)" : "2/5 - Fair")}
+                    {newRating === 1 && (language === "bn" ? "১/৫ - দুর্বল (Needs Improvement)" : "1/5 - Poor")}
+                  </span>
+                </label>
+                <div className="flex items-center gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 justify-center">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setNewRating(star)}
+                      className="p-1 hover:scale-125 transition-transform"
+                    >
+                      <Star
+                        className={`w-7 h-7 transition-colors ${
+                          star <= newRating
+                            ? "text-amber-500 fill-amber-500 drop-shadow-sm"
+                            : "text-slate-300 dark:text-slate-600 hover:text-amber-400"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Review Comment Textarea */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  {language === "bn" ? "আপনার বিস্তারিত অভিজ্ঞতা লিখুন *" : "Your Evaluation & Review *"}
+                </label>
+                <textarea
+                  rows={3}
+                  minLength={10}
+                  maxLength={500}
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder={
+                    language === "bn"
+                      ? "শিক্ষকের পড়ানোর ধরণ, ক্লাসের স্লাইড, কাউন্সেলিং আওয়ার এবং পরীক্ষার প্রশ্ন সম্পর্কে আপনার বাস্তব অভিজ্ঞতা লিখুন..."
+                      : "Describe teaching style, lecture clarity, helpfulness in counseling hours, and exam question patterns..."
+                  }
+                  className="w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-white"
+                  required
+                />
+                <div className="flex items-center justify-between text-[11px] px-1">
+                  {newComment.length > 0 && newComment.trim().length < 10 ? (
+                    <span className="text-amber-500 font-medium">
+                      {10 - newComment.trim().length} {language === "bn" ? "অক্ষর আরও প্রয়োজন (কমপক্ষে ১০)" : "more characters needed (min 10)"}
+                    </span>
+                  ) : newComment.trim().length >= 10 ? (
+                    <span className="text-emerald-500 font-medium">
+                      ✓ {language === "bn" ? "নূন্যতম দৈর্ঘ্য পূরণ হয়েছে" : "Minimum length met"}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">
+                      {language === "bn" ? "কমপক্ষে ১০ অক্ষর" : "Minimum 10 characters"}
+                    </span>
+                  )}
+                  <span className={`font-mono ${newComment.length >= 480 ? "text-amber-500 font-bold" : "text-slate-400"}`}>
+                    {newComment.length}/500
+                  </span>
+                </div>
+              </div>
+
+              {/* Anonymous vs Named Toggle */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 space-y-2">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                  {language === "bn" ? "রিভিউ পরিচিতি নির্বাচন করুন" : "Choose Identity for this Review:"}
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewIsAnonymous(true)}
+                    className={`p-2.5 rounded-xl text-left border transition-all flex items-center gap-2 ${
+                      newIsAnonymous
+                        ? "bg-purple-50 dark:bg-purple-950/40 border-purple-500 text-purple-700 dark:text-purple-300 font-bold shadow-sm"
+                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
+                    }`}
+                  >
+                    <EyeOff className="w-4 h-4 shrink-0 text-purple-600 dark:text-purple-400" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold truncate">
+                        {language === "bn" ? "অজ্ঞাতনামা শিক্ষার্থী" : "Anonymous Student"}
+                      </p>
+                      <p className="text-[10px] text-slate-400 truncate">
+                        {language === "bn" ? "নাম সম্পূর্ণ গোপন থাকবে" : "Identity completely hidden"}
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setNewIsAnonymous(false)}
+                    className={`p-2.5 rounded-xl text-left border transition-all flex items-center gap-2 ${
+                      !newIsAnonymous
+                        ? "bg-blue-50 dark:bg-blue-950/40 border-blue-500 text-blue-700 dark:text-blue-300 font-bold shadow-sm"
+                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
+                    }`}
+                  >
+                    <User className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold truncate">
+                        {user?.name || (language === "bn" ? "আমার নাম দেখাও" : "Show My Name")}
+                      </p>
+                      <p className="text-[10px] text-slate-400 truncate">
+                        {language === "bn" ? "পাবলিকলি নাম দেখাবে" : "Show name on review"}
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowReviewModal(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  {language === "bn" ? "বাতিল" : "Cancel"}
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingReview || hasReviewedCourse || checkingReviewStatus}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submittingReview
+                    ? (language === "bn" ? "জমা হচ্ছে..." : "Submitting...")
+                    : hasReviewedCourse
+                    ? (language === "bn" ? "রিভিউ সম্পন্ন হয়েছে" : "Already Evaluated")
+                    : (language === "bn" ? "রিভিউ জমা দিন" : "Submit Review")}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. VIEW ALL REVIEWS MODAL */}
+      {showAllReviewsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className="w-full max-w-2xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-7 space-y-4 max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                  <Star className="w-5 h-5 fill-amber-500" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    {language === "bn" ? "সকল শিক্ষার্থী রিভিউ" : "All Student Reviews"} ({reviews.length})
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {teacher.name} • {language === "bn" ? `গড় রেটিং ${avgRating} ⭐` : `Average Rating ${avgRating} ⭐`}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAllReviewsModal(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Scrollable Reviews List matching media_1793343309179_a0fafd75.png */}
+            <div className="overflow-y-auto space-y-6 pr-1 flex-1">
+              {reviews.map((rev) => (
+                <div key={rev.id} className="space-y-2">
+                  {/* Trait badges with full text visibility and vivid coloring */}
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 px-0.5">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <span className="text-[10px] uppercase font-bold text-slate-400">Course:</span>
+                      <span>{rev.courseCode || rev.courseTitle || rev.course?.code || "Course"}</span>
+                    </span>
+
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                      <span className="text-[10px] uppercase font-bold text-slate-400">Personality:</span>
+                      <span>{rev.personality || "Friendly"}</span>
+                    </span>
+
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black border ${
+                      rev.marking?.toLowerCase().includes("strict")
+                        ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                        : rev.marking?.toLowerCase().includes("fair") || rev.marking?.toLowerCase().includes("generous") || rev.marking?.toLowerCase().includes("lenient")
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                        : "bg-sky-500/10 text-sky-400 border-sky-500/30"
+                    }`}>
+                      <span className="text-[10px] uppercase font-bold text-slate-400">Marking:</span>
+                      <span className="whitespace-nowrap">{rev.marking || "Fair & Generous"}</span>
+                    </span>
+
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black border ${
+                      rev.difficulty?.toLowerCase().includes("hard")
+                        ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                        : rev.difficulty?.toLowerCase().includes("easy")
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                        : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                    }`}>
+                      <span className="text-[10px] uppercase font-bold text-slate-400">Difficulty:</span>
+                      <span>{rev.difficulty || "Medium"}</span>
+                    </span>
+                  </div>
+
+                  {/* Review Card Box */}
+                  <div className="p-5 rounded-2xl bg-[#0d131f] border border-slate-800 text-white shadow-lg space-y-3.5">
+                    {/* Author Row with circular avatar, Name, Date, green Smiley face + star badge */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 text-blue-400">
+                          <User className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs sm:text-sm font-bold text-white truncate">
+                            {rev.anonymous
+                              ? (language === "bn" ? "অজ্ঞাতনামা শিক্ষার্থী" : "Anonymous Student")
+                              : (rev.authorName || rev.studentName || "Student")}
+                          </div>
+                          <p className="text-[11px] text-slate-400 font-mono">
+                            {formatReviewDate(rev.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Green Smiley Icon matching demo screenshot + star rating */}
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <div className="flex items-center text-amber-400">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`w-3 h-3 ${
+                                star <= (rev.rating || 5)
+                                  ? "fill-amber-400 text-amber-400"
+                                  : "text-slate-700"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <Smile className="w-5 h-5 text-emerald-400 shrink-0" />
+                      </div>
+                    </div>
+
+                    {/* Quoted Feedback with Blue Left Border Accent */}
+                    <div className="border-l-2 border-blue-500 pl-3.5 sm:pl-4 py-0.5 text-xs sm:text-sm text-slate-200 leading-relaxed font-normal">
+                      &quot;{rev.comment}&quot;
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-slate-400">
+                {language === "bn" ? "প্রশাসক দ্বারা অনুমোদিত রিভিউ প্রদর্শিত হচ্ছে" : "Verified & approved reviews only"}
+              </span>
+              <button
+                onClick={() => setShowAllReviewsModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              >
+                {language === "bn" ? "বন্ধ করুন" : "Close"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

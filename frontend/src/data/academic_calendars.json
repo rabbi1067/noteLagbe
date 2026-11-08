@@ -1,0 +1,2226 @@
+{
+  "calendars": {
+    "2026": [
+      {
+        "semester": "Spring - 2026",
+        "items": [
+          {
+            "date": "Dec 28 - 31",
+            "description": "Pre-registration for Spring 2026 (From Fall 2025)",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "Jan 23",
+            "description": "Holiday (Saraswati Puja) *",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 01",
+            "description": "Registration begins for Spring 2026",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 04",
+            "description": "Holiday (Shab-e-Barat)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 11",
+            "description": "Registration ends",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 11 - 12",
+            "description": "Orientation of newly admitted students",
+            "category": "orientation",
+            "isHighlight": true
+          },
+          {
+            "date": "Feb 15",
+            "description": "Classes begin",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "Feb 21",
+            "description": "Holiday (Shaheed Dibash & International Mother Language Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 28",
+            "description": "Last date for Course ADD/DROP",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "March 02",
+            "description": "Last date for payment of 1st installment (40%) without late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "March 03-08",
+            "description": "Payment with Late Fine Tk. 500 for Registration",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "March 08",
+            "description": "Last date for payment of 1st installment (40%) with late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "March 12",
+            "description": "Last date of Semester Drop with full adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "March 14",
+            "description": "Student Attendance Disabling with Late Fine Tk. 500 + Tk. 50 per day",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "March 15",
+            "description": "Last date of Semester Withdrawal with 50% adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "March 16 - 25",
+            "description": "Holiday (Jummatul Bida, Lailatul Qadr & Eid-ul-Fitr)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "March 26",
+            "description": "Holiday (Independence Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "April 08",
+            "description": "Last date for payment of 2nd installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "April 11",
+            "description": "Last date of Self-issuance of Admit Card for Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "April 12 - 21",
+            "description": "Midterm Examination (8 Days)",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "April 14",
+            "description": "Holiday (Bangla Nababorsho)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "April 23",
+            "description": "Course Offering for Summer 2026 uploaded",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "May 01",
+            "description": "Holiday (May Day & Buddha Purnima)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "May 04",
+            "description": "Last date of Withdrawal with \"W\" Grade without adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "May 11 - 14",
+            "description": "Pre-registration for Summer 2026",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "May 15 - 20",
+            "description": "Teaching Evaluation",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "May 22 - June 01",
+            "description": "Holiday (Eid-ul-Azha)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "June 11",
+            "description": "Last date for payment of Final installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "June 11",
+            "description": "Last Date of Classes (UG-Regular)",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "June 12",
+            "description": "Last Date of Classes (UG-Diploma & Master's)",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "June 12",
+            "description": "Last date of Self-issuance of Admit card for Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "June 13 - 20",
+            "description": "Final Examination (8 Days)",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "June 22",
+            "description": "Last date of Grade Submission",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "June 23",
+            "description": "Announcement of Exam Results",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "June 21 - 29",
+            "description": "Semester Break (9 Days)",
+            "category": "semester_break",
+            "isHighlight": true
+          },
+          {
+            "date": "June 30",
+            "description": "Academic Council Meeting",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "June 30",
+            "description": "Classes begin of Summer Semester 2026",
+            "category": "class",
+            "isHighlight": true
+          }
+        ]
+      },
+      {
+        "semester": "Summer - 2026",
+        "items": [
+          {
+            "date": "May 11 - 14",
+            "description": "Pre-registration for Summer 2026 (From Spring 2026)",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "June 24",
+            "description": "Registration begins for Summer 2026",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "June 26",
+            "description": "Holiday (Ashura)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "June 29",
+            "description": "Registration ends",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "June 29",
+            "description": "Orientation of newly admitted students",
+            "category": "orientation",
+            "isHighlight": true
+          },
+          {
+            "date": "June 30",
+            "description": "Classes begin",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "July 11",
+            "description": "Last date for Course ADD/DROP",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "July 13",
+            "description": "Last date for payment of 1st installment (40%) without late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "July 14 - 15",
+            "description": "Payment with Late Fine Tk. 500 for Registration",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "July 13",
+            "description": "Last date for payment of 1st installment (40%) with late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "July 16",
+            "description": "Last date of Semester Drop with full adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "July 18",
+            "description": "Student Attendance Disabling with Late Fine Tk. 500 + Tk. 50 per day",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "July 19",
+            "description": "Last date of Semester Drop with 50% adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 5",
+            "description": "July Mass Upraising Day/July Gono-obbhutthan Dibos",
+            "category": "general",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 12",
+            "description": "Last date for payment of 2nd installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 13",
+            "description": "Last date of Self-Issuance of Admit Card for Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Aug 15 - 22",
+            "description": "Midterm Examination (8 Days)",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Aug 23",
+            "description": "Course offering for Fall 2026 uploaded",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 25",
+            "description": "Last date of withdrawal with \"W\" Grade without adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 26",
+            "description": "Holiday (Eid-e-Miladun-Nabi)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 27 -31",
+            "description": "Pre-registration for Fall 2026",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "Sept 04",
+            "description": "Holiday (Janmashtami)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Sept 18 - 21",
+            "description": "Teaching Evaluation",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 01",
+            "description": "Last date for payment of final installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 01",
+            "description": "Last Date of Classes (UG-Regular)",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 03",
+            "description": "Last Date of Classes (UG-Diploma & Master's)",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 03",
+            "description": "Last date of Self-Issuance of Admit Card for Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 04-11",
+            "description": "Final Examination (8 Days)",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 13",
+            "description": "Last date of Grade Submission",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 14",
+            "description": "Announcement of Exam Results",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 12 - 24",
+            "description": "Semester Break (13 Days)",
+            "category": "semester_break",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 22",
+            "description": "Academic Council Meeting",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 25",
+            "description": "Classes begin of Fall Semester 2026",
+            "category": "class",
+            "isHighlight": true
+          }
+        ]
+      },
+      {
+        "semester": "Fall - 2026",
+        "items": [
+          {
+            "date": "Aug 27-31",
+            "description": "Pre-registration for Fall 2026 (From Summer 2026)",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 14",
+            "description": "Registration begins for Fall 2026",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 18",
+            "description": "Orientation of newly admitted students",
+            "category": "orientation",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 19",
+            "description": "Registration ends",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 20 -21",
+            "description": "Holiday (Durga Puja)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 25",
+            "description": "Classes begin",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 29",
+            "description": "Last date for Course ADD/ DROP",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "Nov 05",
+            "description": "Last date for payment of 1st installment (40%) without late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Nov 08",
+            "description": "Last date for payment of 1st installment (40%) with late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Nov 07",
+            "description": "Holiday (National Revolution & Solidarity Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Nov 09",
+            "description": "Last date of Semester Drop with full adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "Nov 12",
+            "description": "Last date of Semester Drop with 50% adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "Nov 30",
+            "description": "Last date for payment of 2nd installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 01",
+            "description": "Last date of Self-Issuance of Admit Card for Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Dec 01 - 08",
+            "description": "Midterm Examination (8 Days)",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Dec 16",
+            "description": "Holiday (Victory Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 17",
+            "description": "Last date of withdrawal with \"W\" Grade without adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 24",
+            "description": "Course offering for Spring 2027 uploaded",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 25",
+            "description": "Holiday (Christmas Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 29 - 31",
+            "description": "Pre-registration for Spring Semester 2027",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "Jan 04 - 09 , 2027",
+            "description": "Teaching Evaluation",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Jan 14, 2027",
+            "description": "Last date for payment of final installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Jan 14, 2027",
+            "description": "Last Date of Classes (UG-Regular)",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "Jan 16, 2027",
+            "description": "Last Date of Classes (UG-Diploma & Master's)",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "Jan 17, 2027",
+            "description": "Last date of Self-issuance of Admit card for Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Jan 17 - 24, 2027",
+            "description": "Final Examination (8 Days)",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Jan 26, 2027",
+            "description": "Last date of Grade Submission",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "Jan 27, 2027",
+            "description": "Announcement of Exam Results",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "Jan 25 - Feb 02, 2027",
+            "description": "Semester Break (9 Days)",
+            "category": "semester_break",
+            "isHighlight": true
+          },
+          {
+            "date": "Feb 11, 2027",
+            "description": "Academic Council Meeting",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 03 , 2027",
+            "description": "Classes begin of Spring 2027",
+            "category": "class",
+            "isHighlight": true
+          }
+        ]
+      }
+    ],
+    "2025": [
+      {
+        "semester": "Spring  2025",
+        "items": [
+          {
+            "date": "Jan 06 - 09",
+            "description": "Pre-registration for Spring 2025",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 03",
+            "description": "Holiday (Saraswati Puja) *",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 09",
+            "description": "Registration begins for Spring 2025",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 15",
+            "description": "Holiday (Shab-e-Barat)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 19 - 20",
+            "description": "Orientation of newly admitted students",
+            "category": "orientation",
+            "isHighlight": true
+          },
+          {
+            "date": "Feb 20",
+            "description": "Registration ends",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 21",
+            "description": "Holiday (Shaheed Dibash & International Mother Language Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 23",
+            "description": "Classes begin",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "March 03",
+            "description": "Last date for payment of 1st installment (40%) without late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "March 10",
+            "description": "Last date for payment of 1st installment (40%) with late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "March 17",
+            "description": "Last date of Semester Drop with full adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "March 20",
+            "description": "Last date of Semester Drop with 50% adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "March 24",
+            "description": "Last date for payment of 2nd installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "March 25",
+            "description": "Last date of Self-Issuance of Admit Card for Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "March 26",
+            "description": "Holiday (Independence Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "March 27 - April 06",
+            "description": "Holiday (Jummatul Bida, Lailatul Qadr & Eid-ul-Fitr)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "April 14",
+            "description": "Holiday (Bangla Nababorsho)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "April 15 - 21",
+            "description": "Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "May 01",
+            "description": "Holiday (May Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "May 04",
+            "description": "Course Offering for Summer 2025 uploaded",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "May 07",
+            "description": "Last date of Withdrawal with \"W\" Grade without adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "May 11",
+            "description": "Holiday (Buddha Purnima)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "May 12 - 15",
+            "description": "Pre-registration for Summer 2025",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "May 21 - 23",
+            "description": "Teaching Evaluation",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "May 31",
+            "description": "Last Date of Classes (UG-Diploma & Master's)",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "June 03",
+            "description": "Last date of Self-issuance of Admit card for Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "June 04",
+            "description": "Last Date of Classes (UG-Regular)",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "June 05 - 14",
+            "description": "Holiday (Eid-ul-Azha)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "June 16 - 22",
+            "description": "Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "June 23",
+            "description": "Last date of Grade Submission",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "June 24",
+            "description": "Announcement of Exam Results",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "June 23 - July 06",
+            "description": "Semester Break (14 Days)",
+            "category": "semester_break",
+            "isHighlight": true
+          }
+        ]
+      },
+      {
+        "semester": "Summer 2025",
+        "items": [
+          {
+            "date": "May 12 - 15",
+            "description": "Pre-registration for Summer 2025",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "June 25",
+            "description": "Registration begins for Summer 2025",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "July 02 - 03",
+            "description": "Orientation of newly admitted students",
+            "category": "orientation",
+            "isHighlight": true
+          },
+          {
+            "date": "July 03",
+            "description": "Registration ends",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "July 06",
+            "description": "Holiday (Ashura)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "July 07",
+            "description": "Classes begin",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "July 14",
+            "description": "Last date for Course ADD/DROP",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "July 20",
+            "description": "Last date for payment of 1st installment (40%) without late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "July 21-23",
+            "description": "Payment with Late Fine Tk. 500 for Registration",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "July 22",
+            "description": "Last date of Semester Drop with full adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "July 24",
+            "description": "Student Attendance Disabling with Late Fine Tk. 500 + Tk. 50 per day",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "July 28",
+            "description": "Last date of Semester Drop with 50% adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 13",
+            "description": "Last date for payment of 2nd installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 14",
+            "description": "Last date of Self-Issuance of Admit Card for Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Aug 15 - 22",
+            "description": "Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Aug 16",
+            "description": "Holiday (Janmashtami)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 25",
+            "description": "Course offering for Fall 2025 uploaded",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 28",
+            "description": "Last date of withdrawal with \"W\" Grade without adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Sept 03 - 10",
+            "description": "Pre-registration for Fall 2025",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "Sept 06",
+            "description": "Holiday (Eid-e-Miladun-Nabi)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Sept 16 - 18",
+            "description": "Teaching Evaluation",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Sept 30",
+            "description": "Last Date of Classes (UG-Regular)",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 01 - 02",
+            "description": "Holiday (Durga Puja)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 05",
+            "description": "Last date for payment of final installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 05",
+            "description": "Last date of Self-Issuance of Admit Card for Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 05",
+            "description": "Last Date of Classes (UG-Diploma & Master's)",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 10 - 19",
+            "description": "Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 20",
+            "description": "Last date of Grade Submission",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 22",
+            "description": "Announcement of Exam Results",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 20 - 25",
+            "description": "Semester Break (6 Days)",
+            "category": "semester_break",
+            "isHighlight": true
+          }
+        ]
+      },
+      {
+        "semester": "Fall 2025",
+        "items": [
+          {
+            "date": "Sept 03 - 10",
+            "description": "Pre-registration for Fall 2025",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 15",
+            "description": "Registration begins for Fall 2025",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 22 - 23",
+            "description": "Orientation of newly admitted students",
+            "category": "orientation",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 23",
+            "description": "Registration ends",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 26",
+            "description": "Classes begin",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "Nov 04",
+            "description": "Last date for Course ADD/ DROP",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "Nov 06",
+            "description": "Last date for payment of 1st installment (40%) without late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Nov 07 - 10",
+            "description": "Payment with Late Fine Tk. 500 for Registration",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Nov 13",
+            "description": "Last date of Semester Drop with full adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "Nov 20",
+            "description": "Last date of Semester Drop with 50% adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 02",
+            "description": "Last date for payment of 2nd installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 04",
+            "description": "Last date of Self-Issuance of Admit Card for Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Dec 07 - 13",
+            "description": "Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Dec 15",
+            "description": "Course offering for Spring 2026 uploaded",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 16",
+            "description": "Holiday (Victory Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 21",
+            "description": "Last date of withdrawal with \"W\" Grade without adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 25",
+            "description": "Holiday (Christmas Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 28 - 31",
+            "description": "Pre-registration for Spring Semester 2026",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "Jan 11 - 15, 2026",
+            "description": "Teaching Evaluation",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Jan 21, 2026",
+            "description": "Last date for payment of final installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Jan 22, 2026",
+            "description": "Last date of Self-issuance of Admit card for Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Jan 22, 2026",
+            "description": "Last Date of Classes (UG-Regular)",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "Jan 23, 2026",
+            "description": "Holiday (Saraswati Puja) *",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Jan 24, 2026",
+            "description": "Last Date of Classes (UG-Diploma & Master's)",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "Jan 25 - 31, 2026",
+            "description": "Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Feb 02, 2026",
+            "description": "Last date of Grade Submission",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "Feb 03, 2026",
+            "description": "Announcement of Exam Results",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "Feb 01 - 14, 2026",
+            "description": "Semester Break (14 Days)",
+            "category": "semester_break",
+            "isHighlight": true
+          }
+        ]
+      }
+    ],
+    "2024": [
+      {
+        "semester": "Spring 2024",
+        "items": [
+          {
+            "date": "January 02-07",
+            "description": "Pre-registration for Spring 2024",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "February 10",
+            "description": "Registration begins for Spring 2024",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "February 14",
+            "description": "Holiday (Saraswati Puja)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "February 17",
+            "description": "Registration ends",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "February 18",
+            "description": "Classes begin",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "February 19-23",
+            "description": "Orientation of newly admitted students",
+            "category": "orientation",
+            "isHighlight": true
+          },
+          {
+            "date": "February 21",
+            "description": "Holiday (Shaheed Dibash)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "February 26",
+            "description": "Holiday (Shab-e-Barat)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "February 28",
+            "description": "Last date for Course Add/Drop",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "March 04",
+            "description": "Last date for payment of 1st installment (40%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "March 11",
+            "description": "Last date for payment of 1st installment(40%) with late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "March 17",
+            "description": "Holiday (Birthday of Bangabandhu Sheikh Mujibur Rahman)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "March 18",
+            "description": "Last date of Semester Drop with full adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "March 21",
+            "description": "Last date of Semester Drop with 50% adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "March 26",
+            "description": "Holiday (Independence Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "March 27",
+            "description": "Last date for payment of 2nd installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "March 27",
+            "description": "Last date of Self-issuance of Admit Card for Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "March 28 - April 04",
+            "description": "Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "April 05-15",
+            "description": "Holiday (Jummatul Bida, Lailatul Qadr, Eid-ul-Fitr & Bangla Noboborsho)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "May 01",
+            "description": "Holiday (May Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "May 05",
+            "description": "Course Offering for Summer 2024 uploaded",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "May 08",
+            "description": "Last date of withdrawal with \"W\" Grade without adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "May 13-20",
+            "description": "Pre-registration for Summer 2024",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "May 21 - 23",
+            "description": "Teaching Evaluation",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "May 22",
+            "description": "Holiday (Buddha Purnima) *",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "June 02",
+            "description": "Last date for payment of Final installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "June 04",
+            "description": "Last date of Self-issuance of Admit Card for Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "June 06 - 13",
+            "description": "Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "June 14 - 23",
+            "description": "Holiday (Eid-ul-Azha)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "June 24",
+            "description": "Last date of Grade Submission",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "June 25",
+            "description": "Announcement of Exam Results",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "June 14 - July 06",
+            "description": "Semester Break (23 Days)",
+            "category": "semester_break",
+            "isHighlight": true
+          }
+        ]
+      },
+      {
+        "semester": "Summer 2024",
+        "items": [
+          {
+            "date": "May 13-20",
+            "description": "Pre-registration for Summer 2024",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "June 26",
+            "description": "Registration begins for Summer 2024",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "July 02",
+            "description": "Registration ends",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "July 07",
+            "description": "Classes begin",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "July 10-12",
+            "description": "Orientation of newly admitted students",
+            "category": "orientation",
+            "isHighlight": true
+          },
+          {
+            "date": "July 14",
+            "description": "Last Date for Course Add/Drop",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "July 17",
+            "description": "Holiday (Ashura)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "July 18",
+            "description": "Last date for payment of 1st installment(40%) without late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "July 28",
+            "description": "Last Date of semester drop",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "August 01",
+            "description": "Last Date of Semester Drop with 50% adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "August 14",
+            "description": "Last date for payment of 2nd installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "August 15",
+            "description": "Holiday (National Mourning Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "August 18",
+            "description": "Last date of Self-issuance of Admit Card for Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "August 26",
+            "description": "Holiday (Janmashtami)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "September 13-21",
+            "description": "Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "September 16",
+            "description": "Holiday (Eid-e-Miladun-Nabi)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "September 24",
+            "description": "Last date of withdrawal with \"W\" Grade without adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "September 26",
+            "description": "Course offering for Fall 2024 uploaded",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "September 27-30",
+            "description": "Pre-registration for Fall 2024",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "October 01-03",
+            "description": "Teaching Evaluation",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "October 12-13",
+            "description": "Holiday (Durga Puja)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "October 29",
+            "description": "Last date for payment of Final installment (20% due to special waiver)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "October 31",
+            "description": "Last date of Self-Issuance of Admit Card for Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "November 01-09",
+            "description": "Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "November 13",
+            "description": "Last date of Grade Submission",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "November 13",
+            "description": "Announcement of Exam Results",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "Nov 10 - 16",
+            "description": "Semester Break (7 Days)",
+            "category": "semester_break",
+            "isHighlight": true
+          }
+        ]
+      },
+      {
+        "semester": "Fall 2024",
+        "items": [
+          {
+            "date": "September 27-30",
+            "description": "Pre-registration for Fall 2024",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "November 13",
+            "description": "Registration begins for Fall 2024",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "November 13-14",
+            "description": "Orientation of newly admitted students",
+            "category": "orientation",
+            "isHighlight": true
+          },
+          {
+            "date": "November 16",
+            "description": "Registration ends",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "November 17",
+            "description": "Classes begin",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "November 23",
+            "description": "Last date for Course ADD/DROP",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "November 28",
+            "description": "Last date for payment of 1st installment (40%) without late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "December 01",
+            "description": "Last date of Semester Drop with full adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "December 05",
+            "description": "Last date of payment of 1st installment (40%) with late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "December 12",
+            "description": "Last date of Semester Drop with 50% adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "December 16",
+            "description": "Holiday (Victory Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "December 19",
+            "description": "Last date for payment of 2nd installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "December 19",
+            "description": "Last date of Self-Issuance of Admit Card for Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "December 20-28",
+            "description": "Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "December 25",
+            "description": "Holiday (Christmas Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "January 01, 2025",
+            "description": "Course offering for Spring 2025 uploaded",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "January 05, 2025",
+            "description": "Last date of withdrawal with \"W\" Grade without adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "January 06-09, 2025",
+            "description": "Pre-registration for Spring 2025",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "January 25-27, 2025",
+            "description": "Teaching Evaluation",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "January 30, 2025",
+            "description": "Last date for payment of final installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "January 30, 2025",
+            "description": "Last date of Self-issuance of Admit card for Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "February 01-08, 2025",
+            "description": "Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "February 02, 2025",
+            "description": "Holiday (Saraswati Puja)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "February 10, 2025",
+            "description": "Last date of Grade Submission",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "February 11, 2025",
+            "description": "Announcement of Exam Results",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "Feb 09 - 22, 2025",
+            "description": "Semester Break (14 Days)",
+            "category": "semester_break",
+            "isHighlight": true
+          }
+        ]
+      }
+    ],
+    "2023": [
+      {
+        "semester": "Spring 2023",
+        "items": [
+          {
+            "date": "Jan 03-17",
+            "description": "Pre-registration for Spring 2023",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "Jan 26",
+            "description": "Holiday (Saraswati Puja) *",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 21",
+            "description": "Holiday (Shaheed Dibash & International Mother Language Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 22",
+            "description": "Registration begins for Spring 2023",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 26",
+            "description": "Classes begin",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "March 03",
+            "description": "Registration ends",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "March 05 - 09",
+            "description": "Orientation of newly admitted students",
+            "category": "orientation",
+            "isHighlight": true
+          },
+          {
+            "date": "March 08",
+            "description": "Holiday (Shab-e-Barat)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "March 17",
+            "description": "Holiday (Birthday of Bangabandhu Sheikh Mujibur Rahman)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "March 22",
+            "description": "Last date of payment of 1st installment (40%) with late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "March 26",
+            "description": "Holiday (Independence Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "March 29",
+            "description": "Last date of payment of 1st installment (40%) with late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "April 04",
+            "description": "Last date of withdrawal from the semester with full adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "April 13",
+            "description": "Last date for payment of 2nd installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "April 14",
+            "description": "Holiday (Bangla Nababorsho)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "April 18",
+            "description": "Last date of withdrawal from the semester with 50% adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "April 19 - 27",
+            "description": "Holiday (Jummatul Bida, Lailatul Qadr & Eid-ul-Fitr)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "May 01",
+            "description": "May Day",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "May 04",
+            "description": "Holiday (Buddha Purnima)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "May 05 - 13",
+            "description": "Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "May 18",
+            "description": "Course offering for Summer 2023 uploaded",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "May 21",
+            "description": "Last date of withdrawal with \"W\" Grade without adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "May 29 - June 05",
+            "description": "Pre-registration for Summer Semester 2023",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "June 05 - 08",
+            "description": "Teaching Evaluation",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "June 11",
+            "description": "Last date for payment of Final installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "June 12",
+            "description": "Self-issuance of Admit Card for Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "June 16 - 26",
+            "description": "Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "June 27 - July 06",
+            "description": "Holiday (Eid-ul-Azha)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "July 09",
+            "description": "Last date of Grade Submission",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "July 11",
+            "description": "Announcement of Exam Results",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "June 27 - July 15",
+            "description": "Semester Break (19 Days)",
+            "category": "semester_break",
+            "isHighlight": true
+          }
+        ]
+      },
+      {
+        "semester": "Summer 2023",
+        "items": [
+          {
+            "date": "May 29 - June 05",
+            "description": "Pre-registration for Summer 2023",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "July 12",
+            "description": "Registration begins for Summer 2023",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "July 16",
+            "description": "Classes begin",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "July 18 - 20",
+            "description": "Orientation of newly admitted students",
+            "category": "orientation",
+            "isHighlight": true
+          },
+          {
+            "date": "July 20",
+            "description": "Registration ends",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "July 29",
+            "description": "Holiday (Ashura)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 03",
+            "description": "Last date for Course Add/Drop & Payment of 1st Installment (40%) without late fee",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 08",
+            "description": "Last date of Withdrawal from the Semester with full adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 10",
+            "description": "Last date of payment of 1st installment (40%) with late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 15",
+            "description": "Holiday (National Mourning Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 23",
+            "description": "Last date of withdrawal from the Semester with 50% adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Aug 31",
+            "description": "Course Offering for Fall 2023 uploaded",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Sept 01 - 09",
+            "description": "Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Sept 03",
+            "description": "Last date for payment of 2nd installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Sept 03",
+            "description": "Self-issuance of Admit Card for Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Sept 03 - 14",
+            "description": "Pre-registration for Fall 2023",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "Sept 06",
+            "description": "Holiday (Janmashtami)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Sept 16",
+            "description": "Last date of withdrawal with \"W\" Grade without adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Sept 17 - 21",
+            "description": "Teaching Evaluation",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Sept 28",
+            "description": "Holiday (Eid-e-Miladun-Nabi)*",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 04",
+            "description": "Last date for payment of final installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 05",
+            "description": "Self-issuance of Admit Card for Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 06 - 14",
+            "description": "Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 19",
+            "description": "Last date of Grade Submission",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 22",
+            "description": "Announcement of Exam Results",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 15 - 28",
+            "description": "Semester Break (14 Days)",
+            "category": "semester_break",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 23 -24",
+            "description": "Holiday (Durga Puja)*",
+            "category": "holiday",
+            "isHighlight": false
+          }
+        ]
+      },
+      {
+        "semester": "Fall 2023",
+        "items": [
+          {
+            "date": "Sept 03 - 14",
+            "description": "Pre-registration for Fall 2023",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 25",
+            "description": "Registration begins for Fall 2023",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 29",
+            "description": "Classes begin",
+            "category": "class",
+            "isHighlight": true
+          },
+          {
+            "date": "Oct 30",
+            "description": "Registration ends",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Oct 31 - Nov 02",
+            "description": "Orientation of newly admitted students",
+            "category": "orientation",
+            "isHighlight": true
+          },
+          {
+            "date": "Nov 15",
+            "description": "Last date for Course Add/Drop & Payment of 1st Installment (40%) without late fee",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "Nov 22",
+            "description": "Last date for payment of 1st installment (40%) without late fee",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 05",
+            "description": "Last date of withdrawal from the Semester with full adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 06",
+            "description": "Last date for payment of 2nd installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 07",
+            "description": "Self-issuance of Admit Card for Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Dec 08 - 17",
+            "description": "Midterm Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Dec 16",
+            "description": "Holiday (Victory Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 20",
+            "description": "Last date of Semester Drop with 50% adjustment",
+            "category": "add_drop",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 25",
+            "description": "Holiday (Christmas Day)",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Dec 27",
+            "description": "Course offering for Spring 2024 uploaded",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Jan 02, 2024",
+            "description": "Last date of withdrawal with \"W\" Grade without adjustment",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Jan 02 - 14",
+            "description": "Pre-registration for Spring Semester 2024",
+            "category": "pre_registration",
+            "isHighlight": false
+          },
+          {
+            "date": "Jan 14 -18",
+            "description": "Teaching Evaluation",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Jan 27",
+            "description": "Holiday (Saraswati Puja) *",
+            "category": "holiday",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 01",
+            "description": "Last date for payment of final installment (30%)",
+            "category": "admin",
+            "isHighlight": false
+          },
+          {
+            "date": "Feb 01",
+            "description": "Self-issuance of Admit Card for Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Feb 02 - 10,2024",
+            "description": "Final Examination",
+            "category": "exam",
+            "isHighlight": true
+          },
+          {
+            "date": "Feb 15, 2024",
+            "description": "Last date of Grade Submission",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "Feb 19, 2024",
+            "description": "Announcement of Exam Results",
+            "category": "result",
+            "isHighlight": true
+          },
+          {
+            "date": "Feb 11 - 17, 2024",
+            "description": "Semester Break (7 Days)",
+            "category": "semester_break",
+            "isHighlight": true
+          }
+        ]
+      }
+    ]
+  }
+}

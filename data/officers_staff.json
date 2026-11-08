@@ -1,0 +1,52 @@
+[
+  {
+    "category": "OFFICERS_AND_STAFF",
+    "name": "Md. Abu Sayed",
+    "designation": "Senior Officer",
+    "room": "528, 5th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "abu.sayed@seu.edu.bd",
+    "image": "./Southeast University1_files/abu.sayed_3lid7oc7.jpg"
+  },
+  {
+    "category": "OFFICERS_AND_STAFF",
+    "name": "Md. Juboraj",
+    "designation": "Lab Officer",
+    "room": "612, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "md.juboraj@seu.edu.bd",
+    "image": "./Southeast University1_files/md.juboraj_kipooung.jpg"
+  },
+  {
+    "category": "OFFICERS_AND_STAFF",
+    "name": "Rajan Sarker",
+    "designation": "Lab Officer",
+    "room": "528, 5th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "rajan.sarker@seu.edu.bd",
+    "image": "./Southeast University1_files/rajan.sarker_zrlpsdqc.jpg"
+  },
+  {
+    "category": "OFFICERS_AND_STAFF",
+    "name": "Md. Imran Hossen",
+    "designation": "Assistant Officer",
+    "room": "528, 5th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "md.imranhossen@seu.edu.bd",
+    "image": "./Southeast University1_files/md.imranhossen_d9xcvgmv.jpeg"
+  },
+  {
+    "category": "OFFICERS_AND_STAFF",
+    "name": "Rezia Parvin",
+    "designation": "Assistant Officer",
+    "room": "528, 5th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "rezia.parvin@seu.edu.bd",
+    "image": "./Southeast University1_files/avatar_blue.png"
+  }
+]

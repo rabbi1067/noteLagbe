@@ -1,0 +1,722 @@
+[
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Prof. Yusuf Mahbubul Islam PhD",
+    "designation": "Vice Chancellor",
+    "room": "112, 1st Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "vc@seu.edu.bd, dean.sit@seu.edu.bd, ymislam@seu.edu.bd",
+    "image": "./Southeast University2_files/ymislam_0z1r4tn5.png"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Prof. Dr. Abdul Kadar Muhammad Masum",
+    "designation": "Director, IQAC",
+    "room": "105, 1st Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "director.iqac@seu.edu.bd, dean.se@seu.edu.bd, akmmasum@seu.edu.bd",
+    "image": "./Southeast University2_files/akmmasum_1jhtewrt.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Dr. Shaheena Sultana",
+    "designation": "Professor",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "shaheena.sultana@seu.edu.bd",
+    "image": "./Southeast University2_files/avatar_blue.png"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Shahriar Manzoor",
+    "designation": "Chairman & Associate Professor",
+    "room": "530, 5th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "cse.chair@seu.edu.bd, smanzoor@seu.edu.bd",
+    "image": "./Southeast University2_files/smanzoor_dwoeayzj.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Dr. Gazi Zahirul Islam",
+    "designation": "Associate Professor",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "gazi.islam@seu.edu.bd",
+    "image": "./Southeast University2_files/gazi.islam_jgvltepr.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Dr. Md. Maruf Hassan",
+    "designation": "Director, CCS & Associate Professor",
+    "room": "809, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "director.ccs@seu.edu.bd, drmdmaruf.hassan@seu.edu.bd",
+    "image": "./Southeast University2_files/drmdmaruf.hassan_itzn9q8i.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Dr. Mohammed Ashikur Rahman",
+    "designation": "Associate Professor",
+    "room": "813, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "ashikur.rahman@seu.edu.bd",
+    "image": "./Southeast University2_files/ashikur.rahman_6yu1vzv9.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Dr. Md. Ruhul Amin",
+    "designation": "Associate Professor",
+    "room": "810, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "dr.mdruhulamin@seu.edu.bd",
+    "image": "./Southeast University2_files/dr.mdruhulamin_3x29aig3.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Md. Mijanur Rahman",
+    "designation": "Assistant Professor",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "mijanur.rahman@seu.edu.bd",
+    "image": "./Southeast University2_files/mijanur.rahman_q48euoyf.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Mohammad Ashraful Hoque",
+    "designation": "Assistant Professor",
+    "room": "522, 5th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "ashraful@seu.edu.bd",
+    "image": "./Southeast University2_files/ashraful_qu7pm4hk.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Shifat Ahmed",
+    "designation": "Assistant Professor",
+    "room": "522, 5th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "shifat.ahmed@seu.edu.bd",
+    "image": "./Southeast University2_files/shifat.ahmed_uwecgpqf.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Mou Mahmood",
+    "designation": "Assistant Professor",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "habibullah.belali@seu.edu.bd",
+    "image": "./Southeast University2_files/mou.mahmood_t7joiv1k.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Khandaker Mohammad  Mohi Uddin",
+    "designation": "Assistant Professor",
+    "room": "810, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "mohiuddin.kh@seu.edu.bd",
+    "image": "./Southeast University2_files/mohiuddin.kh_tq1ygp2m.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Md. Ashiqur Rahman",
+    "designation": "Assistant Professor",
+    "room": "810, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "ferdous.binhafiz@seu.edu.bd",
+    "image": "./Southeast University2_files/ashiqur.rahman_9qrgrylx.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Mahdin Mahboob",
+    "designation": "Assistant Professor",
+    "room": "810, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "mahdin.mahboob@seu.edu.bd",
+    "image": "./Southeast University2_files/mahdin.mahboob_o9typrhr.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Md. Shohel Babu",
+    "designation": "Co-ordinator & Assistant Professor",
+    "room": "529, 5th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "shohel.babu@seu.edu.bd",
+    "image": "./Southeast University2_files/shohel.babu_feebvqho.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Mohammad Ariful Huq",
+    "designation": "Assistant Professor",
+    "room": "810, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "ariful.huq@seu.edu.bd",
+    "image": "./Southeast University2_files/ariful.huq_2keufnsb.png"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Dr. Mohammad Lutful Hakim",
+    "designation": "Assistant Professor",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "lutful.hakim@seu.edu.bd",
+    "image": "./Southeast University2_files/lutful.hakim_iumzhhkr.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Golam Mostafa",
+    "designation": "Assistant Professor",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "golam.mostafa@seu.edu.bd",
+    "image": "./Southeast University2_files/golam.mostafa_vvknr2az.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Mohammad Shohel Rana",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "mohammad.rana@seu.edu.bd",
+    "image": "./Southeast University2_files/mohammad.rana_psl8t5y3.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Tashreef Muhammad",
+    "designation": "Co-ordinator & Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "tashreef.muhammad@seu.edu.bd",
+    "image": "./Southeast University2_files/tashreef.muhammad_ipsizfnq.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Mahbub Hasan",
+    "designation": "Lecturer",
+    "room": "810, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "mahbub.hasan@seu.edu.bd",
+    "image": "./Southeast University2_files/mahbub.hasan_qkvg8pqr.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Ishrat Jahan",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "ishrat.jahan@seu.edu.bd",
+    "image": "./Southeast University2_files/ishrat.jahan_retqtqxs.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Sakib Mahmud",
+    "designation": "Co-ordinator & Lecturer",
+    "room": "529, 5th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "sakib.mahmud@seu.edu.bd",
+    "image": "./Southeast University2_files/sakib.mahmud_8vmi5wql.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Rifat Ahommed",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "rifat.ahommed@seu.edu.bd",
+    "image": "./Southeast University2_files/rifat.ahommed_teumywrz.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Md. Shamim",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "shamim@seu.edu.bd",
+    "image": "./Southeast University2_files/shamim_abrbosux.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Md. Asiful Islam Miah",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "asiful.miah@seu.edu.bd",
+    "image": "./Southeast University2_files/asiful.miah_xj8v04ty.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Farhad Uz Zaman",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "farhad.zaman@seu.edu.bd",
+    "image": "./Southeast University2_files/farhad.zaman_fgmuyhxm.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Md Alamin",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "alamin.md@seu.edu.bd",
+    "image": "./Southeast University2_files/alamin.md_2irangib.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Md. Nazrul Islam",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "islam.nazrul@seu.edu.bd",
+    "image": "./Southeast University2_files/islam.nazrul_nrzzicbq.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Shimul Dey Katha",
+    "designation": "Co-ordinator & Lecturer",
+    "room": "529, 5th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "shimul.katha@seu.edu.bd",
+    "image": "./Southeast University2_files/shimul.katha_zxw7lyih.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Adib Md. Ridwan",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "adib.ridwan@seu.edu.bd",
+    "image": "./Southeast University2_files/adib.ridwan_j9gv5b8p.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Khondker Rawan Hamid",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "rawan.hamid@seu.edu.bd",
+    "image": "./Southeast University2_files/rawan.hamid_y0putq0u.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Tanver Hossain Refat",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "tanver.refat@seu.edu.bd",
+    "image": "./Southeast University2_files/tanver.refat_oacjf4v0.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Md. Khairul Alam",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "md.khairulalam@seu.edu.bd",
+    "image": "./Southeast University2_files/avatar_blue.png"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Rajon Bardhan",
+    "designation": "Lecturer",
+    "room": "N/A",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "md.alamin@seu.edu.bd",
+    "image": "./Southeast University2_files/rajonbardhan_qvu2ycse.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Yeaseen Arafat",
+    "designation": "Lecturer",
+    "room": "810, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "mdsarowar.rana@seu.edu.bd",
+    "image": "./Southeast University2_files/yeaseen.arafat_h8ehtecd.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Mahbubul Haq Bhuiyan",
+    "designation": "Lecturer",
+    "room": "813, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "mahbubul.haq@seu.edu.bd",
+    "image": "./Southeast University2_files/mahbubul.haq_xk9aroio.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Maisha Muntaha",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "maisha.muntaha@seu.edu.bd",
+    "image": "./Southeast University2_files/maisha.muntaha_tt2guwme.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Muhaimen Khan",
+    "designation": "Lecturer",
+    "room": "810, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "muhaimen.khan@seu.edu.bd",
+    "image": "./Southeast University2_files/muhaimen.khan_1rzqa0ja.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Md. Tamim Khandakar",
+    "designation": "Lecturer",
+    "room": "810, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "md.tamimkhandakar@seu.edu.bd",
+    "image": "./Southeast University2_files/md.tamimkhandakar_okqz5tni.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Tanjina Oriana",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "tanjina.oriana@seu.edu.bd",
+    "image": "./Southeast University2_files/tanjina.oriana_j85yaqy6.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Nishat Anjum Lea",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "nishat.anjumlea@seu.edu.bd",
+    "image": "./Southeast University2_files/avatar_blue.png"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Abid Ahmad",
+    "designation": "Lecturer",
+    "room": "809, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "abid.ahmad@seu.edu.bd",
+    "image": "./Southeast University2_files/abid.ahmad_ljosc2rn.png"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Radiathun Tasnia",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "radiathun.tasnia@seu.edu.bd",
+    "image": "./Southeast University2_files/radiathun.tasnia_lndbyph0.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Mustofa  Khalid Ovi",
+    "designation": "Lecturer",
+    "room": "810, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "mustofa.khalidovi@seu.edu.bd",
+    "image": "./Southeast University2_files/mustofa.khalidovi_20qnpfrf.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Mehedi Ahamed",
+    "designation": "Lecturer",
+    "room": "810, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "mehedi.ahamed@seu.edu.bd",
+    "image": "./Southeast University2_files/mehedi.ahamed_mypzsu0f.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Mst. Jesiara Khatun",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "mst.jesiarakhatun@seu.edu.bd",
+    "image": "./Southeast University2_files/mst.jesiarakhatun_nexpy6be.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Borhan Ul Arif",
+    "designation": "Lecturer",
+    "room": "813, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "borhan.ularif@seu.edu.bd",
+    "image": "./Southeast University2_files/borhan.ularif_5qa4uzz6.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Mayukh Mallick",
+    "designation": "Lecturer",
+    "room": "810, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "mayukh.mallick@seu.edu.bd",
+    "image": "./Southeast University2_files/mayukh.mallick_npzuu6us.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Subah Noshin",
+    "designation": "Lecturer",
+    "room": "203, 2nd Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "subah.noshin@seu.edu.bd",
+    "image": "./Southeast University2_files/subah.noshin_d36sjhwh.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Noman Amin",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "noman.amin@seu.edu.bd",
+    "image": "./Southeast University2_files/noman.amin_egwtw3rm.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Naimur Rahman",
+    "designation": "Lecturer",
+    "room": "203, 2nd Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "naimur.rahman@seu.edu.bd",
+    "image": "./Southeast University2_files/naimur.rahman_15t2ensw.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Md. Ayon Mia",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "md.ayonmia@seu.edu.bd",
+    "image": "./Southeast University2_files/md.ayonmia_1htxggu6.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "A N M Zahid Hossain Milkan",
+    "designation": "Lecturer",
+    "room": "813, 8th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "anmzahid.milkan@seu.edu.bd",
+    "image": "./Southeast University2_files/anmzahid.milkan_9c3bd6hc.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "S I M Adnan",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "sim.adnan@seu.edu.bd",
+    "image": "./Southeast University2_files/sim.adnan_dcerlz7b.jpg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Shujoy Kundu",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "shujoy.kundu@seu.edu.bd",
+    "image": "./Southeast University2_files/shujoy.kundu_5yhngdik.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Mahjabin Sultana",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "mahjabin.sultana@seu.edu.bd",
+    "image": "./Southeast University2_files/mahjabin.sultana_ufamttcu.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Md. Safwan Zaher Asif",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "safwan.zaherasif@seu.edu.bd",
+    "image": "./Southeast University2_files/safwan.zaherasif_3r32bejx.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Anik Mahmud Shanto",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "anik.mahmudshanto@seu.edu.bd",
+    "image": "./Southeast University2_files/anik.mahmudshanto_ttp1jj1z.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Nusrat Jahan Jonaki",
+    "designation": "Lecturer",
+    "room": "203, 2nd Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "nusrat.jahanjonaki@seu.edu.bd",
+    "image": "./Southeast University2_files/nusrat.jahanjonaki_ksckbkao.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Sadia Hossain",
+    "designation": "Lecturer",
+    "room": "203, 2nd Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "sadia.hossain@seu.edu.bd",
+    "image": "./Southeast University2_files/sadia.hossain_pejxtztq.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Sadia Afroj Tithi",
+    "designation": "Lecturer",
+    "room": "203, 2nd Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "sadia.afrojtithi@seu.edu.bd",
+    "image": "./Southeast University2_files/sadia.afrojtithi_9paugo7l.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Md. Ismail",
+    "designation": "Lecturer",
+    "room": "203, 2nd Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "md.ismail@seu.edu.bd",
+    "image": "./Southeast University2_files/md.ismail_l9akanxk.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Snigdha Rahman",
+    "designation": "Lecturer",
+    "room": "203, 2nd Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "snigdha.rahman@seu.edu.bd",
+    "image": "./Southeast University2_files/snigdha.rahman_rhyyyfgj.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Rubina Arfin Somiya",
+    "designation": "Lecturer",
+    "room": "203, 2nd Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "rubina.arfinsomiya@seu.edu.bd",
+    "image": "./Southeast University2_files/rubina.arfinsomiya_fb2ncfbr.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Md. Nahid Anam Opu",
+    "designation": "Lecturer",
+    "room": "203, 2nd Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "md.nahidanamopu@seu.edu.bd",
+    "image": "./Southeast University2_files/md.nahidanamopu_fe7u9pgr.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Jayed Bin Azad",
+    "designation": "Lecturer",
+    "room": "203, 2nd Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "jayed.binazad@seu.edu.bd",
+    "image": "./Southeast University2_files/jayed.binazad_jpyb6rrm.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Namirah Rasul",
+    "designation": "Lecturer",
+    "room": "203, 2nd Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "namirah.rasul@seu.edu.bd",
+    "image": "./Southeast University2_files/namirah.rasul_0pfh5pvw.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Zarif Safwan Hoque",
+    "designation": "Lecturer",
+    "room": "203, 2nd Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "zarif.safwanhoque@seu.edu.bd",
+    "image": "./Southeast University2_files/zarif.safwanhoque_yojhswmo.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Md. Tanbeer Jubaer",
+    "designation": "Lecturer",
+    "room": "203, 2nd Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "md.tanbeerjubaer@seu.edu.bd",
+    "image": "./Southeast University2_files/md.tanbeerjubaer_92oihqdw.jpeg"
+  },
+  {
+    "category": "FULL_TIME_FACULTY",
+    "name": "Mahdi Bhuiyan",
+    "designation": "Lecturer",
+    "room": "606, 6th Floor",
+    "phone": "N/A",
+    "ext": "N/A",
+    "email": "mahdi.bhuiyan@seu.edu.bd",
+    "image": "./Southeast University2_files/mahdi.bhuiyan_jugoznos.jpeg"
+  }
+]
