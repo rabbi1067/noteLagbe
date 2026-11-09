@@ -9,6 +9,12 @@ import com.notelagbe.entity.TeacherCourse;
 import com.notelagbe.repository.CourseRepository;
 import com.notelagbe.repository.TeacherCourseRepository;
 import com.notelagbe.repository.TeacherRepository;
+import com.notelagbe.entity.User;
+import com.notelagbe.entity.Role;
+import com.notelagbe.entity.AuthProvider;
+import com.notelagbe.repository.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -42,19 +48,31 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
     private final SeuFacultySyncService seuFacultySyncService;
     private final ObjectMapper objectMapper;
     private final CacheManager cacheManager;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    @Value("${app.admin.initial-email:}")
+    private String initialAdminEmail;
+
+    @Value("${app.admin.initial-password:}")
+    private String initialAdminPassword;
 
     public AcademicCatalogInitializer(CourseRepository courseRepository,
                                       TeacherRepository teacherRepository,
                                       TeacherCourseRepository teacherCourseRepository,
                                       SeuFacultySyncService seuFacultySyncService,
                                       ObjectMapper objectMapper,
-                                      CacheManager cacheManager) {
+                                      CacheManager cacheManager,
+                                      UserRepository userRepository,
+                                      PasswordEncoder passwordEncoder) {
         this.courseRepository = courseRepository;
         this.teacherRepository = teacherRepository;
         this.teacherCourseRepository = teacherCourseRepository;
         this.seuFacultySyncService = seuFacultySyncService;
         this.objectMapper = objectMapper;
         this.cacheManager = cacheManager;
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -65,6 +83,7 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
         seedTeachersIfEmpty();
         ensureTeacherCourseMappings();
         ensureAllTeachersHaveInitials();
+        ensureSuperAdminUser();
         
         if (cacheManager != null) {
             for (String cacheName : cacheManager.getCacheNames()) {
@@ -73,6 +92,25 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
             }
         }
         log.info(">>> Southeast University Academic Catalog verified in database.");
+    }
+
+    private void ensureSuperAdminUser() {
+        if (initialAdminEmail != null && !initialAdminEmail.isBlank() &&
+            initialAdminPassword != null && !initialAdminPassword.isBlank()) {
+            
+            String cleanEmail = initialAdminEmail.trim().toLowerCase();
+            if (!userRepository.existsByEmail(cleanEmail)) {
+                User superAdmin = new User();
+                superAdmin.setName("Fazle Rabbi");
+                superAdmin.setEmail(cleanEmail);
+                superAdmin.setPassword(passwordEncoder.encode(initialAdminPassword.trim()));
+                superAdmin.setRole(Role.ROLE_SUPER_ADMIN);
+                superAdmin.setStudentId("2022100010045");
+                superAdmin.setAuthProvider(AuthProvider.LOCAL);
+                userRepository.save(superAdmin);
+                log.info(">>> Initial Super Admin provisioned securely for email: {}", cleanEmail);
+            }
+        }
     }
 
     private void seedCoursesIfEmpty() {
