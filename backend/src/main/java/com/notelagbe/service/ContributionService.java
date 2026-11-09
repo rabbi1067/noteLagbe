@@ -32,6 +32,7 @@ public class ContributionService {
     private final TeacherCourseRepository teacherCourseRepository;
     private final UnlockedCourseRepository unlockedCourseRepository;
     private final LiveSyncService liveSyncService;
+    private final InputSanitizationService inputSanitizationService;
 
     public ContributionService(ContributionRequestRepository contributionRequestRepository,
                                ResourceRepository resourceRepository,
@@ -39,7 +40,8 @@ public class ContributionService {
                                TeacherRepository teacherRepository,
                                TeacherCourseRepository teacherCourseRepository,
                                UnlockedCourseRepository unlockedCourseRepository,
-                               LiveSyncService liveSyncService) {
+                               LiveSyncService liveSyncService,
+                               InputSanitizationService inputSanitizationService) {
         this.contributionRequestRepository = contributionRequestRepository;
         this.resourceRepository = resourceRepository;
         this.courseRepository = courseRepository;
@@ -47,21 +49,16 @@ public class ContributionService {
         this.teacherCourseRepository = teacherCourseRepository;
         this.unlockedCourseRepository = unlockedCourseRepository;
         this.liveSyncService = liveSyncService;
+        this.inputSanitizationService = inputSanitizationService;
     }
 
     @Transactional
     public ContributionRequest submitContribution(ContributionSubmitRequest request, User user) {
-        // Sanitize and validate title
-        String cleanTitle = request.getTitle() != null ? request.getTitle().trim() : "";
-        if (cleanTitle.length() < 5 || cleanTitle.length() > 80) {
-            throw new ApiException("Material title must be between 5 and 80 characters");
-        }
-        if (cleanTitle.matches(".*(.)\\1{4,}.*")) {
-            throw new ApiException("Invalid title: repetitive spam characters are not allowed");
-        }
+        // Sanitize and validate title against XSS, spam, and profanity
+        String cleanTitle = inputSanitizationService.validateGenuineText(request.getTitle(), "Material title", 5, 80, true);
 
         // Sanitize and validate semester
-        String cleanSemester = request.getSemesterName() != null ? request.getSemesterName().trim() : "";
+        String cleanSemester = inputSanitizationService.sanitizePlainText(request.getSemesterName());
         if (cleanSemester.length() < 3 || cleanSemester.length() > 25) {
             throw new ApiException("Semester must be between 3 and 25 characters");
         }

@@ -28,6 +28,7 @@ public class PaymentService {
     private final NotificationService notificationService;
     private final EmailService emailService;
     private final LiveSyncService liveSyncService;
+    private final InputSanitizationService inputSanitizationService;
 
     public PaymentService(PaymentRequestRepository paymentRequestRepository,
                           SubscriptionRepository subscriptionRepository,
@@ -36,7 +37,8 @@ public class PaymentService {
                           ObjectMapper objectMapper,
                           NotificationService notificationService,
                           EmailService emailService,
-                          LiveSyncService liveSyncService) {
+                          LiveSyncService liveSyncService,
+                          InputSanitizationService inputSanitizationService) {
         this.paymentRequestRepository = paymentRequestRepository;
         this.subscriptionRepository = subscriptionRepository;
         this.unlockedCourseRepository = unlockedCourseRepository;
@@ -45,22 +47,28 @@ public class PaymentService {
         this.notificationService = notificationService;
         this.emailService = emailService;
         this.liveSyncService = liveSyncService;
+        this.inputSanitizationService = inputSanitizationService;
     }
 
     @Transactional
     public PaymentRequest submitPayment(PaymentSubmitRequest request, User user) {
-        if (paymentRequestRepository.existsByTransactionId(request.getTransactionId().trim())) {
-            throw new ApiException("This Transaction ID has already been submitted!");
+        // Enforce strict threat shield on payment inputs (Trx ID & BD Phone number)
+        String cleanTrx = inputSanitizationService.sanitizeAndValidateTransactionId(request.getTransactionId());
+        String cleanPhone = inputSanitizationService.sanitizeAndValidatePhoneNumber(request.getSenderPhone());
+        String cleanSlip = inputSanitizationService.sanitizePlainText(request.getSlipUrl());
+
+        if (paymentRequestRepository.existsByTransactionId(cleanTrx)) {
+            throw new ApiException("This Transaction ID has already been submitted / এই ট্রানজেকশন আইডি ইতিপূর্বে সাবমিট করা হয়েছে!");
         }
 
         PaymentRequest pr = new PaymentRequest();
         pr.setUser(user);
         pr.setPlanType(request.getPlanType());
         pr.setPaymentMethod(request.getPaymentMethod());
-        pr.setSenderPhone(request.getSenderPhone().trim());
-        pr.setTransactionId(request.getTransactionId().trim());
+        pr.setSenderPhone(cleanPhone);
+        pr.setTransactionId(cleanTrx);
         pr.setAmount(request.getPlanType().getPrice());
-        pr.setSlipUrl(request.getSlipUrl());
+        pr.setSlipUrl(cleanSlip);
         pr.setSelectedCoursesJson(request.getSelectedCoursesJson());
         pr.setStatus(PaymentStatus.PENDING);
 

@@ -13,6 +13,7 @@ import com.notelagbe.repository.CourseRepository;
 import com.notelagbe.repository.ReviewRepository;
 import com.notelagbe.repository.TeacherRepository;
 import com.notelagbe.repository.UserCourseReviewRepository;
+import com.notelagbe.service.InputSanitizationService;
 import com.notelagbe.service.review.ReviewAnonymityHandler;
 import com.notelagbe.service.review.ReviewEligibilityValidator;
 import com.notelagbe.service.review.ReviewMapper;
@@ -23,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Single Responsibility & Dependency Inversion Principle:
  * Orchestrates review submission, relying on injected abstractions for validation,
- * anonymity policy, mapping, and persistence.
+ * anonymity policy, mapping, input sanitization, and persistence.
  */
 @Service
 public class ReviewSubmissionServiceImpl implements ReviewSubmissionService {
@@ -35,6 +36,7 @@ public class ReviewSubmissionServiceImpl implements ReviewSubmissionService {
     private final ReviewEligibilityValidator eligibilityValidator;
     private final ReviewAnonymityHandler anonymityHandler;
     private final ReviewMapper reviewMapper;
+    private final InputSanitizationService inputSanitizationService;
 
     public ReviewSubmissionServiceImpl(ReviewRepository reviewRepository,
                                        CourseRepository courseRepository,
@@ -42,7 +44,8 @@ public class ReviewSubmissionServiceImpl implements ReviewSubmissionService {
                                        UserCourseReviewRepository userCourseReviewRepository,
                                        ReviewEligibilityValidator eligibilityValidator,
                                        ReviewAnonymityHandler anonymityHandler,
-                                       ReviewMapper reviewMapper) {
+                                       ReviewMapper reviewMapper,
+                                       InputSanitizationService inputSanitizationService) {
         this.reviewRepository = reviewRepository;
         this.courseRepository = courseRepository;
         this.teacherRepository = teacherRepository;
@@ -50,6 +53,7 @@ public class ReviewSubmissionServiceImpl implements ReviewSubmissionService {
         this.eligibilityValidator = eligibilityValidator;
         this.anonymityHandler = anonymityHandler;
         this.reviewMapper = reviewMapper;
+        this.inputSanitizationService = inputSanitizationService;
     }
 
     @Override
@@ -61,7 +65,10 @@ public class ReviewSubmissionServiceImpl implements ReviewSubmissionService {
         // 1. Single Responsibility: Validate submission eligibility via policy
         eligibilityValidator.validateEligibility(user, course, request);
 
-        // 2. Track evaluated course without coupling to review identity
+        // 2. Strict Input Threat Shield: Validate & sanitize review comment against HTML, gibberish, spam & profanity
+        String cleanComment = inputSanitizationService.sanitizeAndValidateReview(request.getComment());
+
+        // 3. Track evaluated course without coupling to review identity
         userCourseReviewRepository.save(new UserCourseReview(user, course));
 
         Teacher teacher = null;
@@ -69,22 +76,22 @@ public class ReviewSubmissionServiceImpl implements ReviewSubmissionService {
             teacher = teacherRepository.findById(request.getTeacherId()).orElse(null);
         }
 
-        // 3. Assemble review entity with traits
+        // 4. Assemble review entity with traits
         Review review = new Review();
         review.setCourse(course);
         review.setTeacher(teacher);
         review.setRating(request.getRating());
-        review.setComment(request.getComment().trim());
+        review.setComment(cleanComment);
         // Normalize traits for course reviews vs teacher reviews
         String defaultPersonality = teacher != null ? "Friendly" : "Mid Degree (Sem 4-6)";
         String defaultMarking = teacher != null ? "Fair & Generous" : "Moderate / Balanced";
-        review.setPersonality(sanitizeTrait(request.getPersonality(), defaultPersonality));
-        review.setMarking(sanitizeTrait(request.getMarking(), defaultMarking));
-        review.setDifficulty(sanitizeTrait(request.getDifficulty(), "Medium"));
+        review.setPersonality(inputSanitizationService.sanitizePlainText(sanitizeTrait(request.getPersonality(), defaultPersonality)));
+        review.setMarking(inputSanitizationService.sanitizePlainText(sanitizeTrait(request.getMarking(), defaultMarking)));
+        review.setDifficulty(inputSanitizationService.sanitizePlainText(sanitizeTrait(request.getDifficulty(), "Medium")));
         // Course feedback publishes directly for peer guidance; 1 review per student per course enforced
         review.setStatus(ReviewStatus.APPROVED);
 
-        // 4. Single Responsibility: Apply privacy & architectural anonymity policy
+        // 5. Single Responsibility: Apply privacy & architectural anonymity policy
         anonymityHandler.applyAnonymityPolicy(review, user, request.isAnonymous());
 
         Review saved = reviewRepository.save(review);

@@ -69,7 +69,11 @@ export function removeToken() {
   }
 }
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+// Anti-spam & double-click protection maps for mutating requests (POST, PUT, DELETE, PATCH)
+const inFlightMutations = new Map<string, Promise<any>>();
+const lastMutationTimestamps = new Map<string, number>();
+
+async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
@@ -91,12 +95,20 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       removeToken();
       window.dispatchEvent(new Event("notelagbe:session-expired"));
     }
+    
     let errorMessage = "An error occurred";
     try {
       const errorData = await response.json();
-      errorMessage = errorData.message || errorData.error || errorMessage;
+      if (response.status === 429 && typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("notelagbe:rate-limit-hit", { detail: { endpoint, ...errorData } }));
+      }
+      errorMessage = errorData.bengaliMessage || errorData.message || errorData.error || errorMessage;
     } catch {
-      errorMessage = `HTTP error ${response.status}: ${response.statusText}`;
+      if (response.status === 429) {
+        errorMessage = "Too many requests! Please slow down and wait a moment before trying again. / আপনি খুব দ্রুত ক্লিক করছেন, দয়া করে কিছুক্ষণ অপেক্ষা করুন।";
+      } else {
+        errorMessage = `HTTP error ${response.status}: ${response.statusText}`;
+      }
     }
     throw new Error(errorMessage);
   }
@@ -107,6 +119,43 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   return response.json();
+}
+
+async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const method = (options.method || "GET").toUpperCase();
+  const isMutation = ["POST", "PUT", "DELETE", "PATCH"].includes(method);
+
+  // Client-side double-click shield & mutation deduplication
+  if (isMutation && typeof window !== "undefined") {
+    const now = Date.now();
+    const lastTime = lastMutationTimestamps.get(endpoint) || 0;
+    
+    // Drop rapid clicks arriving within 350ms on the exact same endpoint
+    if (now - lastTime < 350) {
+      throw new Error("You are clicking too fast! Please wait a moment. / অতিরিক্ত ক্লিক করবেন না, দয়া করে এক মুহূর্ত অপেক্ষা করুন।");
+    }
+    lastMutationTimestamps.set(endpoint, now);
+
+    // Lock in-flight request to deduplicate concurrent identical submissions
+    const bodyStr = typeof options.body === "string" ? options.body : "";
+    const mutationKey = `${method}:${endpoint}:${bodyStr}`;
+    if (inFlightMutations.has(mutationKey)) {
+      return inFlightMutations.get(mutationKey)!;
+    }
+
+    const promise = (async () => {
+      try {
+        return await executeFetch<T>(endpoint, options);
+      } finally {
+        inFlightMutations.delete(mutationKey);
+      }
+    })();
+
+    inFlightMutations.set(mutationKey, promise);
+    return promise;
+  }
+
+  return executeFetch<T>(endpoint, options);
 }
 
 export const api = {

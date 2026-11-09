@@ -29,27 +29,35 @@ public class WaiverService {
     private final NotificationService notificationService;
     private final EmailService emailService;
     private final LiveSyncService liveSyncService;
+    private final InputSanitizationService inputSanitizationService;
 
     public WaiverService(WaiverRequestRepository waiverRequestRepository,
                          SubscriptionRepository subscriptionRepository,
                          NotificationService notificationService,
                          @Autowired(required = false) EmailService emailService,
-                         LiveSyncService liveSyncService) {
+                         LiveSyncService liveSyncService,
+                         InputSanitizationService inputSanitizationService) {
         this.waiverRequestRepository = waiverRequestRepository;
         this.subscriptionRepository = subscriptionRepository;
         this.notificationService = notificationService;
         this.emailService = emailService;
         this.liveSyncService = liveSyncService;
+        this.inputSanitizationService = inputSanitizationService;
     }
 
     @Transactional
     public WaiverRequest submitWaiver(WaiverSubmitRequest request, User user) {
+        // Enforce input sanitization & genuine content verification
+        String cleanStudentId = inputSanitizationService.sanitizeAndValidateStudentId(request.getStudentId());
+        String cleanReason = inputSanitizationService.sanitizeAndValidateWaiverReason(request.getReason());
+        String cleanCardUrl = inputSanitizationService.sanitizePlainText(request.getIdCardUrl());
+
         WaiverRequest wr = new WaiverRequest();
         wr.setUser(user);
-        wr.setStudentId(request.getStudentId());
+        wr.setStudentId(cleanStudentId);
         wr.setCgpa(request.getCgpa() != null ? request.getCgpa() : 0.0);
-        wr.setReason(request.getReason());
-        wr.setIdCardUrl(request.getIdCardUrl());
+        wr.setReason(cleanReason);
+        wr.setIdCardUrl(cleanCardUrl);
         wr.setStatus(PaymentStatus.PENDING);
         wr.setGrantedCoursesCount(6);
 

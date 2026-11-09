@@ -34,15 +34,18 @@ public class ChatService {
     private final UserRepository userRepository;
     private final ProfanityFilterService profanityFilterService;
     private final LiveSyncService liveSyncService;
+    private final InputSanitizationService inputSanitizationService;
 
     public ChatService(ChatMessageRepository chatMessageRepository,
                        UserRepository userRepository,
                        ProfanityFilterService profanityFilterService,
-                       LiveSyncService liveSyncService) {
+                       LiveSyncService liveSyncService,
+                       InputSanitizationService inputSanitizationService) {
         this.chatMessageRepository = chatMessageRepository;
         this.userRepository = userRepository;
         this.profanityFilterService = profanityFilterService;
         this.liveSyncService = liveSyncService;
+        this.inputSanitizationService = inputSanitizationService;
     }
 
     // High-performance thread-safe memory cache to eliminate database load on repeated polls
@@ -111,8 +114,8 @@ public class ChatService {
             throw new ApiException("Message text cannot be empty.");
         }
 
-        // Apply automated profanity & abusive language filter
-        String cleanText = profanityFilterService.filterProfanity(req.getText().trim());
+        // Apply enterprise input threat shield & automated profanity filter
+        String cleanText = inputSanitizationService.sanitizeAndValidateChatMessage(req.getText().trim());
 
         ChatMessage msg = new ChatMessage();
         msg.setSender(sender);

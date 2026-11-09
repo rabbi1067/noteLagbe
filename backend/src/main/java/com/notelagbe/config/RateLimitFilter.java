@@ -17,6 +17,21 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Enterprise Rate Limiting & Rapid-Click Shield Filter
+ * 1. Rapid Mutation Burst Guard: Drops duplicate mutating requests (POST, PUT, DELETE, PATCH)
+ *    within < 350ms per client IP + endpoint to prevent double-clicks and button spamming.
+ * 2. Multi-Tier Token Bucket Algorithm (Bucket4j):
+ *    - Auth Tier (Login / Register): 15 attempts / min
+ *    - Review Tier (/api/reviews): 10 evaluations / min
+ *    - Payment Tier (/api/payments): 8 submissions / min
+ *    - Financial Waiver Tier (/api/waivers): 10 submissions / min
+ *    - Contribution Tier (/api/contributions): 15 submissions / min
+ *    - Live Chat Tier (/api/chat): 30 messages / min
+ *    - Sync Tier (/api/teachers/sync-cse): 5 requests / min
+ *    - General High-Throughput API: 240 requests / min
+ * 3. Returns HTTP 429 Too Many Requests with informative English & Bengali messages.
+ */
 @Component
 @Order(1)
 public class RateLimitFilter implements Filter {
@@ -25,6 +40,9 @@ public class RateLimitFilter implements Filter {
 
     // Multi-tier bucket maps with endpoint classification
     private final Map<String, BucketEntry> buckets = new ConcurrentHashMap<>();
+    
+    // Rapid mutation cooldown map to shield against double-clicking and spam clicking
+    private final Map<String, Long> lastMutationTimes = new ConcurrentHashMap<>();
 
     private static class BucketEntry {
         final Bucket bucket;
@@ -42,18 +60,27 @@ public class RateLimitFilter implements Filter {
         if (path.startsWith("/api/auth/login") || path.startsWith("/api/auth/register")) {
             // Strict tier: 15 attempts / min (brute force protection)
             limit = Bandwidth.builder().capacity(15).refillGreedy(15, Duration.ofMinutes(1)).build();
-        } else if (path.startsWith("/api/chat/messages")) {
+        } else if (path.startsWith("/api/reviews")) {
+            // Review tier: 10 evaluations / min (anti-spam protection)
+            limit = Bandwidth.builder().capacity(10).refillGreedy(10, Duration.ofMinutes(1)).build();
+        } else if (path.startsWith("/api/payments")) {
+            // Payment tier: 8 submissions / min (anti-fraud protection)
+            limit = Bandwidth.builder().capacity(8).refillGreedy(8, Duration.ofMinutes(1)).build();
+        } else if (path.startsWith("/api/waivers")) {
+            // Financial waiver tier: 10 submissions / min
+            limit = Bandwidth.builder().capacity(10).refillGreedy(10, Duration.ofMinutes(1)).build();
+        } else if (path.startsWith("/api/chat/messages") || path.startsWith("/api/chat")) {
             // Chat tier: 30 messages / min (anti-spam protection)
             limit = Bandwidth.builder().capacity(30).refillGreedy(30, Duration.ofMinutes(1)).build();
-        } else if (path.startsWith("/api/contributions") || path.startsWith("/api/waivers")) {
+        } else if (path.startsWith("/api/contributions")) {
             // Mutation tier: 15 submissions / min
             limit = Bandwidth.builder().capacity(15).refillGreedy(15, Duration.ofMinutes(1)).build();
         } else if (path.startsWith("/api/teachers/sync-cse")) {
             // Intensive sync tier: 5 requests / min
             limit = Bandwidth.builder().capacity(5).refillGreedy(5, Duration.ofMinutes(1)).build();
         } else {
-            // General high-throughput API tier: 180 requests / min
-            limit = Bandwidth.builder().capacity(180).refillGreedy(180, Duration.ofMinutes(1)).build();
+            // General high-throughput API tier: 240 requests / min
+            limit = Bandwidth.builder().capacity(240).refillGreedy(240, Duration.ofMinutes(1)).build();
         }
 
         return Bucket.builder().addLimit(limit).build();
@@ -66,26 +93,50 @@ public class RateLimitFilter implements Filter {
         HttpServletResponse response = (HttpServletResponse) servletResponse;
 
         String path = request.getRequestURI();
+        String method = request.getMethod();
 
-        // Whitelist static files, h2 console, uploads, SSE sync streams, and admin dashboard
+        // Whitelist static files, h2 console, uploads, SSE sync streams, and admin read analytics
         if (path.startsWith("/h2-console") ||
             path.startsWith("/static") ||
             path.startsWith("/uploads") ||
             path.startsWith("/api/sync") ||
-            path.startsWith("/api/admin")) {
+            (path.startsWith("/api/admin") && "GET".equalsIgnoreCase(method))) {
             filterChain.doFilter(servletRequest, servletResponse);
             return;
         }
 
         String clientIp = getClientIP(request);
 
-        // Exclude internal localhost loopback from strict rate limiting during local dev
-        if ("127.0.0.1".equals(clientIp) || "0:0:0:0:0:0:0:1".equals(clientIp) || "localhost".equalsIgnoreCase(clientIp)) {
+        // 1. Rapid Mutation Burst Guard (< 350ms anti-rapid-click shield)
+        // Protects against user spam-clicking submit buttons or double-clicking forms
+        boolean isMutation = "POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method) ||
+                             "DELETE".equalsIgnoreCase(method) || "PATCH".equalsIgnoreCase(method);
+
+        if (isMutation) {
+            String burstKey = clientIp + ":" + method + ":" + path;
+            long now = System.currentTimeMillis();
+            Long lastTime = lastMutationTimes.put(burstKey, now);
+            if (lastTime != null && (now - lastTime) < 350) {
+                response.setStatus(429);
+                response.setHeader("Retry-After", "1");
+                response.setHeader("X-RateLimit-Remaining", "0");
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write(
+                        "{\"status\": 429, \"error\": \"Too Many Requests\", \"message\": \"You are clicking too fast! Please slow down and wait a moment before trying again.\", \"bengaliMessage\": \"আপনি খুব দ্রুত ক্লিক করছেন! দয়া করে কিছুক্ষণ অপেক্ষা করে আবার চেষ্টা করুন।\", \"retryAfterSeconds\": 1}"
+                );
+                log.warn("[RateLimit-Burst] Blocked rapid burst clicks: ip={}, method={}, path={}, deltaMs={}", clientIp, method, path, (now - lastTime));
+                return;
+            }
+        }
+
+        // 2. Localhost GET exemption to keep Next.js HMR & SSR blazing fast in development
+        boolean isLocal = "127.0.0.1".equals(clientIp) || "0:0:0:0:0:0:0:1".equals(clientIp) || "localhost".equalsIgnoreCase(clientIp);
+        if (isLocal && !isMutation) {
             filterChain.doFilter(servletRequest, servletResponse);
             return;
         }
 
-        // Cache key per client IP + path category
+        // 3. Multi-tier Token Bucket Enforcement
         String tierKey = getTierKey(path);
         String bucketKey = clientIp + ":" + tierKey;
 
@@ -111,15 +162,18 @@ public class RateLimitFilter implements Filter {
             response.setHeader("X-RateLimit-Remaining", "0");
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write(String.format(
-                    "{\"status\": 429, \"error\": \"Too Many Requests\", \"message\": \"Rate limit exceeded. Please wait %d seconds before trying again.\", \"retryAfterSeconds\": %d}",
-                    waitForRefillSeconds, waitForRefillSeconds
+                    "{\"status\": 429, \"error\": \"Too Many Requests\", \"message\": \"Rate limit exceeded. Please wait %d seconds before trying again.\", \"bengaliMessage\": \"অনুরোধের সীমা অতিক্রম করেছে। দয়া করে %d সেকেন্ড অপেক্ষা করে আবার চেষ্টা করুন।\", \"retryAfterSeconds\": %d}",
+                    waitForRefillSeconds, waitForRefillSeconds, waitForRefillSeconds
             ));
-            log.warn("[RateLimit] Throttled client: ip={}, path={}, wait={}s", clientIp, path, waitForRefillSeconds);
+            log.warn("[RateLimit] Throttled client: ip={}, path={}, tier={}, wait={}s", clientIp, path, tierKey, waitForRefillSeconds);
         }
     }
 
     private String getTierKey(String path) {
         if (path.startsWith("/api/auth")) return "auth";
+        if (path.startsWith("/api/reviews")) return "reviews";
+        if (path.startsWith("/api/payments")) return "payments";
+        if (path.startsWith("/api/waivers")) return "waivers";
         if (path.startsWith("/api/chat")) return "chat";
         if (path.startsWith("/api/contributions")) return "contrib";
         if (path.startsWith("/api/teachers/sync-cse")) return "sync";
@@ -139,7 +193,7 @@ public class RateLimitFilter implements Filter {
     }
 
     /**
-     * Scheduled memory purge: Evicts buckets idle for more than 15 minutes to guarantee zero memory leaks
+     * Scheduled memory purge: Evicts buckets idle for more than 15 minutes and expired mutation timers
      */
     @Scheduled(fixedRate = 600000) // Every 10 minutes
     public void cleanupIdleBuckets() {
@@ -147,6 +201,7 @@ public class RateLimitFilter implements Filter {
         long maxIdleMs = Duration.ofMinutes(15).toMillis();
         int initialSize = buckets.size();
         buckets.entrySet().removeIf(entry -> (now - entry.getValue().lastAccessTime) > maxIdleMs);
+        lastMutationTimes.entrySet().removeIf(entry -> (now - entry.getValue()) > 60000); // 1 minute
         int purged = initialSize - buckets.size();
         if (purged > 0) {
             log.debug("[RateLimit] Cleaned up {} idle rate-limit buckets. Active: {}", purged, buckets.size());
