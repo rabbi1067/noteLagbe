@@ -2424,6 +2424,8 @@ export default function StudentToolsPage() {
     }
 
     const themeCfg = ROUTINE_COLOR_THEMES[routineColorTheme] || ROUTINE_COLOR_THEMES.navy;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const logoUrl = origin ? `${origin}/seu-official-logo.png` : "/seu-official-logo.png";
 
     let rowsHtml = "";
     SEU_TIMELINE_DAYS.forEach(({ code, fullDay, bg }, rIdx) => {
@@ -2473,15 +2475,12 @@ export default function StudentToolsPage() {
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>SEU Class Timetable (8:00 AM – 6:30 PM)</title>
+  <title>SEU Class Timetable • NoteLagbe</title>
   <style>
     @page { size: landscape; margin: 8mm; }
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 12px; background: ${themeCfg.printBg}; color: ${themeCfg.printCardCode}; }
     .no-print { display: flex; justify-content: space-between; align-items: center; background: ${themeCfg.printRulerBg}; padding: 10px 16px; border-radius: 8px; margin-bottom: 12px; border: 1px solid ${themeCfg.printContainerBorder}; }
-    .header { text-align: center; margin-bottom: 12px; border-bottom: 2px solid ${themeCfg.printHeaderLine}; padding-bottom: 8px; }
-    .header h1 { margin: 0; font-size: 20px; font-weight: 900; color: ${themeCfg.printHeaderH1}; letter-spacing: 0.5px; }
-    .header p { margin: 3px 0 0; font-size: 11px; color: ${themeCfg.printHeaderP}; }
     @media print {
       body { padding: 0; background: ${themeCfg.printBg} !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .no-print { display: none !important; }
@@ -2493,10 +2492,37 @@ export default function StudentToolsPage() {
     <span style="font-size: 13px; font-weight: bold; color: ${themeCfg.printRulerText};">📄 Southeast University Weekly Routine Timeline (8:00 AM – 6:30 PM) • [Theme: ${themeCfg.name}]</span>
     <button onclick="window.print()" style="background: ${themeCfg.printHeaderLine}; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;">🖨️ Print / Save as PDF</button>
   </div>
-  <div class="header">
-    <h1>SOUTHEAST UNIVERSITY</h1>
-    <p>Official Weekly Class Routine & Schedule • All Academic Departments (8:00 AM – 6:30 PM)</p>
+
+  <!-- Official Southeast University & NoteLagbe Branded Header -->
+  <div style="border: 1px solid ${themeCfg.printContainerBorder}; border-radius: 12px; background: ${themeCfg.printContainerBg}; margin-bottom: 12px; padding: 12px 18px; overflow: hidden;">
+    <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid ${themeCfg.printHeaderLine};">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="background: #2563eb; color: #fff; font-weight: 900; font-size: 13px; padding: 4px 10px; border-radius: 6px; letter-spacing: 0.5px;">NoteLagbe <span style="font-size: 9.5px; opacity: 0.85; font-family: monospace;">SEU</span></div>
+        <div style="text-align: left;">
+          <div style="font-size: 11.5px; font-weight: 800; color: ${themeCfg.printHeaderH1};">Southeast University Academic Resource & Routine Archive</div>
+          <div style="font-size: 9.5px; color: ${themeCfg.printHeaderP}; font-weight: 600;">Official Student Portal • notelagbe.vercel.app</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <span style="border: 1px solid ${themeCfg.printContainerBorder}; background: ${themeCfg.printRulerBg}; color: ${themeCfg.printRulerText}; font-size: 10px; font-weight: bold; padding: 3px 10px; border-radius: 9999px;">
+          🟢 Verified Official Schedule (8:00 AM – 6:30 PM)
+        </span>
+        <span style="border: 1px solid ${themeCfg.printContainerBorder}; background: ${themeCfg.printRulerBg}; color: ${themeCfg.printRulerText}; font-size: 10px; font-weight: bold; padding: 3px 10px; border-radius: 9999px;">
+          ${routineEntries.length} ${routineEntries.length === 1 ? "Class" : "Classes"} Scheduled
+        </span>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: center; gap: 16px; text-align: left;">
+      <img src="${logoUrl}" style="width: 54px; height: 54px; object-fit: contain; flex-shrink: 0;" alt="Southeast University Crest" />
+      <div>
+        <h1 style="margin: 0; font-size: 21px; font-weight: 900; color: ${themeCfg.printHeaderH1}; letter-spacing: 0.8px; font-family: serif; text-transform: uppercase;">SOUTHEAST UNIVERSITY</h1>
+        <p style="margin: 2px 0 0; font-size: 12px; color: ${themeCfg.printHeaderP}; font-style: italic; font-family: serif; font-weight: 600;">Meeting the Challenges of Time</p>
+        <p style="margin: 2px 0 0; font-size: 10px; color: ${themeCfg.printRulerText}; font-family: monospace; font-weight: bold; letter-spacing: 0.5px;">WEEKLY CLASS ROUTINE & SCHEDULE • ALL DEPARTMENTS</p>
+      </div>
+    </div>
   </div>
+
   <div style="border: 1px solid ${themeCfg.printContainerBorder}; border-radius: 12px; overflow: hidden; background: ${themeCfg.printContainerBg};">
     <!-- Timeline Hours Ruler -->
     <div style="display: flex; height: 32px; background: ${themeCfg.printRulerBg}; border-bottom: 1px solid ${themeCfg.printRulerBorder}; align-items: center;">
@@ -2508,9 +2534,16 @@ export default function StudentToolsPage() {
     <!-- Day Rows -->
     ${rowsHtml}
   </div>
+
+  <!-- Document Footer -->
+  <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-family: monospace; color: ${themeCfg.printHeaderP}; padding: 4px 6px;">
+    <div>Generated via <strong>NoteLagbe</strong> (notelagbe.vercel.app) • Official SEU Student Academic Portal</div>
+    <div>Tejgaon Permanent Campus, Dhaka • Session: 2026</div>
+  </div>
+
   <script>
     window.onload = function() {
-      setTimeout(function() { window.print(); }, 400);
+      setTimeout(function() { window.print(); }, 500);
     };
   </script>
 </body>
@@ -2537,13 +2570,14 @@ export default function StudentToolsPage() {
           : "Generating high-resolution routine PNG image..."
       );
 
-      await new Promise((r) => setTimeout(r, 120));
+      await new Promise((r) => setTimeout(r, 150));
 
       const { toPng } = await import("html-to-image");
       const themeCfg = ROUTINE_COLOR_THEMES[routineColorTheme] || ROUTINE_COLOR_THEMES.navy;
       const el = routineContainerRef.current;
-      const targetWidth = Math.max(el.scrollWidth, 980);
-      const bgColor = themeCfg.printBg || "#0b1328";
+      const targetWidth = Math.max(el.offsetWidth, el.scrollWidth, 1060);
+      const targetHeight = Math.max(el.offsetHeight, el.scrollHeight);
+      const bgColor = themeCfg.printBg || (routineColorTheme === "daylight" ? "#ffffff" : "#070e1c");
 
       let dataUrl = "";
       try {
@@ -2551,9 +2585,16 @@ export default function StudentToolsPage() {
           quality: 1,
           pixelRatio: 2.5,
           width: targetWidth,
+          height: targetHeight,
           backgroundColor: bgColor,
           skipFonts: true,
           cacheBust: true,
+          style: {
+            overflow: "hidden",
+            overflowX: "hidden",
+            overflowY: "hidden",
+            scrollbarWidth: "none",
+          },
         });
       } catch (e1) {
         console.warn("toPng with skipFonts error, retrying standard:", e1);
@@ -2562,8 +2603,15 @@ export default function StudentToolsPage() {
             quality: 1,
             pixelRatio: 2.5,
             width: targetWidth,
+            height: targetHeight,
             backgroundColor: bgColor,
             cacheBust: true,
+            style: {
+              overflow: "hidden",
+              overflowX: "hidden",
+              overflowY: "hidden",
+              scrollbarWidth: "none",
+            },
           });
         } catch (e2) {
           console.warn("Standard toPng error, falling back to html2canvas:", e2);
@@ -2575,6 +2623,11 @@ export default function StudentToolsPage() {
             backgroundColor: bgColor,
             logging: false,
             width: targetWidth,
+            height: targetHeight,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: targetWidth,
+            windowHeight: targetHeight,
           });
           dataUrl = canvas.toDataURL("image/png");
         }
@@ -6767,129 +6820,255 @@ export default function StudentToolsPage() {
                 </div>
               </div>
 
-              <div ref={routineContainerRef} id="seu-routine-grid-container" className={`overflow-x-auto border rounded-2xl transition-all duration-300 ${curRoutineTheme.containerClass}`}>
-                <div className="min-w-[920px]">
-                  
-                  {/* Top Hours Ruler (08 to 20 / 8 AM to 8 PM) */}
-                  <div className={`flex items-center h-10 border-b transition-colors duration-300 ${curRoutineTheme.rulerClass}`}>
-                    <div className={`w-16 sm:w-20 shrink-0 border-r flex items-center justify-center font-mono text-[11px] font-extrabold ${curRoutineTheme.dayLabelClass} ${curRoutineTheme.rulerTextClass}`}>
-                      DAY
+              {/* Outer Horizontal Scroll Wrapper (Only scrollable container for responsiveness) */}
+              <div className="w-full overflow-x-auto rounded-3xl pb-2 scrollbar-thin scrollbar-thumb-slate-700/60 scrollbar-track-transparent">
+                {/* Inner Full-Width Export Card (Target of routineContainerRef for PNG export - ZERO scrollbars guaranteed) */}
+                <div
+                  ref={routineContainerRef}
+                  id="seu-routine-export-card"
+                  style={{ overflow: "hidden" }}
+                  className={`min-w-[1060px] w-full border rounded-3xl transition-all duration-300 shadow-2xl overflow-hidden ${curRoutineTheme.containerClass}`}
+                >
+                  {/* ======================================================== */}
+                  {/* OFFICIAL SOUTHEAST UNIVERSITY & NOTELAGBE BRAND HEADER   */}
+                  {/* ======================================================== */}
+                  <div className={`p-4 sm:p-5 border-b select-none transition-colors duration-300 ${
+                    routineColorTheme === "daylight"
+                      ? "bg-slate-50/90 border-slate-200"
+                      : "bg-white/[0.03] border-white/10"
+                  }`}>
+                    {/* NoteLagbe Official Academic Portal Branding Strip */}
+                    <div className={`flex flex-wrap items-center justify-between pb-3 mb-3 border-b gap-3 ${
+                      routineColorTheme === "daylight" ? "border-slate-200" : "border-white/10"
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-xs tracking-wider shadow-md shadow-blue-900/30">
+                          <span>NoteLagbe</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/20 uppercase tracking-widest font-mono">SEU</span>
+                        </div>
+                        <div className="flex flex-col text-left">
+                          <div className={`font-extrabold text-xs tracking-tight flex items-center gap-1.5 ${
+                            routineColorTheme === "daylight" ? "text-slate-900" : "text-white"
+                          }`}>
+                            <span>Southeast University Academic Resource & Routine Archive</span>
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9.5px] font-mono font-bold tracking-wider">
+                              VERIFIED
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-blue-500 dark:text-blue-400 font-semibold">
+                            Official Student Academic Portal • notelagbe.vercel.app
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Schedule Stats Pills */}
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10.5px] font-bold font-mono border ${
+                          routineColorTheme === "daylight"
+                            ? "bg-blue-50 text-blue-700 border-blue-200"
+                            : "bg-blue-500/10 text-blue-300 border-blue-500/30"
+                        }`}>
+                          <Clock className="w-3 h-3 text-blue-500" />
+                          8:00 AM – 6:30 PM (All Slots)
+                        </span>
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10.5px] font-bold font-mono border ${
+                          routineColorTheme === "daylight"
+                            ? "bg-purple-50 text-purple-700 border-purple-200"
+                            : "bg-purple-500/10 text-purple-300 border-purple-500/30"
+                        }`}>
+                          <Calendar className="w-3 h-3 text-purple-500" />
+                          {routineEntries.length} {routineEntries.length === 1 ? "Class" : "Classes"} Scheduled
+                        </span>
+                      </div>
                     </div>
-                    <div className="grow relative h-full flex items-center">
-                      {SEU_TIMELINE_HOURS.map((hour, idx) => {
-                        const leftPercent = (idx / (SEU_TIMELINE_HOURS.length - 1)) * 100;
-                        const hourLabel = routineTimeFormat === "12h"
-                          ? (hour === 12 ? "12 PM" : hour > 12 ? `${hour - 12} PM` : `${hour} AM`)
-                          : `${hour.toString().padStart(2, "0")}:00`;
-                        const translateX = idx === 0 ? "0%" : idx === SEU_TIMELINE_HOURS.length - 1 ? "-100%" : "-50%";
+
+                    {/* Main University Crest & Title Centerpiece */}
+                    <div className="flex items-center justify-between gap-4 py-1">
+                      <div className="flex items-center gap-3.5">
+                        {/* Official Transparent Southeast University Crest */}
+                        <img
+                          src="/seu-official-logo.png"
+                          alt="Southeast University Crest"
+                          className="w-14 h-14 sm:w-16 sm:h-16 object-contain shrink-0 drop-shadow-md"
+                        />
+                        <div className="flex flex-col text-left">
+                          <h1 className={`text-xl sm:text-2xl font-serif font-black tracking-tight uppercase leading-none ${
+                            routineColorTheme === "daylight" ? "text-[#173775]" : "text-white"
+                          }`}>
+                            SOUTHEAST UNIVERSITY
+                          </h1>
+                          <p className={`text-xs sm:text-sm italic font-serif font-semibold mt-1 tracking-wide ${
+                            routineColorTheme === "daylight" ? "text-slate-600" : "text-slate-300"
+                          }`}>
+                            Meeting the Challenges of Time
+                          </p>
+                          <p className="text-[11px] font-mono uppercase tracking-widest text-blue-500 dark:text-blue-400 font-bold mt-1">
+                            Smart Weekly Class Routine & Academic Timetable
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Theme & Session Metadata Badges on the right */}
+                      <div className="hidden sm:flex flex-col items-end gap-1.5 text-right font-mono">
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                          routineColorTheme === "daylight"
+                            ? "bg-slate-100 text-slate-800 border-slate-300"
+                            : "bg-white/10 text-slate-200 border-white/10"
+                        }`}>
+                          Session: Academic Year 2026
+                        </span>
+                        <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                          <span>Palette:</span>
+                          <span className="text-blue-500 dark:text-blue-400 font-bold uppercase">{curRoutineTheme.name}</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ======================================================== */}
+                  {/* ROUTINE TIMELINE GRID (HOURS RULER & DAY ROWS)          */}
+                  {/* ======================================================== */}
+                  <div className="w-full">
+                    {/* Top Hours Ruler (08 to 20 / 8 AM to 8 PM) */}
+                    <div className={`flex items-center h-10 border-b transition-colors duration-300 ${curRoutineTheme.rulerClass}`}>
+                      <div className={`w-16 sm:w-20 shrink-0 border-r flex items-center justify-center font-mono text-[11px] font-extrabold ${curRoutineTheme.dayLabelClass} ${curRoutineTheme.rulerTextClass}`}>
+                        DAY
+                      </div>
+                      <div className="grow relative h-full flex items-center">
+                        {SEU_TIMELINE_HOURS.map((hour, idx) => {
+                          const leftPercent = (idx / (SEU_TIMELINE_HOURS.length - 1)) * 100;
+                          const hourLabel = routineTimeFormat === "12h"
+                            ? (hour === 12 ? "12 PM" : hour > 12 ? `${hour - 12} PM` : `${hour} AM`)
+                            : `${hour.toString().padStart(2, "0")}:00`;
+                          const translateX = idx === 0 ? "0%" : idx === SEU_TIMELINE_HOURS.length - 1 ? "-100%" : "-50%";
+                          return (
+                            <div
+                              key={hour}
+                              style={{ left: `${leftPercent}%`, transform: `translateX(${translateX})` }}
+                              className="absolute flex flex-col items-center select-none"
+                            >
+                              <span className={`font-mono text-[11px] font-bold ${curRoutineTheme.rulerTextClass}`}>
+                                {hourLabel}
+                              </span>
+                              <div className={`w-[1px] h-1.5 mt-0.5 ${curRoutineTheme.rulerTickClass}`} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Day Rows: SUN, MON, TUE, WED, THU, FRI, SAT */}
+                    <div className={`divide-y transition-colors duration-300 ${curRoutineTheme.rowDividerClass}`}>
+                      {SEU_TIMELINE_DAYS.map(({ code, fullDay, bg }, rIdx) => {
+                        const dayClasses = routineEntries.filter(e => e.day === fullDay || e.day === code);
+                        const isAlternate = rIdx % 2 === 1;
+
                         return (
                           <div
-                            key={hour}
-                            style={{ left: `${leftPercent}%`, transform: `translateX(${translateX})` }}
-                            className="absolute flex flex-col items-center select-none"
+                            key={code}
+                            className={`flex items-stretch min-h-[76px] transition-colors relative ${
+                              isAlternate ? curRoutineTheme.rowOddClass : curRoutineTheme.rowEvenClass
+                            } ${curRoutineTheme.rowHoverClass}`}
                           >
-                            <span className={`font-mono text-[11px] font-bold ${curRoutineTheme.rulerTextClass}`}>
-                              {hourLabel}
-                            </span>
-                            <div className={`w-[1px] h-1.5 mt-0.5 ${curRoutineTheme.rulerTickClass}`} />
+                            {/* Day Label on Left (SUN, MON, TUE...) */}
+                            <div className={`w-16 sm:w-20 shrink-0 border-r flex items-center justify-center font-mono font-black text-xs sm:text-sm tracking-wider select-none ${curRoutineTheme.dayLabelClass} ${curRoutineTheme.dayLabelTextClass}`}>
+                              {code}
+                            </div>
+
+                            {/* Timeline Canvas Track */}
+                            <div className="grow relative min-h-[76px]">
+                              {/* Vertical hour guidelines */}
+                              {SEU_TIMELINE_HOURS.map((_, hIdx) => (
+                                <div
+                                  key={hIdx}
+                                  style={{ left: `${(hIdx / (SEU_TIMELINE_HOURS.length - 1)) * 100}%` }}
+                                  className={`absolute top-0 bottom-0 w-[1px] pointer-events-none ${curRoutineTheme.gridLineClass}`}
+                                />
+                              ))}
+
+                              {/* Positioned Class Cards */}
+                              {dayClasses.map((item) => {
+                                const timeParsed = parseTimeToMinutes(item.time);
+                                const startMin = timeParsed ? Math.max(480, timeParsed.start) : 480;
+                                const endMin = timeParsed ? Math.min(1140, timeParsed.end) : 560;
+                                const leftPercent = Math.max(0, Math.min(95, ((startMin - 480) / 660) * 100));
+                                const widthPercent = Math.max(7, Math.min(100 - leftPercent, ((endMin - startMin) / 660) * 100));
+                                const timeLabel = routineTimeFormat === "12h" ? formatRange12(item.time) : formatRange24(item.time);
+                                const isClashing = clashes.some(c => (c.e1.id === item.id || c.e2.id === item.id));
+
+                                return (
+                                  <div
+                                    key={item.id}
+                                    style={{
+                                      left: `${leftPercent}%`,
+                                      width: `${widthPercent}%`,
+                                      minWidth: "92px",
+                                    }}
+                                    className={`absolute top-1.5 bottom-1.5 rounded-xl p-2 border transition-all shadow-md group z-10 flex flex-col justify-between ${
+                                      isClashing
+                                        ? "bg-rose-950/90 border-2 border-rose-500 text-rose-100 ring-2 ring-rose-500/50 shadow-rose-500/20"
+                                        : curRoutineTheme.cardNormalClass
+                                    }`}
+                                  >
+                                    {/* Line 1: Course Code & Section e.g. CSE381.4 */}
+                                    <div className="flex items-center justify-between gap-1 leading-none">
+                                      <span className={`font-mono font-black text-xs tracking-tight truncate ${curRoutineTheme.cardCodeClass}`}>
+                                        {item.fullCode || item.code}
+                                      </span>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          removeRoutineEntry(item.id);
+                                        }}
+                                        className="text-slate-400 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-xs cursor-pointer print:hidden"
+                                        title="Remove from routine"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+
+                                    {/* Line 2: 24h Time e.g. 11:30-12:50 */}
+                                    <div className={`font-mono text-[10px] font-semibold leading-tight mt-0.5 truncate ${curRoutineTheme.cardTimeClass}`}>
+                                      {timeLabel}
+                                    </div>
+
+                                    {/* Line 3: Room e.g. 📍 SEU419 */}
+                                    <div className={`text-[9.5px] font-semibold flex items-center gap-1 mt-0.5 leading-none truncate ${curRoutineTheme.cardRoomClass}`}>
+                                      <MapPin className={`w-2.5 h-2.5 shrink-0 ${curRoutineTheme.cardIconClass}`} />
+                                      <span className="truncate">{item.room || "SEU TBA"}</span>
+                                      {item.teacher && (
+                                        <span className="opacity-75 font-normal truncate">• {item.teacher}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         );
                       })}
                     </div>
                   </div>
 
-                  {/* Day Rows: SUN, MON, TUE, WED, THU, FRI, SAT */}
-                  <div className={`divide-y transition-colors duration-300 ${curRoutineTheme.rowDividerClass}`}>
-                    {SEU_TIMELINE_DAYS.map(({ code, fullDay, bg }, rIdx) => {
-                      const dayClasses = routineEntries.filter(e => e.day === fullDay || e.day === code);
-                      const isAlternate = rIdx % 2 === 1;
-
-                      return (
-                        <div
-                          key={code}
-                          className={`flex items-stretch min-h-[76px] transition-colors relative ${
-                            isAlternate ? curRoutineTheme.rowOddClass : curRoutineTheme.rowEvenClass
-                          } ${curRoutineTheme.rowHoverClass}`}
-                        >
-                          {/* Day Label on Left (SUN, MON, TUE...) */}
-                          <div className={`w-16 sm:w-20 shrink-0 border-r flex items-center justify-center font-mono font-black text-xs sm:text-sm tracking-wider select-none ${curRoutineTheme.dayLabelClass} ${curRoutineTheme.dayLabelTextClass}`}>
-                            {code}
-                          </div>
-
-                          {/* Timeline Canvas Track */}
-                          <div className="grow relative min-h-[76px]">
-                            {/* Vertical hour guidelines */}
-                            {SEU_TIMELINE_HOURS.map((_, hIdx) => (
-                              <div
-                                key={hIdx}
-                                style={{ left: `${(hIdx / (SEU_TIMELINE_HOURS.length - 1)) * 100}%` }}
-                                className={`absolute top-0 bottom-0 w-[1px] pointer-events-none ${curRoutineTheme.gridLineClass}`}
-                              />
-                            ))}
-
-                            {/* Positioned Class Cards */}
-                            {dayClasses.map((item) => {
-                              const timeParsed = parseTimeToMinutes(item.time);
-                              const startMin = timeParsed ? Math.max(480, timeParsed.start) : 480;
-                              const endMin = timeParsed ? Math.min(1140, timeParsed.end) : 560;
-                              const leftPercent = Math.max(0, Math.min(95, ((startMin - 480) / 660) * 100));
-                              const widthPercent = Math.max(7, Math.min(100 - leftPercent, ((endMin - startMin) / 660) * 100));
-                              const timeLabel = routineTimeFormat === "12h" ? formatRange12(item.time) : formatRange24(item.time);
-                              const isClashing = clashes.some(c => (c.e1.id === item.id || c.e2.id === item.id));
-
-                              return (
-                                <div
-                                  key={item.id}
-                                  style={{
-                                    left: `${leftPercent}%`,
-                                    width: `${widthPercent}%`,
-                                    minWidth: "92px",
-                                  }}
-                                  className={`absolute top-1.5 bottom-1.5 rounded-xl p-2 border transition-all shadow-md group z-10 flex flex-col justify-between ${
-                                    isClashing
-                                      ? "bg-rose-950/90 border-2 border-rose-500 text-rose-100 ring-2 ring-rose-500/50 shadow-rose-500/20"
-                                      : curRoutineTheme.cardNormalClass
-                                  }`}
-                                >
-                                  {/* Line 1: Course Code & Section e.g. CSE381.4 */}
-                                  <div className="flex items-center justify-between gap-1 leading-none">
-                                    <span className={`font-mono font-black text-xs tracking-tight truncate ${curRoutineTheme.cardCodeClass}`}>
-                                      {item.fullCode || item.code}
-                                    </span>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        removeRoutineEntry(item.id);
-                                      }}
-                                      className="text-slate-400 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-xs cursor-pointer"
-                                      title="Remove from routine"
-                                    >
-                                      ✕
-                                    </button>
-                                  </div>
-
-                                  {/* Line 2: 24h Time e.g. 11:30-12:50 */}
-                                  <div className={`font-mono text-[10px] font-semibold leading-tight mt-0.5 truncate ${curRoutineTheme.cardTimeClass}`}>
-                                    {timeLabel}
-                                  </div>
-
-                                  {/* Line 3: Room e.g. 📍 SEU419 */}
-                                  <div className={`text-[9.5px] font-semibold flex items-center gap-1 mt-0.5 leading-none truncate ${curRoutineTheme.cardRoomClass}`}>
-                                    <MapPin className={`w-2.5 h-2.5 shrink-0 ${curRoutineTheme.cardIconClass}`} />
-                                    <span className="truncate">{item.room || "SEU TBA"}</span>
-                                    {item.teacher && (
-                                      <span className="opacity-75 font-normal truncate">• {item.teacher}</span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
+                  {/* ======================================================== */}
+                  {/* OFFICIAL NOTELAGBE VERIFICATION FOOTER STRIP            */}
+                  {/* ======================================================== */}
+                  <div className={`px-5 py-2.5 border-t flex items-center justify-between text-[10px] font-mono select-none ${
+                    routineColorTheme === "daylight"
+                      ? "bg-slate-50 border-slate-200 text-slate-500"
+                      : "bg-white/[0.02] border-white/10 text-slate-400"
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <span className={`font-bold ${routineColorTheme === "daylight" ? "text-blue-600" : "text-white"}`}>NoteLagbe</span>
+                      <span>•</span>
+                      <span>Southeast University Official Academic Portal</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span>Tejgaon Permanent Campus, Dhaka</span>
+                      <span>•</span>
+                      <span className="text-blue-500 font-bold">notelagbe.vercel.app</span>
+                    </div>
                   </div>
-
                 </div>
               </div>
 
