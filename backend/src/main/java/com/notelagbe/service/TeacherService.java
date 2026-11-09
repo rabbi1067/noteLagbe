@@ -66,15 +66,13 @@ public class TeacherService {
 
     public List<TeacherCourse> getCoursesTaughtByTeacher(Long teacherId) {
         List<TeacherCourse> list = new java.util.ArrayList<>(teacherCourseRepository.findByTeacherId(teacherId));
-        // Strict filter: purge/remove any demo mappings with TBA schedule if no real resource exists
+        // Strict filter: purge/remove any demo mappings if no real resource exists and not admin assigned
         list.removeIf(tc -> {
-            boolean isDemoSchedule = tc.getScheduleInfo() != null && tc.getScheduleInfo().contains("TBA @ Southeast University");
-            if (isDemoSchedule) {
-                boolean hasResource = tc.getCourse() != null && resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
-                        tc.getCourse().getCode(), teacherId, com.notelagbe.entity.ResourceStatus.APPROVED);
-                return !hasResource;
-            }
-            return false;
+            if (tc.getCourse() == null) return true;
+            boolean hasResource = resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
+                    tc.getCourse().getCode(), teacherId, com.notelagbe.entity.ResourceStatus.APPROVED);
+            boolean isAdminAssigned = "ADMIN_ASSIGNED".equalsIgnoreCase(tc.getScheduleInfo());
+            return !hasResource && !isAdminAssigned;
         });
 
         java.util.Set<Long> existingCourseIds = list.stream().filter(tc -> tc.getCourse() != null).map(tc -> tc.getCourse().getId()).collect(java.util.stream.Collectors.toSet());

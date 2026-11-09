@@ -113,14 +113,12 @@ export default function TeacherDetailPage() {
       .then(([tData, cData, rData, revData]) => {
         setTeacher(tData);
 
-        // Strict safety filter: purge demo TBA courses that have no actual uploaded materials
+        // Strict safety filter: only include courses that have real uploaded materials or are admin-assigned
         const realCourses = (cData || []).filter((c: any) => {
-          if (c.scheduleInfo && c.scheduleInfo.includes("TBA @ Southeast University")) {
-            const courseCode = (c.course?.code || c.code || "").toLowerCase();
-            const hasResource = (rData || []).some((r: any) => (r.course?.code || "").toLowerCase() === courseCode);
-            return hasResource;
-          }
-          return true;
+          const courseCode = (c.course?.code || c.code || "").toLowerCase();
+          const hasResource = (rData || []).some((r: any) => (r.course?.code || "").toLowerCase() === courseCode);
+          const isAdminAssigned = c.scheduleInfo === "ADMIN_ASSIGNED";
+          return hasResource || isAdminAssigned;
         });
 
         // Also dynamically include courses with approved materials if not already in realCourses

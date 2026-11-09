@@ -341,17 +341,11 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
                 toPurge.add(tc);
                 continue;
             }
-            boolean isDemoSchedule = tc.getScheduleInfo() != null && tc.getScheduleInfo().contains("TBA @ Southeast University");
-            if (isDemoSchedule) {
-                boolean hasResource = resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
-                        tc.getCourse().getCode(), tc.getTeacher().getId(), ResourceStatus.APPROVED);
-                if (!hasResource) {
-                    toPurge.add(tc);
-                } else {
-                    tc.setScheduleInfo(null);
-                    tc.setSection("General");
-                    teacherCourseRepository.save(tc);
-                }
+            boolean hasApprovedResource = resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
+                    tc.getCourse().getCode(), tc.getTeacher().getId(), ResourceStatus.APPROVED);
+            boolean isAdminAssigned = "ADMIN_ASSIGNED".equalsIgnoreCase(tc.getScheduleInfo());
+            if (!hasApprovedResource && !isAdminAssigned) {
+                toPurge.add(tc);
             }
         }
         if (!toPurge.isEmpty()) {

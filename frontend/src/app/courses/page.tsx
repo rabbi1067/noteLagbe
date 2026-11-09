@@ -38,7 +38,7 @@ export default function CoursesPage() {
         setCourses(validCourses);
         setAllCourses(validCourses);
         try {
-          localStorage.setItem("notelagbe_cached_courses_v3", JSON.stringify(validCourses));
+          localStorage.setItem("notelagbe_cached_courses_v4", JSON.stringify(validCourses));
         } catch {}
       }
     } catch {
@@ -51,7 +51,7 @@ export default function CoursesPage() {
   // Load from local storage cache if available and revalidate silently
   useEffect(() => {
     try {
-      const cached = localStorage.getItem("notelagbe_cached_courses_v3");
+      const cached = localStorage.getItem("notelagbe_cached_courses_v4");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -458,55 +458,64 @@ export default function CoursesPage() {
                   {language === "bn" ? "দায়িত্বপ্রাপ্ত শিক্ষক ও ম্যাটেরিয়াল:" : "Assigned Faculty & Material Status:"}
                 </p>
 
-                {course.teachers && course.teachers.length > 0 ? (
-                  <div className="space-y-1.5">
-                    {course.teachers.slice(0, 3).map((teacher: any) => (
-                      <div
-                        key={teacher.id}
-                        className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0">
-                            {teacher.initial ? teacher.initial.substring(0, 2) : teacher.name.charAt(0)}
-                          </span>
-                          <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
-                            {teacher.name} {teacher.initial ? `[${teacher.initial}]` : ""}
-                          </span>
-                        </div>
+                {(() => {
+                  const validTeachers = (course.teachers || []).filter((teacher: any) =>
+                    teacher.hasNotes ||
+                    teacher.hasQuestions ||
+                    (teacher.notesCount && teacher.notesCount > 0) ||
+                    (teacher.questionsCount && teacher.questionsCount > 0) ||
+                    teacher.scheduleInfo === "ADMIN_ASSIGNED"
+                  );
+                  return validTeachers.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {validTeachers.slice(0, 3).map((teacher: any) => (
+                        <div
+                          key={teacher.id}
+                          className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0">
+                              {teacher.initial ? teacher.initial.substring(0, 2) : teacher.name.charAt(0)}
+                            </span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                              {teacher.name} {teacher.initial ? `[${teacher.initial}]` : ""}
+                            </span>
+                          </div>
 
-                        {/* Availability Pill */}
-                        <div className="shrink-0 pl-2">
-                          {teacher.hasNotes && teacher.hasQuestions ? (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                              {language === "bn" ? "নোট ও প্রশ্ন" : "Notes & Qs"}
-                            </span>
-                          ) : teacher.hasNotes ? (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
-                              {language === "bn" ? "নোট" : "Notes"}
-                            </span>
-                          ) : teacher.hasQuestions ? (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
-                              {language === "bn" ? "প্রশ্ন" : "Exam Papers"}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-medium text-slate-400">
-                              {language === "bn" ? "আসছে" : "Upcoming"}
-                            </span>
-                          )}
+                          {/* Availability Pill */}
+                          <div className="shrink-0 pl-2">
+                            {teacher.hasNotes && teacher.hasQuestions ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                {language === "bn" ? "নোট ও প্রশ্ন" : "Notes & Qs"}
+                              </span>
+                            ) : teacher.hasNotes ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                                {language === "bn" ? "নোট" : "Notes"}
+                              </span>
+                            ) : teacher.hasQuestions ? (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
+                                {language === "bn" ? "প্রশ্ন" : "Exam Papers"}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                {language === "bn" ? "অ্যাসাইনকৃত শিক্ষক" : "Assigned Faculty"}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                    {course.teachers.length > 3 && (
-                      <p className="text-[10px] text-slate-400 text-right pr-1">
-                        +{course.teachers.length - 3} {language === "bn" ? "জন শিক্ষক" : "more faculty members"}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 italic py-1">
-                    {language === "bn" ? "কোর্স রেজিস্ট্রেশন অনুযায়ী শিক্ষক নির্ধারিত হবে" : "Faculty assigned on course registration"}
-                  </p>
-                )}
+                      ))}
+                      {validTeachers.length > 3 && (
+                        <p className="text-[10px] text-slate-400 text-right pr-1">
+                          +{validTeachers.length - 3} {language === "bn" ? "জন শিক্ষক" : "more faculty members"}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic py-1">
+                      {language === "bn" ? "কোর্স রেজিস্ট্রেশন অনুযায়ী শিক্ষক নির্ধারিত হবে" : "Faculty assigned on course registration"}
+                    </p>
+                  );
+                })()}
               </div>
 
               {/* Card Footer: Action */}

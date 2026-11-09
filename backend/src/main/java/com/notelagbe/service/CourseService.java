@@ -161,11 +161,11 @@ public class CourseService {
         Map<Long, Teacher> distinctTeachers = new LinkedHashMap<>();
         for (TeacherCourse tc : tcs) {
             if (tc.getTeacher() != null) {
-                boolean isDemo = tc.getScheduleInfo() != null && tc.getScheduleInfo().contains("TBA @ Southeast University");
-                if (isDemo) {
-                    boolean hasRes = resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
-                            course.getCode(), tc.getTeacher().getId(), ResourceStatus.APPROVED);
-                    if (!hasRes) continue;
+                boolean hasRes = resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
+                        course.getCode(), tc.getTeacher().getId(), ResourceStatus.APPROVED);
+                boolean isAdminAssigned = "ADMIN_ASSIGNED".equalsIgnoreCase(tc.getScheduleInfo());
+                if (!hasRes && !isAdminAssigned) {
+                    continue; // Skip any demo or unverified auto-assignments
                 }
                 distinctTeachers.putIfAbsent(tc.getTeacher().getId(), tc.getTeacher());
             }
@@ -270,16 +270,21 @@ public class CourseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with code: " + courseCode));
         Teacher teacher = teacherRepository.findById(teacherId)
                 .orElseThrow(() -> new ResourceNotFoundException("Teacher not found with id: " + teacherId));
-        if (!teacherCourseRepository.existsByCourseIdAndTeacherId(course.getId(), teacher.getId())) {
+        java.util.Optional<TeacherCourse> existingOpt = teacherCourseRepository.findByCourseIdAndTeacherId(course.getId(), teacher.getId());
+        if (existingOpt.isPresent()) {
+            TeacherCourse tc = existingOpt.get();
+            tc.setScheduleInfo("ADMIN_ASSIGNED");
+            teacherCourseRepository.save(tc);
+        } else {
             TeacherCourse tc = new TeacherCourse();
             tc.setCourse(course);
             tc.setTeacher(teacher);
             tc.setSection("General");
-            tc.setScheduleInfo(null);
+            tc.setScheduleInfo("ADMIN_ASSIGNED");
             teacherCourseRepository.save(tc);
-            liveSyncService.broadcast("matrix", "assigned", courseCode + "->" + teacherId);
-            liveSyncService.broadcast("teacher_course", "updated", teacherId);
         }
+        liveSyncService.broadcast("matrix", "assigned", courseCode + "->" + teacherId);
+        liveSyncService.broadcast("teacher_course", "updated", teacherId);
     }
 
     @CacheEvict(value = {"courses", "course_details", "teachers", "teacher_details", "teacher_courses"}, allEntries = true)

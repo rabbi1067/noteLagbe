@@ -461,29 +461,7 @@ public class DemoDataSeeder implements CommandLineRunner {
             log.error("Failed to load teacher_course_offerings.json", e);
         }
 
-        // Map Shakib Sir and Belal Sir to CSE241 (Data Structures)
-        mapTeacherToCourse("CSE241", "Md. Shakib Hasan", "MSH", "Sec 1", "SUN # 09:50 ~ 11:10 @ SEU528");
-        mapTeacherToCourse("CSE241", "Belal Ahmed", "BA", "Sec 2", "MON # 11:20 ~ 12:40 @ SEU529");
-
-        // Map Shakib Sir and Shanto Sir to CSE347 (Advanced Networking)
-        mapTeacherToCourse("CSE347", "Md. Shakib Hasan", "MSH", "Sec 1", "SUN # 08:30 ~ 09:50 @ SEU528");
-        mapTeacherToCourse("CSE347", "Anik Mahmud Shanto", "AMS", "Sec 2", "TUE # 11:20 ~ 12:40 @ SEU529");
-
-        // Map Shakib Sir and Shanto Sir to CSE348 (Advanced Networking Lab)
-        mapTeacherToCourse("CSE348", "Md. Shakib Hasan", "MSH", "Sec 1", "SUN # 11:20 ~ 12:40 @ Lab 4");
-        mapTeacherToCourse("CSE348", "Anik Mahmud Shanto", "AMS", "Sec 2", "TUE # 08:30 ~ 09:50 @ Lab 5");
-
-        // Map Shakib Sir and Belal Sir to CSE242 (Data Structures Lab)
-        mapTeacherToCourse("CSE242", "Md. Shakib Hasan", "MSH", "Sec 1", "MON # 08:30 ~ 09:50 @ Lab 2");
-        mapTeacherToCourse("CSE242", "Belal Ahmed", "BA", "Sec 2", "WED # 11:20 ~ 12:40 @ Lab 3");
-
-        // Map Sakib Mahmud (SMA) to CSE347 (Advanced Networking), CSE348 (Lab), CSE241 (Data Structures), CSE242 (Lab), CSE181 (Discrete Math), CSE265 (Algorithms)
-        mapTeacherToCourse("CSE347", "Sakib Mahmud", "SMA", "Sec 1", "WED # 08:30 ~ 09:50 @ SEU528");
-        mapTeacherToCourse("CSE348", "Sakib Mahmud", "SMA", "Sec 1", "WED # 11:20 ~ 12:40 @ Lab 4");
-        mapTeacherToCourse("CSE241", "Sakib Mahmud", "SMA", "Sec 3", "SUN # 11:20 ~ 12:40 @ SEU529");
-        mapTeacherToCourse("CSE242", "Sakib Mahmud", "SMA", "Sec 3", "MON # 11:20 ~ 12:40 @ Lab 2");
-        mapTeacherToCourse("CSE181", "Sakib Mahmud", "SMA", "Sec 2", "TUE # 09:50 ~ 11:10 @ SEU528");
-        mapTeacherToCourse("CSE265", "Sakib Mahmud", "SMA", "Sec 1", "THU # 08:30 ~ 09:50 @ SEU529");
+        // No demo teacher-course mappings seeded. Only authentic admin or material assignments.
     }
 
     private Course findBestMatchingCourse(String rawTitle) {
