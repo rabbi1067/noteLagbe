@@ -501,28 +501,37 @@ export default function HomePage() {
 
           {/* Metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto pt-6 text-center">
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
-              <p suppressHydrationWarning className="text-2xl font-black text-blue-600 dark:text-blue-400">
+            <Link
+              href="/courses"
+              className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 hover:shadow-md transition-all group cursor-pointer block"
+            >
+              <p suppressHydrationWarning className="text-2xl font-black text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform">
                 {allCourses.length > 0 ? allCourses.length : 85}
               </p>
-              <p className="text-xs font-semibold text-slate-500 mt-0.5">
+              <p className="text-xs font-semibold text-slate-500 group-hover:text-blue-500 transition-colors mt-0.5">
                 {language === "bn" ? "কারিকুলাম কোর্স" : "Curriculum Courses"}
               </p>
-            </div>
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
-              <p suppressHydrationWarning className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-                {teachers.length > 0 ? `${teachers.length}` : "405"}
+            </Link>
+            <Link
+              href="/teachers"
+              className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 hover:border-indigo-500/50 hover:shadow-md transition-all group cursor-pointer block"
+            >
+              <p suppressHydrationWarning className="text-2xl font-black text-indigo-600 dark:text-indigo-400 group-hover:scale-105 transition-transform">
+                {teachers.length > 0 ? `${teachers.length}` : "397"}
               </p>
-              <p className="text-xs font-semibold text-slate-500 mt-0.5">
+              <p className="text-xs font-semibold text-slate-500 group-hover:text-indigo-500 transition-colors mt-0.5">
                 {language === "bn" ? "সাউথইস্ট শিক্ষক তালিকা" : "SEU Faculty Directory"}
               </p>
-            </div>
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
-              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">100%</p>
-              <p className="text-xs font-semibold text-slate-500 mt-0.5">
+            </Link>
+            <Link
+              href="/courses"
+              className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 hover:border-emerald-500/50 hover:shadow-md transition-all group cursor-pointer block"
+            >
+              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform">100%</p>
+              <p className="text-xs font-semibold text-slate-500 group-hover:text-emerald-500 transition-colors mt-0.5">
                 {language === "bn" ? "ভেরিফাইড মিড ও ফাইনাল প্রশ্ন" : "Verified Mid & Final Exams"}
               </p>
-            </div>
+            </Link>
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 relative group overflow-hidden">
               <div className="flex items-center justify-center gap-2">
                 <span className="relative flex h-2.5 w-2.5">

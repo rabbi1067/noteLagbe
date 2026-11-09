@@ -14,9 +14,13 @@ export async function GET(request: NextRequest) {
     const timeoutId = setTimeout(() => controller.abort(), 2000);
 
     const backendUrl =
-      process.env.BACKEND_INTERNAL_URL ||
-      process.env.NEXT_PUBLIC_API_URL ||
-      "http://localhost:8888";
+      (process.env.BACKEND_INTERNAL_URL && process.env.BACKEND_INTERNAL_URL.startsWith("http"))
+        ? process.env.BACKEND_INTERNAL_URL
+        : (process.env.BACKEND_URL && process.env.BACKEND_URL.startsWith("http"))
+        ? process.env.BACKEND_URL
+        : (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.startsWith("http"))
+        ? process.env.NEXT_PUBLIC_API_URL
+        : "http://localhost:8888";
 
     const queryString = searchParams.toString();
     const res = await fetch(`${backendUrl}/api/teachers${queryString ? `?${queryString}` : ""}`, {

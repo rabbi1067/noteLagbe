@@ -958,13 +958,23 @@ export default function CurriculumPage() {
                 <span>{copiedTopics ? "Copied to Clipboard!" : "Copy Syllabus Topics"}</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setSelectedCourseForSyllabus(null)}
-                className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-xs cursor-pointer"
-              >
-                Close
-              </button>
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/courses/${selectedCourseForSyllabus.code}`}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-xs cursor-pointer"
+                >
+                  <span>Materials & Questions</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedCourseForSyllabus(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors shadow-xs cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

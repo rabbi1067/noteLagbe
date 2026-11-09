@@ -9,7 +9,14 @@ export async function GET() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8888";
+    const backendUrl =
+      (process.env.BACKEND_INTERNAL_URL && process.env.BACKEND_INTERNAL_URL.startsWith("http"))
+        ? process.env.BACKEND_INTERNAL_URL
+        : (process.env.BACKEND_URL && process.env.BACKEND_URL.startsWith("http"))
+        ? process.env.BACKEND_URL
+        : (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.startsWith("http"))
+        ? process.env.NEXT_PUBLIC_API_URL
+        : "http://localhost:8888";
     const backendRes = await fetch(`${backendUrl}/api/departments`, {
       signal: controller.signal,
       headers: { Accept: "application/json" },
