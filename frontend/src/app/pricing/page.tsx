@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
+import LiveRemainingCountdown from "@/components/LiveRemainingCountdown";
 
 export default function PricingPage() {
   const { user, isAuthenticated, setShowAuthModal, refreshProfile } = useAuth();
@@ -283,62 +284,28 @@ export default function PricingPage() {
         </div>
       </div>
 
-      {/* Active Subscription Live Status Banner */}
-      {user?.hasActiveSubscription && (
-        <div className="max-w-4xl mx-auto p-6 sm:p-7 rounded-3xl bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-blue-950/30 border-2 border-emerald-500/50 shadow-xl shadow-emerald-500/10 space-y-4 animate-in fade-in">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black shadow-md shadow-emerald-600/30 shrink-0">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200">
-                    {language === "bn" ? "আপনার সক্রিয় প্ল্যান" : "Your Active Plan"}
-                  </span>
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                </div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white mt-0.5">
-                  {user.planName || (language === "bn" ? "প্রিমিয়াম প্ল্যান" : "Premium Plan")}
-                </h3>
-              </div>
-            </div>
+      {/* Active Access Live Remaining Countdown HUD & Quota Telemetry */}
+      {(user?.hasActiveSubscription || user?.activeAccessExpiresAt || (user?.unlockedCourseDetails && user.unlockedCourseDetails.length > 0) || user?.role === "ROLE_ADMIN" || user?.role === "ROLE_SUPER_ADMIN") && (
+        <div className="max-w-4xl mx-auto space-y-4 animate-in fade-in">
+          <LiveRemainingCountdown />
 
-            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-              <Link
-                href="/courses"
-                className="px-4 py-2.5 rounded-xl font-black text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5"
-              >
-                <span>{language === "bn" ? "কোর্স ব্রাউজ ও আনলক করুন" : "Browse & Unlock"}</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+          {/* If Paid Subscription with Course Quota, show Quota Breakdown Cards */}
+          {user?.hasActiveSubscription && !user?.unlimited && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 sm:p-5 rounded-3xl bg-slate-900/80 border border-slate-800 text-xs font-semibold text-slate-300 shadow-lg">
+              <div className="p-3.5 rounded-2xl bg-slate-800/70 border border-slate-700/60">
+                <span className="text-[10px] text-slate-400 block uppercase tracking-wider">{language === "bn" ? "মোট প্ল্যান কোটা:" : "Total Plan Quota:"}</span>
+                <strong className="text-base font-black text-white mt-0.5 block">{user.maxCoursesAllowed} Courses</strong>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-slate-800/70 border border-slate-700/60">
+                <span className="text-[10px] text-slate-400 block uppercase tracking-wider">{language === "bn" ? "ব্যবহৃত কোর্স:" : "Used Unlocks:"}</span>
+                <strong className="text-base font-black text-slate-300 mt-0.5 block">{user.usedCoursesCount} Courses</strong>
+              </div>
+              <div className="col-span-2 sm:col-span-1 p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-800/60">
+                <span className="text-[10px] text-emerald-400 block uppercase tracking-wider">{language === "bn" ? "অবশিষ্ট কোটা:" : "Remaining Quota:"}</span>
+                <strong className="text-base font-black text-emerald-400 mt-0.5 block">{user.remainingCoursesCount} Left</strong>
+              </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 text-xs border-t border-emerald-200/60 dark:border-emerald-800/60 font-semibold text-slate-700 dark:text-slate-200">
-            <div>
-              <span className="text-[10px] text-slate-500 block">{language === "bn" ? "মোট কোটা:" : "Total Quota:"}</span>
-              <strong className="text-sm font-black text-slate-900 dark:text-white">
-                {user.unlimited ? (language === "bn" ? "আনলিমিটেড (সকল ৮৫+)" : "Unlimited (All 85+)") : `${user.maxCoursesAllowed} Courses`}
-              </strong>
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-500 block">{language === "bn" ? "ব্যবহৃত কোর্স:" : "Used Unlocks:"}</span>
-              <strong className="text-sm font-black text-slate-900 dark:text-white">{user.usedCoursesCount} Courses</strong>
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-500 block">{language === "bn" ? "অবশিষ্ট কোটা:" : "Remaining Quota:"}</span>
-              <strong className="text-sm font-black text-emerald-600 dark:text-emerald-400">
-                {user.unlimited ? (language === "bn" ? "আনলিমিটেড" : "Unlimited") : `${user.remainingCoursesCount} Left`}
-              </strong>
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-500 block">{language === "bn" ? "মেয়াদ উত্তীর্ণ:" : "Expires On:"}</span>
-              <strong className="text-sm font-black text-slate-900 dark:text-white">
-                {user.subscriptionExpiresAt ? new Date(user.subscriptionExpiresAt).toLocaleDateString() : (language === "bn" ? "সক্রিয়" : "Active")}
-              </strong>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -613,12 +580,12 @@ export default function PricingPage() {
             {language === "bn" ? "১০০% ফ্রি অপশন" : "100% Free Option"}
           </div>
           <h3 className="font-black text-xl text-emerald-950 dark:text-emerald-200">
-            {language === "bn" ? "নোট আপলোড করে ফ্রিতে কোর্স আনলক করুন" : "Earn Free Course Unlocks with Community Uploads"}
+            {language === "bn" ? "নোট আপলোড করে ৩ মাসের জন্য ফ্রিতে কোর্স আনলক করুন" : "Upload Notes — Unlock 2 Courses for 3 Months Free"}
           </h3>
           <p className="text-xs text-slate-600 dark:text-slate-400 max-w-xl leading-relaxed">
             {language === "bn" 
-              ? "যেকোনো শিক্ষকের লেকচার নোট বা বিগত পরীক্ষার প্রশ্নপত্র আপলোড করুন। অ্যাডমিন অ্যাপ্রুভ করলেই আপনার পছন্দের যেকোনো ২টি কোর্স সম্পূর্ণ ফ্রিতে আনলক হয়ে যাবে!" 
-              : "Upload any verified lecture notes or past semester exam question paper. When approved by admin, you instantly receive 2 free course unlocks credited to your profile!"}
+              ? "যেকোনো শিক্ষকের লেকচার নোট বা বিগত পরীক্ষার প্রশ্নপত্র আপলোড করুন। অ্যাডমিন ভেরিফাই করলেই আপনার পছন্দের যেকোনো ২টি কোর্স ১টি পূর্ণ সেমিস্টারের (৩ মাস / ৯০ দিন) জন্য সম্পূর্ণ ফ্রিতে আনলক হয়ে যাবে!" 
+              : "Upload verified lecture notes or past semester exam question paper. When approved by admin, your 2 chosen courses unlock for 3 Months (1 Full Semester / 90 Days) completely free!"}
           </p>
         </div>
         <Link

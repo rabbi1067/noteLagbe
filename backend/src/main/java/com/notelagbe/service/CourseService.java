@@ -122,7 +122,7 @@ public class CourseService {
                 .orElseThrow(() -> new ApiException("No active subscription plan found or your plan validity has ended. Please purchase or renew a plan to unlock courses!"));
 
         if (sub.isUnlimited()) {
-            UnlockedCourse uc = new UnlockedCourse(user, course, UnlockSource.YEAR_UNLIMITED);
+            UnlockedCourse uc = new UnlockedCourse(user, course, UnlockSource.YEAR_UNLIMITED, sub.getEndDate());
             unlockedCourseRepository.save(uc);
             return true;
         }
@@ -135,7 +135,7 @@ public class CourseService {
         sub.setUsedCoursesCount(sub.getUsedCoursesCount() + 1);
         subscriptionRepository.save(sub);
 
-        UnlockedCourse uc = new UnlockedCourse(user, course, UnlockSource.PURCHASED_QUOTA);
+        UnlockedCourse uc = new UnlockedCourse(user, course, UnlockSource.PURCHASED_QUOTA, sub.getEndDate());
         unlockedCourseRepository.save(uc);
 
         return true;

@@ -636,7 +636,26 @@ export default function CourseDetailPage() {
                   <CheckCircle2 className="w-4 h-4" />
                   <span>{t("course.allFacultyUnlocked", "All Faculty Unlocked")}</span>
                 </div>
-                <span className="text-[10px] font-normal opacity-85">{t("course.allAccessible", "All notes & exams accessible")}</span>
+                {(() => {
+                  const detail = user?.unlockedCourseDetails?.find((d) => d.courseCode?.toLowerCase() === code?.toLowerCase());
+                  if (detail && detail.remainingDays > 0) {
+                    return (
+                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-300 font-extrabold flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> {detail.remainingDays} {language === "bn" ? "দিন অ্যাক্সেস অবশিষ্ট" : "Days Access Left"}
+                      </span>
+                    );
+                  }
+                  if (user?.activeAccessRemainingDays && user.activeAccessRemainingDays > 0) {
+                    return (
+                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-300 font-extrabold flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> {user.activeAccessRemainingDays} {language === "bn" ? "দিন অ্যাক্সেস অবশিষ্ট" : "Days Access Left"}
+                      </span>
+                    );
+                  }
+                  return (
+                    <span className="text-[10px] font-normal opacity-85">{t("course.allAccessible", "All notes & exams accessible")}</span>
+                  );
+                })()}
               </div>
             ) : (
               <button

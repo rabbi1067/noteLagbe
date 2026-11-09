@@ -33,6 +33,7 @@ import SearchableCourseSelect, { sortCoursesNaturally } from "@/components/Searc
 import SearchableTeacherSelect from "@/components/SearchableTeacherSelect";
 import GoogleDrivePublicGuideModal from "@/components/GoogleDrivePublicGuideModal";
 import TopContributorsLeaderboard from "@/components/TopContributorsLeaderboard";
+import LiveRemainingCountdown from "@/components/LiveRemainingCountdown";
 import { useDataSync, notifyDataChanged } from "@/lib/sync";
 
 const DEPARTMENTS = [
@@ -528,8 +529,8 @@ export default function ContributePage() {
       confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
       toast.success(
         language === "bn"
-          ? "আপনার অ্যাকাডেমিক ম্যাটেরিয়াল সফলভাবে জমা হয়েছে! অ্যাডমিন অনুমোদন করলেই নির্বাচিত ২টি কোর্স স্বয়ংক্রিয়ভাবে ফ্রি আনলক হয়ে যাবে।"
-          : "Contribution submitted successfully! Once verified by an admin, your 2 selected reward courses will unlock automatically."
+          ? "আপনার অ্যাকাডেমিক ম্যাটেরিয়াল সফলভাবে জমা হয়েছে! অ্যাডমিন অনুমোদন করলেই নির্বাচিত ২টি কোর্স ৩ মাসের জন্য (১টি পূর্ণ সেমিস্টার) স্বয়ংক্রিয়ভাবে ফ্রি আনলক হয়ে যাবে।"
+          : "Contribution submitted successfully! Once verified by an admin, your 2 selected reward courses will unlock for 3 months (1 Full Semester) free."
       );
       setTitle("");
       setFileUrl("");
@@ -549,6 +550,11 @@ export default function ContributePage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
       
+      {/* Active Access Live Countdown Banner (if contributor or subscriber has active access) */}
+      {(user?.activeAccessExpiresAt || user?.subscriptionExpiresAt || (user?.unlockedCourseDetails && user.unlockedCourseDetails.length > 0)) && (
+        <LiveRemainingCountdown />
+      )}
+
       {/* 1. Header Banner */}
       <div className="p-8 sm:p-10 rounded-3xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-xl space-y-3">
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
@@ -556,13 +562,13 @@ export default function ContributePage() {
         </span>
         <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
           {language === "bn"
-            ? "পড়াশোনার ম্যাটেরিয়াল আপলোড করুন — ২টি কোর্স সম্পূর্ণ ফ্রিতে আনলক করুন!"
-            : "Upload Study Materials — Unlock 2 Courses for Free!"}
+            ? "পড়াশোনার ম্যাটেরিয়াল আপলোড করুন — ২টি কোর্স ৩ মাসের জন্য ফ্রিতে আনলক করুন!"
+            : "Upload Study Materials — Unlock 2 Courses for 3 Months Free!"}
         </h1>
         <p className="text-xs sm:text-sm text-emerald-50 leading-relaxed max-w-2xl">
           {language === "bn"
-            ? "সাউথইস্ট বিশ্ববিদ্যালয়ের সহপাঠীদের সহযোগিতার লক্ষ্যে হস্তলিখিত লেকচার নোট, ক্লাস টেস্ট (CT/Quiz), মিডটার্ম বা ফাইনাল পরীক্ষার প্রশ্ন আপলোড করুন। অ্যাডমিন ভেরিফাই করলেই আপনার পছন্দের যেকোনো ২টি কোর্স বিনামূল্যে আজীবনের জন্য আনলক হয়ে যাবে।"
-            : "Contribute handwritten lecture notes, class tests (CT/Quiz), midterm questions, or final papers to help fellow Southeast University students. Once verified by our faculty review team, your 2 chosen courses will be permanently unlocked for free."}
+            ? "সাউথইস্ট বিশ্ববিদ্যালয়ের সহপাঠীদের সহযোগিতার লক্ষ্যে হস্তলিখিত লেকচার নোট, ক্লাস টেস্ট (CT/Quiz), মিডটার্ম বা ফাইনাল পরীক্ষার প্রশ্ন আপলোড করুন। অ্যাডমিন ভেরিফাই করলেই আপনার পছন্দের যেকোনো ২টি কোর্স ১টি পূর্ণ সেমিস্টারের (৩ মাস / ৯০ দিন) জন্য সম্পূর্ণ বিনামূল্যে আনলক হয়ে যাবে।"
+            : "Contribute handwritten lecture notes, class tests (CT/Quiz), midterm questions, or final papers to help fellow Southeast University students. Once verified by our faculty review team, your 2 chosen courses will be unlocked for 3 months (1 Full Semester / 90 Days) completely free!"}
         </p>
       </div>
 
@@ -1074,8 +1080,8 @@ export default function ContributePage() {
                 <Sparkles className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 <h3 className="font-extrabold text-xs sm:text-sm text-emerald-950 dark:text-emerald-200">
                   {language === "bn"
-                    ? "অনুমোদনের পর ফ্রি আনলক করার জন্য ২টি পুরস্কার কোর্স নির্বাচন করুন:"
-                    : "Select Your 2 Reward Courses to Unlock Upon Verification:"}
+                    ? "অনুমোদনের পর ৩ মাসের জন্য ফ্রি আনলক করার ২টি কোর্স নির্বাচন করুন:"
+                    : "Select Your 2 Reward Courses to Unlock for 3 Months Upon Verification:"}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
@@ -1083,7 +1089,7 @@ export default function ContributePage() {
                   {currentDepartment.code} {language === "bn" ? "ডিপার্টমেন্ট" : "Dept"} ({rewardCourses.length} {language === "bn" ? "কোর্স উপলব্ধ" : "courses"})
                 </span>
                 <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 px-2.5 py-0.5 rounded-full">
-                  {language === "bn" ? "২টি কোর্স আজীবনের জন্য ফ্রি!" : "2 Courses Free for Life!"}
+                  {language === "bn" ? "২টি কোর্স ৩ মাসের (১ সেমিস্টার) জন্য ফ্রি!" : "2 Courses Free for 3 Months (1 Semester)!"}
                 </span>
               </div>
             </div>

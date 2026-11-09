@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import LiveRemainingCountdown from "@/components/LiveRemainingCountdown";
 import { api } from "@/lib/api";
 import {
   User,
@@ -608,6 +609,11 @@ export default function StudentDashboardPage() {
           ) : null}
         </div>
       </div>
+
+      {/* Live Remaining Access Countdown HUD */}
+      {(user?.hasActiveSubscription || user?.activeAccessExpiresAt || (user?.unlockedCourseDetails && user.unlockedCourseDetails.length > 0)) && (
+        <LiveRemainingCountdown />
+      )}
 
       {/* 2. DASHBOARD NAVIGATION TABS (SELECTORS) */}
       <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 overflow-x-auto shadow-sm">

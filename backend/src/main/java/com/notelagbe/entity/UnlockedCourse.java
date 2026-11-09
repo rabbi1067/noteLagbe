@@ -27,6 +27,9 @@ public class UnlockedCourse {
 
     private LocalDateTime unlockedAt = LocalDateTime.now();
 
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
     public UnlockedCourse() {}
 
     public UnlockedCourse(User user, Course course, UnlockSource source) {
@@ -34,6 +37,14 @@ public class UnlockedCourse {
         this.course = course;
         this.source = source;
         this.unlockedAt = LocalDateTime.now();
+    }
+
+    public UnlockedCourse(User user, Course course, UnlockSource source, LocalDateTime expiresAt) {
+        this.user = user;
+        this.course = course;
+        this.source = source;
+        this.unlockedAt = LocalDateTime.now();
+        this.expiresAt = expiresAt;
     }
 
     public Long getId() { return id; }
@@ -50,4 +61,11 @@ public class UnlockedCourse {
 
     public LocalDateTime getUnlockedAt() { return unlockedAt; }
     public void setUnlockedAt(LocalDateTime unlockedAt) { this.unlockedAt = unlockedAt; }
+
+    public LocalDateTime getExpiresAt() { return expiresAt; }
+    public void setExpiresAt(LocalDateTime expiresAt) { this.expiresAt = expiresAt; }
+
+    public boolean isExpired() {
+        return expiresAt != null && LocalDateTime.now().isAfter(expiresAt);
+    }
 }

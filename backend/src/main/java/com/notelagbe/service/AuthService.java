@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -225,18 +226,70 @@ public class AuthService {
             response.setUnlimited(false);
         }
 
-        List<String> unlockedCodes;
+        LocalDateTime now = LocalDateTime.now();
+        List<UnlockedCourse> userUnlocks = unlockedCourseRepository.findByUserId(user.getId());
+        List<UserProfileResponse.UnlockedCourseDetail> details = new ArrayList<>();
+        List<String> validUnlockedCodes = new ArrayList<>();
+
+        LocalDateTime latestAccessExp = null;
+        if (subOpt.isPresent()) {
+            latestAccessExp = subOpt.get().getEndDate();
+            response.setActiveAccessSource("SUBSCRIPTION");
+        } else {
+            response.setActiveAccessSource("NONE");
+        }
+
+        for (UnlockedCourse uc : userUnlocks) {
+            LocalDateTime exp = uc.getExpiresAt();
+            if (exp == null && subOpt.isPresent()) {
+                exp = subOpt.get().getEndDate();
+            }
+
+            boolean expired = exp != null && now.isAfter(exp);
+            long daysLeft = 0;
+            long hoursLeft = 0;
+            if (exp != null && !expired) {
+                daysLeft = java.time.temporal.ChronoUnit.DAYS.between(now, exp);
+                hoursLeft = java.time.temporal.ChronoUnit.HOURS.between(now, exp);
+                if (latestAccessExp == null || exp.isAfter(latestAccessExp)) {
+                    latestAccessExp = exp;
+                    if (subOpt.isEmpty()) {
+                        response.setActiveAccessSource(uc.getSource().name());
+                    }
+                }
+            }
+
+            if (!expired && uc.getCourse() != null) {
+                validUnlockedCodes.add(uc.getCourse().getCode());
+                details.add(new UserProfileResponse.UnlockedCourseDetail(
+                        uc.getCourse().getId(),
+                        uc.getCourse().getCode(),
+                        uc.getCourse().getTitle(),
+                        uc.getCourse().getDepartment() != null ? uc.getCourse().getDepartment() : "CSE",
+                        uc.getSource().name(),
+                        uc.getUnlockedAt(),
+                        exp,
+                        daysLeft,
+                        hoursLeft,
+                        false
+                ));
+            }
+        }
+
         if (user.getRole() == Role.ROLE_ADMIN || user.getRole() == Role.ROLE_SUPER_ADMIN || user.getRole() == Role.ROLE_MANAGER
                 || (subOpt.isPresent() && subOpt.get().isUnlimited())) {
-            unlockedCodes = courseRepository.findAll().stream()
-                    .map(Course::getCode)
-                    .toList();
+            response.setUnlockedCourseCodes(courseRepository.findAll().stream().map(Course::getCode).toList());
+            response.setActiveAccessSource(user.getRole() == Role.ROLE_STUDENT ? "UNLIMITED_ACCESS" : "STAFF_UNRESTRICTED");
         } else {
-            unlockedCodes = unlockedCourseRepository.findByUserId(user.getId()).stream()
-                    .map(uc -> uc.getCourse().getCode())
-                    .toList();
+            response.setUnlockedCourseCodes(validUnlockedCodes);
         }
-        response.setUnlockedCourseCodes(unlockedCodes);
+
+        response.setUnlockedCourseDetails(details);
+        if (latestAccessExp != null && latestAccessExp.isAfter(now)) {
+            response.setActiveAccessExpiresAt(latestAccessExp);
+            response.setActiveAccessRemainingDays(java.time.temporal.ChronoUnit.DAYS.between(now, latestAccessExp));
+            response.setActiveAccessRemainingHours(java.time.temporal.ChronoUnit.HOURS.between(now, latestAccessExp));
+        }
 
         return response;
     }

@@ -8,6 +8,8 @@ import com.notelagbe.exception.ApiException;
 import com.notelagbe.exception.ResourceNotFoundException;
 import com.notelagbe.repository.*;
 import org.springframework.cache.annotation.CacheEvict;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +34,10 @@ public class ContributionService {
     private final TeacherCourseRepository teacherCourseRepository;
     private final UnlockedCourseRepository unlockedCourseRepository;
     private final LiveSyncService liveSyncService;
+    private static final Logger log = LoggerFactory.getLogger(ContributionService.class);
+
     private final InputSanitizationService inputSanitizationService;
+    private final NotificationService notificationService;
 
     public ContributionService(ContributionRequestRepository contributionRequestRepository,
                                ResourceRepository resourceRepository,
@@ -41,7 +46,8 @@ public class ContributionService {
                                TeacherCourseRepository teacherCourseRepository,
                                UnlockedCourseRepository unlockedCourseRepository,
                                LiveSyncService liveSyncService,
-                               InputSanitizationService inputSanitizationService) {
+                               InputSanitizationService inputSanitizationService,
+                               NotificationService notificationService) {
         this.contributionRequestRepository = contributionRequestRepository;
         this.resourceRepository = resourceRepository;
         this.courseRepository = courseRepository;
@@ -50,6 +56,7 @@ public class ContributionService {
         this.unlockedCourseRepository = unlockedCourseRepository;
         this.liveSyncService = liveSyncService;
         this.inputSanitizationService = inputSanitizationService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -238,19 +245,55 @@ public class ContributionService {
             }
         }
 
-        // 2. Auto-unlock the 2 requested reward courses for the contributor!
+        // 2. Auto-unlock the 2 requested reward courses for the contributor for 3 Months (1 Full Semester / 90 Days)!
         User contributor = cr.getUser();
-        if (!unlockedCourseRepository.existsByUserIdAndCourseId(contributor.getId(), cr.getRequestedCourse1().getId())) {
-            unlockedCourseRepository.save(new UnlockedCourse(contributor, cr.getRequestedCourse1(), UnlockSource.CONTRIBUTION_REWARD));
+        LocalDateTime rewardExpiresAt = LocalDateTime.now().plusMonths(3);
+
+        if (cr.getRequestedCourse1() != null) {
+            Optional<UnlockedCourse> existing1 = unlockedCourseRepository.findByUserIdAndCourseId(contributor.getId(), cr.getRequestedCourse1().getId());
+            if (existing1.isPresent()) {
+                UnlockedCourse uc = existing1.get();
+                LocalDateTime base = (uc.getExpiresAt() != null && uc.getExpiresAt().isAfter(LocalDateTime.now())) ? uc.getExpiresAt() : LocalDateTime.now();
+                uc.setExpiresAt(base.plusMonths(3));
+                uc.setSource(UnlockSource.CONTRIBUTION_REWARD);
+                unlockedCourseRepository.save(uc);
+            } else {
+                unlockedCourseRepository.save(new UnlockedCourse(contributor, cr.getRequestedCourse1(), UnlockSource.CONTRIBUTION_REWARD, rewardExpiresAt));
+            }
         }
-        if (!unlockedCourseRepository.existsByUserIdAndCourseId(contributor.getId(), cr.getRequestedCourse2().getId())) {
-            unlockedCourseRepository.save(new UnlockedCourse(contributor, cr.getRequestedCourse2(), UnlockSource.CONTRIBUTION_REWARD));
+
+        if (cr.getRequestedCourse2() != null) {
+            Optional<UnlockedCourse> existing2 = unlockedCourseRepository.findByUserIdAndCourseId(contributor.getId(), cr.getRequestedCourse2().getId());
+            if (existing2.isPresent()) {
+                UnlockedCourse uc = existing2.get();
+                LocalDateTime base = (uc.getExpiresAt() != null && uc.getExpiresAt().isAfter(LocalDateTime.now())) ? uc.getExpiresAt() : LocalDateTime.now();
+                uc.setExpiresAt(base.plusMonths(3));
+                uc.setSource(UnlockSource.CONTRIBUTION_REWARD);
+                unlockedCourseRepository.save(uc);
+            } else {
+                unlockedCourseRepository.save(new UnlockedCourse(contributor, cr.getRequestedCourse2(), UnlockSource.CONTRIBUTION_REWARD, rewardExpiresAt));
+            }
         }
 
         // 3. Update contribution request
+        String c1Code = cr.getRequestedCourse1() != null ? cr.getRequestedCourse1().getCode() : "Course 1";
+        String c2Code = cr.getRequestedCourse2() != null ? cr.getRequestedCourse2().getCode() : "Course 2";
         cr.setStatus(ResourceStatus.APPROVED);
-        cr.setAdminFeedback(feedback != null && !feedback.trim().isEmpty() ? feedback.trim() : "Verified and approved! Your 2 requested courses have been unlocked as a reward.");
+        cr.setAdminFeedback(feedback != null && !feedback.trim().isEmpty() ? feedback.trim() : "Verified and approved! Your 2 requested reward courses (" + c1Code + ", " + c2Code + ") have been unlocked for 3 months (1 Full Semester) free.");
         cr.setReviewedAt(LocalDateTime.now());
+
+        // Send in-app notification to contributor
+        try {
+            notificationService.createNotification(
+                    contributor,
+                    "Academic Contribution Approved! 🎉",
+                    "Your uploaded material for " + (res.getCourse() != null ? res.getCourse().getCode() : "SEU") + " is verified. " + c1Code + " & " + c2Code + " are now unlocked for 3 months (90 days) free!",
+                    "CONTRIBUTION_APPROVED",
+                    "/courses"
+            );
+        } catch (Exception e) {
+            log.warn("Failed to dispatch contribution approval notification: {}", e.getMessage());
+        }
 
         ContributionRequest saved = contributionRequestRepository.save(cr);
         liveSyncService.broadcast("contribution", "approved", saved.getId());

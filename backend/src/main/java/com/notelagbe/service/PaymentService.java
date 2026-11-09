@@ -127,7 +127,7 @@ public class PaymentService {
                     if (code != null) {
                         courseRepository.findByCodeIgnoreCase(code.trim()).ifPresent(course -> {
                             if (!unlockedCourseRepository.existsByUserIdAndCourseId(pr.getUser().getId(), course.getId())) {
-                                unlockedCourseRepository.save(new UnlockedCourse(pr.getUser(), course, UnlockSource.PURCHASED_QUOTA));
+                                unlockedCourseRepository.save(new UnlockedCourse(pr.getUser(), course, UnlockSource.PURCHASED_QUOTA, sub.getEndDate()));
                             }
                         });
                         unlockedCount++;

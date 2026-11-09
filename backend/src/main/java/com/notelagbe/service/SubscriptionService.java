@@ -78,7 +78,7 @@ public class SubscriptionService {
 
     /**
      * Determines whether a course is currently unlocked for the user.
-     * Evaluates staff overrides, active subscription validity, quota, and permanent awards.
+     * Evaluates staff overrides, active subscription validity, quota, and contribution awards (3-month semester access).
      */
     @Transactional
     public boolean isCourseUnlocked(User user, Course course) {
@@ -94,18 +94,33 @@ public class SubscriptionService {
             if (validSub.get().isUnlimited()) {
                 return true;
             }
-            return unlockedCourseRepository.existsByUserIdAndCourseId(user.getId(), course.getId());
+            Optional<UnlockedCourse> ucOpt = unlockedCourseRepository.findByUserIdAndCourseId(user.getId(), course.getId());
+            if (ucOpt.isPresent()) {
+                UnlockedCourse uc = ucOpt.get();
+                if (uc.getExpiresAt() != null && LocalDateTime.now().isAfter(uc.getExpiresAt())) {
+                    unlockedCourseRepository.delete(uc);
+                    return false;
+                }
+                return true;
+            }
+            return false;
         }
 
-        // Check if unlocked via non-subscription permanent sources (e.g., contribution rewards or waivers)
+        // Check if unlocked via non-subscription sources (e.g., 3-month contribution rewards or waivers)
         Optional<UnlockedCourse> ucOpt = unlockedCourseRepository.findByUserIdAndCourseId(user.getId(), course.getId());
         if (ucOpt.isPresent()) {
-            UnlockSource src = ucOpt.get().getSource();
+            UnlockedCourse uc = ucOpt.get();
+            // If the 3-month contribution access or reward validity has passed, automatically expire and delete
+            if (uc.getExpiresAt() != null && LocalDateTime.now().isAfter(uc.getExpiresAt())) {
+                unlockedCourseRepository.delete(uc);
+                return false;
+            }
+            UnlockSource src = uc.getSource();
             if (src == UnlockSource.CONTRIBUTION_REWARD || src == UnlockSource.FREE_WAIVER) {
                 return true;
             } else {
                 // Relock orphaned quota unlock because subscription has expired
-                unlockedCourseRepository.delete(ucOpt.get());
+                unlockedCourseRepository.delete(uc);
                 return false;
             }
         }
@@ -114,12 +129,13 @@ public class SubscriptionService {
     }
 
     /**
-     * Periodic background task every 10 minutes to auto-expire past subscriptions.
+     * Periodic background task every 10 minutes to auto-expire past subscriptions and contribution awards.
      */
     @Scheduled(fixedRate = 600000)
     @Transactional
     public void autoExpireSubscriptions() {
-        List<Subscription> expiredSubs = subscriptionRepository.findByActiveTrueAndEndDateBefore(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        List<Subscription> expiredSubs = subscriptionRepository.findByActiveTrueAndEndDateBefore(now);
         for (Subscription sub : expiredSubs) {
             sub.setActive(false);
             subscriptionRepository.save(sub);
@@ -139,6 +155,22 @@ public class SubscriptionService {
                 // Ignore
             }
             log.info("Auto-expired subscription id={} for user={}", sub.getId(), sub.getUser().getEmail());
+        }
+
+        // Auto-expire individual unlocked courses (e.g. 3-month contribution rewards whose validity has elapsed)
+        List<UnlockedCourse> expiredUnlocks = unlockedCourseRepository.findByExpiresAtNotNullAndExpiresAtBefore(now);
+        for (UnlockedCourse uc : expiredUnlocks) {
+            try {
+                notificationService.createNotification(
+                        uc.getUser(),
+                        "Course Reward Access Concluded ⏳",
+                        "Your 3-month free access to " + (uc.getCourse() != null ? uc.getCourse().getCode() : "course") + " has concluded. Thank you for contributing to NoteLagbe!",
+                        "COURSE_EXPIRED",
+                        "/pricing"
+                );
+            } catch (Exception ignored) {}
+            unlockedCourseRepository.delete(uc);
+            log.info("Auto-expired unlocked course id={} for user={}", uc.getId(), uc.getUser().getEmail());
         }
     }
 }

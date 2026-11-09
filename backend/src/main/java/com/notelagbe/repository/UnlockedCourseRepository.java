@@ -17,6 +17,8 @@ public interface UnlockedCourseRepository extends JpaRepository<UnlockedCourse, 
     boolean existsByUserIdAndCourseCodeIgnoreCase(Long userId, String code);
     Optional<UnlockedCourse> findByUserIdAndCourseId(Long userId, Long courseId);
 
+    List<UnlockedCourse> findByExpiresAtNotNullAndExpiresAtBefore(java.time.LocalDateTime dateTime);
+
     @Modifying
     @Transactional
     void deleteByUserIdAndSourceIn(Long userId, Collection<UnlockSource> sources);

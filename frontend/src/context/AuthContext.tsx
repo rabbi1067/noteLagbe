@@ -6,6 +6,19 @@ import { api, getToken, setToken, removeToken } from "@/lib/api";
 import { subscribeToSync, SyncPayload } from "@/lib/sync";
 import { toast } from "sonner";
 
+export interface UnlockedCourseDetail {
+  courseId: number;
+  courseCode: string;
+  courseTitle: string;
+  department: string;
+  source: string;
+  unlockedAt: string;
+  expiresAt?: string;
+  remainingDays: number;
+  remainingHours: number;
+  isExpired: boolean;
+}
+
 export interface UserProfile {
   id: number;
   name: string;
@@ -23,6 +36,11 @@ export interface UserProfile {
   unlimited: boolean;
   subscriptionExpiresAt?: string;
   unlockedCourseCodes: string[];
+  unlockedCourseDetails?: UnlockedCourseDetail[];
+  activeAccessRemainingDays?: number;
+  activeAccessRemainingHours?: number;
+  activeAccessExpiresAt?: string;
+  activeAccessSource?: string;
   chatBlocked?: boolean;
 }
 

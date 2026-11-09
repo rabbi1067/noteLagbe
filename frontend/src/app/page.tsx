@@ -909,8 +909,8 @@ export default function HomePage() {
             </h2>
             <p className="text-xs sm:text-sm text-blue-100 leading-relaxed max-w-2xl">
               {language === "bn"
-                ? "বিকাশ বা নগদে ৳৯৯ পেমেন্ট করে আপনার পছন্দের ৬টি কোর্সের সকল শিক্ষকের লেকচার নোট, স্লাইড এবং বিগত মিড ও ফাইনাল প্রশ্নপত্র আনলক করুন। অথবা সাউথইস্ট সহপাঠীদের সহযোগিতায় নোট শেয়ার করুন এবং ফ্রিতে ২টি কোর্স আনলক করুন।"
-                : "Pay ৳99 via bKash or Nagad to unlock handwritten lecture slides and past mid/final question papers for 6 chosen courses with your preferred teachers. Or contribute study materials to help SEU peers and get 2 courses unlocked permanently for free."}
+                ? "বিকাশ বা নগদে ৳৯৯ পেমেন্ট করে আপনার পছন্দের ৬টি কোর্সের সকল শিক্ষকের লেকচার নোট, স্লাইড এবং বিগত মিড ও ফাইনাল প্রশ্নপত্র আনলক করুন। অথবা সাউথইস্ট সহপাঠীদের সহযোগিতায় নোট শেয়ার করুন এবং ৩ মাসের জন্য (১ সেমিস্টার) ফ্রিতে ২টি কোর্স আনলক করুন।"
+                : "Pay ৳99 via bKash or Nagad to unlock handwritten lecture slides and past mid/final question papers for 6 chosen courses with your preferred teachers. Or contribute study materials to help SEU peers and get 2 courses unlocked for 3 months (1 Full Semester) completely free."}
             </p>
 
             <div className="pt-2 flex flex-col sm:flex-row items-center gap-4">
