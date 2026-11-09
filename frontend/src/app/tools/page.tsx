@@ -44,7 +44,9 @@ import {
   Banknote,
   ClipboardList,
   HelpCircle,
-  Palette
+  Palette,
+  Image as ImageIcon,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import JSZip from "jszip";
@@ -78,8 +80,6 @@ export const SEU_THEORY_SLOTS = [
   "13:30-14:50",
   "15:00-16:20",
   "16:30-17:50",
-  "18:00-19:20",
-  "18:30-19:50",
 ];
 
 export const SEU_LAB_SLOTS = [
@@ -89,7 +89,6 @@ export const SEU_LAB_SLOTS = [
   "13:30-15:30",
   "15:30-17:30",
   "16:30-18:30",
-  "18:00-20:00",
 ];
 
 export const SEU_DAY_SLOTS = [
@@ -115,7 +114,7 @@ export const SEU_TIMELINE_DAYS = [
   { code: "SAT", fullDay: "Saturday", bg: "bg-[#0b1328]" },
 ];
 
-export const SEU_TIMELINE_HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+export const SEU_TIMELINE_HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
 
 
 // ==========================================
@@ -2169,6 +2168,8 @@ export default function StudentToolsPage() {
   const [newTeacher, setNewTeacher] = useState("");
   const [routineTimeFormat, setRoutineTimeFormat] = useState<"12h" | "24h">("12h");
   const [routineColorTheme, setRoutineColorTheme] = useState<"navy" | "orange" | "pink" | "emerald" | "purple" | "daylight">("navy");
+  const routineContainerRef = useRef<HTMLDivElement>(null);
+  const [isDownloadingPng, setIsDownloadingPng] = useState(false);
 
   useEffect(() => {
     try {
@@ -2431,9 +2432,9 @@ export default function StudentToolsPage() {
       dayClasses.forEach(item => {
         const timeParsed = parseTimeToMinutes(item.time);
         const startMin = timeParsed ? Math.max(480, timeParsed.start) : 480;
-        const endMin = timeParsed ? Math.min(1200, timeParsed.end) : 560;
-        const leftPercent = Math.max(0, Math.min(95, ((startMin - 480) / 720) * 100));
-        const widthPercent = Math.max(7, Math.min(100 - leftPercent, ((endMin - startMin) / 720) * 100));
+        const endMin = timeParsed ? Math.min(1140, timeParsed.end) : 560;
+        const leftPercent = Math.max(0, Math.min(95, ((startMin - 480) / 660) * 100));
+        const widthPercent = Math.max(7, Math.min(100 - leftPercent, ((endMin - startMin) / 660) * 100));
         const timeLabel = routineTimeFormat === "12h" ? formatRange12(item.time) : formatRange24(item.time);
 
         cardsHtml += `
@@ -2452,7 +2453,7 @@ export default function StudentToolsPage() {
           </div>
           <div style="flex-grow: 1; position: relative; height: 100%;">
             ${SEU_TIMELINE_HOURS.map((_, hIdx) => `
-              <div style="position: absolute; left: ${(hIdx / 12) * 100}%; top: 0; bottom: 0; width: 1px; background: ${themeCfg.printGridLine};"></div>
+              <div style="position: absolute; left: ${(hIdx / (SEU_TIMELINE_HOURS.length - 1)) * 100}%; top: 0; bottom: 0; width: 1px; background: ${themeCfg.printGridLine};"></div>
             `).join("")}
             ${cardsHtml}
           </div>
@@ -2460,11 +2461,11 @@ export default function StudentToolsPage() {
     });
 
     const hoursHtml = SEU_TIMELINE_HOURS.map((h, i) => {
-      const left = (i / 12) * 100;
+      const left = (i / (SEU_TIMELINE_HOURS.length - 1)) * 100;
       const hLabel = routineTimeFormat === "12h"
         ? (h === 12 ? "12 PM" : h > 12 ? `${h - 12} PM` : `${h} AM`)
         : `${h.toString().padStart(2, "0")}:00`;
-      const tx = i === 0 ? "0%" : i === 12 ? "-100%" : "-50%";
+      const tx = i === 0 ? "0%" : i === SEU_TIMELINE_HOURS.length - 1 ? "-100%" : "-50%";
       return `<div style="position: absolute; left: ${left}%; transform: translateX(${tx}); font-family: monospace; font-size: 10.5px; font-weight: bold; color: ${themeCfg.printRulerText};">${hLabel}</div>`;
     }).join("");
 
@@ -2472,7 +2473,7 @@ export default function StudentToolsPage() {
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>SEU Class Timetable (8 AM - 8 PM)</title>
+  <title>SEU Class Timetable (8:00 AM – 6:30 PM)</title>
   <style>
     @page { size: landscape; margin: 8mm; }
     * { box-sizing: border-box; }
@@ -2489,12 +2490,12 @@ export default function StudentToolsPage() {
 </head>
 <body>
   <div class="no-print">
-    <span style="font-size: 13px; font-weight: bold; color: ${themeCfg.printRulerText};">📄 Southeast University Weekly Routine Timeline (8 AM - 8 PM) • [Theme: ${themeCfg.name}]</span>
+    <span style="font-size: 13px; font-weight: bold; color: ${themeCfg.printRulerText};">📄 Southeast University Weekly Routine Timeline (8:00 AM – 6:30 PM) • [Theme: ${themeCfg.name}]</span>
     <button onclick="window.print()" style="background: ${themeCfg.printHeaderLine}; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;">🖨️ Print / Save as PDF</button>
   </div>
   <div class="header">
     <h1>SOUTHEAST UNIVERSITY</h1>
-    <p>Official Weekly Class Routine & Schedule • All Academic Departments (8:00 AM – 8:00 PM)</p>
+    <p>Official Weekly Class Routine & Schedule • All Academic Departments (8:00 AM – 6:30 PM)</p>
   </div>
   <div style="border: 1px solid ${themeCfg.printContainerBorder}; border-radius: 12px; overflow: hidden; background: ${themeCfg.printContainerBg};">
     <!-- Timeline Hours Ruler -->
@@ -2523,6 +2524,84 @@ export default function StudentToolsPage() {
   const handleDownloadPdfRoutine = () => {
     toast.info(language === "bn" ? "প্রিন্ট ডায়ালগ থেকে 'Save as PDF' নির্বাচন করে সেভ করুন।" : "In the print dialog, set Destination to 'Save as PDF' to download.", { duration: 4000 });
     handlePrintRoutineOnly();
+  };
+
+  // Download High-Resolution PNG Image
+  const handleDownloadPngRoutine = async () => {
+    if (!routineContainerRef.current) return;
+    try {
+      setIsDownloadingPng(true);
+      toast.info(
+        language === "bn"
+          ? "হাই-রেজোলিউশন রুটিন PNG প্রস্তুত হচ্ছে..."
+          : "Generating high-resolution routine PNG image..."
+      );
+
+      await new Promise((r) => setTimeout(r, 120));
+
+      const { toPng } = await import("html-to-image");
+      const themeCfg = ROUTINE_COLOR_THEMES[routineColorTheme] || ROUTINE_COLOR_THEMES.navy;
+      const el = routineContainerRef.current;
+      const targetWidth = Math.max(el.scrollWidth, 980);
+      const bgColor = themeCfg.printBg || "#0b1328";
+
+      let dataUrl = "";
+      try {
+        dataUrl = await toPng(el, {
+          quality: 1,
+          pixelRatio: 2.5,
+          width: targetWidth,
+          backgroundColor: bgColor,
+          skipFonts: true,
+          cacheBust: true,
+        });
+      } catch (e1) {
+        console.warn("toPng with skipFonts error, retrying standard:", e1);
+        try {
+          dataUrl = await toPng(el, {
+            quality: 1,
+            pixelRatio: 2.5,
+            width: targetWidth,
+            backgroundColor: bgColor,
+            cacheBust: true,
+          });
+        } catch (e2) {
+          console.warn("Standard toPng error, falling back to html2canvas:", e2);
+          const html2canvas = (await import("html2canvas")).default;
+          const canvas = await html2canvas(el, {
+            scale: 2.5,
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor: bgColor,
+            logging: false,
+            width: targetWidth,
+          });
+          dataUrl = canvas.toDataURL("image/png");
+        }
+      }
+
+      if (!dataUrl) throw new Error("Failed to generate image data URL");
+
+      const link = document.createElement("a");
+      link.download = `NoteLagbe_SEU_Class_Routine_${routineColorTheme}.png`;
+      link.href = dataUrl;
+      link.click();
+
+      toast.success(
+        language === "bn"
+          ? "স্মার্ট রুটিন PNG ইমেজ ডাউনলোড সম্পন্ন হয়েছে!"
+          : "Smart Routine PNG image downloaded successfully!"
+      );
+    } catch (err: any) {
+      console.error("Error downloading routine PNG:", err);
+      toast.error(
+        language === "bn"
+          ? "PNG ডাউনলোড ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।"
+          : "Failed to download routine PNG. Please try again."
+      );
+    } finally {
+      setIsDownloadingPng(false);
+    }
   };
 
   return (
@@ -6474,7 +6553,7 @@ export default function StudentToolsPage() {
                 </p>
               </div>
 
-              {/* Action Buttons: Print ONLY timetable / Download PDF */}
+              {/* Action Buttons: Print ONLY timetable / Download PDF / Download PNG */}
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={handlePrintRoutineOnly}
@@ -6482,7 +6561,7 @@ export default function StudentToolsPage() {
                   title="Print only the routine table grid"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Print Timetable</span>
+                  <span>{language === "bn" ? "প্রিন্ট রুটিন" : "Print Timetable"}</span>
                 </button>
                 <button
                   onClick={handleDownloadPdfRoutine}
@@ -6490,7 +6569,20 @@ export default function StudentToolsPage() {
                   title="Download timetable as PDF"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Download PDF</span>
+                  <span>{language === "bn" ? "PDF ডাউনলোড" : "Download PDF"}</span>
+                </button>
+                <button
+                  onClick={handleDownloadPngRoutine}
+                  disabled={isDownloadingPng}
+                  className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-xs font-bold text-white flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                  title="Download timetable as high-resolution PNG image"
+                >
+                  {isDownloadingPng ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <ImageIcon className="w-3.5 h-3.5" />
+                  )}
+                  <span>{language === "bn" ? "PNG ডাউনলোড" : "Download PNG"}</span>
                 </button>
                 {routineEntries.length > 0 && (
                   <button
@@ -6641,10 +6733,10 @@ export default function StudentToolsPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-black uppercase text-slate-700 dark:text-slate-300 tracking-wide flex items-center gap-1.5">
                     <Clock className="w-4 h-4 text-blue-500" />
-                    <span>Weekly Class Schedule (8:00 AM – 8:00 PM)</span>
+                    <span>Weekly Class Schedule (8:00 AM – 6:30 PM)</span>
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 font-mono font-bold">
-                    8:00 - 20:00
+                    8:00 - 18:30
                   </span>
                 </div>
 
@@ -6675,7 +6767,7 @@ export default function StudentToolsPage() {
                 </div>
               </div>
 
-              <div id="seu-routine-grid-container" className={`overflow-x-auto border rounded-2xl transition-all duration-300 ${curRoutineTheme.containerClass}`}>
+              <div ref={routineContainerRef} id="seu-routine-grid-container" className={`overflow-x-auto border rounded-2xl transition-all duration-300 ${curRoutineTheme.containerClass}`}>
                 <div className="min-w-[920px]">
                   
                   {/* Top Hours Ruler (08 to 20 / 8 AM to 8 PM) */}
@@ -6685,11 +6777,11 @@ export default function StudentToolsPage() {
                     </div>
                     <div className="grow relative h-full flex items-center">
                       {SEU_TIMELINE_HOURS.map((hour, idx) => {
-                        const leftPercent = (idx / 12) * 100;
+                        const leftPercent = (idx / (SEU_TIMELINE_HOURS.length - 1)) * 100;
                         const hourLabel = routineTimeFormat === "12h"
                           ? (hour === 12 ? "12 PM" : hour > 12 ? `${hour - 12} PM` : `${hour} AM`)
                           : `${hour.toString().padStart(2, "0")}:00`;
-                        const translateX = idx === 0 ? "0%" : idx === 12 ? "-100%" : "-50%";
+                        const translateX = idx === 0 ? "0%" : idx === SEU_TIMELINE_HOURS.length - 1 ? "-100%" : "-50%";
                         return (
                           <div
                             key={hour}
@@ -6730,7 +6822,7 @@ export default function StudentToolsPage() {
                             {SEU_TIMELINE_HOURS.map((_, hIdx) => (
                               <div
                                 key={hIdx}
-                                style={{ left: `${(hIdx / 12) * 100}%` }}
+                                style={{ left: `${(hIdx / (SEU_TIMELINE_HOURS.length - 1)) * 100}%` }}
                                 className={`absolute top-0 bottom-0 w-[1px] pointer-events-none ${curRoutineTheme.gridLineClass}`}
                               />
                             ))}
@@ -6739,9 +6831,9 @@ export default function StudentToolsPage() {
                             {dayClasses.map((item) => {
                               const timeParsed = parseTimeToMinutes(item.time);
                               const startMin = timeParsed ? Math.max(480, timeParsed.start) : 480;
-                              const endMin = timeParsed ? Math.min(1200, timeParsed.end) : 560;
-                              const leftPercent = Math.max(0, Math.min(95, ((startMin - 480) / 720) * 100));
-                              const widthPercent = Math.max(7, Math.min(100 - leftPercent, ((endMin - startMin) / 720) * 100));
+                              const endMin = timeParsed ? Math.min(1140, timeParsed.end) : 560;
+                              const leftPercent = Math.max(0, Math.min(95, ((startMin - 480) / 660) * 100));
+                              const widthPercent = Math.max(7, Math.min(100 - leftPercent, ((endMin - startMin) / 660) * 100));
                               const timeLabel = routineTimeFormat === "12h" ? formatRange12(item.time) : formatRange24(item.time);
                               const isClashing = clashes.some(c => (c.e1.id === item.id || c.e2.id === item.id));
 
