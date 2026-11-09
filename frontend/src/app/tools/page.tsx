@@ -2500,7 +2500,7 @@ export default function StudentToolsPage() {
         <div style="background: #2563eb; color: #fff; font-weight: 900; font-size: 13px; padding: 4px 10px; border-radius: 6px; letter-spacing: 0.5px;">NoteLagbe <span style="font-size: 9.5px; opacity: 0.85; font-family: monospace;">SEU</span></div>
         <div style="text-align: left;">
           <div style="font-size: 11.5px; font-weight: 800; color: ${themeCfg.printHeaderH1};">Southeast University Academic Resource & Routine Archive</div>
-          <div style="font-size: 9.5px; color: ${themeCfg.printHeaderP}; font-weight: 600;">Official Student Portal • notelagbe.vercel.app</div>
+          <div style="font-size: 9.5px; color: ${themeCfg.printHeaderP}; font-weight: 600;">Official Student Portal • note-lagbe-sandy.vercel.app</div>
         </div>
       </div>
       <div style="display: flex; gap: 8px; align-items: center;">
@@ -2537,7 +2537,7 @@ export default function StudentToolsPage() {
 
   <!-- Document Footer -->
   <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-family: monospace; color: ${themeCfg.printHeaderP}; padding: 4px 6px;">
-    <div>Generated via <strong>NoteLagbe</strong> (notelagbe.vercel.app) • Official SEU Student Academic Portal</div>
+    <div>Generated via <strong>NoteLagbe</strong> (note-lagbe-sandy.vercel.app) • Official SEU Student Academic Portal</div>
     <div>Tejgaon Permanent Campus, Dhaka • Session: 2026</div>
   </div>
 
@@ -6856,7 +6856,7 @@ export default function StudentToolsPage() {
                             </span>
                           </div>
                           <span className="text-[10px] text-blue-500 dark:text-blue-400 font-semibold">
-                            Official Student Academic Portal • notelagbe.vercel.app
+                            Official Student Academic Portal • note-lagbe-sandy.vercel.app
                           </span>
                         </div>
                       </div>
@@ -7066,7 +7066,7 @@ export default function StudentToolsPage() {
                     <div className="flex items-center gap-3">
                       <span>Tejgaon Permanent Campus, Dhaka</span>
                       <span>•</span>
-                      <span className="text-blue-500 font-bold">notelagbe.vercel.app</span>
+                      <span className="text-blue-500 font-bold">note-lagbe-sandy.vercel.app</span>
                     </div>
                   </div>
                 </div>

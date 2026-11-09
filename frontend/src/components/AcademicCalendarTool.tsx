@@ -961,7 +961,7 @@ export default function AcademicCalendarTool() {
                     Southeast University Academic Resource & Question Archive
                   </span>
                   <span className="text-[10px] text-blue-600 font-bold">
-                    Official Student Portal • notelagbe.vercel.app
+                    Official Student Portal • note-lagbe-sandy.vercel.app
                   </span>
                 </div>
               </div>
@@ -1109,7 +1109,7 @@ export default function AcademicCalendarTool() {
                   <span className="font-semibold text-slate-700">Southeast University Academic Resource & Question Archive</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-blue-600 font-bold">Portal: notelagbe.vercel.app</span>
+                  <span className="text-blue-600 font-bold">Portal: note-lagbe-sandy.vercel.app</span>
                   <span>•</span>
                   <span>Academic Calendar {selectedYear}</span>
                 </div>
@@ -1145,7 +1145,7 @@ export default function AcademicCalendarTool() {
                   Southeast University Academic Resource & Question Archive
                 </span>
                 <span className="text-[10px] text-blue-600 font-bold">
-                  Official Student Portal • notelagbe.vercel.app
+                  Official Student Portal • note-lagbe-sandy.vercel.app
                 </span>
               </div>
             </div>
@@ -1219,7 +1219,7 @@ export default function AcademicCalendarTool() {
                 <span className="font-semibold text-slate-700">Southeast University Academic Resource & Question Archive</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-blue-600 font-bold">Portal: notelagbe.vercel.app</span>
+                <span className="text-blue-600 font-bold">Portal: note-lagbe-sandy.vercel.app</span>
                 <span>•</span>
                 <span>{singleExportSemester.semester}</span>
               </div>
