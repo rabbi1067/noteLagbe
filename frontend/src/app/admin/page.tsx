@@ -38,6 +38,7 @@ import {
   RefreshCw,
   FolderOpen,
   Mail,
+  Laptop,
   Star,
   EyeOff,
   User,
@@ -888,6 +889,15 @@ export default function AdminDashboardPage() {
     }
   }, [isAdmin, activeTab, activityLogPage, activityLogCategory, loadActivityLogs]);
 
+  // Real-time automatic polling (4 seconds) when viewing Security & Activity Logs tab
+  useEffect(() => {
+    if (!isAdmin || activeTab !== "activityLogs") return;
+    const interval = setInterval(() => {
+      loadActivityLogs(activityLogPage, activityLogSearch, activityLogCategory);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isAdmin, activeTab, activityLogPage, activityLogSearch, activityLogCategory, loadActivityLogs]);
+
 
   // Data Loading
   useEffect(() => {
@@ -907,6 +917,9 @@ export default function AdminDashboardPage() {
   useDataSync((payload) => {
     if (isAdmin && payload?.action !== "admin_broadcast") {
       loadAllAdminData(true);
+      if (activeTab === "activityLogs" || payload?.entity === "activity_log") {
+        loadActivityLogs(activityLogPage, activityLogSearch, activityLogCategory);
+      }
     }
   });
 
@@ -8070,13 +8083,21 @@ export default function AdminDashboardPage() {
                           return (
                             <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                               {/* Timestamp */}
-                              <td className="px-5 py-3.5 whitespace-nowrap min-w-[170px]">
-                                <div className="font-bold text-slate-900 dark:text-white">
-                                  {new Date(log.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                              <td className="px-5 py-3.5 whitespace-nowrap min-w-[185px]">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-slate-900 dark:text-white text-xs">
+                                    {log.formattedDate || (log.createdAt ? new Date(log.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Today")}
+                                  </span>
+                                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                                    {log.relativeTime || "Recent"}
+                                  </span>
                                 </div>
-                                <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1 mt-0.5">
-                                  <Clock className="w-2.5 h-2.5" />
-                                  {new Date(log.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                                <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1.5 mt-1">
+                                  <Clock className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                    {log.formattedTime || (log.createdAt ? new Date(log.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "")}
+                                  </span>
+                                  <span className="text-slate-400 dark:text-slate-500 text-[9px] font-sans font-medium">BST (UTC+6)</span>
                                 </div>
                               </td>
 
@@ -8121,12 +8142,20 @@ export default function AdminDashboardPage() {
                                 </p>
                               </td>
 
-                              {/* Client IP Address */}
+                              {/* Client IP Address & Device */}
                               <td className="px-5 py-3.5 whitespace-nowrap">
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] font-mono text-blue-600 dark:text-blue-400 font-semibold shadow-2xs">
-                                  <Globe className="w-3 h-3 text-slate-400" />
-                                  {log.ipAddress || "127.0.0.1"}
-                                </span>
+                                <div className="flex flex-col gap-1">
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] font-mono text-blue-600 dark:text-blue-400 font-semibold shadow-2xs">
+                                    <Globe className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span>{log.ipAddress || "127.0.0.1"}</span>
+                                  </span>
+                                  {log.deviceInfo && (
+                                    <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1 pl-1">
+                                      <Laptop className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                                      <span className="truncate max-w-[140px]" title={log.deviceInfo}>{log.deviceInfo}</span>
+                                    </span>
+                                  )}
+                                </div>
                               </td>
 
                               {/* Status */}

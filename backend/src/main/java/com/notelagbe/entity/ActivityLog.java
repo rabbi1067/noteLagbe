@@ -36,6 +36,9 @@ public class ActivityLog {
     @Column(nullable = false, length = 60)
     private String ipAddress = "127.0.0.1";
 
+    @Column(length = 150)
+    private String deviceInfo = "Web Client";
+
     @Column(length = 30)
     private String status = "SUCCESS"; // SUCCESS, FAILED, WARNING
 
@@ -45,6 +48,10 @@ public class ActivityLog {
     public ActivityLog() {}
 
     public ActivityLog(String action, String actionType, String details, String userEmail, String userName, String userRole, String ipAddress, String status) {
+        this(action, actionType, details, userEmail, userName, userRole, ipAddress, "Web Client", status);
+    }
+
+    public ActivityLog(String action, String actionType, String details, String userEmail, String userName, String userRole, String ipAddress, String deviceInfo, String status) {
         this.action = action;
         this.actionType = actionType != null ? actionType : "SYSTEM";
         this.details = details;
@@ -52,6 +59,7 @@ public class ActivityLog {
         this.userName = userName;
         this.userRole = userRole;
         this.ipAddress = ipAddress != null && !ipAddress.isBlank() ? ipAddress : "127.0.0.1";
+        this.deviceInfo = deviceInfo != null && !deviceInfo.isBlank() ? deviceInfo : "Web Client";
         this.status = status != null ? status : "SUCCESS";
         this.createdAt = LocalDateTime.now();
     }
@@ -64,6 +72,7 @@ public class ActivityLog {
         this.userName = userName;
         this.userRole = userRole;
         this.ipAddress = ipAddress != null && !ipAddress.isBlank() ? ipAddress : "127.0.0.1";
+        this.deviceInfo = "Web Client";
         this.status = status != null ? status : "SUCCESS";
         this.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
     }
@@ -130,6 +139,14 @@ public class ActivityLog {
 
     public void setIpAddress(String ipAddress) {
         this.ipAddress = ipAddress;
+    }
+
+    public String getDeviceInfo() {
+        return deviceInfo;
+    }
+
+    public void setDeviceInfo(String deviceInfo) {
+        this.deviceInfo = deviceInfo;
     }
 
     public String getStatus() {

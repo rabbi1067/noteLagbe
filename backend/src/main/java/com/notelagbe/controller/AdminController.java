@@ -45,6 +45,7 @@ public class AdminController {
     private final ActivityLogService activityLogService;
     private final SeuFacultySyncService seuFacultySyncService;
     private final CacheManager cacheManager;
+    private final HttpServletRequest httpRequest;
 
     public AdminController(AdminService adminService,
                            PaymentService paymentService,
@@ -60,7 +61,8 @@ public class AdminController {
                            ChatService chatService,
                            ActivityLogService activityLogService,
                            SeuFacultySyncService seuFacultySyncService,
-                           CacheManager cacheManager) {
+                           CacheManager cacheManager,
+                           HttpServletRequest httpRequest) {
         this.adminService = adminService;
         this.paymentService = paymentService;
         this.contributionService = contributionService;
@@ -76,6 +78,24 @@ public class AdminController {
         this.activityLogService = activityLogService;
         this.seuFacultySyncService = seuFacultySyncService;
         this.cacheManager = cacheManager;
+        this.httpRequest = httpRequest;
+    }
+
+    private User getCurrentAdminUser() {
+        try {
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof CustomUserDetails cud) {
+                return cud.getUser();
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    private void logAdminAction(String action, String actionType, String details) {
+        try {
+            User user = getCurrentAdminUser();
+            activityLogService.logActivity(action, actionType, details, user, httpRequest);
+        } catch (Exception ignored) {}
     }
 
 
@@ -107,6 +127,7 @@ public class AdminController {
     @DeleteMapping("/activity-logs")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<Map<String, String>> clearActivityLogs() {
+        logAdminAction("LOGS_CLEAR", "SYSTEM", "Super Admin cleared activity audit logs");
         activityLogService.clearAllLogs();
         return ResponseEntity.ok(Map.of("message", "All activity logs have been cleared successfully."));
     }
@@ -147,6 +168,7 @@ public class AdminController {
             initialTeacherId = Long.parseLong(payload.get("teacherId").toString());
         }
         Course created = courseService.createCourse(course, initialTeacherId);
+        logAdminAction("COURSE_CREATE", "ACADEMIC", "Admin created curriculum course: " + created.getCode() + " - " + created.getTitle());
         return ResponseEntity.ok(Map.of("success", true, "message", "Course created successfully", "course", created));
     }
 
@@ -155,6 +177,7 @@ public class AdminController {
             @PathVariable String code,
             @PathVariable Long teacherId) {
         courseService.assignTeacherToCourse(code, teacherId);
+        logAdminAction("FACULTY_ASSIGN", "ACADEMIC", "Assigned faculty ID #" + teacherId + " to course " + code);
         return ResponseEntity.ok(Map.of("success", true, "message", "Teacher assigned to course successfully"));
     }
 
@@ -163,6 +186,7 @@ public class AdminController {
             @PathVariable String code,
             @PathVariable Long teacherId) {
         courseService.removeTeacherFromCourse(code, teacherId);
+        logAdminAction("FACULTY_UNASSIGN", "ACADEMIC", "Removed faculty ID #" + teacherId + " from course " + code);
         return ResponseEntity.ok(Map.of("success", true, "message", "Teacher removed from course successfully"));
     }
 
@@ -171,12 +195,14 @@ public class AdminController {
             @PathVariable String code,
             @RequestBody Map<String, Object> payload) {
         Course updated = courseService.updateCourse(code, payload);
+        logAdminAction("COURSE_UPDATE", "ACADEMIC", "Admin updated curriculum course details for: " + code);
         return ResponseEntity.ok(Map.of("success", true, "message", "Course updated successfully", "course", updated));
     }
 
     @DeleteMapping("/courses/{code}")
     public ResponseEntity<Map<String, Object>> deleteCourse(@PathVariable String code) {
         courseService.deleteCourse(code);
+        logAdminAction("COURSE_DELETE", "ACADEMIC", "Admin deleted curriculum course: " + code);
         return ResponseEntity.ok(Map.of("success", true, "message", "Course deleted successfully"));
     }
 
@@ -186,6 +212,7 @@ public class AdminController {
     @PostMapping("/teachers")
     public ResponseEntity<Map<String, Object>> createTeacher(@RequestBody Teacher teacher) {
         Teacher saved = teacherService.createTeacher(teacher);
+        logAdminAction("FACULTY_CREATE", "ACADEMIC", "Admin created faculty profile: " + saved.getName() + (saved.getInitial() != null ? " (" + saved.getInitial() + ")" : ""));
         return ResponseEntity.ok(Map.of("success", true, "message", "Faculty profile created successfully", "teacher", saved));
     }
 
@@ -205,12 +232,14 @@ public class AdminController {
             @PathVariable Long id,
             @RequestBody Map<String, Object> payload) {
         Teacher updated = teacherService.updateTeacher(id, payload);
+        logAdminAction("FACULTY_UPDATE", "ACADEMIC", "Admin updated faculty profile ID #" + id + " (" + updated.getName() + ")");
         return ResponseEntity.ok(Map.of("success", true, "message", "Faculty profile updated successfully", "teacher", updated));
     }
 
     @DeleteMapping("/teachers/{id}")
     public ResponseEntity<Map<String, Object>> deleteTeacher(@PathVariable Long id) {
         teacherService.deleteTeacher(id);
+        logAdminAction("FACULTY_DELETE", "ACADEMIC", "Admin deleted faculty profile ID #" + id);
         return ResponseEntity.ok(Map.of("success", true, "message", "Faculty member removed successfully"));
     }
 
@@ -233,10 +262,9 @@ public class AdminController {
     public ResponseEntity<Resource> createResource(
             @Valid @RequestBody ResourceCreateRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ResponseEntity.ok(resourceService.createResource(
-                request,
-                userDetails != null ? userDetails.getUser() : null
-        ));
+        Resource created = resourceService.createResource(request, userDetails != null ? userDetails.getUser() : null);
+        logAdminAction("RESOURCE_UPLOAD", "CONTENT", "Admin uploaded material: " + created.getTitle() + (created.getCourse() != null ? " for course " + created.getCourse().getCode() : ""));
+        return ResponseEntity.ok(created);
     }
 
     @PutMapping("/resources/{id}")
@@ -249,6 +277,7 @@ public class AdminController {
     @DeleteMapping("/resources/{id}")
     public ResponseEntity<Map<String, Object>> deleteResource(@PathVariable Long id) {
         resourceService.deleteResource(id);
+        logAdminAction("RESOURCE_DELETE", "CONTENT", "Admin deleted study material ID #" + id);
         return ResponseEntity.ok(Map.of("success", true, "message", "Resource deleted successfully"));
     }
 
@@ -264,7 +293,9 @@ public class AdminController {
     public ResponseEntity<StaffResponseDto> createStaff(
             @Valid @RequestBody StaffCreateRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ResponseEntity.ok(adminService.createStaff(request, userDetails.getUser()));
+        StaffResponseDto staff = adminService.createStaff(request, userDetails.getUser());
+        logAdminAction("STAFF_CREATE", "STAFF", "Super Admin provisioned staff account: " + request.getEmail() + " as " + request.getRole());
+        return ResponseEntity.ok(staff);
     }
 
     @PutMapping("/staff/{id}")
@@ -279,7 +310,9 @@ public class AdminController {
     public ResponseEntity<Map<String, Object>> toggleStaffStatus(
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ResponseEntity.ok(adminService.toggleStaffBlock(id, userDetails.getUser()));
+        Map<String, Object> res = adminService.toggleStaffBlock(id, userDetails.getUser());
+        logAdminAction("STAFF_STATUS_TOGGLE", "STAFF", "Super Admin toggled account active status for staff member ID #" + id);
+        return ResponseEntity.ok(res);
     }
 
     @DeleteMapping("/staff/{id}")
@@ -287,6 +320,7 @@ public class AdminController {
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         adminService.deleteStaff(id, userDetails.getUser());
+        logAdminAction("STAFF_DELETE", "STAFF", "Super Admin removed staff account ID #" + id);
         return ResponseEntity.ok(Map.of("success", true, "message", "Staff account removed successfully"));
     }
 
@@ -305,7 +339,9 @@ public class AdminController {
             @PathVariable Long id,
             @RequestBody(required = false) Map<String, String> body) {
         String notes = body != null && body.containsKey("notes") ? body.get("notes") : "Approved by Admin";
-        return ResponseEntity.ok(paymentService.approvePayment(id, notes));
+        PaymentRequest p = paymentService.approvePayment(id, notes);
+        logAdminAction("PAYMENT_APPROVE", "BILLING", "Super Admin approved subscription payment ID #" + id + " (" + notes + ")");
+        return ResponseEntity.ok(p);
     }
 
     @PreAuthorize("hasRole('SUPER_ADMIN')")
@@ -314,7 +350,9 @@ public class AdminController {
             @PathVariable Long id,
             @RequestBody(required = false) Map<String, String> body) {
         String notes = body != null && body.containsKey("notes") ? body.get("notes") : "Rejected by Admin";
-        return ResponseEntity.ok(paymentService.rejectPayment(id, notes));
+        PaymentRequest p = paymentService.rejectPayment(id, notes);
+        logAdminAction("PAYMENT_REJECT", "BILLING", "Super Admin rejected subscription payment ID #" + id + " (" + notes + ")");
+        return ResponseEntity.ok(p);
     }
 
     // ==========================================
@@ -348,7 +386,9 @@ public class AdminController {
         String department = body != null && body.containsKey("department") && body.get("department") != null
                 ? String.valueOf(body.get("department")) : null;
 
-        return ResponseEntity.ok(contributionService.approveContribution(id, feedback, title, teacherId, resourceType, semesterName, courseCode, department));
+        ContributionRequest c = contributionService.approveContribution(id, feedback, title, teacherId, resourceType, semesterName, courseCode, department);
+        logAdminAction("CONTRIBUTION_APPROVE", "CONTENT", "Admin approved student study contribution ID #" + id + (courseCode != null ? " for course " + courseCode : ""));
+        return ResponseEntity.ok(c);
     }
 
     @PostMapping("/contributions/{id}/reject")
@@ -356,7 +396,9 @@ public class AdminController {
             @PathVariable Long id,
             @RequestBody(required = false) Map<String, String> body) {
         String feedback = body != null && body.containsKey("feedback") ? body.get("feedback") : "Resource does not meet quality requirements.";
-        return ResponseEntity.ok(contributionService.rejectContribution(id, feedback));
+        ContributionRequest c = contributionService.rejectContribution(id, feedback);
+        logAdminAction("CONTRIBUTION_REJECT", "CONTENT", "Admin rejected student contribution ID #" + id + " (" + feedback + ")");
+        return ResponseEntity.ok(c);
     }
 
     @DeleteMapping("/contributions/{id}")
@@ -387,7 +429,9 @@ public class AdminController {
                 notes = body.get("notes").toString();
             }
         }
-        return ResponseEntity.ok(waiverService.approveWaiver(id, quota, notes));
+        WaiverRequest w = waiverService.approveWaiver(id, quota, notes);
+        logAdminAction("WAIVER_APPROVE", "BILLING", "Admin approved 100% financial waiver request ID #" + id + " (Quota: " + quota + " courses)");
+        return ResponseEntity.ok(w);
     }
 
     @PostMapping("/waivers/{id}/reject")
@@ -395,7 +439,9 @@ public class AdminController {
             @PathVariable Long id,
             @RequestBody(required = false) Map<String, String> body) {
         String notes = body != null && body.containsKey("notes") ? body.get("notes") : "Application declined.";
-        return ResponseEntity.ok(waiverService.rejectWaiver(id, notes));
+        WaiverRequest w = waiverService.rejectWaiver(id, notes);
+        logAdminAction("WAIVER_REJECT", "BILLING", "Admin rejected financial waiver request ID #" + id);
+        return ResponseEntity.ok(w);
     }
 
     // ==========================================
@@ -438,6 +484,7 @@ public class AdminController {
             @RequestBody Map<String, Boolean> body) {
         boolean enabled = body != null && body.getOrDefault("enabled", true);
         emailService.setEmailNotificationsEnabled(enabled);
+        logAdminAction("SETTINGS_UPDATE", "SYSTEM", "Admin updated notification settings: emailNotificationsEnabled=" + enabled);
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "emailNotificationsEnabled", enabled
@@ -503,7 +550,9 @@ public class AdminController {
 
     @PostMapping("/notices")
     public ResponseEntity<Notice> createNotice(@Valid @RequestBody NoticeRequest request) {
-        return ResponseEntity.ok(noticeService.createNotice(request));
+        Notice n = noticeService.createNotice(request);
+        logAdminAction("NOTICE_CREATE", "SYSTEM", "Admin published campus notice: " + (n.getText() != null && n.getText().length() > 50 ? n.getText().substring(0, 50) + "..." : n.getText()));
+        return ResponseEntity.ok(n);
     }
 
     @PutMapping("/notices/{id}")
@@ -514,12 +563,15 @@ public class AdminController {
     @DeleteMapping("/notices/{id}")
     public ResponseEntity<Map<String, Object>> deleteNotice(@PathVariable Long id) {
         noticeService.deleteNotice(id);
+        logAdminAction("NOTICE_DELETE", "SYSTEM", "Admin deleted campus notice ID #" + id);
         return ResponseEntity.ok(Map.of("success", true, "message", "Notice deleted successfully"));
     }
 
     @PutMapping("/notices/{id}/toggle-status")
     public ResponseEntity<Map<String, Object>> toggleNoticeStatus(@PathVariable Long id) {
-        return ResponseEntity.ok(noticeService.toggleNoticeStatus(id));
+        Map<String, Object> res = noticeService.toggleNoticeStatus(id);
+        logAdminAction("NOTICE_TOGGLE", "SYSTEM", "Admin toggled campus notice status ID #" + id);
+        return ResponseEntity.ok(res);
     }
 
     // ==========================================

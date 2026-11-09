@@ -34,12 +34,13 @@ public class ActivityLogService {
     }
 
     /**
-     * Log an action with detailed metadata and client IP.
+     * Log an action with detailed metadata, client IP, and device info.
      */
     @Transactional
-    public ActivityLog logActivity(String action, String actionType, String details, String userEmail, String userName, String userRole, String ipAddress, String status) {
+    public ActivityLog logActivity(String action, String actionType, String details, String userEmail, String userName, String userRole, String ipAddress, String deviceInfo, String status) {
         try {
             String safeIp = (ipAddress != null && !ipAddress.isBlank()) ? ipAddress : "127.0.0.1";
+            String safeDevice = (deviceInfo != null && !deviceInfo.isBlank()) ? deviceInfo : "Web Client";
             ActivityLog entry = new ActivityLog(
                     action,
                     actionType,
@@ -48,6 +49,7 @@ public class ActivityLogService {
                     userName,
                     userRole,
                     safeIp,
+                    safeDevice,
                     status != null ? status : "SUCCESS"
             );
             entry = activityLogRepository.save(entry);
@@ -60,23 +62,45 @@ public class ActivityLogService {
     }
 
     /**
-     * Overload accepting User object.
+     * Legacy Overload without deviceInfo.
+     */
+    @Transactional
+    public ActivityLog logActivity(String action, String actionType, String details, String userEmail, String userName, String userRole, String ipAddress, String status) {
+        return logActivity(action, actionType, details, userEmail, userName, userRole, ipAddress, "Web Client", status);
+    }
+
+    /**
+     * Overload accepting User object and IP.
      */
     @Transactional
     public ActivityLog logActivity(String action, String actionType, String details, User user, String ipAddress, String status) {
         String email = user != null ? user.getEmail() : "system@seu.edu.bd";
         String name = user != null ? user.getName() : "System Automated";
         String role = user != null && user.getRole() != null ? user.getRole().name() : "SYSTEM";
-        return logActivity(action, actionType, details, email, name, role, ipAddress, status);
+        return logActivity(action, actionType, details, email, name, role, ipAddress, "Web Client", status);
     }
 
     /**
-     * Overload extracting IP and user from request.
+     * Overload extracting IP, User-Agent device, and user from HttpServletRequest.
      */
     @Transactional
     public ActivityLog logActivity(String action, String actionType, String details, User user, HttpServletRequest request) {
         String clientIp = getClientIp(request);
-        return logActivity(action, actionType, details, user, clientIp, "SUCCESS");
+        String deviceInfo = getDeviceInfo(request);
+        String email = user != null ? user.getEmail() : "system@seu.edu.bd";
+        String name = user != null ? user.getName() : "System Automated";
+        String role = user != null && user.getRole() != null ? user.getRole().name() : "SYSTEM";
+        return logActivity(action, actionType, details, email, name, role, clientIp, deviceInfo, "SUCCESS");
+    }
+
+    /**
+     * Helper specifically for Authentication actions (Logins, SSO, Register).
+     */
+    @Transactional
+    public ActivityLog logAuth(String action, String details, String email, String name, String role, HttpServletRequest request, String status) {
+        String clientIp = getClientIp(request);
+        String deviceInfo = getDeviceInfo(request);
+        return logActivity(action, "AUTH", details, email, name, role, clientIp, deviceInfo, status != null ? status : "SUCCESS");
     }
 
     /**
@@ -87,6 +111,8 @@ public class ActivityLogService {
 
         String[] headers = {
                 "CF-Connecting-IP",      // Cloudflare tunnel
+                "True-Client-IP",
+                "X-Client-IP",
                 "X-Forwarded-For",
                 "X-Real-IP",
                 "Proxy-Client-IP",
@@ -94,17 +120,49 @@ public class ActivityLogService {
         };
 
         for (String header : headers) {
-            String ip = request.getHeader(header);
-            if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
-                return ip.split(",")[0].trim();
+            String val = request.getHeader(header);
+            if (val != null && !val.isBlank() && !"unknown".equalsIgnoreCase(val)) {
+                String[] ips = val.split(",");
+                for (String ip : ips) {
+                    String clean = ip.trim();
+                    if (!clean.isEmpty() && !"unknown".equalsIgnoreCase(clean)) {
+                        return clean;
+                    }
+                }
             }
         }
 
         String remote = request.getRemoteAddr();
-        if ("0:0:0:0:0:0:0:1".equals(remote)) {
+        if ("0:0:0:0:0:0:0:1".equals(remote) || "::1".equals(remote)) {
             return "127.0.0.1";
         }
         return remote != null ? remote : "127.0.0.1";
+    }
+
+    /**
+     * Parses browser and operating system details from the User-Agent header.
+     */
+    public static String getDeviceInfo(HttpServletRequest request) {
+        if (request == null) return "Web Browser";
+        String ua = request.getHeader("User-Agent");
+        if (ua == null || ua.isBlank()) return "Web Client";
+
+        String browser = "Browser";
+        if (ua.contains("Edg/")) browser = "Edge";
+        else if (ua.contains("Chrome/")) browser = "Chrome";
+        else if (ua.contains("Firefox/")) browser = "Firefox";
+        else if (ua.contains("Safari/") && !ua.contains("Chrome/")) browser = "Safari";
+        else if (ua.contains("Postman")) browser = "Postman";
+        else if (ua.contains("curl")) browser = "cURL";
+
+        String os = "Unknown OS";
+        if (ua.contains("Windows")) os = "Windows";
+        else if (ua.contains("Macintosh") || ua.contains("Mac OS")) os = "macOS";
+        else if (ua.contains("Android")) os = "Android";
+        else if (ua.contains("iPhone") || ua.contains("iPad")) os = "iOS";
+        else if (ua.contains("Linux")) os = "Linux";
+
+        return browser + " on " + os;
     }
 
     /**
@@ -116,7 +174,7 @@ public class ActivityLogService {
         int safeSize = Math.min(100, Math.max(1, size));
         Pageable pageable = PageRequest.of(safePage, safeSize);
 
-        // 365-day rolling retention cutoff: ajk theke bigoto one year show korbe
+        // 365-day rolling retention cutoff
         LocalDateTime cutoff = LocalDateTime.now().minusDays(365);
         String safeSearch = search != null ? search.trim() : "";
         String safeActionType = (actionType != null && !actionType.isBlank() && !"ALL".equalsIgnoreCase(actionType))
@@ -149,7 +207,6 @@ public class ActivityLogService {
     /**
      * Automatic Rolling Purge: Runs every day at 2:00 AM.
      * Deletes any activity log records older than 365 days (1 year).
-     * "agamikal aber last day thake one day auto delete hoye jabe ay vabe"
      */
     @Scheduled(cron = "0 0 2 * * ?")
     @Transactional

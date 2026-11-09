@@ -4,6 +4,8 @@ import com.notelagbe.dto.CourseSearchResponse;
 import com.notelagbe.dto.UnlockCourseRequest;
 import com.notelagbe.security.CustomUserDetails;
 import com.notelagbe.service.CourseService;
+import com.notelagbe.service.ActivityLogService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -21,10 +23,14 @@ public class CourseController {
 
     private final CourseService courseService;
     private final com.notelagbe.service.AiRevisionService aiRevisionService;
+    private final ActivityLogService activityLogService;
+    private final HttpServletRequest httpRequest;
 
-    public CourseController(CourseService courseService, com.notelagbe.service.AiRevisionService aiRevisionService) {
+    public CourseController(CourseService courseService, com.notelagbe.service.AiRevisionService aiRevisionService, ActivityLogService activityLogService, HttpServletRequest httpRequest) {
         this.courseService = courseService;
         this.aiRevisionService = aiRevisionService;
+        this.activityLogService = activityLogService;
+        this.httpRequest = httpRequest;
     }
 
     @GetMapping
@@ -61,6 +67,9 @@ public class CourseController {
             return ResponseEntity.status(401).body(Map.of("success", false, "message", "Login required"));
         }
         boolean success = courseService.unlockCourse(code, userDetails.getUser());
+        try {
+            activityLogService.logActivity("COURSE_UNLOCK", "CONTENT", "Student unlocked course: " + code.toUpperCase(), userDetails.getUser(), httpRequest);
+        } catch (Exception ignored) {}
         return ResponseEntity.ok(Map.of("success", success, "message", "Course materials successfully unlocked!"));
     }
 
@@ -88,6 +97,9 @@ public class CourseController {
             response.setContentType("application/zip");
             response.setHeader("Content-Disposition", "attachment; filename=\"" + code.toUpperCase() + "_Offline_Study_Pack.zip\"");
             courseService.generateOfflineStudyPackZip(code, user, response.getOutputStream());
+            try {
+                activityLogService.logActivity("OFFLINE_PACK_DOWNLOAD", "CONTENT", "Student downloaded offline study pack for: " + code.toUpperCase(), user, httpRequest);
+            } catch (Exception ignored) {}
         } catch (com.notelagbe.exception.ApiException e) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.setContentType("application/json");

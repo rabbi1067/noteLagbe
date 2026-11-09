@@ -35,14 +35,13 @@ public class AuthController {
         AuthResponse res = authService.login(request);
         try {
             if (res != null && res.getEmail() != null) {
-                activityLogService.logActivity(
+                activityLogService.logAuth(
                         "USER_LOGIN",
-                        "AUTH",
-                        "User authenticated successfully: " + res.getEmail(),
+                        "User authenticated successfully via password: " + res.getEmail(),
                         res.getEmail(),
                         res.getName(),
                         res.getRole(),
-                        ActivityLogService.getClientIp(httpRequest),
+                        httpRequest,
                         "SUCCESS"
                 );
             }
@@ -55,14 +54,13 @@ public class AuthController {
         AuthResponse res = authService.register(request);
         try {
             if (res != null && res.getEmail() != null) {
-                activityLogService.logActivity(
+                activityLogService.logAuth(
                         "USER_REGISTER",
-                        "AUTH",
                         "New student account registered: " + res.getEmail() + (request.getStudentId() != null ? " (ID: " + request.getStudentId() + ")" : ""),
                         res.getEmail(),
                         res.getName(),
                         res.getRole(),
-                        ActivityLogService.getClientIp(httpRequest),
+                        httpRequest,
                         "SUCCESS"
                 );
             }
@@ -71,8 +69,40 @@ public class AuthController {
     }
 
     @PostMapping("/google")
-    public ResponseEntity<AuthResponse> googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
-        return ResponseEntity.ok(authService.loginWithGoogle(request));
+    public ResponseEntity<AuthResponse> googleLogin(@Valid @RequestBody GoogleLoginRequest request, HttpServletRequest httpRequest) {
+        AuthResponse res = authService.loginWithGoogle(request);
+        try {
+            if (res != null && res.getEmail() != null) {
+                activityLogService.logAuth(
+                        "USER_LOGIN_GOOGLE",
+                        "User authenticated via Google Single Sign-On: " + res.getEmail(),
+                        res.getEmail(),
+                        res.getName(),
+                        res.getRole(),
+                        httpRequest,
+                        "SUCCESS"
+                );
+            }
+        } catch (Exception ignored) {}
+        return ResponseEntity.ok(res);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, String>> logout(@AuthenticationPrincipal CustomUserDetails userDetails, HttpServletRequest httpRequest) {
+        if (userDetails != null && userDetails.getUser() != null) {
+            try {
+                activityLogService.logAuth(
+                        "USER_LOGOUT",
+                        "User signed out from session: " + userDetails.getUser().getEmail(),
+                        userDetails.getUser().getEmail(),
+                        userDetails.getUser().getName(),
+                        userDetails.getUser().getRole() != null ? userDetails.getUser().getRole().name() : "STUDENT",
+                        httpRequest,
+                        "SUCCESS"
+                );
+            } catch (Exception ignored) {}
+        }
+        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 
     @GetMapping("/me")

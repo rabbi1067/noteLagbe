@@ -157,6 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = (showToast: boolean = true) => {
+    api.auth.logout().catch(() => {});
     removeToken();
     setTokenState(null);
     setUser(null);

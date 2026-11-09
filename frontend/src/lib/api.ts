@@ -83,6 +83,7 @@ export const api = {
     login: (data: any) => request<any>("/auth/login", { method: "POST", body: JSON.stringify(data) }),
     register: (data: any) => request<any>("/auth/register", { method: "POST", body: JSON.stringify(data) }),
     googleLogin: (data: any) => request<any>("/auth/google", { method: "POST", body: JSON.stringify(data) }),
+    logout: () => request<any>("/auth/logout", { method: "POST" }),
     getMe: () => request<any>("/auth/me"),
     updateProfile: (data: { name?: string; phone?: string; address?: string; avatarUrl?: string | null }) =>
       request<any>("/auth/profile", { method: "PUT", body: JSON.stringify(data) }),
