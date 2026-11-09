@@ -725,18 +725,18 @@ export default function AcademicCalendarTool() {
     }
   };
 
-  // Category Pills Data (Including Installment & Payment)
+  // Category Pills Data (Arranged in natural academic sequence: All Events, Classes, Installment & Payment, Examinations, Results, etc.)
   const categoriesList = [
     { id: "all", labelEn: "All Events", labelBn: "সব ইভেন্ট" },
+    { id: "class", labelEn: "Classes", labelBn: "ক্লাস শুরু/শেষ" },
     { id: "installment", labelEn: "Installment & Payment", labelBn: "কিস্তি ও পেমেন্ট" },
     { id: "exam", labelEn: "Examinations", labelBn: "পরীক্ষা (Exams)" },
-    { id: "class", labelEn: "Classes", labelBn: "ক্লাস শুরু/শেষ" },
+    { id: "result", labelEn: "Results", labelBn: "রেজাল্ট ও গ্রেড" },
+    { id: "add_drop", labelEn: "Add / Drop", labelBn: "অ্যাড / ড্রপ" },
+    { id: "pre_registration", labelEn: "Pre-registration", labelBn: "প্রি-রেজিস্ট্রেশন" },
     { id: "holiday", labelEn: "Holidays", labelBn: "ছুটি (Holidays)" },
     { id: "semester_break", labelEn: "Semester Break", labelBn: "সেমিস্টার বিরতি" },
     { id: "orientation", labelEn: "Orientation", labelBn: "ওরিয়েন্টেশন" },
-    { id: "add_drop", labelEn: "Add / Drop", labelBn: "অ্যাড / ড্রপ" },
-    { id: "pre_registration", labelEn: "Pre-registration", labelBn: "প্রি-রেজিস্ট্রেশন" },
-    { id: "result", labelEn: "Results", labelBn: "রেজাল্ট ও গ্রেড" },
   ];
 
   return (
@@ -949,6 +949,30 @@ export default function AcademicCalendarTool() {
             ref={fullCalendarRef}
             className="bg-white text-slate-900 p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6 relative overflow-hidden"
           >
+            {/* NoteLagbe Official Academic Portal Branding Bar (Prominent in UI & Downloads) */}
+            <div className="w-full flex flex-wrap items-center justify-between pb-3 mb-2 border-b-2 border-slate-200 text-xs font-sans gap-2 relative z-10">
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 text-white font-extrabold text-xs tracking-wider shadow-sm">
+                  <span className="font-black text-white">NoteLagbe</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/20 uppercase tracking-widest font-mono text-white">SEU</span>
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-slate-900 font-extrabold text-xs tracking-tight">
+                    Southeast University Academic Resource & Question Archive
+                  </span>
+                  <span className="text-[10px] text-blue-600 font-bold">
+                    Official Student Portal • notelagbe.vercel.app
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-[10px] font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Verified University Academic Calendar
+                </span>
+              </div>
+            </div>
+
             {/* Official Southeast University Top Header (Matching SEU Official Document exactly) */}
             <div className="flex flex-col items-center justify-center text-center pb-2 relative z-10">
               <div className="flex items-center justify-center gap-4 mb-2">
@@ -968,9 +992,17 @@ export default function AcademicCalendarTool() {
                 </div>
               </div>
 
-              {/* Blue Header Banner matching official document */}
-              <div className="w-full mt-2 py-2 px-4 bg-[#1d63ed] rounded-lg text-white font-black text-sm sm:text-base md:text-lg tracking-wide uppercase text-center shadow-sm">
-                ACADEMIC CALENDAR {selectedYear}
+              {/* Blue Header Banner matching official document with NoteLagbe Portal Branding */}
+              <div className="w-full mt-2 py-2.5 px-4 bg-[#1d63ed] rounded-xl text-white font-black text-sm sm:text-base md:text-lg tracking-wide uppercase text-center shadow-sm flex items-center justify-between">
+                <span className="text-xs font-bold tracking-wider opacity-90 hidden sm:inline font-sans">
+                  NOTELAGBE ARCHIVE
+                </span>
+                <span className="flex-1 text-center font-black tracking-wide">
+                  ACADEMIC CALENDAR {selectedYear}
+                </span>
+                <span className="text-xs font-mono font-bold opacity-90 hidden sm:inline">
+                  SEU.EDU.BD
+                </span>
               </div>
             </div>
 
@@ -1064,16 +1096,23 @@ export default function AcademicCalendarTool() {
 
             {/* Official Footnotes & NoteLagbe Archive Watermark Footer */}
             <div className="pt-4 border-t-2 border-slate-200 text-center text-xs space-y-2 text-slate-600 font-medium font-serif relative z-10">
-              <p className="bg-blue-50 py-1 px-3 rounded-lg border border-blue-200 text-blue-900 inline-block">
+              <p className="bg-blue-50 py-1 px-3 rounded-lg border border-blue-200 text-blue-900 inline-block text-[11px]">
                 * Depends on sighting of the moon and approval of the Government
               </p>
               <p className="text-slate-700 font-bold">
                 University Authority reserves the right to change the Academic Calendar
               </p>
-              <div className="pt-2 text-[11px] text-slate-500 font-sans flex items-center justify-center gap-2">
-                <span>Southeast University</span>
-                <span>•</span>
-                <span>Academic Calendar {selectedYear}</span>
+              <div className="pt-3 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between text-[11px] font-sans text-slate-500 gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-[#173775]">NoteLagbe</span>
+                  <span>•</span>
+                  <span className="font-semibold text-slate-700">Southeast University Academic Resource & Question Archive</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-blue-600 font-bold">Portal: notelagbe.vercel.app</span>
+                  <span>•</span>
+                  <span>Academic Calendar {selectedYear}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1094,6 +1133,30 @@ export default function AcademicCalendarTool() {
           }}
           className="bg-white text-slate-900 p-8 rounded-none border border-slate-300 space-y-6"
         >
+          {/* NoteLagbe Official Academic Portal Branding Bar */}
+          <div className="w-full flex items-center justify-between pb-3 mb-2 border-b-2 border-slate-200 text-xs font-sans">
+            <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 text-white font-extrabold text-xs tracking-wider shadow-sm">
+                <span className="font-black text-white">NoteLagbe</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/20 uppercase tracking-widest font-mono text-white">SEU</span>
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="text-slate-900 font-extrabold text-xs tracking-tight">
+                  Southeast University Academic Resource & Question Archive
+                </span>
+                <span className="text-[10px] text-blue-600 font-bold">
+                  Official Student Portal • notelagbe.vercel.app
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-[10px] font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Verified University Academic Calendar
+              </span>
+            </div>
+          </div>
+
           {/* Southeast University Official Header */}
           <div className="flex flex-col items-center justify-center text-center pb-2 relative z-10">
             <div className="flex items-center justify-center gap-4 mb-2">
@@ -1141,16 +1204,25 @@ export default function AcademicCalendarTool() {
             </table>
           </div>
 
-          {/* Footnotes */}
+          {/* Footnotes & NoteLagbe Branding */}
           <div className="pt-4 border-t-2 border-slate-200 text-center text-xs space-y-1.5 text-slate-600 font-serif relative z-10">
-            <p className="bg-blue-50 py-1 px-3 rounded-lg border border-blue-200 text-blue-900 inline-block">
+            <p className="bg-blue-50 py-1 px-3 rounded-lg border border-blue-200 text-blue-900 inline-block text-[11px]">
               * Depends on sighting of the moon and approval of the Government
             </p>
             <p className="text-slate-700 font-bold">
               University Authority reserves the right to change the Academic Calendar
             </p>
-            <div className="pt-2 text-[11px] text-slate-500 font-sans">
-              Southeast University • Academic Calendar {selectedYear}
+            <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-[11px] font-sans text-slate-500">
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-[#173775]">NoteLagbe</span>
+                <span>•</span>
+                <span className="font-semibold text-slate-700">Southeast University Academic Resource & Question Archive</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-blue-600 font-bold">Portal: notelagbe.vercel.app</span>
+                <span>•</span>
+                <span>{singleExportSemester.semester}</span>
+              </div>
             </div>
           </div>
         </div>
