@@ -550,12 +550,14 @@ export default function CourseDetailPage() {
                 </span>
               )}
 
-              {/* Social Proof & Unlock Counter Badges */}
-              <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-400 border border-orange-200/70 dark:border-orange-800/50 flex items-center gap-1.5 shadow-sm">
-                <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500 animate-pulse" />
-                <span>{course.unlockCount || 360}+ {language === "bn" ? "জন শিক্ষার্থী আনলক করেছে" : "Students Unlocked"}</span>
-              </span>
-              {course.trending && (
+              {/* Real Database Unlock Counter Badges (Only shown when real users have unlocked) */}
+              {Boolean(course.unlockCount && course.unlockCount > 0) && (
+                <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-400 border border-orange-200/70 dark:border-orange-800/50 flex items-center gap-1.5 shadow-sm">
+                  <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500 animate-pulse" />
+                  <span>{course.unlockCount} {language === "bn" ? "জন শিক্ষার্থী আনলক করেছে" : "Students Unlocked"}</span>
+                </span>
+              )}
+              {Boolean(course.trending && course.unlockCount && course.unlockCount > 0) && (
                 <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200/70 dark:border-rose-800/50 flex items-center gap-1 shadow-sm">
                   <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
                   <span>{language === "bn" ? "জনপ্রিয় কোর্স" : "Trending Course"}</span>
@@ -704,37 +706,30 @@ export default function CourseDetailPage() {
               </button>
             )}
 
-            {/* Social Proof & Conversion Booster Card */}
-            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-blue-500/10 border border-amber-200/70 dark:border-amber-900/40 space-y-2">
-              <div className="flex items-center gap-2">
-                {/* Overlapping mini avatars */}
-                <div className="flex -space-x-1.5 overflow-hidden shrink-0">
-                  <div className="inline-flex h-6 w-6 rounded-full ring-2 ring-white dark:ring-slate-900 bg-blue-500 text-[10px] font-black text-white items-center justify-center shadow-sm">S</div>
-                  <div className="inline-flex h-6 w-6 rounded-full ring-2 ring-white dark:ring-slate-900 bg-emerald-500 text-[10px] font-black text-white items-center justify-center shadow-sm">R</div>
-                  <div className="inline-flex h-6 w-6 rounded-full ring-2 ring-white dark:ring-slate-900 bg-purple-500 text-[10px] font-black text-white items-center justify-center shadow-sm">F</div>
-                  <div className="inline-flex h-6 w-6 rounded-full ring-2 ring-white dark:ring-slate-900 bg-amber-500 text-[9px] font-black text-white items-center justify-center shadow-sm">
-                    +{Math.max(1, (course.unlockCount || 360) - 3)}
+            {/* Real Social Proof Card - Only when real unlocks exist */}
+            {Boolean(course.unlockCount && course.unlockCount > 0) && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-blue-500/10 border border-amber-200/70 dark:border-amber-900/40 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="text-[11px] font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1">
+                    <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                    <span>{course.unlockCount} {language === "bn" ? "জন SEU শিক্ষার্থী যুক্ত" : "SEU Students Enrolled"}</span>
                   </div>
                 </div>
-                <div className="text-[11px] font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1">
-                  <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                  <span>{course.unlockCount || 360}+ {language === "bn" ? "জন SEU শিক্ষার্থী যুক্ত" : "SEU Students Enrolled"}</span>
+                <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-tight">
+                  {isCourseUnlocked
+                    ? (language === "bn"
+                        ? "অভিনন্দন! আপনি এই কোর্সের পূর্ণাঙ্গ রিসোর্স আর্काइভের সফল আনলককারী।"
+                        : "You are actively utilizing this course archive alongside your batchmates.")
+                    : (language === "bn"
+                        ? "মিডটার্ম ও ফাইনাল পরীক্ষার সেরা প্রস্তুতির জন্য ব্যাচমেটদের সর্বাধিক পছন্দের কোর্স।"
+                        : "Trusted by batchmates preparing for Midterm & Final examinations.")}
+                </p>
+                <div className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                  <span>{language === "bn" ? "সকল শিক্ষকের হ্যান্ডনোট ও বিগত প্রশ্ন অন্তর্ভুক্ত" : "Includes all faculty notes & exam papers"}</span>
                 </div>
               </div>
-              <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-tight">
-                {isCourseUnlocked
-                  ? (language === "bn"
-                      ? "অভিনন্দন! আপনি এই কোর্সের পূর্ণাঙ্গ রিসোর্স আর্काइভের সফল আনলককারী।"
-                      : "You are actively utilizing this course archive alongside your batchmates.")
-                  : (language === "bn"
-                      ? "মিডটার্ম ও ফাইনাল পরীক্ষার সেরা প্রস্তুতির জন্য ব্যাচমেটদের সর্বাধিক পছন্দের কোর্স।"
-                      : "Trusted by batchmates preparing for Midterm & Final examinations.")}
-              </p>
-              <div className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                <span>{language === "bn" ? "সকল শিক্ষকের হ্যান্ডনোট ও বিগত প্রশ্ন অন্তর্ভুক্ত" : "Includes all faculty notes & exam papers"}</span>
-              </div>
-            </div>
+            )}
 
             <Link
               href="/contribute"

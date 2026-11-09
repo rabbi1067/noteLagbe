@@ -26,7 +26,8 @@ export default function CoursesPage() {
   // Instant client cache restore without SSR hydration mismatch
   useEffect(() => {
     try {
-      const cached = localStorage.getItem("notelagbe_cached_courses");
+      localStorage.removeItem("notelagbe_cached_courses");
+      const cached = localStorage.getItem("notelagbe_cached_courses_v2");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -50,7 +51,7 @@ export default function CoursesPage() {
       setCourses(validCourses);
       if (typeof window !== "undefined" && validCourses.length > 0 && selectedDepartment === "ALL" && !selectedSemester) {
         try {
-          localStorage.setItem("notelagbe_cached_courses", JSON.stringify(validCourses));
+          localStorage.setItem("notelagbe_cached_courses_v2", JSON.stringify(validCourses));
         } catch {}
       }
     } catch {
@@ -415,16 +416,18 @@ export default function CoursesPage() {
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                  {course.trending && (
+                  {Boolean(course.trending && course.unlockCount && course.unlockCount > 0) && (
                     <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 flex items-center gap-0.5 shadow-xs">
                       <TrendingUp className="w-2.5 h-2.5" />
                       <span>HOT</span>
                     </span>
                   )}
-                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border border-orange-200/70 dark:border-orange-800/40 flex items-center gap-1 shadow-xs">
-                    <Flame className="w-2.5 h-2.5 text-orange-500 fill-orange-500" />
-                    <span>{course.unlockCount || 360}+ {language === "bn" ? "আনলক" : "Unlocks"}</span>
-                  </span>
+                  {Boolean(course.unlockCount && course.unlockCount > 0) && (
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border border-orange-200/70 dark:border-orange-800/40 flex items-center gap-1 shadow-xs">
+                      <Flame className="w-2.5 h-2.5 text-orange-500 fill-orange-500" />
+                      <span>{course.unlockCount} {language === "bn" ? "আনলক" : "Unlocks"}</span>
+                    </span>
+                  )}
                   {course.isLab && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
                       {language === "bn" ? "ল্যাব" : "Lab"}

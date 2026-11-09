@@ -249,18 +249,10 @@ public class CourseService {
         // Check if unlocked via SubscriptionService (handles expiration, quotas, and automatic locking)
         res.setUnlocked(subscriptionService.isCourseUnlocked(user, course));
 
-        // Social Proof / Unlock Counter for university marketing & student conversion
+        // Real database unlock count (Zero fake/demo offsets)
         long realCount = unlockedCourseRepository.countByCourseId(course.getId());
-        int hash = Math.abs(course.getCode() != null ? course.getCode().hashCode() : 42);
-        int baseOffset = 180 + (hash % 240);
-        if (course.getSemester() > 0 && course.getSemester() <= 3) {
-            baseOffset += 110; // Early foundational courses have higher enrollment
-        } else if (course.getSemester() > 3 && course.getSemester() <= 6) {
-            baseOffset += 50;
-        }
-        int totalUnlocks = (int) (baseOffset + realCount);
-        res.setUnlockCount(totalUnlocks);
-        res.setTrending(totalUnlocks >= 350);
+        res.setUnlockCount((int) realCount);
+        res.setTrending(realCount >= 10);
 
         return res;
     }
