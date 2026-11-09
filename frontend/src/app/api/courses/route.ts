@@ -12,19 +12,21 @@ export async function GET(request: NextRequest) {
 
   const semester = semesterStr ? parseInt(semesterStr, 10) : null;
 
-  // 1. Try to fetch fresh live data from Spring Boot backend with short timeout
+  // 1. Try to fetch fresh live data from Spring Boot backend with resilient timeout
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     const backendUrl =
       (process.env.BACKEND_INTERNAL_URL && process.env.BACKEND_INTERNAL_URL.startsWith("http"))
         ? process.env.BACKEND_INTERNAL_URL
+        : (process.env.NEXT_PUBLIC_BACKEND_URL && process.env.NEXT_PUBLIC_BACKEND_URL.startsWith("http"))
+        ? process.env.NEXT_PUBLIC_BACKEND_URL
         : (process.env.BACKEND_URL && process.env.BACKEND_URL.startsWith("http"))
         ? process.env.BACKEND_URL
         : (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.startsWith("http"))
         ? process.env.NEXT_PUBLIC_API_URL
-        : "http://localhost:8888";
+        : (process.env.NODE_ENV === "development" ? "http://localhost:8888" : "https://notelagbe-backend.onrender.com");
 
     const queryString = searchParams.toString();
     const res = await fetch(`${backendUrl}/api/courses${queryString ? `?${queryString}` : ""}`, {
@@ -39,7 +41,7 @@ export async function GET(request: NextRequest) {
       if (Array.isArray(data)) {
         return NextResponse.json(data, {
           headers: {
-            "Cache-Control": "public, s-maxage=120, stale-while-revalidate=300",
+            "Cache-Control": "no-store, no-cache, must-revalidate",
             "X-Data-Source": "backend-live",
           },
         });
@@ -84,7 +86,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(filtered, {
     headers: {
-      "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
       "X-Data-Source": "catalog-bundled",
     },
   });

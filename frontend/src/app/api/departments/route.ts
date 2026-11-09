@@ -7,16 +7,18 @@ export async function GET() {
   // 1. Try to fetch from the NoteLagbe Spring Boot backend (which live-syncs with seu.edu.bd/programs)
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     const backendUrl =
       (process.env.BACKEND_INTERNAL_URL && process.env.BACKEND_INTERNAL_URL.startsWith("http"))
         ? process.env.BACKEND_INTERNAL_URL
+        : (process.env.NEXT_PUBLIC_BACKEND_URL && process.env.NEXT_PUBLIC_BACKEND_URL.startsWith("http"))
+        ? process.env.NEXT_PUBLIC_BACKEND_URL
         : (process.env.BACKEND_URL && process.env.BACKEND_URL.startsWith("http"))
         ? process.env.BACKEND_URL
         : (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.startsWith("http"))
         ? process.env.NEXT_PUBLIC_API_URL
-        : "http://localhost:8888";
+        : (process.env.NODE_ENV === "development" ? "http://localhost:8888" : "https://notelagbe-backend.onrender.com");
     const backendRes = await fetch(`${backendUrl}/api/departments`, {
       signal: controller.signal,
       headers: { Accept: "application/json" },

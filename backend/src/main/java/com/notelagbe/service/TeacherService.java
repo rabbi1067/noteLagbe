@@ -66,6 +66,17 @@ public class TeacherService {
 
     public List<TeacherCourse> getCoursesTaughtByTeacher(Long teacherId) {
         List<TeacherCourse> list = new java.util.ArrayList<>(teacherCourseRepository.findByTeacherId(teacherId));
+        // Strict filter: purge/remove any demo mappings with TBA schedule if no real resource exists
+        list.removeIf(tc -> {
+            boolean isDemoSchedule = tc.getScheduleInfo() != null && tc.getScheduleInfo().contains("TBA @ Southeast University");
+            if (isDemoSchedule) {
+                boolean hasResource = tc.getCourse() != null && resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
+                        tc.getCourse().getCode(), teacherId, com.notelagbe.entity.ResourceStatus.APPROVED);
+                return !hasResource;
+            }
+            return false;
+        });
+
         java.util.Set<Long> existingCourseIds = list.stream().filter(tc -> tc.getCourse() != null).map(tc -> tc.getCourse().getId()).collect(java.util.stream.Collectors.toSet());
         List<Resource> approvedResources = resourceRepository.findByTeacherIdAndStatus(teacherId, com.notelagbe.entity.ResourceStatus.APPROVED);
         Teacher teacher = teacherRepository.findById(teacherId).orElse(null);
@@ -73,7 +84,7 @@ public class TeacherService {
             for (Resource r : approvedResources) {
                 if (r.getCourse() != null && !existingCourseIds.contains(r.getCourse().getId())) {
                     existingCourseIds.add(r.getCourse().getId());
-                    TeacherCourse synthetic = new TeacherCourse(teacher, r.getCourse(), "General", "Contributed Material");
+                    TeacherCourse synthetic = new TeacherCourse(teacher, r.getCourse(), "General", "Course Material Archive");
                     list.add(synthetic);
                 }
             }

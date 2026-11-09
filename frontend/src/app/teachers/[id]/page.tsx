@@ -112,7 +112,37 @@ export default function TeacherDetailPage() {
     ])
       .then(([tData, cData, rData, revData]) => {
         setTeacher(tData);
-        const sortedCourses = sortTeacherCoursesNaturally(cData || []);
+
+        // Strict safety filter: purge demo TBA courses that have no actual uploaded materials
+        const realCourses = (cData || []).filter((c: any) => {
+          if (c.scheduleInfo && c.scheduleInfo.includes("TBA @ Southeast University")) {
+            const courseCode = (c.course?.code || c.code || "").toLowerCase();
+            const hasResource = (rData || []).some((r: any) => (r.course?.code || "").toLowerCase() === courseCode);
+            return hasResource;
+          }
+          return true;
+        });
+
+        // Also dynamically include courses with approved materials if not already in realCourses
+        const courseMap = new Map<string, any>();
+        realCourses.forEach((c: any) => {
+          const code = (c.course?.code || c.code || "").toUpperCase();
+          if (code) courseMap.set(code, c);
+        });
+        (rData || []).forEach((r: any) => {
+          const code = (r.course?.code || "").toUpperCase();
+          if (code && !courseMap.has(code) && r.course) {
+            courseMap.set(code, {
+              id: `mat-${r.id}`,
+              course: r.course,
+              teacher: tData,
+              section: "General",
+              scheduleInfo: null,
+            });
+          }
+        });
+
+        const sortedCourses = sortTeacherCoursesNaturally(Array.from(courseMap.values()));
         setCourses(sortedCourses);
         setResources(rData || []);
         setReviews(revData || []);

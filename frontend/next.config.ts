@@ -3,7 +3,10 @@ import type { NextConfig } from "next";
 const backendBaseUrl =
   process.env.BACKEND_INTERNAL_URL ||
   process.env.NEXT_PUBLIC_BACKEND_URL ||
-  "http://localhost:8888";
+  process.env.BACKEND_URL ||
+  (process.env.NODE_ENV === "development"
+    ? "http://localhost:8888"
+    : "https://notelagbe-backend.onrender.com");
 
 const nextConfig: NextConfig = {
   /* config options here */

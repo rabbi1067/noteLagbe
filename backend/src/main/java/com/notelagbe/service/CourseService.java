@@ -161,6 +161,12 @@ public class CourseService {
         Map<Long, Teacher> distinctTeachers = new LinkedHashMap<>();
         for (TeacherCourse tc : tcs) {
             if (tc.getTeacher() != null) {
+                boolean isDemo = tc.getScheduleInfo() != null && tc.getScheduleInfo().contains("TBA @ Southeast University");
+                if (isDemo) {
+                    boolean hasRes = resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
+                            course.getCode(), tc.getTeacher().getId(), ResourceStatus.APPROVED);
+                    if (!hasRes) continue;
+                }
                 distinctTeachers.putIfAbsent(tc.getTeacher().getId(), tc.getTeacher());
             }
         }
@@ -257,7 +263,7 @@ public class CourseService {
         return res;
     }
 
-    @CacheEvict(value = {"courses", "course_details"}, allEntries = true)
+    @CacheEvict(value = {"courses", "course_details", "teachers", "teacher_details", "teacher_courses"}, allEntries = true)
     @Transactional
     public void assignTeacherToCourse(String courseCode, Long teacherId) {
         Course course = courseRepository.findByCodeIgnoreCase(courseCode.trim())
@@ -269,18 +275,21 @@ public class CourseService {
             tc.setCourse(course);
             tc.setTeacher(teacher);
             tc.setSection("General");
+            tc.setScheduleInfo(null);
             teacherCourseRepository.save(tc);
             liveSyncService.broadcast("matrix", "assigned", courseCode + "->" + teacherId);
+            liveSyncService.broadcast("teacher_course", "updated", teacherId);
         }
     }
 
-    @CacheEvict(value = {"courses", "course_details"}, allEntries = true)
+    @CacheEvict(value = {"courses", "course_details", "teachers", "teacher_details", "teacher_courses"}, allEntries = true)
     @Transactional
     public void removeTeacherFromCourse(String courseCode, Long teacherId) {
         Course course = courseRepository.findByCodeIgnoreCase(courseCode.trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with code: " + courseCode));
         teacherCourseRepository.deleteByCourseIdAndTeacherId(course.getId(), teacherId);
         liveSyncService.broadcast("matrix", "removed", courseCode + "->" + teacherId);
+        liveSyncService.broadcast("teacher_course", "updated", teacherId);
     }
 
     @CacheEvict(value = {"courses", "course_details"}, allEntries = true)

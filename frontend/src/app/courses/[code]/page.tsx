@@ -2082,7 +2082,7 @@ function MaterialCard({
       {/* Card Footer Actions */}
       <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
         <span className="text-[10px] text-slate-400 font-mono">
-          {resource.downloadsCount || 42} {language === "bn" ? "ভিউ" : "views"}
+          {resource.downloadsCount || 0} {language === "bn" ? "ভিউ" : "views"}
         </span>
 
         <div className="flex items-center gap-2">

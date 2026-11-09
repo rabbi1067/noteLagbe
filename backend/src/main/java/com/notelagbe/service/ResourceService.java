@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,8 @@ public class ResourceService {
     private final LiveSyncService liveSyncService;
     private final ContributionRequestRepository contributionRequestRepository;
     private final CloudinaryService cloudinaryService;
+    private final TeacherCourseRepository teacherCourseRepository;
+    private final CacheManager cacheManager;
 
     public ResourceService(ResourceRepository resourceRepository,
                            CourseRepository courseRepository,
@@ -41,7 +44,9 @@ public class ResourceService {
                            SubscriptionService subscriptionService,
                            LiveSyncService liveSyncService,
                            ContributionRequestRepository contributionRequestRepository,
-                           CloudinaryService cloudinaryService) {
+                           CloudinaryService cloudinaryService,
+                           TeacherCourseRepository teacherCourseRepository,
+                           CacheManager cacheManager) {
         this.resourceRepository = resourceRepository;
         this.courseRepository = courseRepository;
         this.teacherRepository = teacherRepository;
@@ -51,6 +56,17 @@ public class ResourceService {
         this.liveSyncService = liveSyncService;
         this.contributionRequestRepository = contributionRequestRepository;
         this.cloudinaryService = cloudinaryService;
+        this.teacherCourseRepository = teacherCourseRepository;
+        this.cacheManager = cacheManager;
+    }
+
+    private void evictCaches() {
+        if (cacheManager != null) {
+            for (String cacheName : List.of("courses", "course_details", "teachers", "teacher_details", "teacher_courses")) {
+                var c = cacheManager.getCache(cacheName);
+                if (c != null) c.clear();
+            }
+        }
     }
 
     public List<Resource> getResourcesForCourse(String courseCode, User user) {
@@ -191,7 +207,18 @@ public class ResourceService {
         r.setStatus(ResourceStatus.APPROVED);
 
         Resource saved = resourceRepository.save(r);
+
+        // Auto-link teacher to course when academic material is added
+        if (teacher != null && course != null) {
+            if (!teacherCourseRepository.existsByCourseIdAndTeacherId(course.getId(), teacher.getId())) {
+                TeacherCourse tc = new TeacherCourse(teacher, course, "General", "Course Material Archive");
+                teacherCourseRepository.save(tc);
+            }
+        }
+
+        evictCaches();
         liveSyncService.broadcast("resource", "created", saved.getId());
+        liveSyncService.broadcast("teacher_course", "updated", teacher != null ? teacher.getId() : 0);
         return saved;
     }
 
@@ -232,7 +259,17 @@ public class ResourceService {
         }
 
         Resource updated = resourceRepository.save(r);
+
+        if (updated.getTeacher() != null && updated.getCourse() != null) {
+            if (!teacherCourseRepository.existsByCourseIdAndTeacherId(updated.getCourse().getId(), updated.getTeacher().getId())) {
+                TeacherCourse tc = new TeacherCourse(updated.getTeacher(), updated.getCourse(), "General", "Course Material Archive");
+                teacherCourseRepository.save(tc);
+            }
+        }
+
+        evictCaches();
         liveSyncService.broadcast("resource", "updated", id);
+        liveSyncService.broadcast("teacher_course", "updated", updated.getTeacher() != null ? updated.getTeacher().getId() : 0);
         return updated;
     }
 

@@ -9,6 +9,9 @@ import com.notelagbe.entity.TeacherCourse;
 import com.notelagbe.repository.CourseRepository;
 import com.notelagbe.repository.TeacherCourseRepository;
 import com.notelagbe.repository.TeacherRepository;
+import com.notelagbe.repository.ResourceRepository;
+import com.notelagbe.entity.Resource;
+import com.notelagbe.entity.ResourceStatus;
 import com.notelagbe.entity.User;
 import com.notelagbe.entity.Role;
 import com.notelagbe.entity.AuthProvider;
@@ -45,6 +48,7 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
     private final CourseRepository courseRepository;
     private final TeacherRepository teacherRepository;
     private final TeacherCourseRepository teacherCourseRepository;
+    private final ResourceRepository resourceRepository;
     private final SeuFacultySyncService seuFacultySyncService;
     private final ObjectMapper objectMapper;
     private final CacheManager cacheManager;
@@ -60,6 +64,7 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
     public AcademicCatalogInitializer(CourseRepository courseRepository,
                                       TeacherRepository teacherRepository,
                                       TeacherCourseRepository teacherCourseRepository,
+                                       ResourceRepository resourceRepository,
                                       SeuFacultySyncService seuFacultySyncService,
                                       ObjectMapper objectMapper,
                                       CacheManager cacheManager,
@@ -68,6 +73,7 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
         this.courseRepository = courseRepository;
         this.teacherRepository = teacherRepository;
         this.teacherCourseRepository = teacherCourseRepository;
+        this.resourceRepository = resourceRepository;
         this.seuFacultySyncService = seuFacultySyncService;
         this.objectMapper = objectMapper;
         this.cacheManager = cacheManager;
@@ -81,7 +87,8 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
         log.info(">>> Checking Southeast University Academic Catalog in database...");
         seedCoursesIfEmpty();
         seedTeachersIfEmpty();
-        ensureTeacherCourseMappings();
+        purgeDemoTeacherCourseOfferings();
+        syncCoursesFromMaterials();
         ensureAllTeachersHaveInitials();
         ensureSuperAdminUser();
         
@@ -325,42 +332,48 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
         }
     }
 
-    private void ensureTeacherCourseMappings() {
-        if (teacherCourseRepository.count() > 0) return;
-
-        try {
-            ClassPathResource res = new ClassPathResource("data/teacher_course_offerings.json");
-            if (!res.exists()) return;
-
-            try (InputStream is = res.getInputStream()) {
-                List<Map<String, Object>> list = objectMapper.readValue(is, new TypeReference<>() {});
-                for (Map<String, Object> map : list) {
-                    String courseCode = (String) map.get("courseCode");
-                    String teacherInitial = (String) map.get("teacherInitial");
-                    String section = (String) map.getOrDefault("section", "Sec 1");
-                    String schedule = (String) map.getOrDefault("schedule", "TBA @ Southeast University");
-
-                    if (courseCode == null || teacherInitial == null) continue;
-
-                    Optional<Course> courseOpt = courseRepository.findByCodeIgnoreCase(courseCode.trim());
-                    List<Teacher> teachers = teacherRepository.findByInitialIgnoreCase(teacherInitial.trim());
-
-                    if (courseOpt.isPresent() && !teachers.isEmpty()) {
-                        Course course = courseOpt.get();
-                        Teacher teacher = teachers.get(0);
-                        if (!teacherCourseRepository.existsByCourseIdAndTeacherId(course.getId(), teacher.getId())) {
-                            TeacherCourse tc = new TeacherCourse();
-                            tc.setCourse(course);
-                            tc.setTeacher(teacher);
-                            tc.setSection(section);
-                            tc.setScheduleInfo(schedule);
-                            teacherCourseRepository.save(tc);
-                        }
-                    }
+    private void purgeDemoTeacherCourseOfferings() {
+        log.info(">>> Checking and purging demo/fake teacher course offerings...");
+        List<TeacherCourse> all = teacherCourseRepository.findAll();
+        List<TeacherCourse> toPurge = new ArrayList<>();
+        for (TeacherCourse tc : all) {
+            if (tc.getCourse() == null || tc.getTeacher() == null) {
+                toPurge.add(tc);
+                continue;
+            }
+            boolean isDemoSchedule = tc.getScheduleInfo() != null && tc.getScheduleInfo().contains("TBA @ Southeast University");
+            if (isDemoSchedule) {
+                boolean hasResource = resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
+                        tc.getCourse().getCode(), tc.getTeacher().getId(), ResourceStatus.APPROVED);
+                if (!hasResource) {
+                    toPurge.add(tc);
+                } else {
+                    tc.setScheduleInfo(null);
+                    tc.setSection("General");
+                    teacherCourseRepository.save(tc);
                 }
             }
-        } catch (Exception e) {
-            log.error("Failed to load teacher_course_offerings.json", e);
+        }
+        if (!toPurge.isEmpty()) {
+            teacherCourseRepository.deleteAll(toPurge);
+            log.info(">>> Successfully purged {} demo teacher course mappings from database.", toPurge.size());
+        }
+    }
+
+    private void syncCoursesFromMaterials() {
+        List<Resource> approved = resourceRepository.findAll();
+        int added = 0;
+        for (Resource r : approved) {
+            if (r.getTeacher() != null && r.getCourse() != null) {
+                if (!teacherCourseRepository.existsByCourseIdAndTeacherId(r.getCourse().getId(), r.getTeacher().getId())) {
+                    TeacherCourse tc = new TeacherCourse(r.getTeacher(), r.getCourse(), "General", "Course Material Archive");
+                    teacherCourseRepository.save(tc);
+                    added++;
+                }
+            }
+        }
+        if (added > 0) {
+            log.info(">>> Auto-registered {} teacher-course mappings from existing academic materials.", added);
         }
     }
 

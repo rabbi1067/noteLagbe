@@ -94,7 +94,7 @@ public class DemoDataSeeder implements CommandLineRunner {
         seedTeachers();
         syncTeachersFromRateMyFaculty();
         seuFacultySyncService.syncCseFaculties();
-        seedTeacherCourseMappings();
+        // No demo teacher course mappings seeded
         ensureAllTeachersHaveInitials();
         seedSampleResources();
         seedSampleReviews();
@@ -321,26 +321,7 @@ public class DemoDataSeeder implements CommandLineRunner {
                         addedCount++;
                     }
 
-                    // Map coursesTaught from RateMyFaculty JSON
-                    Teacher savedTeacher = (t.getId() != null) ? t : teacherRepository.save(t);
-                    Object coursesObj = map.get("coursesTaught");
-                    if (coursesObj instanceof List<?> courseList) {
-                        for (Object cItem : courseList) {
-                            if (cItem instanceof String courseTitleStr && !courseTitleStr.trim().isEmpty()) {
-                                Course matchedCourse = findBestMatchingCourse(courseTitleStr.trim());
-                                if (matchedCourse != null && savedTeacher.getId() != null) {
-                                    if (!teacherCourseRepository.existsByCourseIdAndTeacherId(matchedCourse.getId(), savedTeacher.getId())) {
-                                        TeacherCourse tc = new TeacherCourse();
-                                        tc.setCourse(matchedCourse);
-                                        tc.setTeacher(savedTeacher);
-                                        tc.setSection("Sec 1");
-                                        tc.setScheduleInfo("TBA @ Southeast University");
-                                        teacherCourseRepository.save(tc);
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    // No demo coursesTaught mapped: only authentic admin or material assignments
                 }
                 log.info("Synced SEU RateMyFaculty teachers: {} updated with initials, {} newly added.", updatedCount, addedCount);
             }
