@@ -2493,32 +2493,24 @@ export default function StudentToolsPage() {
     <button onclick="window.print()" style="background: ${themeCfg.printHeaderLine}; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;">🖨️ Print / Save as PDF</button>
   </div>
 
-  <!-- Official Southeast University & NoteLagbe Branded Header -->
-  <div style="border: 1px solid ${themeCfg.printContainerBorder}; border-radius: 12px; background: ${themeCfg.printContainerBg}; margin-bottom: 12px; padding: 12px 18px; overflow: hidden;">
-    <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid ${themeCfg.printHeaderLine};">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <div style="background: #2563eb; color: #fff; font-weight: 900; font-size: 13px; padding: 4px 10px; border-radius: 6px; letter-spacing: 0.5px;">NoteLagbe <span style="font-size: 9.5px; opacity: 0.85; font-family: monospace;">SEU</span></div>
-        <div style="text-align: left;">
-          <div style="font-size: 11.5px; font-weight: 800; color: ${themeCfg.printHeaderH1};">Southeast University Academic Resource & Routine Archive</div>
-          <div style="font-size: 9.5px; color: ${themeCfg.printHeaderP}; font-weight: 600;">Official Student Portal • note-lagbe-sandy.vercel.app</div>
+  <!-- Official Southeast University Header -->
+  <div style="border: 1px solid ${themeCfg.printContainerBorder}; border-radius: 12px; background: ${themeCfg.printContainerBg}; margin-bottom: 12px; padding: 14px 20px; overflow: hidden;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+      <div style="display: flex; align-items: center; gap: 14px; text-align: left;">
+        <img src="${logoUrl}" style="width: 56px; height: 56px; object-fit: contain; flex-shrink: 0;" alt="Southeast University Crest" />
+        <div>
+          <h1 style="margin: 0; font-size: 22px; font-weight: 900; color: ${themeCfg.printHeaderH1}; letter-spacing: 0.8px; font-family: serif; text-transform: uppercase; line-height: 1;">SOUTHEAST UNIVERSITY</h1>
+          <p style="margin: 3px 0 0; font-size: 13px; color: ${themeCfg.printHeaderP}; font-style: italic; font-family: serif; font-weight: 600;">Meeting the Challenges of Time</p>
+          <p style="margin: 4px 0 0; font-size: 10.5px; color: ${themeCfg.printCardTime}; font-family: monospace; font-weight: bold; letter-spacing: 0.8px; text-transform: uppercase;">SMART WEEKLY CLASS ROUTINE & ACADEMIC TIMETABLE</p>
         </div>
       </div>
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <span style="border: 1px solid ${themeCfg.printContainerBorder}; background: ${themeCfg.printRulerBg}; color: ${themeCfg.printRulerText}; font-size: 10px; font-weight: bold; padding: 3px 10px; border-radius: 9999px;">
-          🟢 Verified Official Schedule (8:00 AM – 6:30 PM)
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-family: monospace;">
+        <span style="border: 1px solid ${themeCfg.printContainerBorder}; background: ${themeCfg.printRulerBg}; color: ${themeCfg.printRulerText}; font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: 6px;">
+          Session: Academic Year 2026
         </span>
-        <span style="border: 1px solid ${themeCfg.printContainerBorder}; background: ${themeCfg.printRulerBg}; color: ${themeCfg.printRulerText}; font-size: 10px; font-weight: bold; padding: 3px 10px; border-radius: 9999px;">
-          ${routineEntries.length} ${routineEntries.length === 1 ? "Class" : "Classes"} Scheduled
+        <span style="font-size: 10px; color: ${themeCfg.printHeaderP};">
+          Palette: <strong style="color: ${themeCfg.printCardCode}; text-transform: uppercase;">${themeCfg.name}</strong>
         </span>
-      </div>
-    </div>
-
-    <div style="display: flex; align-items: center; justify-content: center; gap: 16px; text-align: left;">
-      <img src="${logoUrl}" style="width: 54px; height: 54px; object-fit: contain; flex-shrink: 0;" alt="Southeast University Crest" />
-      <div>
-        <h1 style="margin: 0; font-size: 21px; font-weight: 900; color: ${themeCfg.printHeaderH1}; letter-spacing: 0.8px; font-family: serif; text-transform: uppercase;">SOUTHEAST UNIVERSITY</h1>
-        <p style="margin: 2px 0 0; font-size: 12px; color: ${themeCfg.printHeaderP}; font-style: italic; font-family: serif; font-weight: 600;">Meeting the Challenges of Time</p>
-        <p style="margin: 2px 0 0; font-size: 10px; color: ${themeCfg.printRulerText}; font-family: monospace; font-weight: bold; letter-spacing: 0.5px;">WEEKLY CLASS ROUTINE & SCHEDULE • ALL DEPARTMENTS</p>
       </div>
     </div>
   </div>
@@ -6837,51 +6829,6 @@ export default function StudentToolsPage() {
                       ? "bg-slate-50/90 border-slate-200"
                       : "bg-white/[0.03] border-white/10"
                   }`}>
-                    {/* NoteLagbe Official Academic Portal Branding Strip */}
-                    <div className={`flex flex-wrap items-center justify-between pb-3 mb-3 border-b gap-3 ${
-                      routineColorTheme === "daylight" ? "border-slate-200" : "border-white/10"
-                    }`}>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black text-xs tracking-wider shadow-md shadow-blue-900/30">
-                          <span>NoteLagbe</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/20 uppercase tracking-widest font-mono">SEU</span>
-                        </div>
-                        <div className="flex flex-col text-left">
-                          <div className={`font-extrabold text-xs tracking-tight flex items-center gap-1.5 ${
-                            routineColorTheme === "daylight" ? "text-slate-900" : "text-white"
-                          }`}>
-                            <span>Southeast University Academic Resource & Routine Archive</span>
-                            <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9.5px] font-mono font-bold tracking-wider">
-                              VERIFIED
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-blue-500 dark:text-blue-400 font-semibold">
-                            Official Student Academic Portal • note-lagbe-sandy.vercel.app
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Schedule Stats Pills */}
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10.5px] font-bold font-mono border ${
-                          routineColorTheme === "daylight"
-                            ? "bg-blue-50 text-blue-700 border-blue-200"
-                            : "bg-blue-500/10 text-blue-300 border-blue-500/30"
-                        }`}>
-                          <Clock className="w-3 h-3 text-blue-500" />
-                          8:00 AM – 6:30 PM (All Slots)
-                        </span>
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10.5px] font-bold font-mono border ${
-                          routineColorTheme === "daylight"
-                            ? "bg-purple-50 text-purple-700 border-purple-200"
-                            : "bg-purple-500/10 text-purple-300 border-purple-500/30"
-                        }`}>
-                          <Calendar className="w-3 h-3 text-purple-500" />
-                          {routineEntries.length} {routineEntries.length === 1 ? "Class" : "Classes"} Scheduled
-                        </span>
-                      </div>
-                    </div>
-
                     {/* Main University Crest & Title Centerpiece */}
                     <div className="flex items-center justify-between gap-4 py-1">
                       <div className="flex items-center gap-3.5">
