@@ -418,6 +418,10 @@ public class ContributionService {
 
     public List<ContributorLeaderboardItem> getLeaderboard() {
         List<ContributionRequest> approvedRequests = contributionRequestRepository.findByStatusOrderByCreatedAtDesc(ResourceStatus.APPROVED);
+        if (approvedRequests == null || approvedRequests.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+
         java.util.Map<User, Long> userCounts = approvedRequests.stream()
                 .filter(cr -> cr.getUser() != null)
                 .collect(java.util.stream.Collectors.groupingBy(ContributionRequest::getUser, java.util.stream.Collectors.counting()));
@@ -438,85 +442,13 @@ public class ContributionService {
                     0,
                     u.getId(),
                     u.getName(),
-                    u.getStudentId() != null ? u.getStudentId() : "2022***" + (u.getId() % 900 + 100),
+                    u.getStudentId() != null ? u.getStudentId() : "",
                     userDept,
                     count,
                     "",
                     "",
                     u.getAvatarUrl()
             ));
-        }
-
-        String[][] communityProfiles = {
-            {"Tanvir Ahmed Chowdhury", "2021100010012", "CSE", "48", "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=160&auto=format&fit=crop&q=80"},
-            {"Sadia Afrin Sneha", "2021200020045", "CSE", "41", "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=160&auto=format&fit=crop&q=80"},
-            {"Mahmudul Hasan Rifat", "2021100030089", "EEE", "37", "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=160&auto=format&fit=crop&q=80"},
-            {"Nusrat Jahan Mim", "2022100040023", "BBA", "32", "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&auto=format&fit=crop&q=80"},
-            {"Shakil Hossain", "2022100010077", "CSE", "29", "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=160&auto=format&fit=crop&q=80"},
-            {"Anika Tabassum", "2022200050014", "ENG", "27", "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=160&auto=format&fit=crop&q=80"},
-            {"Rifat Al Mamun", "2021300010056", "CSE", "25", "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=160&auto=format&fit=crop&q=80"},
-            {"Mehedi Hasan Shawon", "2022100060032", "TE", "24", "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=160&auto=format&fit=crop&q=80"},
-            {"Farzana Akter", "2021200070088", "PHAR", "22", "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=160&auto=format&fit=crop&q=80"},
-            {"Zubair Al Mahmud", "2022100080019", "LAW", "21", "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=160&auto=format&fit=crop&q=80"},
-            {"Tasnim Rahman", "2022200010091", "CSE", "19", "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=160&auto=format&fit=crop&q=80"},
-            {"Abrar Fahim", "2022100030044", "EEE", "18"},
-            {"Muntaha Islam", "2023100040011", "BBA", "18"},
-            {"Kazi Samiur Rahman", "2021100010103", "CSE", "17"},
-            {"Fahim Shahriar", "2022200010034", "CSE", "16"},
-            {"Nafisa Anjum", "2022100090022", "ARCH", "16"},
-            {"Shahriar Kabir", "2021300100015", "TEX", "15"},
-            {"Jannatul Ferdous", "2022100050049", "ENG", "15"},
-            {"Rayhan Uddin", "2022100010118", "CSE", "14"},
-            {"Sabbir Ahmed", "2022300030027", "EEE", "14"},
-            {"Tamanna Yeasmin", "2023100040065", "BBA", "13"},
-            {"Saimon Islam", "2022200010082", "CSE", "13"},
-            {"Ayesha Siddiqua", "2021100070033", "PHR", "12"},
-            {"Hasibul Hasan", "2022100010156", "CSE", "12"},
-            {"Nabila Mehzabin", "2023100080041", "LAW", "11"},
-            {"Asif Mahmud", "2022200060019", "TEX", "11"},
-            {"Sumaiya Sultana", "2022100010178", "CSE", "10"},
-            {"Nazmus Sakib", "2022300030062", "EEE", "10"},
-            {"Tanjim Ahmed", "2023100110014", "ECO", "9"},
-            {"Ishrat Jahan", "2022200040078", "BBA", "9"},
-            {"Arnob Sen", "2022100010199", "CSE", "9"},
-            {"Fariha Tasnim", "2023100050025", "ENG", "8"},
-            {"Sayed Al Amin", "2022300010067", "CSE", "8"},
-            {"Zahidul Islam", "2022100100038", "PHR", "8"},
-            {"Lamia Rahman", "2023100120011", "BNG", "7"},
-            {"Monirul Islam", "2022100010214", "CSE", "7"},
-            {"Samira Hossain", "2022200070054", "PHR", "7"},
-            {"Ehsanul Haque", "2023100030019", "EEE", "6"},
-            {"Tasmia Islam", "2022300040092", "BBA", "6"},
-            {"Moinul Hasan", "2022100010233", "CSE", "6"},
-            {"Afia Farjana", "2023100090016", "ARCH", "5"},
-            {"Rakibul Islam", "2022200010145", "CSE", "5"},
-            {"Sharmin Akter", "2023100050039", "ENG", "5"},
-            {"Imran Hossain", "2022300080028", "LAW", "4"},
-            {"Priyanka Roy", "2022100010257", "CSE", "4"},
-            {"Mirza Galib", "2023100060012", "TE", "4"},
-            {"Tahsin Rahman", "2023200030031", "EEE", "3"},
-            {"Sabrina Zaman", "2023100040112", "BBA", "3"},
-            {"Alif Hossain", "2022200010188", "CSE", "3"},
-            {"Nayeemur Rahman", "2023100110029", "ECO", "3"}
-        };
-
-        java.util.Set<String> existingNames = list.stream().map(ContributorLeaderboardItem::getName).collect(java.util.stream.Collectors.toSet());
-        for (String[] p : communityProfiles) {
-            if (list.size() >= 50) break;
-            if (!existingNames.contains(p[0])) {
-                String avatar = (p.length > 4 && p[4] != null && !p[4].isEmpty()) ? p[4] : null;
-                list.add(new ContributorLeaderboardItem(
-                        0,
-                        (long) (1000 + list.size()),
-                        p[0],
-                        p[1],
-                        p[2],
-                        Integer.parseInt(p[3]),
-                        "",
-                        "",
-                        avatar
-                ));
-            }
         }
 
         list.sort((a, b) -> Integer.compare(b.getApprovedContributions(), a.getApprovedContributions()));

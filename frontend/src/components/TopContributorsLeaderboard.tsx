@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { 
   Trophy, 
   Crown, 
@@ -14,7 +15,9 @@ import {
   CheckCircle2, 
   ShieldCheck, 
   Flame,
-  UserCheck
+  UserCheck,
+  UploadCloud,
+  ArrowRight
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
@@ -71,12 +74,15 @@ export default function TopContributorsLeaderboard() {
     api.contributions
       .getLeaderboard()
       .then((res) => {
-        if (Array.isArray(res) && res.length > 0) {
+        if (Array.isArray(res)) {
           setContributors(res);
+        } else {
+          setContributors([]);
         }
       })
       .catch((err) => {
         console.error("Failed to load leaderboard:", err);
+        setContributors([]);
       })
       .finally(() => {
         setLoading(false);
@@ -113,14 +119,15 @@ export default function TopContributorsLeaderboard() {
   const top1 = contributors.find((c) => c.rank === 1);
   const top2 = contributors.find((c) => c.rank === 2);
   const top3 = contributors.find((c) => c.rank === 3);
+  const hasTop3Podium = Boolean(top1 && top2 && top3 && !searchQuery.trim() && selectedDept === "ALL");
 
-  // Ranks 4 to 50 (or filtered list items excluding top 3 unless searching)
+  // Ranks 4 to 50 (or all items if fewer than 4 or searching)
   const directoryContributors = useMemo(() => {
-    if (searchQuery.trim() || selectedDept !== "ALL") {
+    if (searchQuery.trim() || selectedDept !== "ALL" || !hasTop3Podium) {
       return filteredContributors;
     }
     return filteredContributors.filter((c) => c.rank > 3);
-  }, [filteredContributors, searchQuery, selectedDept]);
+  }, [filteredContributors, searchQuery, selectedDept, hasTop3Podium]);
 
   const displayedDirectory = showAll ? directoryContributors : directoryContributors.slice(0, 10);
 
@@ -156,8 +163,37 @@ export default function TopContributorsLeaderboard() {
         </div>
       </div>
 
-      {/* 2. TOP 3 SPECIAL PODIUM SPOTLIGHT (NO GOLD / SILVER / BRONZE MEDALS) */}
-      {top1 && top2 && top3 && !searchQuery.trim() && selectedDept === "ALL" && (
+      {/* Empty State when no contributors yet */}
+      {!loading && contributors.length === 0 ? (
+        <div className="p-8 sm:p-14 rounded-3xl bg-gradient-to-b from-blue-500/5 via-slate-50/50 to-white dark:from-blue-950/20 dark:via-slate-900/60 dark:to-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-800 text-center space-y-5">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-3xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25">
+            <Trophy className="w-8 h-8 sm:w-10 sm:h-10 text-amber-300" />
+          </div>
+          <div className="max-w-md mx-auto space-y-2">
+            <h3 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white">
+              {language === "bn" ? "প্রথম অ্যাকাডেমিক কন্ট্রিবিউটর হোন!" : "Be the First Academic Contributor!"}
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+              {language === "bn"
+                ? "এখনো কোনো অবদান ভেরিফাই হয়নি। আপনার হ্যান্ডনোট, কুইজ সলিউশন বা পরীক্ষার প্রশ্নপত্র শেয়ার করে লিডারবোর্ডের শীর্ষ স্থান অর্জন করুন!"
+                : "No verified contributions yet. Share your handwritten lecture notes, quiz solutions, or exam questions to top the Hall of Fame!"}
+            </p>
+          </div>
+          <div className="pt-2 flex justify-center">
+            <Link
+              href="/contribute"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-500/25 transition-all hover:scale-105"
+            >
+              <UploadCloud className="w-4 h-4" />
+              <span>{language === "bn" ? "নোট বা প্রশ্ন কন্ট্রিবিউট করুন" : "Contribute Notes Now"}</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* 2. TOP 3 SPECIAL PODIUM SPOTLIGHT (NO GOLD / SILVER / BRONZE MEDALS) */}
+          {top1 && top2 && top3 && !searchQuery.trim() && selectedDept === "ALL" && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 items-end pt-2">
           
           {/* Card: Rank #2 (Left - Senior Contributor, Emerald & Teal) */}
@@ -436,6 +472,8 @@ export default function TopContributorsLeaderboard() {
           </div>
         )}
       </div>
+      </>
+      )}
 
     </section>
   );
