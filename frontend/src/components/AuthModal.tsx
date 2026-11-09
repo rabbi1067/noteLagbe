@@ -16,7 +16,8 @@ import {
   ArrowLeft, 
   Send, 
   CheckCircle2,
-  Info
+  Info,
+  Phone
 } from "lucide-react";
 import { toast } from "sonner";
 import { notifyDataChanged } from "@/lib/sync";
@@ -33,6 +34,7 @@ export default function AuthModal() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [studentId, setStudentId] = useState("");
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Forgot password specific state
@@ -86,10 +88,19 @@ export default function AuthModal() {
     if (isRegister) {
       const cleanName = name.trim();
       const cleanId = studentId.trim();
+      const cleanPhone = phone.trim();
 
       if (cleanName.length < 2 || cleanName.length > 60) {
         toast.error("Full name must be between 2 and 60 characters.");
         return;
+      }
+
+      if (cleanPhone) {
+        const digitsOnly = cleanPhone.replace(/\D/g, "");
+        if (digitsOnly.length < 10 || digitsOnly.length > 15) {
+          toast.error("Please enter a valid phone number (e.g. 01712345678).");
+          return;
+        }
       }
 
       if (cleanId && (cleanId.length < 5 || cleanId.length > 20)) {
@@ -99,7 +110,7 @@ export default function AuthModal() {
 
       setLoading(true);
       try {
-        await register(cleanName, cleanEmail, cleanPassword, cleanId || undefined);
+        await register(cleanName, cleanEmail, cleanPassword, cleanId || undefined, cleanPhone || undefined);
         notifyDataChanged("user", "created");
         notifyDataChanged("staff", "created");
       } catch (err: any) {
@@ -476,6 +487,28 @@ export default function AuthModal() {
                   onChange={(e) => setStudentId(e.target.value.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 20))}
                   className="w-full text-xs px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                 />
+              </div>
+            )}
+
+            {isRegister && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Phone Number (Optional)
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-mono">{phone.length}/15</span>
+                </div>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="tel"
+                    maxLength={15}
+                    placeholder="e.g. 01712345678"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/[^0-9+-\s]/g, "").slice(0, 15))}
+                    className="w-full text-xs pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                  />
+                </div>
               </div>
             )}
 

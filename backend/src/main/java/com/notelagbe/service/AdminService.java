@@ -153,7 +153,24 @@ public class AdminService {
         u.setPassword(passwordEncoder.encode(req.getPassword()));
         u.setRole(targetRole);
         if (req.getStudentId() != null && !req.getStudentId().trim().isEmpty()) {
-            u.setStudentId(req.getStudentId().trim());
+            String sId = req.getStudentId().trim();
+            if (userRepository.existsByStudentId(sId)) {
+                throw new ApiException("This Student ID is already registered to another account: " + sId);
+            }
+            u.setStudentId(sId);
+        }
+        if (req.getPhone() != null && !req.getPhone().trim().isEmpty()) {
+            String rawPhone = req.getPhone().trim();
+            String cleanPhone = rawPhone.replaceAll("[^0-9+]", "");
+            String baseDigits = cleanPhone.replaceAll("[^0-9]", "");
+            if (baseDigits.startsWith("880") && baseDigits.length() >= 13) {
+                baseDigits = "0" + baseDigits.substring(3);
+            }
+            List<User> matching = userRepository.findMatchingPhoneUsers(cleanPhone, baseDigits, "+88" + baseDigits);
+            if (!matching.isEmpty()) {
+                throw new ApiException("An account with this phone number already exists: " + rawPhone);
+            }
+            u.setPhone(cleanPhone);
         }
         u.setAuthProvider(AuthProvider.LOCAL);
         u.setEnabled(true);

@@ -35,7 +35,7 @@ interface AuthContextType {
   isSuperAdmin: boolean;
   isStudent: boolean;
   login: (email: string, pass: string) => Promise<void>;
-  register: (name: string, email: string, pass: string, studentId?: string) => Promise<void>;
+  register: (name: string, email: string, pass: string, studentId?: string, phone?: string) => Promise<void>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
   hasUnlocked: (courseCode: string) => boolean;
@@ -146,8 +146,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (name: string, email: string, pass: string, studentId?: string) => {
-    const res = await api.auth.register({ name, email, password: pass, studentId });
+  const register = async (name: string, email: string, pass: string, studentId?: string, phone?: string) => {
+    const res = await api.auth.register({ name, email, password: pass, studentId, phone });
     setToken(res.token);
     setTokenState(res.token);
     await refreshProfile();

@@ -98,14 +98,42 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request) {
         String email = request.getEmail().toLowerCase().trim();
         if (userRepository.existsByEmail(email)) {
-            throw new ApiException("Email is already registered! Please log in.");
+            throw new ApiException("An account with this email address already exists! Please log in instead.");
         }
 
         User user = new User();
         user.setName(request.getName().trim());
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setStudentId(request.getStudentId());
+        // Phone duplicate check
+        String rawPhone = request.getPhone() != null ? request.getPhone().trim() : null;
+        String cleanPhone = null;
+        if (rawPhone != null && !rawPhone.isEmpty()) {
+            cleanPhone = rawPhone.replaceAll("[^0-9+]", "");
+            String baseDigits = cleanPhone.replaceAll("[^0-9]", "");
+            if (baseDigits.startsWith("880") && baseDigits.length() >= 13) {
+                baseDigits = "0" + baseDigits.substring(3);
+            }
+            String p1 = cleanPhone;
+            String p2 = baseDigits;
+            String p3 = "+88" + baseDigits;
+
+            List<User> existingWithPhone = userRepository.findMatchingPhoneUsers(p1, p2, p3);
+            if (!existingWithPhone.isEmpty()) {
+                throw new ApiException("This phone number is already registered to another account! Please use a different phone number or log in.");
+            }
+        }
+
+        // Student ID duplicate check
+        String sId = request.getStudentId() != null ? request.getStudentId().trim() : null;
+        if (sId != null && !sId.isEmpty()) {
+            if (userRepository.existsByStudentId(sId)) {
+                throw new ApiException("This Student ID is already registered! Please check your ID or contact support.");
+            }
+        }
+
+        user.setStudentId(sId);
+        user.setPhone(cleanPhone);
                 if (userRepository.count() == 0 || (initialAdminEmail != null && !initialAdminEmail.isBlank() && email.equalsIgnoreCase(initialAdminEmail.trim()))) {
             user.setRole(Role.ROLE_SUPER_ADMIN);
         } else {

@@ -19,6 +19,8 @@ public class RegisterRequest {
 
     private String studentId;
 
+    private String phone;
+
     public RegisterRequest() {}
 
     public String getName() { return name; }
@@ -32,4 +34,7 @@ public class RegisterRequest {
 
     public String getStudentId() { return studentId; }
     public void setStudentId(String studentId) { this.studentId = studentId; }
+
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
 }

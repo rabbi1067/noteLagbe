@@ -23,6 +23,8 @@ public class StaffCreateRequest {
 
     private String studentId;
 
+    private String phone;
+
     @NotNull(message = "Role is required")
     private Role role = Role.ROLE_STUDENT;
 
@@ -39,6 +41,9 @@ public class StaffCreateRequest {
 
     public String getStudentId() { return studentId; }
     public void setStudentId(String studentId) { this.studentId = studentId; }
+
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
 
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }
