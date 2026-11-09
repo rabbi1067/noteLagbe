@@ -23,14 +23,41 @@ export interface ChatMessageDto {
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
+export function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return true;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    const payload = JSON.parse(jsonPayload);
+    if (!payload.exp) return false;
+    return payload.exp * 1000 <= Date.now();
+  } catch {
+    return true;
+  }
+}
+
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("notelagbe_token");
+  const token = localStorage.getItem("notelagbe_token");
+  if (!token) return null;
+  if (isTokenExpired(token)) {
+    removeToken();
+    return null;
+  }
+  return token;
 }
 
 export function setToken(token: string) {
   if (typeof window !== "undefined") {
     localStorage.setItem("notelagbe_token", token);
+    localStorage.setItem("notelagbe_last_activity", String(Date.now()));
   }
 }
 
@@ -38,6 +65,7 @@ export function removeToken() {
   if (typeof window !== "undefined") {
     localStorage.removeItem("notelagbe_token");
     localStorage.removeItem("notelagbe_user");
+    localStorage.removeItem("notelagbe_last_activity");
   }
 }
 
@@ -59,6 +87,10 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   });
 
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== "undefined") {
+      removeToken();
+      window.dispatchEvent(new Event("notelagbe:session-expired"));
+    }
     let errorMessage = "An error occurred";
     try {
       const errorData = await response.json();

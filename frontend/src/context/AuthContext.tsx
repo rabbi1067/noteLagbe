@@ -99,6 +99,103 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // -------------------------------------------------------------
+  // Enterprise Inactivity Session Expiry & Security Guardian (OWASP)
+  // Auto-logs out when user is inactive to protect unattended lab/campus PCs.
+  // Admin / Staff: 20 minutes idle timeout
+  // Students: 45 minutes idle timeout
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (!token || !user) return;
+
+    const isStaff = user.role === "ROLE_ADMIN" || user.role === "ROLE_SUPER_ADMIN" || user.role === "ROLE_MANAGER";
+    const IDLE_TIMEOUT_MS = isStaff ? 20 * 60 * 1000 : 45 * 60 * 1000;
+    const WARNING_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes before auto-logout
+
+    let lastRecordTime = Date.now();
+    let warningToastShown = false;
+
+    // Reset idle timer on any genuine user interaction (throttled to every 2 seconds)
+    const recordActivity = () => {
+      const now = Date.now();
+      if (now - lastRecordTime > 2000) {
+        lastRecordTime = now;
+        try {
+          localStorage.setItem("notelagbe_last_activity", String(now));
+        } catch {}
+        if (warningToastShown) {
+          warningToastShown = false;
+          toast.dismiss("inactivity-warn");
+        }
+      }
+    };
+
+    // Ensure current activity baseline is registered immediately
+    try {
+      if (!localStorage.getItem("notelagbe_last_activity")) {
+        localStorage.setItem("notelagbe_last_activity", String(Date.now()));
+      }
+    } catch {}
+
+    const events = ["mousedown", "keydown", "scroll", "touchstart", "click"];
+    events.forEach((evt) => window.addEventListener(evt, recordActivity, { passive: true }));
+
+    // Heartbeat check every 10 seconds across all tabs
+    const checkInterval = setInterval(() => {
+      let storedLast = Date.now();
+      try {
+        const raw = localStorage.getItem("notelagbe_last_activity");
+        if (raw) storedLast = parseInt(raw, 10);
+      } catch {}
+
+      const elapsed = Date.now() - storedLast;
+
+      // 1. Session Exceeded Inactivity Limit -> Auto Logout
+      if (elapsed >= IDLE_TIMEOUT_MS) {
+        clearInterval(checkInterval);
+        toast.dismiss("inactivity-warn");
+        logout(false);
+        toast.error(
+          "🔒 Security Session Timeout: You were automatically signed out due to inactivity to protect your account. Please log in again.",
+          { duration: 8000 }
+        );
+        return;
+      }
+
+      // 2. Approaching Inactivity Limit (Within 2 minutes) -> Show warning alert
+      if (elapsed >= IDLE_TIMEOUT_MS - WARNING_THRESHOLD_MS && !warningToastShown) {
+        warningToastShown = true;
+        const minutesLeft = Math.ceil((IDLE_TIMEOUT_MS - elapsed) / 60000);
+        toast.warning(
+          `⚠️ Inactivity Warning: Your session will expire in ${minutesLeft} minute(s) due to inactivity for security. Click anywhere or press a key to stay logged in.`,
+          { id: "inactivity-warn", duration: 12000 }
+        );
+      }
+    }, 10000);
+
+    // Cross-tab and 401 session-expired listener
+    const handleSessionExpired = () => {
+      logout(false);
+      toast.info("Session expired or signed out from another tab.");
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "notelagbe_token" && !e.newValue) {
+        logout(false);
+      }
+    };
+
+    window.addEventListener("notelagbe:session-expired", handleSessionExpired);
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      events.forEach((evt) => window.removeEventListener(evt, recordActivity));
+      clearInterval(checkInterval);
+      window.removeEventListener("notelagbe:session-expired", handleSessionExpired);
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, [token, user]);
+
   // Universal Live Sync: Automatically keep user profile, subscription, and quota in sync across tabs
   useEffect(() => {
     const handleSync = (payload: SyncPayload) => {
