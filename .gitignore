@@ -85,6 +85,6 @@ ref_*.png
 seu_official_header_*.png
 user_logo_preview.jpg
 
-tools/
-tools/**
+/tools/
+/tools/**
 *.exe
