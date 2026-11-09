@@ -137,7 +137,9 @@ export default function FloatingCommunityChat() {
   // Chat data state
   const [messages, setMessages] = useState<ChatMessageDto[]>([]);
   const [pinnedMessage, setPinnedMessage] = useState<ChatMessageDto | null>(null);
-  const [activeUsersCount, setActiveUsersCount] = useState<number>(24);
+  const [activeUsersCount, setActiveUsersCount] = useState<number>(0);
+  const [deleteConfirmMsg, setDeleteConfirmMsg] = useState<ChatMessageDto | null>(null);
+  const [isDeletingMsg, setIsDeletingMsg] = useState<boolean>(false);
 
   // Text input state
   const [inputText, setInputText] = useState("");
@@ -502,7 +504,7 @@ export default function FloatingCommunityChat() {
       const [msgs, pinned, active] = await Promise.all([
         api.chat.getMessages(),
         api.chat.getPinned().catch(() => null),
-        api.chat.getActiveCount().catch(() => ({ activeCount: 24, status: "LIVE" })),
+        api.chat.getActiveCount().catch(() => ({ activeCount: 0, status: "LIVE" })),
       ]);
 
       if (msgs && Array.isArray(msgs)) {
@@ -565,7 +567,7 @@ export default function FloatingCommunityChat() {
       }
 
       setPinnedMessage(pinned || null);
-      if (active?.activeCount) {
+      if (typeof active?.activeCount === "number") {
         setActiveUsersCount(active.activeCount);
       }
     } catch {
@@ -1049,24 +1051,24 @@ export default function FloatingCommunityChat() {
     }
   };
 
-  const handleAdminDelete = async (msgId: number) => {
+  const handleAdminDelete = (msg: ChatMessageDto) => {
     if (!isAdmin && !isSuperAdmin) return;
-    if (
-      !confirm(
-        isBn
-          ? "আপনি কি নিশ্চিত এই মেসেজটি মুছে ফেলতে চান?"
-          : "Are you sure you want to permanently delete this message?"
-      )
-    )
-      return;
+    setDeleteConfirmMsg(msg);
+  };
 
+  const confirmDeleteMessage = async () => {
+    if (!deleteConfirmMsg) return;
+    setIsDeletingMsg(true);
     try {
-      await api.admin.deleteChatMessage(msgId);
-      setMessages((prev) => prev.filter((m) => m.id !== msgId));
-      if (pinnedMessage?.id === msgId) setPinnedMessage(null);
+      await api.admin.deleteChatMessage(deleteConfirmMsg.id);
+      setMessages((prev) => prev.filter((m) => m.id !== deleteConfirmMsg.id));
+      if (pinnedMessage?.id === deleteConfirmMsg.id) setPinnedMessage(null);
       toast.success(isBn ? "মেসেজ মুছে ফেলা হয়েছে।" : "Message deleted.");
+      setDeleteConfirmMsg(null);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to delete message.");
+    } finally {
+      setIsDeletingMsg(false);
     }
   };
 
@@ -1344,7 +1346,9 @@ export default function FloatingCommunityChat() {
           <div className="absolute right-full mr-3.5 px-3 py-1.5 rounded-2xl bg-slate-900/90 backdrop-blur-xl border border-cyan-400/30 text-white text-[11px] font-bold shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             <span>{isBn ? "SEU ক্যাম্পাস লাইভ চ্যাট" : "SEU Campus Live Chat"}</span>
-            <span className="text-cyan-400 font-mono text-[10px]">✦ {activeUsersCount} live</span>
+            <span className="text-cyan-400 font-mono text-[10px]">
+              {activeUsersCount > 0 ? `✦ ${activeUsersCount} live` : "✦ LiveSync"}
+            </span>
           </div>
 
         </div>
@@ -1414,11 +1418,13 @@ export default function FloatingCommunityChat() {
                 </div>
                 {/* Clean, Non-intrusive Online Pill */}
                 <div className="flex items-center gap-1.5 text-[11px]">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                  <span className="text-emerald-500 font-semibold truncate">
-                    {isBn
-                      ? `${formatNumber(activeUsersCount)} জন শিক্ষার্থী লাইভ`
-                      : `${activeUsersCount} SEUians online`}
+                  <span className={`h-2 w-2 rounded-full shrink-0 ${activeUsersCount > 0 ? "bg-emerald-400 animate-pulse" : "bg-slate-400"}`} />
+                  <span className={`${activeUsersCount > 0 ? "text-emerald-500" : "text-slate-400"} font-semibold truncate`}>
+                    {activeUsersCount > 0
+                      ? (isBn
+                          ? `${formatNumber(activeUsersCount)} জন শিক্ষার্থী লাইভ`
+                          : `${activeUsersCount} SEUian${activeUsersCount === 1 ? "" : "s"} online`)
+                      : (isBn ? "লাইভ কানেক্টেড" : "LiveSync connected")}
                   </span>
                 </div>
               </div>
@@ -1878,7 +1884,7 @@ export default function FloatingCommunityChat() {
                                 )}
 
                                 <button
-                                  onClick={() => handleAdminDelete(msg.id)}
+                                  onClick={() => handleAdminDelete(msg)}
                                   className="text-slate-400 hover:text-rose-400"
                                   title={isBn ? "ডিলিট করুন" : "Delete"}
                                 >
@@ -2208,6 +2214,69 @@ export default function FloatingCommunityChat() {
                 )}
               </button>
             </form>
+          )}
+
+          {/* Admin Delete Confirmation Modal Overlay */}
+          {deleteConfirmMsg && (
+            <div className="absolute inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 rounded-3xl animate-in fade-in zoom-in-95 duration-150">
+              <div
+                className="w-full max-w-[320px] bg-slate-900 border border-slate-700/80 rounded-2xl p-5 shadow-2xl space-y-3.5 text-left text-white"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-white">
+                      {isBn ? "মেসেজ ডিলিট নিশ্চিতকরণ" : "Delete Message"}
+                    </h4>
+                    <p className="text-[11px] text-slate-400">SEU Campus Live</p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  {isBn
+                    ? `আপনি কি নিশ্চিত ${deleteConfirmMsg.senderName}-এর এই মেসেজটি পার্মানেন্টলি ডিলিট করতে চান?`
+                    : `Are you sure you want to permanently delete this message sent by ${deleteConfirmMsg.senderName}?`}
+                </p>
+
+                {deleteConfirmMsg.text && (
+                  <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 text-[11px] text-slate-300 italic truncate max-h-16 overflow-hidden">
+                    "{deleteConfirmMsg.text}"
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirmMsg(null)}
+                    disabled={isDeletingMsg}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors"
+                  >
+                    {isBn ? "বাতিল" : "Cancel"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmDeleteMessage}
+                    disabled={isDeletingMsg}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 transition-colors shadow-md shadow-rose-600/30 flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isDeletingMsg ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>{isBn ? "ডিলিট হচ্ছে..." : "Deleting..."}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{isBn ? "ডিলিট করুন" : "Delete"}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       )}

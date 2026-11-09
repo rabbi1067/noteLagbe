@@ -363,8 +363,6 @@ public class ChatService {
     }
 
     public int getActiveUsersCount() {
-        // Base active SEU members (seeded simulation) + live SSE clients
-        int sseClients = liveSyncService.getActiveClientsCount();
-        return Math.max(12, 18 + (sseClients * 2));
+        return liveSyncService.getActiveClientsCount();
     }
 }

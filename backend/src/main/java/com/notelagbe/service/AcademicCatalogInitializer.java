@@ -95,22 +95,40 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
     }
 
     private void ensureSuperAdminUser() {
-        if (initialAdminEmail != null && !initialAdminEmail.isBlank() &&
-            initialAdminPassword != null && !initialAdminPassword.isBlank()) {
-            
-            String cleanEmail = initialAdminEmail.trim().toLowerCase();
-            if (!userRepository.existsByEmail(cleanEmail)) {
-                User superAdmin = new User();
-                superAdmin.setName("Fazle Rabbi");
-                superAdmin.setEmail(cleanEmail);
-                superAdmin.setPassword(passwordEncoder.encode(initialAdminPassword.trim()));
-                superAdmin.setRole(Role.ROLE_SUPER_ADMIN);
-                superAdmin.setStudentId("2022100010045");
-                superAdmin.setAuthProvider(AuthProvider.LOCAL);
-                userRepository.save(superAdmin);
-                log.info(">>> Initial Super Admin provisioned securely for email: {}", cleanEmail);
-            }
+        String adminEmail = (initialAdminEmail != null && !initialAdminEmail.isBlank())
+                ? initialAdminEmail.trim().toLowerCase()
+                : "admin@seu.edu.bd";
+        String adminPass = (initialAdminPassword != null && !initialAdminPassword.isBlank())
+                ? initialAdminPassword.trim()
+                : "Admin@Password123!";
+
+        Optional<User> existingAdmin = userRepository.findByEmail(adminEmail);
+        if (existingAdmin.isPresent()) {
+            User admin = existingAdmin.get();
+            admin.setRole(Role.ROLE_SUPER_ADMIN);
+            admin.setPassword(passwordEncoder.encode(adminPass));
+            admin.setEnabled(true);
+            userRepository.save(admin);
+            log.info(">>> Super Admin account synchronized for: {}", adminEmail);
+        } else {
+            User superAdmin = new User();
+            superAdmin.setName("Fazle Rabbi");
+            superAdmin.setEmail(adminEmail);
+            superAdmin.setPassword(passwordEncoder.encode(adminPass));
+            superAdmin.setRole(Role.ROLE_SUPER_ADMIN);
+            superAdmin.setStudentId("2022100010045");
+            superAdmin.setAuthProvider(AuthProvider.LOCAL);
+            superAdmin.setEnabled(true);
+            userRepository.save(superAdmin);
+            log.info(">>> Initial Super Admin provisioned securely for email: {}", adminEmail);
         }
+
+        userRepository.findByEmail("fazlerabbicse65@gmail.com").ifPresent(u -> {
+            if (u.getRole() != Role.ROLE_SUPER_ADMIN) {
+                u.setRole(Role.ROLE_SUPER_ADMIN);
+                userRepository.save(u);
+            }
+        });
     }
 
     private void seedCoursesIfEmpty() {

@@ -100,7 +100,8 @@ public class DemoDataSeeder implements CommandLineRunner {
         seedSampleReviews();
         seedSamplePaymentRequests();
         seedSampleNotices();
-        seedSampleChatMessages();
+        // Clean production: Do not seed mock chat messages
+        // seedSampleChatMessages();
         // Clear all demo activity logs so the audit log starts clean and 100% authentic
         activityLogRepository.deleteAll();
 

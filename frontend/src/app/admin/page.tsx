@@ -472,6 +472,7 @@ export default function AdminDashboardPage() {
   // Live Chat Moderation States
   const [chatMessages, setChatMessages] = useState<ChatMessageDto[]>([]);
   const [pinnedChatMessage, setPinnedChatMessage] = useState<ChatMessageDto | null>(null);
+  const [activeChatUsersCount, setActiveChatUsersCount] = useState<number>(0);
   const [chatSearch, setChatSearch] = useState("");
   const [chatSenderFilter, setChatSenderFilter] = useState<"ALL" | "STUDENT" | "FACULTY" | "ADMIN">("ALL");
   const [chatTypeFilter, setChatTypeFilter] = useState<"ALL" | "TEXT" | "VOICE" | "IMAGE">("ALL");
@@ -941,7 +942,7 @@ export default function AdminDashboardPage() {
   const loadAllAdminData = async (isInitial = false) => {
     setLoading(true);
     try {
-      const [sData, rData, pData, staffData, cData, wData, cList, tList, settingsData, revData, profileData, noticeData, chatMsgs, pinnedChat] = await Promise.all([
+      const [sData, rData, pData, staffData, cData, wData, cList, tList, settingsData, revData, profileData, noticeData, chatMsgs, pinnedChat, chatActiveData] = await Promise.all([
         api.admin.getStats().catch(() => null),
         api.admin.getResources().catch(() => []),
         isSuperAdmin ? api.admin.getPayments("PENDING").catch(() => []) : Promise.resolve([]),
@@ -956,6 +957,7 @@ export default function AdminDashboardPage() {
         api.admin.getNotices().catch(() => []),
         api.chat.getMessages().catch(() => []),
         api.chat.getPinned().catch(() => null),
+        api.chat.getActiveCount().catch(() => ({ activeCount: 0 })),
       ]);
       setStats(sData);
       setResources(rData || []);
@@ -977,6 +979,7 @@ export default function AdminDashboardPage() {
       setNotices(noticeData || []);
       setChatMessages(chatMsgs || []);
       setPinnedChatMessage(pinnedChat || null);
+      setActiveChatUsersCount(chatActiveData?.activeCount ?? 0);
       if (settingsData && typeof settingsData.emailNotificationsEnabled === "boolean") {
         setEmailNotificationsEnabled(settingsData.emailNotificationsEnabled);
       }
@@ -2238,17 +2241,35 @@ export default function AdminDashboardPage() {
   };
 
   // Chat Moderation Actions
-  const handleAdminDeleteChatMessage = async (id: number) => {
-    if (!confirm("Are you sure you want to permanently delete this chat message?")) return;
-    try {
-      await api.admin.deleteChatMessage(id);
-      setChatMessages((prev) => prev.filter((m) => m.id !== id));
-      if (pinnedChatMessage?.id === id) setPinnedChatMessage(null);
-      toast.success("Chat message removed by admin.");
-      notifyDataChanged("chat", "deleted", id);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to delete message.");
-    }
+  const handleAdminDeleteChatMessage = (msg: ChatMessageDto) => {
+    const preview = msg.text
+      ? (msg.text.length > 50 ? msg.text.substring(0, 50) + "..." : msg.text)
+      : (msg.messageType === "VOICE" ? `🎙️ Voice Note (${msg.voiceDuration || 1}s)` : "📷 Image Attachment");
+
+    openDeleteConfirm({
+      title: "Permanently Delete Chat Message",
+      itemType: "Campus Live Message",
+      itemName: `${msg.senderName}: "${preview}"`,
+      warningText: "Are you sure you want to delete this message? It will be permanently removed from SEU Campus Live for all students and administrators immediately.",
+      confirmButtonText: "Delete Message",
+      onConfirm: async () => {
+        try {
+          await api.admin.deleteChatMessage(msg.id);
+          setChatMessages((prev) => prev.filter((m) => m.id !== msg.id));
+          if (pinnedChatMessage?.id === msg.id) setPinnedChatMessage(null);
+          notifyDataChanged("chat", "deleted", msg.id);
+          toast.success("Chat message removed permanently.");
+          showDeleteSuccess(
+            "Message Deleted Successfully!",
+            "The chat message has been permanently deleted from SEU Campus Live stream.",
+            preview
+          );
+        } catch (err: any) {
+          toast.error(err.message || "Failed to delete chat message.");
+          throw err;
+        }
+      },
+    });
   };
 
   const handleAdminPinChatMessage = async (id: number) => {
@@ -7280,15 +7301,15 @@ export default function AdminDashboardPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Connected Students</p>
-                      <h3 className="text-2xl font-black text-emerald-500 mt-1">24 Active</h3>
+                      <h3 className="text-2xl font-black text-emerald-500 mt-1">{activeChatUsersCount} Active</h3>
                     </div>
                     <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-500">
                       <Users className="w-5 h-5" />
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 mt-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Real-time LiveSync connected</span>
+                    <span className={`w-2 h-2 rounded-full ${activeChatUsersCount > 0 ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
+                    <span>{activeChatUsersCount > 0 ? "Real-time LiveSync connected" : "No active LiveSync sessions"}</span>
                   </div>
                 </div>
 
@@ -7331,13 +7352,15 @@ export default function AdminDashboardPage() {
                     <button
                       onClick={async () => {
                         try {
-                          const [msgs, pinned] = await Promise.all([
+                          const [msgs, pinned, activeData] = await Promise.all([
                             api.chat.getMessages(),
                             api.chat.getPinned().catch(() => null),
+                            api.chat.getActiveCount().catch(() => ({ activeCount: 0 })),
                           ]);
                           setChatMessages(msgs || []);
                           setPinnedChatMessage(pinned || null);
-                          toast.success("Chat stream refreshed.");
+                          setActiveChatUsersCount(activeData?.activeCount ?? 0);
+                          toast.success("Chat stream and active metrics refreshed.");
                         } catch {
                           toast.error("Failed to refresh chat.");
                         }
@@ -7695,7 +7718,7 @@ export default function AdminDashboardPage() {
 
                                   {/* Delete Message Button */}
                                   <button
-                                    onClick={() => handleAdminDeleteChatMessage(msg.id)}
+                                    onClick={() => handleAdminDeleteChatMessage(msg)}
                                     className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-colors"
                                     title="Delete this message"
                                   >
