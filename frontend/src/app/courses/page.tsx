@@ -8,81 +8,63 @@ import { useDataSync } from "@/lib/sync";
 import { Search, BookOpen, ArrowRight, Filter, Layers, Sparkles, ChevronRight, ChevronLeft, CheckCircle2, Flame, TrendingUp, ArrowUpDown } from "lucide-react";
 import { CourseGridSkeleton } from "@/components/skeletons/CardSkeletons";
 import { useSeuDepartments } from "@/lib/seuDepartments";
+import coursesCatalogData from "@/data/courses_catalog.json";
 
 export default function CoursesPage() {
   const { language, t } = useLanguage();
   const { departments: officialSeuDepts } = useSeuDepartments();
-  const [courses, setCourses] = useState<any[]>([]);
-  const [allCourses, setAllCourses] = useState<any[]>([]);
+  // Instant 0ms load: Pre-populated with verified Southeast University course catalog
+  const [courses, setCourses] = useState<any[]>(() => (coursesCatalogData as any[]) || []);
+  const [allCourses, setAllCourses] = useState<any[]>(() => (coursesCatalogData as any[]) || []);
   const [selectedSemester, setSelectedSemester] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("ALL");
   const [filterType, setFilterType] = useState<"all" | "has_notes" | "has_questions">("all");
   const [sortBy, setSortBy] = useState<"default" | "popular" | "notes" | "questions">("default");
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [syncTick, setSyncTick] = useState(0);
 
-  // Instant client cache restore without SSR hydration mismatch
+  // Background silent revalidation: refreshes counts without wiping UI or blocking user
+  const fetchCourses = useCallback(async (isSilent = true) => {
+    if (!isSilent && courses.length === 0) setLoading(true);
+    try {
+      const data = await api.courses.getAll();
+      const validCourses = Array.isArray(data) && data.length > 0 ? data : null;
+      if (validCourses) {
+        setCourses(validCourses);
+        setAllCourses(validCourses);
+        try {
+          localStorage.setItem("notelagbe_cached_courses_v2", JSON.stringify(validCourses));
+        } catch {}
+      }
+    } catch {
+      // Preserve catalog on network lag or backend warming up
+    } finally {
+      setLoading(false);
+    }
+  }, [courses.length]);
+
+  // Load from local storage cache if available and revalidate silently
   useEffect(() => {
     try {
-      localStorage.removeItem("notelagbe_cached_courses");
       const cached = localStorage.getItem("notelagbe_cached_courses_v2");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setCourses(parsed);
           setAllCourses(parsed);
-          setLoading(false);
         }
       }
     } catch {}
-  }, []);
 
-  const fetchCourses = useCallback(async (isSilent = false) => {
-    if (!isSilent) setLoading(true);
-    try {
-      const data = await api.courses.getAll({
-        semester: selectedSemester || undefined,
-        electiveGroup: selectedGroup || undefined,
-        department: selectedDepartment === "ALL" ? undefined : selectedDepartment,
-      });
-      const validCourses = data || [];
-      setCourses(validCourses);
-      if (typeof window !== "undefined" && validCourses.length > 0 && selectedDepartment === "ALL" && !selectedSemester) {
-        try {
-          localStorage.setItem("notelagbe_cached_courses_v2", JSON.stringify(validCourses));
-        } catch {}
-      }
-    } catch {
-      setCourses([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedSemester, selectedGroup, selectedDepartment]);
-
-  const loadAllCourses = useCallback(async () => {
-    try {
-      const all = await api.courses.getAll();
-      setAllCourses(all || []);
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchCourses();
+    fetchCourses(true);
   }, [fetchCourses]);
-
-  useEffect(() => {
-    loadAllCourses();
-  }, [loadAllCourses]);
 
   // Enterprise Live Sync: Instantly updates when admin adds/edits/deletes courses
   useDataSync(() => {
     setSyncTick((v) => v + 1);
     fetchCourses(true);
-    loadAllCourses();
   });
 
   const departments = useMemo(() => {
@@ -107,6 +89,10 @@ export default function CoursesPage() {
     let list = courses.filter((c) => {
       const dept = (c.department || "CSE").toUpperCase().trim();
       if (selectedDepartment !== "ALL" && dept !== selectedDepartment.toUpperCase().trim()) return false;
+
+      // Instant 0ms client-side semester and elective group filtering
+      if (selectedSemester !== null && c.semester !== selectedSemester) return false;
+      if (selectedGroup && (c.electiveGroup || "").toUpperCase() !== selectedGroup.toUpperCase()) return false;
 
       if (filterType === "has_notes" && !c.hasNotes) return false;
       if (filterType === "has_questions" && !c.hasQuestions) return false;
@@ -138,7 +124,7 @@ export default function CoursesPage() {
     }
 
     return list;
-  }, [courses, filterType, searchQuery, sortBy, selectedDepartment]);
+  }, [courses, filterType, searchQuery, sortBy, selectedDepartment, selectedSemester, selectedGroup]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -154,8 +140,14 @@ export default function CoursesPage() {
               {t("catalog.subtitle", "Browse academic curriculum courses, faculty assignments, lecture notes, and past examination archives")}
             </p>
           </div>
-          <div className="text-xs font-bold px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/60 self-start sm:self-auto">
-            {displayedCourses.length} {t("catalog.coursesFound", "Courses Found")}
+          <div className="text-xs font-bold px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/60 self-start sm:self-auto flex items-center gap-1.5">
+            {loading && courses.length === 0 ? (
+              <span>{language === "bn" ? "লোড হচ্ছে..." : "Loading Catalog..."}</span>
+            ) : (
+              <span>
+                {displayedCourses.length} {t("catalog.coursesFound", "Courses Found")}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -357,7 +349,7 @@ export default function CoursesPage() {
       </div>
 
       {/* Courses List */}
-      {loading ? (
+      {loading && courses.length === 0 ? (
         <CourseGridSkeleton count={6} />
       ) : selectedDepartment !== "ALL" && displayedCourses.length === 0 && !searchQuery.trim() && !selectedSemester && filterType === "all" ? (
         <div className="p-12 sm:p-16 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center space-y-4 shadow-sm">

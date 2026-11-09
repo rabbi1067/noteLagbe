@@ -9,17 +9,40 @@ import { useDataSync } from "@/lib/sync";
 import FacultyAvatar from "@/components/FacultyAvatar";
 import { FacultyGridSkeleton } from "@/components/skeletons/CardSkeletons";
 import { Search, User, Mail, Phone, MapPin, Award, BookOpen, ArrowRight, ChevronRight, FileQuestion, Building2, Sparkles } from "lucide-react";
+import teachersDirectoryData from "@/data/teachers_directory.json";
 
 export default function TeachersPage() {
   const { language, t } = useLanguage();
   const { departments: officialSeuDepts } = useSeuDepartments();
-  const [teachers, setTeachers] = useState<any[]>([]);
+  // Instant 0ms load: Pre-populated with verified Southeast University faculty directory
+  const [teachers, setTeachers] = useState<any[]>(() => (teachersDirectoryData as any[]) || []);
   const [category, setCategory] = useState<string>("ALL");
   const [selectedDept, setSelectedDept] = useState<string>("CSE");
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  // Instant client cache restore without SSR hydration mismatch
+  // Background silent revalidation: refreshes counts without wiping UI or blocking user
+  const fetchTeachers = useCallback(async (isSilent = true) => {
+    if (!isSilent && teachers.length === 0) setLoading(true);
+    try {
+      const data = await api.teachers.getAll({
+        category: category === "ALL" ? undefined : category,
+      });
+      const valid = Array.isArray(data) && data.length > 0 ? data : null;
+      if (valid) {
+        setTeachers(valid);
+        try {
+          localStorage.setItem("notelagbe_cached_teachers", JSON.stringify(valid));
+        } catch {}
+      }
+    } catch {
+      // Preserve directory on network lag
+    } finally {
+      setLoading(false);
+    }
+  }, [category, teachers.length]);
+
+  // Load from local storage cache if available and revalidate silently
   useEffect(() => {
     try {
       const cached = localStorage.getItem("notelagbe_cached_teachers");
@@ -27,34 +50,11 @@ export default function TeachersPage() {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setTeachers(parsed);
-          setLoading(false);
         }
       }
     } catch {}
-  }, []);
 
-  const fetchTeachers = useCallback(async (isSilent = false) => {
-    if (!isSilent) setLoading(true);
-    try {
-      const data = await api.teachers.getAll({
-        category: category === "ALL" ? undefined : category,
-      });
-      const valid = data || [];
-      setTeachers(valid);
-      if (typeof window !== "undefined" && valid.length > 0) {
-        try {
-          localStorage.setItem("notelagbe_cached_teachers", JSON.stringify(valid));
-        } catch {}
-      }
-    } catch {
-      setTeachers([]);
-    } finally {
-      if (!isSilent) setLoading(false);
-    }
-  }, [category]);
-
-  useEffect(() => {
-    fetchTeachers();
+    fetchTeachers(true);
   }, [fetchTeachers]);
 
   // Enterprise Live Sync: Instantly updates when admin adds/edits/deletes faculty
@@ -203,7 +203,7 @@ export default function TeachersPage() {
             </button>
           </div>
         </div>
-      ) : loading ? (
+      ) : loading && teachers.length === 0 ? (
         <FacultyGridSkeleton count={6} />
       ) : displayedTeachers.length === 0 ? (
         <div className="py-20 text-center p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
