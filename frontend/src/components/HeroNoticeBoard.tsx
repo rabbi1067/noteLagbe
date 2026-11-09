@@ -34,40 +34,11 @@ export interface NoticeItem {
   updatedAt?: string;
 }
 
-const DEFAULT_NOTICES: NoticeItem[] = [
-  {
-    id: 1,
-    type: "ALERT",
-    text: "📢 Fall 2026 Midterm & Final examination questions, handwritten lecture notes and solved papers are now live!",
-    link: "/courses",
-    active: true,
-    priority: 1,
-  },
-  {
-    id: 2,
-    type: "UPDATE",
-    text: "💡 Upload your study materials & lecture notes to permanently unlock 2 semester courses for free!",
-    link: "/contribute",
-    active: true,
-    priority: 2,
-  },
-  {
-    id: 3,
-    type: "INFO",
-    text: "⚡ Southeast University CSE Department Lab Manuals & Code Solutions archive updated.",
-    link: "/courses",
-    active: true,
-    priority: 3,
-  },
-];
-
 export default function HeroNoticeBoard() {
   const router = useRouter();
   const { language } = useLanguage();
 
-  // Instant render on SSR and page reload: NEVER unmounts or leaves a blank gap
-  const [notices, setNotices] = useState<NoticeItem[]>(DEFAULT_NOTICES);
-
+  const [notices, setNotices] = useState<NoticeItem[]>([]);
   const [isPaused, setIsPaused] = useState(false);
   const [selectedNotice, setSelectedNotice] = useState<NoticeItem | null>(null);
 
@@ -107,14 +78,20 @@ export default function HeroNoticeBoard() {
   const loadNotices = async () => {
     try {
       const data = await api.notices.getActive();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setNotices(data);
         try {
-          localStorage.setItem("notelagbe_cached_notices", JSON.stringify(data));
+          if (data.length > 0) {
+            localStorage.setItem("notelagbe_cached_notices", JSON.stringify(data));
+          } else {
+            localStorage.removeItem("notelagbe_cached_notices");
+          }
         } catch {}
+      } else {
+        setNotices([]);
       }
     } catch {
-      // Keep existing default or cached notices on network lag
+      // Keep existing notices on network lag
     }
   };
 
@@ -124,7 +101,13 @@ export default function HeroNoticeBoard() {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setNotices(parsed);
+          // Guard against old mock notices
+          const isMock = parsed.some((p: any) => p.text && p.text.includes("Fall 2026 Midterm"));
+          if (!isMock) {
+            setNotices(parsed);
+          } else {
+            localStorage.removeItem("notelagbe_cached_notices");
+          }
         }
       }
     } catch {}
@@ -147,7 +130,12 @@ export default function HeroNoticeBoard() {
     return true;
   });
 
-  const displayList = activeNotices.length > 0 ? activeNotices : DEFAULT_NOTICES;
+  // If no live notice is created or active in the database, do not render the banner
+  if (activeNotices.length === 0) {
+    return null;
+  }
+
+  const displayList = activeNotices;
 
   // Ensure enough items to create a seamless infinite loop
   const loopMultiplier = displayList.length === 1 ? 4 : displayList.length === 2 ? 3 : 2;
