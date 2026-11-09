@@ -32,7 +32,6 @@ import {
 } from "lucide-react";
 import FacultyAvatar from "@/components/FacultyAvatar";
 import HeroNoticeBoard from "@/components/HeroNoticeBoard";
-import ThreeDimensionalHeroVisual from "@/components/ThreeDimensionalHeroVisual";
 import { CourseGridSkeleton } from "@/components/skeletons/CardSkeletons";
 import { useSeuDepartments } from "@/lib/seuDepartments";
 
@@ -540,8 +539,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* 3D Interactive Academic Hub Visual */}
-          <ThreeDimensionalHeroVisual />
+
         </div>
       </section>
 

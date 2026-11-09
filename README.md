@@ -15,7 +15,7 @@
 
 **An Enterprise-Grade, Full-Stack Academic Resource & Student Productivity Platform for Southeast University (SEU)**
 
-[Explore Features](#-comprehensive-feature-breakdown) • [System Architecture](#-system-architecture) • [3D Animation Experience](#-interactive-3d-academic-hub) • [Deployment Guide](#-production-deployment-guide) • [API Directory](#-api-endpoints-directory)
+[Explore Features](#-comprehensive-feature-breakdown) • [System Architecture](#-system-architecture) • [Deployment Guide](#-production-deployment-guide) • [API Directory](#-api-endpoints-directory)
 
 </div>
 
@@ -80,15 +80,6 @@ Built with an isolated, cloud-native architecture:
 
 ---
 
-## 💎 Interactive 3D Academic Hub
-
-NoteLagbe features a custom-engineered **3D Academic Engine Visualizer** (`ThreeDimensionalHeroVisual.tsx`) right in the homepage Hero section:
-- **Interactive 3D Mouse Parallax & Gyroscopic Tilt**: Smooth physical tilt calculations with dynamic CSS `rotateX`, `rotateY`, and deep layered `translateZ` multi-plane perspective.
-- **Real-Time 3D Particle & Geometric Constellation**: A 60 FPS HTML5 Canvas engine rendering rotating 3D coordinate orbits with dynamic depth-based opacity and proximity inter-connection lines.
-- **Holographic Specular Sheen**: Real-time cursor reflection sheen simulating high-end glassmorphism across dark and light modes.
-- **Touch-Optimized Auto-Sway on Mobile**: Automatic smooth periodic sway on smartphones and tablets, transitioning to tactile cursor tracking on desktop screens.
-
----
 
 ## 🚀 Comprehensive Feature Breakdown
 
