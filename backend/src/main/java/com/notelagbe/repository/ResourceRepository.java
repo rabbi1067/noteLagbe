@@ -14,6 +14,7 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
     List<Resource> findByCourseIdAndTypeAndStatus(Long courseId, ResourceType type, ResourceStatus status);
     List<Resource> findByTeacherIdAndStatus(Long teacherId, ResourceStatus status);
     List<Resource> findByCourseIdAndTeacherIdAndStatus(Long courseId, Long teacherId, ResourceStatus status);
+    List<Resource> findByCourseIdAndTeacherId(Long courseId, Long teacherId);
     List<Resource> findByCourseCodeIgnoreCaseAndTeacherIdAndStatus(String code, Long teacherId, ResourceStatus status);
     boolean existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(String code, Long teacherId, ResourceStatus status);
     List<Resource> findByStatusOrderByCreatedAtDesc(ResourceStatus status);

@@ -240,7 +240,7 @@ public class ContributionService {
         // Ensure teacher is officially linked to this course in teacher_courses
         if (res.getTeacher() != null && res.getCourse() != null) {
             if (!teacherCourseRepository.existsByCourseIdAndTeacherId(res.getCourse().getId(), res.getTeacher().getId())) {
-                TeacherCourse tc = new TeacherCourse(res.getTeacher(), res.getCourse(), "General", "Contributed Material");
+                TeacherCourse tc = new TeacherCourse(res.getTeacher(), res.getCourse(), "General", "ADMIN_ASSIGNED");
                 teacherCourseRepository.save(tc);
             }
         }

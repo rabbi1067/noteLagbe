@@ -38,7 +38,7 @@ export default function CoursesPage() {
         setCourses(validCourses);
         setAllCourses(validCourses);
         try {
-          localStorage.setItem("notelagbe_cached_courses_v4", JSON.stringify(validCourses));
+          localStorage.setItem("notelagbe_cached_courses_v5", JSON.stringify(validCourses));
         } catch {}
       }
     } catch {
@@ -51,7 +51,7 @@ export default function CoursesPage() {
   // Load from local storage cache if available and revalidate silently
   useEffect(() => {
     try {
-      const cached = localStorage.getItem("notelagbe_cached_courses_v4");
+      const cached = localStorage.getItem("notelagbe_cached_courses_v5");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -459,13 +459,7 @@ export default function CoursesPage() {
                 </p>
 
                 {(() => {
-                  const validTeachers = (course.teachers || []).filter((teacher: any) =>
-                    teacher.hasNotes ||
-                    teacher.hasQuestions ||
-                    (teacher.notesCount && teacher.notesCount > 0) ||
-                    (teacher.questionsCount && teacher.questionsCount > 0) ||
-                    teacher.scheduleInfo === "ADMIN_ASSIGNED"
-                  );
+                  const validTeachers = course.teachers || [];
                   return validTeachers.length > 0 ? (
                     <div className="space-y-1.5">
                       {validTeachers.slice(0, 3).map((teacher: any) => (

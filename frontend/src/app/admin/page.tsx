@@ -2632,10 +2632,28 @@ export default function AdminDashboardPage() {
   const lecturerCount = teachers.filter((t) => t.designation?.toLowerCase().includes("lecturer")).length;
   const departmentsRepresentedCount = new Set(teachers.map((t) => t.department?.toUpperCase()).filter(Boolean)).size;
 
-  // Matrix KPI metrics
-  const assignedCoursesCount = courses.filter((c) => (c.teachers || []).length > 0).length;
-  const unassignedCoursesCount = courses.filter((c) => (c.teachers || []).length === 0).length;
-  const totalFacultyAssignments = courses.reduce((acc, c) => acc + (c.teachers || []).length, 0);
+  // Matrix KPI metrics dynamically computed
+  const assignedCoursesCount = courses.filter((c) => {
+    const hasTeachersInCourse = (c.teachers || []).length > 0;
+    const hasTeachersInRes = (resources || []).some(
+      (r: any) => (r.course?.code?.toLowerCase() === c.code?.toLowerCase() || r.courseCode?.toLowerCase() === c.code?.toLowerCase()) && r.teacher
+    );
+    return hasTeachersInCourse || hasTeachersInRes;
+  }).length;
+  const unassignedCoursesCount = Math.max(0, courses.length - assignedCoursesCount);
+  const totalFacultyAssignments = courses.reduce((acc, c) => {
+    const teacherIdSet = new Set<number>();
+    (c.teachers || []).forEach((t: any) => {
+      if (t?.id) teacherIdSet.add(Number(t.id));
+    });
+    (resources || []).forEach((r: any) => {
+      const rCode = r.course?.code || r.courseCode;
+      if (rCode?.toLowerCase() === c.code?.toLowerCase() && r.teacher?.id) {
+        teacherIdSet.add(Number(r.teacher.id));
+      }
+    });
+    return acc + teacherIdSet.size;
+  }, 0);
 
   // Course-Faculty Matrix filtered lists
   const matrixCourses =
@@ -5500,9 +5518,30 @@ export default function AdminDashboardPage() {
 
                     {/* Assigned Faculty list for selected course */}
                     {(() => {
-                      const activeCourseCode = selectedCourseForFaculty || courses[0]?.code;
-                      const activeCourse = courses.find((c) => c.code === activeCourseCode);
-                      const assignedTeachers = activeCourse?.teachers || [];
+                      const activeCourseCode = selectedCourseForFaculty || matrixCourses[0]?.code || courses[0]?.code;
+                      const activeCourse = courses.find((c) => c.code?.toLowerCase() === activeCourseCode?.toLowerCase());
+                      const assignedTeachers = (() => {
+                        const map = new Map<number, any>();
+                        (activeCourse?.teachers || []).forEach((t: any) => {
+                          if (t && t.id) map.set(Number(t.id), t);
+                        });
+                        (resources || []).forEach((r: any) => {
+                          const rCourseCode = r.course?.code || r.courseCode;
+                          if (rCourseCode?.toLowerCase() === activeCourseCode?.toLowerCase() && r.teacher && r.teacher.id) {
+                            if (!map.has(Number(r.teacher.id))) {
+                              map.set(Number(r.teacher.id), {
+                                id: r.teacher.id,
+                                name: r.teacher.name,
+                                initial: r.teacher.initial,
+                                designation: r.teacher.designation || "Faculty",
+                                hasNotes: r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "DOC_NOTE",
+                                hasQuestions: r.type === "MID_QUESTION" || r.type === "FINAL_QUESTION" || r.type === "QUIZ_CT",
+                              });
+                            }
+                          }
+                        });
+                        return Array.from(map.values());
+                      })();
 
                       return (
                         <div className="space-y-3">
@@ -5597,11 +5636,25 @@ export default function AdminDashboardPage() {
 
                     {/* Courses conducted by selected teacher */}
                     {(() => {
-                      const activeFacultyId = Number(selectedFacultyId || teachers[0]?.id);
-                      const currentFaculty = teachers.find((t) => t.id === activeFacultyId);
-                      const facultyCourses = courses.filter((c) =>
-                        c.teachers?.some((t: any) => t.id === activeFacultyId)
-                      );
+                      const activeFacultyId = Number(selectedFacultyId || matrixTeachers[0]?.id || teachers[0]?.id);
+                      const currentFaculty = teachers.find((t) => Number(t.id) === activeFacultyId);
+                      const facultyCourses = (() => {
+                        const codeSet = new Set<string>();
+                        const list: any[] = [];
+                        courses.forEach((c: any) => {
+                          const hasTeacherInCourse = c.teachers?.some((t: any) => Number(t.id) === activeFacultyId);
+                          const hasTeacherInRes = (resources || []).some(
+                            (r: any) =>
+                              (r.course?.code?.toLowerCase() === c.code?.toLowerCase() || r.courseCode?.toLowerCase() === c.code?.toLowerCase()) &&
+                              Number(r.teacher?.id) === activeFacultyId
+                          );
+                          if ((hasTeacherInCourse || hasTeacherInRes) && !codeSet.has(c.code)) {
+                            codeSet.add(c.code);
+                            list.push(c);
+                          }
+                        });
+                        return list;
+                      })();
 
                       return (
                         <div className="space-y-3">

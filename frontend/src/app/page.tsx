@@ -54,7 +54,7 @@ export default function HomePage() {
   // Instant cache load on client mount without causing SSR hydration mismatch
   useEffect(() => {
     try {
-      const cachedCourses = localStorage.getItem("notelagbe_cached_courses");
+      const cachedCourses = localStorage.getItem("notelagbe_cached_courses_v5");
       if (cachedCourses) {
         const parsed = JSON.parse(cachedCourses);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -62,7 +62,7 @@ export default function HomePage() {
           setAllCourses(parsed);
         }
       }
-      const cachedTeachers = localStorage.getItem("notelagbe_cached_teachers");
+      const cachedTeachers = localStorage.getItem("notelagbe_cached_teachers_v5");
       if (cachedTeachers) {
         const parsed = JSON.parse(cachedTeachers);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -140,8 +140,8 @@ export default function HomePage() {
       setTeachers(validTeachers);
       if (typeof window !== "undefined") {
         try {
-          if (validAll.length > 0) localStorage.setItem("notelagbe_cached_courses", JSON.stringify(validAll));
-          if (validTeachers.length > 0) localStorage.setItem("notelagbe_cached_teachers", JSON.stringify(validTeachers));
+          if (validAll.length > 0) localStorage.setItem("notelagbe_cached_courses_v5", JSON.stringify(validAll));
+          if (validTeachers.length > 0) localStorage.setItem("notelagbe_cached_teachers_v5", JSON.stringify(validTeachers));
         } catch {}
       }
     } catch {
@@ -164,7 +164,7 @@ export default function HomePage() {
       setCourses(validCourses);
       if (typeof window !== "undefined" && validCourses.length > 0) {
         try {
-          localStorage.setItem("notelagbe_cached_courses", JSON.stringify(validCourses));
+          localStorage.setItem("notelagbe_cached_courses_v5", JSON.stringify(validCourses));
         } catch {}
       }
     } catch {
@@ -751,8 +751,8 @@ export default function HomePage() {
                                 {language === "bn" ? "প্রশ্ন" : "Exam Papers"}
                               </span>
                             ) : (
-                              <span className="text-[10px] font-medium text-slate-400">
-                                {language === "bn" ? "শীঘ্রই" : "Upcoming"}
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                {language === "bn" ? "অ্যাসাইনকৃত শিক্ষক" : "Assigned Faculty"}
                               </span>
                             )}
                           </div>

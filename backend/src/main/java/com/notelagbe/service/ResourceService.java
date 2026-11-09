@@ -211,7 +211,7 @@ public class ResourceService {
         // Auto-link teacher to course when academic material is added
         if (teacher != null && course != null) {
             if (!teacherCourseRepository.existsByCourseIdAndTeacherId(course.getId(), teacher.getId())) {
-                TeacherCourse tc = new TeacherCourse(teacher, course, "General", "Course Material Archive");
+                TeacherCourse tc = new TeacherCourse(teacher, course, "General", "ADMIN_ASSIGNED");
                 teacherCourseRepository.save(tc);
             }
         }
@@ -262,7 +262,7 @@ public class ResourceService {
 
         if (updated.getTeacher() != null && updated.getCourse() != null) {
             if (!teacherCourseRepository.existsByCourseIdAndTeacherId(updated.getCourse().getId(), updated.getTeacher().getId())) {
-                TeacherCourse tc = new TeacherCourse(updated.getTeacher(), updated.getCourse(), "General", "Course Material Archive");
+                TeacherCourse tc = new TeacherCourse(updated.getTeacher(), updated.getCourse(), "General", "ADMIN_ASSIGNED");
                 teacherCourseRepository.save(tc);
             }
         }

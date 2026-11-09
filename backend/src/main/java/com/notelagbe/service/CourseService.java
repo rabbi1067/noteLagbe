@@ -158,16 +158,19 @@ public class CourseService {
 
         // Find associated teachers with detailed per-teacher notes and questions breakdown (strictly deduplicated)
         List<TeacherCourse> tcs = teacherCourseRepository.findByCourseId(course.getId());
+        Map<Long, TeacherCourse> teacherCourseMap = new LinkedHashMap<>();
         Map<Long, Teacher> distinctTeachers = new LinkedHashMap<>();
         for (TeacherCourse tc : tcs) {
             if (tc.getTeacher() != null) {
                 boolean hasRes = resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
                         course.getCode(), tc.getTeacher().getId(), ResourceStatus.APPROVED);
-                boolean isAdminAssigned = "ADMIN_ASSIGNED".equalsIgnoreCase(tc.getScheduleInfo());
+                boolean isAdminAssigned = tc.getScheduleInfo() != null &&
+                        ("ADMIN_ASSIGNED".equalsIgnoreCase(tc.getScheduleInfo()) || "Course Material Archive".equalsIgnoreCase(tc.getScheduleInfo()));
                 if (!hasRes && !isAdminAssigned) {
                     continue; // Skip any demo or unverified auto-assignments
                 }
                 distinctTeachers.putIfAbsent(tc.getTeacher().getId(), tc.getTeacher());
+                teacherCourseMap.putIfAbsent(tc.getTeacher().getId(), tc);
             }
         }
         for (Resource r : courseResources) {
@@ -177,6 +180,8 @@ public class CourseService {
         }
 
         List<TeacherBriefDto> teacherDtos = distinctTeachers.values().stream().map(teacher -> {
+            TeacherCourse matchedTc = teacherCourseMap.get(teacher.getId());
+            String sched = matchedTc != null ? matchedTc.getScheduleInfo() : null;
             TeacherBriefDto dto = new TeacherBriefDto(
                     teacher.getId(),
                     teacher.getName(),
@@ -185,7 +190,7 @@ public class CourseService {
                     teacher.getRoom(),
                     teacher.getEmail(),
                     teacher.getImage(),
-                    null
+                    sched
             );
 
             long tNotes = courseResources.stream()
@@ -293,6 +298,11 @@ public class CourseService {
         Course course = courseRepository.findByCodeIgnoreCase(courseCode.trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with code: " + courseCode));
         teacherCourseRepository.deleteByCourseIdAndTeacherId(course.getId(), teacherId);
+        List<Resource> teacherRes = resourceRepository.findByCourseIdAndTeacherId(course.getId(), teacherId);
+        for (Resource r : teacherRes) {
+            r.setTeacher(null);
+            resourceRepository.save(r);
+        }
         liveSyncService.broadcast("matrix", "removed", courseCode + "->" + teacherId);
         liveSyncService.broadcast("teacher_course", "updated", teacherId);
     }
