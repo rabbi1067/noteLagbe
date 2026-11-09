@@ -725,18 +725,18 @@ export default function AcademicCalendarTool() {
     }
   };
 
-  // Category Pills Data (Arranged in natural academic sequence: All Events, Classes, Installment & Payment, Examinations, Results, etc.)
+  // Category Pills Data (Arranged in requested sequence: All Events -> Orientation -> Classes -> Add/Drop -> Installment & Payment -> Pre-registration -> Examinations -> Results -> Holidays -> Semester Break)
   const categoriesList = [
     { id: "all", labelEn: "All Events", labelBn: "সব ইভেন্ট" },
+    { id: "orientation", labelEn: "Orientation", labelBn: "ওরিয়েন্টেশন" },
     { id: "class", labelEn: "Classes", labelBn: "ক্লাস শুরু/শেষ" },
+    { id: "add_drop", labelEn: "Add / Drop", labelBn: "অ্যাড / ড্রপ" },
     { id: "installment", labelEn: "Installment & Payment", labelBn: "কিস্তি ও পেমেন্ট" },
+    { id: "pre_registration", labelEn: "Pre-registration", labelBn: "প্রি-রেজিস্ট্রেশন" },
     { id: "exam", labelEn: "Examinations", labelBn: "পরীক্ষা (Exams)" },
     { id: "result", labelEn: "Results", labelBn: "রেজাল্ট ও গ্রেড" },
-    { id: "add_drop", labelEn: "Add / Drop", labelBn: "অ্যাড / ড্রপ" },
-    { id: "pre_registration", labelEn: "Pre-registration", labelBn: "প্রি-রেজিস্ট্রেশন" },
     { id: "holiday", labelEn: "Holidays", labelBn: "ছুটি (Holidays)" },
     { id: "semester_break", labelEn: "Semester Break", labelBn: "সেমিস্টার বিরতি" },
-    { id: "orientation", labelEn: "Orientation", labelBn: "ওরিয়েন্টেশন" },
   ];
 
   return (
