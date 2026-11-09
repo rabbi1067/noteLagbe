@@ -22,10 +22,38 @@ public class EmailService {
     private final SystemSettingRepository systemSettingRepository;
     private final JavaMailSender mailSender;
 
+    @org.springframework.beans.factory.annotation.Value("${spring.mail.username:}")
+    private String mailUsername;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.mail.password:}")
+    private String mailPassword;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.mail.host:smtp.gmail.com}")
+    private String mailHost;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.mail.port:587}")
+    private int mailPort;
+
     public EmailService(SystemSettingRepository systemSettingRepository,
                         @Autowired(required = false) JavaMailSender mailSender) {
         this.systemSettingRepository = systemSettingRepository;
         this.mailSender = mailSender;
+    }
+
+    public boolean isSmtpConfigured() {
+        return mailUsername != null && !mailUsername.trim().isEmpty()
+                && mailPassword != null && !mailPassword.trim().isEmpty();
+    }
+
+    public String getSmtpSender() {
+        if (!isSmtpConfigured()) {
+            return "Not Configured (Requires Google App Password)";
+        }
+        return mailUsername;
+    }
+
+    public String getSmtpHost() {
+        return mailHost + ":" + mailPort + " (TLS)";
     }
 
     public boolean isEmailNotificationsEnabled() {
@@ -46,6 +74,13 @@ public class EmailService {
     public void sendPaymentApprovalEmail(User user, PlanType planType, double amount, String trxId, int quota, boolean unlimited) {
         if (!isEmailNotificationsEnabled()) {
             log.info("Skipping email notification: Email notifications are disabled by admin.");
+            return;
+        }
+
+        if (!isSmtpConfigured()) {
+            log.info("SMTP Google App Password not configured (SPRING_MAIL_PASSWORD missing). Skipping live email dispatch to {} ({}) - running in safe simulation mode.",
+                    user != null ? user.getEmail() : "unknown",
+                    planType != null ? planType.getDisplayName() : "Plan");
             return;
         }
 
@@ -130,6 +165,12 @@ public class EmailService {
             return;
         }
 
+        if (!isSmtpConfigured()) {
+            log.info("SMTP Google App Password not configured (SPRING_MAIL_PASSWORD missing). Skipping live email dispatch for waiver user {} - running in safe simulation mode.",
+                    user != null ? user.getEmail() : "unknown");
+            return;
+        }
+
         if (mailSender == null) {
             log.warn("JavaMailSender is not configured. Email to {} was not sent.", user.getEmail());
             return;
@@ -198,6 +239,52 @@ public class EmailService {
             log.info("Waiver approval email sent successfully to: {}", user.getEmail());
         } catch (Exception e) {
             log.warn("Failed to send waiver approval email to {}: {}", user.getEmail(), e.getMessage());
+        }
+    }
+
+    public java.util.Map<String, Object> sendTestEmail(String targetEmail) {
+        if (!isEmailNotificationsEnabled()) {
+            return java.util.Map.of("success", false, "message", "Email notifications are currently turned OFF in System Settings.");
+        }
+        if (!isSmtpConfigured()) {
+            return java.util.Map.of("success", false, "message", "Google App Password is not configured in environment variables (SPRING_MAIL_PASSWORD missing). Set it in Render or .env first.");
+        }
+        if (targetEmail == null || targetEmail.trim().isEmpty()) {
+            return java.util.Map.of("success", false, "message", "Target email address is required.");
+        }
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setTo(targetEmail);
+            helper.setSubject("🔔 NoteLagbe: SMTP Live Verification Test");
+            String html = """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; padding: 24px; color: #1e293b;">
+                    <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 28px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                        <h2 style="color: #0284c7; margin-top: 0;">🎉 NoteLagbe SMTP Live Verified!</h2>
+                        <p style="font-size: 14px; line-height: 1.6; color: #475569;">
+                            This test email confirms that your Google App Password and Spring MailSender configuration are operational.
+                        </p>
+                        <div style="background: #f1f5f9; padding: 14px; border-radius: 10px; font-size: 13px; font-family: monospace; line-height: 1.6;">
+                            Sender: %s<br>
+                            Recipient: %s<br>
+                            Status: Authenticated & Delivered
+                        </div>
+                        <p style="font-size: 12px; color: #94a3b8; margin-top: 20px;">
+                            Southeast University NoteLagbe Automation Engine
+                        </p>
+                    </div>
+                </body>
+                </html>
+                """.formatted(mailUsername, targetEmail);
+            helper.setText(html, true);
+            mailSender.send(message);
+            log.info("SMTP test email sent successfully to {}", targetEmail);
+            return java.util.Map.of("success", true, "message", "Test email successfully sent to " + targetEmail);
+        } catch (Exception e) {
+            log.error("Failed to send SMTP test email to {}: {}", targetEmail, e.getMessage());
+            return java.util.Map.of("success", false, "message", "SMTP Delivery failed: " + e.getMessage());
         }
     }
 }

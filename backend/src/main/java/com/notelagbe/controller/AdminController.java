@@ -475,8 +475,26 @@ public class AdminController {
     @GetMapping("/settings")
     public ResponseEntity<Map<String, Object>> getSystemSettings() {
         return ResponseEntity.ok(Map.of(
-                "emailNotificationsEnabled", emailService.isEmailNotificationsEnabled()
+                "emailNotificationsEnabled", emailService.isEmailNotificationsEnabled(),
+                "smtpConfigured", emailService.isSmtpConfigured(),
+                "smtpSender", emailService.getSmtpSender(),
+                "smtpHost", emailService.getSmtpHost(),
+                "statusMessage", emailService.isSmtpConfigured()
+                        ? "Google SMTP Authenticated & Ready"
+                        : "Dev Simulation Mode (Google App Password not configured)"
         ));
+    }
+
+    @PostMapping("/settings/send-test-email")
+    public ResponseEntity<Map<String, Object>> sendTestEmail(
+            @RequestBody(required = false) Map<String, String> body,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        String recipient = body != null && body.containsKey("recipientEmail") && !body.get("recipientEmail").isBlank()
+                ? body.get("recipientEmail")
+                : (userDetails != null && userDetails.getUser() != null ? userDetails.getUser().getEmail() : "admin@seu.edu.bd");
+        Map<String, Object> result = emailService.sendTestEmail(recipient);
+        logAdminAction("TEST_EMAIL", "SYSTEM", "Admin triggered test email to " + recipient + ": success=" + result.get("success"));
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/settings/email-toggle")

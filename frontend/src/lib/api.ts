@@ -353,11 +353,23 @@ export const api = {
     deleteReview: (id: number) => request<any>(`/admin/reviews/${id}`, { method: "DELETE" }),
 
     // Settings & Profile
-    getSettings: () => request<{ emailNotificationsEnabled: boolean }>("/admin/settings"),
+    getSettings: () =>
+      request<{
+        emailNotificationsEnabled: boolean;
+        smtpConfigured: boolean;
+        smtpSender: string;
+        smtpHost: string;
+        statusMessage: string;
+      }>("/admin/settings"),
     toggleEmail: (enabled: boolean) =>
       request<{ success: boolean; emailNotificationsEnabled: boolean }>("/admin/settings/email-toggle", {
         method: "POST",
         body: JSON.stringify({ enabled }),
+      }),
+    sendTestEmail: (recipientEmail?: string) =>
+      request<{ success: boolean; message: string }>("/admin/settings/send-test-email", {
+        method: "POST",
+        body: JSON.stringify({ recipientEmail }),
       }),
     getProfile: () => request<any>("/admin/profile"),
     updateProfile: (data: { name: string; phone?: string; address?: string; avatarUrl?: string | null }) =>

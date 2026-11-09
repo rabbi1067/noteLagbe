@@ -415,7 +415,12 @@ export default function AdminDashboardPage() {
   const [adminReviews, setAdminReviews] = useState<any[]>([]);
   const [notices, setNotices] = useState<any[]>([]);
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState<boolean>(true);
+  const [smtpConfigured, setSmtpConfigured] = useState<boolean>(false);
+  const [smtpSender, setSmtpSender] = useState<string>("Not Configured");
+  const [smtpHost, setSmtpHost] = useState<string>("smtp.gmail.com:587 (TLS)");
   const [togglingEmail, setTogglingEmail] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [showSmtpGuide, setShowSmtpGuide] = useState(false);
   const [syncingCse, setSyncingCse] = useState(false);
 
   // Pagination Settings
@@ -964,7 +969,13 @@ export default function AdminDashboardPage() {
         api.admin.getWaivers("PENDING").catch(() => []),
         api.courses.getAll().catch(() => []),
         api.teachers.getAll().catch(() => []),
-        api.admin.getSettings().catch(() => ({ emailNotificationsEnabled: true })),
+        api.admin.getSettings().catch(() => ({
+          emailNotificationsEnabled: true,
+          smtpConfigured: false,
+          smtpSender: "Not Configured",
+          smtpHost: "smtp.gmail.com:587 (TLS)",
+          statusMessage: "Default",
+        })),
         api.admin.getReviews().catch(() => []),
         api.admin.getProfile().catch(() => null),
         api.admin.getNotices().catch(() => []),
@@ -995,6 +1006,11 @@ export default function AdminDashboardPage() {
       setActiveChatUsersCount(chatActiveData?.activeCount ?? 0);
       if (settingsData && typeof settingsData.emailNotificationsEnabled === "boolean") {
         setEmailNotificationsEnabled(settingsData.emailNotificationsEnabled);
+        if (typeof settingsData.smtpConfigured === "boolean") {
+          setSmtpConfigured(settingsData.smtpConfigured);
+        }
+        if (settingsData.smtpSender) setSmtpSender(settingsData.smtpSender);
+        if (settingsData.smtpHost) setSmtpHost(settingsData.smtpHost);
       }
       if (cList && cList.length > 0 && !resCourseCode) {
         setResCourseCode(cList[0].code);
@@ -2371,13 +2387,39 @@ export default function AdminDashboardPage() {
       setEmailNotificationsEnabled(res.emailNotificationsEnabled);
       toast.success(
         res.emailNotificationsEnabled
-          ? "Automated Email Notifications TURNED ON (SMTP active)"
+          ? (smtpConfigured
+              ? "Automated Email Notifications TURNED ON (Live SMTP Connected)"
+              : "Automated Email Notifications TURNED ON (Dev Simulation Mode - No App Password)")
           : "Automated Email Notifications TURNED OFF"
       );
     } catch (err: any) {
       toast.error(err.message || "Failed to toggle email notifications");
     } finally {
       setTogglingEmail(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    if (!smtpConfigured) {
+      toast.error("Google App Password is not configured in backend!", {
+        description: "Set SPRING_MAIL_USERNAME and SPRING_MAIL_PASSWORD to dispatch real emails.",
+      });
+      setShowSmtpGuide(true);
+      return;
+    }
+    setTestingEmail(true);
+    try {
+      const recipient = adminProfile?.email || user?.email || "admin@seu.edu.bd";
+      const res = await api.admin.sendTestEmail(recipient);
+      if (res.success) {
+        toast.success(res.message || "Test email dispatched successfully!");
+      } else {
+        toast.error(res.message || "Failed to dispatch test email.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error testing SMTP connection");
+    } finally {
+      setTestingEmail(false);
     }
   };
 
@@ -3499,7 +3541,13 @@ export default function AdminDashboardPage() {
                     <Settings className="w-4 h-4" />
                     <span>System Settings</span>
                   </div>
-                  <span className={`w-2 h-2 rounded-full ${emailNotificationsEnabled ? "bg-emerald-500" : "bg-slate-600"}`} />
+                  <span className={`w-2 h-2 rounded-full ${
+                    !emailNotificationsEnabled
+                      ? "bg-slate-600"
+                      : smtpConfigured
+                      ? "bg-emerald-500"
+                      : "bg-amber-500"
+                  }`} />
                 </button>
               </div>
             </div>
@@ -6865,33 +6913,99 @@ export default function AdminDashboardPage() {
                         </p>
                       </div>
 
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-black shrink-0 ${
-                          emailNotificationsEnabled
-                            ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30"
-                            : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-300 dark:border-slate-700"
-                        }`}
-                      >
-                        {emailNotificationsEnabled ? "ACTIVE (ON)" : "DISABLED (OFF)"}
-                      </span>
+                      <div className="shrink-0 flex flex-col items-end gap-1.5">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-black shrink-0 ${
+                            !emailNotificationsEnabled
+                              ? "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-300 dark:border-slate-700"
+                              : smtpConfigured
+                              ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30"
+                              : "bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                          }`}
+                        >
+                          {!emailNotificationsEnabled
+                            ? "DISABLED (OFF)"
+                            : smtpConfigured
+                            ? "LIVE SMTP CONNECTED"
+                            : "PENDING APP PASSWORD"}
+                        </span>
+                        {emailNotificationsEnabled && !smtpConfigured && (
+                          <span className="text-[10px] font-bold text-amber-500 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" /> Dev Simulation Mode
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 space-y-2 text-xs">
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="text-slate-500 dark:text-slate-400">SMTP Gateway:</span>
-                        <span className="font-mono font-bold text-slate-700 dark:text-slate-300">smtp.gmail.com:587 (TLS)</span>
+                        <span className="font-mono font-bold text-slate-700 dark:text-slate-300">{smtpHost}</span>
                       </div>
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="text-slate-500 dark:text-slate-400">Dispatcher Protocol:</span>
                         <span className="font-bold text-slate-700 dark:text-slate-300">Spring MailSender & JavaMail</span>
                       </div>
                       <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500 dark:text-slate-400">Authenticated Sender:</span>
+                        <span className={`font-mono font-semibold ${smtpConfigured ? "text-blue-500 dark:text-blue-400" : "text-amber-500 dark:text-amber-400"}`}>
+                          {smtpConfigured ? smtpSender : "Not Configured (Google App Password Missing)"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
                         <span className="text-slate-500 dark:text-slate-400">Auto-Dispatched Events:</span>
                         <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Payments, Waivers & Rewards</span>
                       </div>
+                      <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-200/60 dark:border-slate-800/60">
+                        <span className="text-slate-500 dark:text-slate-400">Inbox Delivery Status:</span>
+                        <span className={`font-bold ${smtpConfigured ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                          {smtpConfigured
+                            ? "Active (Emails dispatched to student inboxes)"
+                            : "Simulated in Server Logs (No real email leaves server)"}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="pt-1">
+                    {/* Pending App Password Alert Box */}
+                    {!smtpConfigured && (
+                      <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 font-black text-amber-600 dark:text-amber-400">
+                            <AlertCircle className="w-4 h-4 shrink-0" />
+                            <span>Kono Google App Password set kora nei</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowSmtpGuide(!showSmtpGuide)}
+                            className="text-[11px] font-bold text-amber-700 dark:text-amber-300 underline cursor-pointer hover:opacity-80"
+                          >
+                            {showSmtpGuide ? "Hide Setup Guide" : "Setup Instructions"}
+                          </button>
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
+                          Notification toggle switch ta ON thakleo Google Gmail theke email delivery korte ekta 16-character <strong>Google App Password</strong> proyojon. Akhon system safe simulation mode-e cholche (payment ba waiver approve korle transaction thik-i hobe, kintu student inbox-e kono real email jabe na).
+                        </p>
+
+                        {showSmtpGuide && (
+                          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-amber-500/30 space-y-2 text-[11px] text-slate-200">
+                            <p className="font-bold text-amber-400">Google App Password set korar niyam:</p>
+                            <ol className="list-decimal list-inside space-y-1.5 text-slate-300">
+                              <li>Google Account &gt; <strong>Security</strong> &gt; <strong>2-Step Verification</strong> on korun.</li>
+                              <li>Niche <strong>App passwords</strong>-e click korun.</li>
+                              <li>App name hishebe <code>NoteLagbe</code> likhe <strong>Create</strong> korun (ekta 16-digit password paben).</li>
+                              <li>Render dashboard (Environment tab) ba local backend-e ei environment variables gula add korun:
+                                <pre className="mt-1.5 p-2.5 rounded-lg bg-black text-emerald-400 font-mono text-[10px] overflow-x-auto leading-relaxed">
+{`SPRING_MAIL_USERNAME=your_seu_email@gmail.com
+SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
+                                </pre>
+                              </li>
+                            </ol>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="pt-1 flex flex-wrap items-center gap-3">
                       <button
                         onClick={handleToggleEmail}
                         disabled={togglingEmail}
@@ -6903,6 +7017,20 @@ export default function AdminDashboardPage() {
                       >
                         <Mail className="w-4 h-4" />
                         <span>{emailNotificationsEnabled ? "Turn OFF Email Notifications" : "Turn ON Email Notifications"}</span>
+                      </button>
+
+                      <button
+                        onClick={handleTestEmail}
+                        disabled={testingEmail}
+                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        title="Send a live test verification email to admin address"
+                      >
+                        {testingEmail ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Mail className="w-3.5 h-3.5 text-blue-500" />
+                        )}
+                        <span>{testingEmail ? "Testing Connection..." : "Send Test Email"}</span>
                       </button>
                     </div>
                   </div>
