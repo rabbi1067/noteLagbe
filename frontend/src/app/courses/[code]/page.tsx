@@ -2099,7 +2099,7 @@ function MaterialCard({
               </a>
             ) : resource.type === "DOC_NOTE" || resource.fileUrl?.match(/\.(doc|docx|odt|txt|rtf)$/i) ? (
               <a
-                href={resource.fileUrl}
+                href={`/api/resources/${resource.id}/file?download=true`}
                 target="_blank"
                 rel="noopener noreferrer"
                 download

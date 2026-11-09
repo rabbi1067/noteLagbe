@@ -8546,30 +8546,64 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                   </span>
                 </label>
 
-                <MultiPageUploader
-                  uploadFn={api.admin.uploadMaterialFile}
-                  onUploadSuccess={(res, originalFiles) => {
-                    setResFileUrl(res.url);
-                    setResFileName(res.fileName || "");
-                    setResFileSize(res.fileSize || "");
-                    if (!resTitle.trim() && originalFiles && originalFiles.length > 0) {
-                      const cleanName = originalFiles[0].name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
-                      setResTitle(cleanName);
-                    }
-                  }}
-                  onClear={() => {
-                    setResFileUrl("");
-                    setResFileName("");
-                    setResFileSize("");
-                  }}
-                  initialUrl={resFileUrl}
-                  initialFileName={resFileName}
-                  initialFileSize={resFileSize}
-                  titleHint={resTitle || resCourseCode || "Exam_Material"}
-                  language="en"
-                  accentColor="blue"
-                  maxFileSizeMb={50}
-                />
+                {(() => {
+                  const typeLabelMap: Record<string, string> = {
+                    NOTE: "Lecture Note",
+                    MID_QUESTION: "Midterm Question Paper",
+                    FINAL_QUESTION: "Final Exam Paper",
+                    QUIZ_CT: "Quiz & CT Paper",
+                    LAB_MANUAL: "Lab Manual",
+                    LAB_QUIZ: "Lab Quiz",
+                    LAB_FINAL: "Lab Final Exam",
+                    LAB_REPORT: "Lab Report",
+                    LAB_HAND_NOTE: "Lab Hand Note",
+                  };
+                  const currentTypeLabel = typeLabelMap[resType] || "Question Paper";
+                  const currentSemester = resSemester?.trim() || "Fall 2026";
+                  const smartBaseTitle = `${resCourseCode ? resCourseCode + " " : ""}${currentSemester} ${currentTypeLabel}`.trim();
+                  const smartFileName = `${resCourseCode ? resCourseCode + "_" : ""}${currentSemester.replace(/\s+/g, "_")}_${currentTypeLabel.replace(/\s+/g, "_")}`;
+
+                  return (
+                    <MultiPageUploader
+                      uploadFn={api.admin.uploadMaterialFile}
+                      onUploadSuccess={(res, originalFiles) => {
+                        setResFileUrl(res.url);
+                        setResFileName(res.fileName || "");
+                        setResFileSize(res.fileSize || "");
+                        const isGenericTitle =
+                          !resTitle.trim() ||
+                          resTitle.toLowerCase().startsWith("whatsapp") ||
+                          resTitle.toLowerCase().startsWith("img_") ||
+                          resTitle.toLowerCase().startsWith("screenshot") ||
+                          resTitle.toLowerCase().startsWith("document") ||
+                          resTitle.toLowerCase().startsWith("file");
+
+                        if (isGenericTitle) {
+                          setResTitle(smartBaseTitle);
+                        }
+                      }}
+                      onClear={() => {
+                        setResFileUrl("");
+                        setResFileName("");
+                        setResFileSize("");
+                      }}
+                      initialUrl={resFileUrl}
+                      initialFileName={resFileName}
+                      initialFileSize={resFileSize}
+                      titleHint={
+                        resTitle.trim() &&
+                        !resTitle.toLowerCase().startsWith("whatsapp") &&
+                        !resTitle.toLowerCase().startsWith("img_") &&
+                        !resTitle.toLowerCase().startsWith("screenshot")
+                          ? resTitle
+                          : smartFileName
+                      }
+                      language="en"
+                      accentColor="blue"
+                      maxFileSizeMb={50}
+                    />
+                  );
+                })()}
               </div>
 
               <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">

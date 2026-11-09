@@ -48,14 +48,19 @@ export default function PDFViewerModal({
     }
   };
 
+  const secureFileUrl = resource?.id ? `/api/resources/${resource.id}/file` : resource?.fileUrl;
+
   const handleDownload = async () => {
-    if (!resource.fileUrl) return;
+    if (!resource) return;
     try {
-      await api.resources.trackDownload(resource.id);
-      window.open(resource.fileUrl, "_blank");
-    } catch {
-      window.open(resource.fileUrl, "_blank");
-    }
+      if (resource.id) await api.resources.trackDownload(resource.id);
+    } catch {}
+    const link = document.createElement("a");
+    link.href = resource.id ? `/api/resources/${resource.id}/file?download=true` : (resource.fileUrl || "");
+    link.download = "";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -76,10 +81,10 @@ export default function PDFViewerModal({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {isUnlocked && resource.fileUrl && (
+            {isUnlocked && (resource.fileUrl || resource.id) && (
               <>
                 <a
-                  href={resource.fileUrl}
+                  href={`${secureFileUrl}?preview=true`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
@@ -109,7 +114,7 @@ export default function PDFViewerModal({
         {/* Content Body */}
         <div className="flex-1 relative overflow-hidden bg-slate-100 dark:bg-slate-950">
           
-          {isUnlocked && resource.fileUrl ? (
+          {isUnlocked && (resource.fileUrl || resource.id) ? (
             <div className="w-full h-full relative">
               {/* Security Watermark Overlay */}
               <div className="absolute inset-0 pointer-events-none z-10 flex flex-wrap items-center justify-around opacity-[0.06] select-none overflow-hidden">
@@ -122,7 +127,7 @@ export default function PDFViewerModal({
 
               {/* Embedded Document Frame */}
               <iframe
-                src={`${resource.fileUrl}#toolbar=0`}
+                src={`${secureFileUrl}?preview=true#toolbar=0`}
                 className="w-full h-full border-none"
                 title={resource.title}
               />

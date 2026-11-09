@@ -52,6 +52,14 @@ public class ResourceController {
         return ResponseEntity.ok(resourceService.getResourceById(id));
     }
 
+    @GetMapping("/{id}/file")
+    public ResponseEntity<byte[]> getResourceFile(
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "false") boolean download,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return resourceService.streamResourceFile(id, download, userDetails != null ? userDetails.getUser() : null);
+    }
+
     @PostMapping("/{id}/download")
     public ResponseEntity<Map<String, Object>> downloadResource(@PathVariable Long id) {
         resourceService.incrementDownloadCount(id);

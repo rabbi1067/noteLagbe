@@ -15,6 +15,15 @@ import java.util.UUID;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.CacheControl;
+import java.nio.charset.StandardCharsets;
+import java.io.FileNotFoundException;
 
 import java.util.HashMap;
 import java.util.List;
@@ -23,6 +32,8 @@ import java.util.Optional;
 
 @Service
 public class ResourceService {
+
+    private static final Logger log = LoggerFactory.getLogger(ResourceService.class);
 
     private final ResourceRepository resourceRepository;
     private final CourseRepository courseRepository;
@@ -307,6 +318,235 @@ public class ResourceService {
             r.setDownloadsCount(r.getDownloadsCount() + 1);
             resourceRepository.save(r);
         });
+    }
+
+    public ResponseEntity<byte[]> streamResourceFile(Long id, boolean download, User user) {
+        Resource r = getResourceById(id);
+
+        // If resource is not approved, only admin or uploader can view
+        if (r.getStatus() != ResourceStatus.APPROVED) {
+            boolean isAdmin = user != null && user.getRole() != null &&
+                    (user.getRole().name().equals("ADMIN") || user.getRole().name().equals("SUPER_ADMIN"));
+            boolean isUploader = user != null && r.getUploader() != null && user.getId().equals(r.getUploader().getId());
+            if (!isAdmin && !isUploader) {
+                throw new ApiException("This material is pending approval and cannot be accessed yet.");
+            }
+        }
+
+        String targetUrl = r.getFileUrl() != null && !r.getFileUrl().isBlank()
+                ? r.getFileUrl()
+                : r.getPreviewUrl();
+
+        if (targetUrl == null || targetUrl.isBlank()) {
+            throw new ResourceNotFoundException("No downloadable file associated with this resource.");
+        }
+
+        if (download) {
+            incrementDownloadCount(id);
+        }
+
+        try {
+            byte[] fileBytes = fetchResourceBytes(targetUrl);
+
+            // Format clean, university-standard download filename with semester and course code!
+            String courseCode = r.getCourse() != null ? r.getCourse().getCode() : "Course";
+            String semester = r.getSemesterName() != null ? r.getSemesterName().trim() : "Semester";
+            String title = r.getTitle() != null ? r.getTitle().trim() : "Academic_Document";
+
+            String baseName = (courseCode + "_" + semester + "_" + title)
+                    .replaceAll("[^a-zA-Z0-9_\\-\\.]+", "_")
+                    .replaceAll("_+", "_");
+
+            String contentType = "application/pdf";
+            String ext = ".pdf";
+
+            if (fileBytes.length >= 4 && fileBytes[0] == '%' && fileBytes[1] == 'P' && fileBytes[2] == 'D' && fileBytes[3] == 'F') {
+                contentType = "application/pdf";
+                ext = ".pdf";
+            } else if (fileBytes.length >= 3 && (fileBytes[0] & 0xFF) == 0xFF && (fileBytes[1] & 0xFF) == 0xD8 && (fileBytes[2] & 0xFF) == 0xFF) {
+                // If it's a JPEG (from an image-converted PDF fallback), wrap into valid standard PDF document
+                try {
+                    fileBytes = wrapJpegToPdf(fileBytes);
+                    contentType = "application/pdf";
+                    ext = ".pdf";
+                } catch (Exception e) {
+                    contentType = "image/jpeg";
+                    ext = ".jpg";
+                }
+            } else if (fileBytes.length >= 4 && (fileBytes[0] & 0xFF) == 0x89 && fileBytes[1] == 'P' && fileBytes[2] == 'N' && fileBytes[3] == 'G') {
+                contentType = "image/png";
+                ext = ".png";
+            } else if (targetUrl.toLowerCase().endsWith(".docx")) {
+                contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                ext = ".docx";
+            } else if (targetUrl.toLowerCase().endsWith(".zip")) {
+                contentType = "application/zip";
+                ext = ".zip";
+            }
+
+            if (!baseName.toLowerCase().endsWith(ext)) {
+                baseName += ext;
+            }
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType(contentType));
+            if (download) {
+                headers.setContentDisposition(ContentDisposition.attachment().filename(baseName, StandardCharsets.UTF_8).build());
+            } else {
+                headers.setContentDisposition(ContentDisposition.inline().filename(baseName, StandardCharsets.UTF_8).build());
+            }
+            headers.setCacheControl(CacheControl.maxAge(1, java.util.concurrent.TimeUnit.HOURS).cachePrivate());
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .contentLength(fileBytes.length)
+                    .body(fileBytes);
+
+        } catch (Exception e) {
+            log.error("Failed to stream resource file ID {}: {}", id, e.getMessage(), e);
+            throw new ApiException("Unable to download or stream material: " + e.getMessage());
+        }
+    }
+
+    public byte[] fetchResourceBytes(String targetUrl) throws IOException {
+        if (targetUrl == null || targetUrl.isBlank()) {
+            throw new IllegalArgumentException("Target URL is blank");
+        }
+
+        // If local relative path
+        if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
+            String clean = targetUrl.startsWith("/") ? targetUrl.substring(1) : targetUrl;
+            Path p = Paths.get(clean);
+            if (Files.exists(p)) {
+                return Files.readAllBytes(p);
+            }
+            Path uploadsPath = Paths.get("uploads").resolve(p.getFileName());
+            if (Files.exists(uploadsPath)) {
+                return Files.readAllBytes(uploadsPath);
+            }
+            Path materialsPath = Paths.get("uploads", "materials").resolve(p.getFileName());
+            if (Files.exists(materialsPath)) {
+                return Files.readAllBytes(materialsPath);
+            }
+            throw new FileNotFoundException("Local file not found on disk: " + targetUrl);
+        }
+
+        String fetchUrl = targetUrl;
+        if (cloudinaryService.isConfigured() && targetUrl.contains("cloudinary.com")) {
+            fetchUrl = cloudinaryService.getSignedUrl(targetUrl);
+        }
+
+        // Remote URL (Cloudinary, Drive, or external CDN)
+        java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
+                .followRedirects(java.net.http.HttpClient.Redirect.ALWAYS)
+                .build();
+        java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+                .uri(java.net.URI.create(fetchUrl))
+                .GET()
+                .build();
+
+        try {
+            java.net.http.HttpResponse<byte[]> res = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+            if (res.statusCode() >= 200 && res.statusCode() < 300) {
+                return res.body();
+            }
+
+            // Cloudinary 401 ACL fallback for legacy image/upload/*.pdf:
+            if (targetUrl.contains("cloudinary.com") && targetUrl.contains("/image/upload/") && res.statusCode() == 401) {
+                String jpgUrl = targetUrl.replaceFirst("\\.pdf$", ".jpg");
+                java.net.http.HttpRequest jpgReq = java.net.http.HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(jpgUrl))
+                        .GET()
+                        .build();
+                java.net.http.HttpResponse<byte[]> jpgRes = client.send(jpgReq, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+                if (jpgRes.statusCode() >= 200 && jpgRes.statusCode() < 300) {
+                    return jpgRes.body();
+                }
+            }
+
+            throw new IOException("Remote storage returned HTTP status " + res.statusCode());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("File download interrupted", e);
+        }
+    }
+
+    public static byte[] wrapJpegToPdf(byte[] jpegBytes) throws IOException {
+        int width = 800;
+        int height = 1100;
+        try {
+            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(jpegBytes));
+            if (img != null) {
+                width = img.getWidth();
+                height = img.getHeight();
+            }
+        } catch (Exception ignored) {}
+
+        boolean isLandscape = width > height;
+        float pageWidth = isLandscape ? 841.89f : 595.28f;
+        float pageHeight = isLandscape ? 595.28f : 841.89f;
+
+        float margin = 20f;
+        float availW = pageWidth - margin * 2;
+        float availH = pageHeight - margin * 2;
+        float scale = Math.min(availW / width, availH / height);
+        float drawW = width * scale;
+        float drawH = height * scale;
+        float x = (pageWidth - drawW) / 2;
+        float y = (pageHeight - drawH) / 2;
+
+        String contentStream = String.format(java.util.Locale.US,
+                "q\n%.2f 0 0 %.2f %.2f %.2f cm\n/Im1 Do\nQ\n",
+                drawW, drawH, x, y);
+        byte[] contentBytes = contentStream.getBytes(StandardCharsets.US_ASCII);
+
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        java.util.List<Integer> offsets = new java.util.ArrayList<>();
+
+        // Header
+        out.write("%PDF-1.4\n%\u00E2\u00E3\u00CF\u00D3\n".getBytes(StandardCharsets.US_ASCII));
+
+        // 1 0 obj: Catalog
+        offsets.add(out.size());
+        out.write("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n".getBytes(StandardCharsets.US_ASCII));
+
+        // 2 0 obj: Pages
+        offsets.add(out.size());
+        out.write("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n".getBytes(StandardCharsets.US_ASCII));
+
+        // 3 0 obj: Page
+        offsets.add(out.size());
+        String pageObj = String.format(java.util.Locale.US,
+                "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2f %.2f] /Contents 4 0 R /Resources << /XObject << /Im1 5 0 R >> >> >>\nendobj\n",
+                pageWidth, pageHeight);
+        out.write(pageObj.getBytes(StandardCharsets.US_ASCII));
+
+        // 4 0 obj: Contents
+        offsets.add(out.size());
+        out.write(String.format("4 0 obj\n<< /Length %d >>\nstream\n", contentBytes.length).getBytes(StandardCharsets.US_ASCII));
+        out.write(contentBytes);
+        out.write("\nendstream\nendobj\n".getBytes(StandardCharsets.US_ASCII));
+
+        // 5 0 obj: Image XObject with DCTDecode
+        offsets.add(out.size());
+        String imageObjHeader = String.format(
+                "5 0 obj\n<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length %d >>\nstream\n",
+                width, height, jpegBytes.length);
+        out.write(imageObjHeader.getBytes(StandardCharsets.US_ASCII));
+        out.write(jpegBytes);
+        out.write("\nendstream\nendobj\n".getBytes(StandardCharsets.US_ASCII));
+
+        // Cross-reference table
+        int startXref = out.size();
+        out.write(String.format("xref\n0 %d\n0000000000 65535 f \n", offsets.size() + 1).getBytes(StandardCharsets.US_ASCII));
+        for (int off : offsets) {
+            out.write(String.format("%010d 00000 n \n", off).getBytes(StandardCharsets.US_ASCII));
+        }
+
+        // Trailer
+        out.write(String.format("trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", offsets.size() + 1, startXref).getBytes(StandardCharsets.US_ASCII));
+
+        return out.toByteArray();
     }
 
     public Map<String, Object> uploadMaterialFile(MultipartFile file) throws IOException {

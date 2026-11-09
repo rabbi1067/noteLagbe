@@ -866,41 +866,75 @@ export default function ContributePage() {
             {/* TAB CONTENT 1: DIRECT DEVICE UPLOAD WITH MULTI-PAGE AUTO-MERGE */}
             {uploadMode === "DEVICE" && (
               <div className="space-y-3 pt-1">
-                <MultiPageUploader
-                  uploadFn={async (file: File) => {
-                    if (!isAuthenticated) {
-                      setShowAuthModal(true);
-                      toast.error(language === "bn" ? "ফাইল আপলোড করতে অনুগ্রহ করে সাইন ইন করুন।" : "Please sign in to upload files.");
-                      throw new Error(language === "bn" ? "সাইন ইন প্রয়োজন" : "Authentication required");
-                    }
-                    return await api.contributions.uploadFile(file);
-                  }}
-                  onUploadSuccess={(res, originalFiles) => {
-                    setFileUrl(res.url);
-                    setUploadedFileName(res.fileName || "");
-                    setUploadedFileSize(res.fileSize || "");
-                    setLinkStatus("public");
-                    setLinkMessage(language === "bn" ? "ডিভাইস থেকে ফাইল সফলভাবে আপলোড হয়েছে" : "File successfully uploaded from device");
-                    if (!title.trim() && originalFiles && originalFiles.length > 0) {
-                      const cleanName = originalFiles[0].name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
-                      setTitle(cleanName.substring(0, 100));
-                    }
-                  }}
-                  onClear={() => {
-                    setFileUrl("");
-                    setUploadedFileName("");
-                    setUploadedFileSize("");
-                    setLinkStatus("idle");
-                    setLinkMessage("");
-                  }}
-                  initialUrl={fileUrl}
-                  initialFileName={uploadedFileName}
-                  initialFileSize={uploadedFileSize}
-                  titleHint={title || courseCode || "Exam_Material"}
-                  language={language}
-                  accentColor="emerald"
-                  maxFileSizeMb={50}
-                />
+                {(() => {
+                  const typeLabelMap: Record<string, string> = {
+                    NOTE: "Lecture Hand Note",
+                    MID_QUESTION: "Midterm Question Paper",
+                    FINAL_QUESTION: "Final Exam Paper",
+                    QUIZ_CT: "Quiz & CT Paper",
+                    LAB_MANUAL: "Lab Manual",
+                    LAB_QUIZ: "Lab Quiz",
+                    LAB_FINAL: "Lab Final Exam",
+                    LAB_REPORT: "Lab Report",
+                    LAB_HAND_NOTE: "Lab Hand Note",
+                  };
+                  const contributeTypeLabel = typeLabelMap[resourceType] || "Question Paper";
+                  const contributeSemester = semester?.trim() || "Fall 2026";
+                  const smartContributeTitle = `${courseCode ? courseCode + " " : ""}${contributeSemester} ${contributeTypeLabel}`.trim();
+                  const smartFileName = `${courseCode ? courseCode + "_" : ""}${contributeSemester.replace(/\s+/g, "_")}_${contributeTypeLabel.replace(/\s+/g, "_")}`;
+
+                  return (
+                    <MultiPageUploader
+                      uploadFn={async (file: File) => {
+                        if (!isAuthenticated) {
+                          setShowAuthModal(true);
+                          toast.error(language === "bn" ? "ফাইল আপলোড করতে অনুগ্রহ করে সাইন ইন করুন।" : "Please sign in to upload files.");
+                          throw new Error(language === "bn" ? "সাইন ইন প্রয়োজন" : "Authentication required");
+                        }
+                        return await api.contributions.uploadFile(file);
+                      }}
+                      onUploadSuccess={(res, originalFiles) => {
+                        setFileUrl(res.url);
+                        setUploadedFileName(res.fileName || "");
+                        setUploadedFileSize(res.fileSize || "");
+                        setLinkStatus("public");
+                        setLinkMessage(language === "bn" ? "ডিভাইস থেকে ফাইল সফলভাবে আপলোড হয়েছে" : "File successfully uploaded from device");
+                        const isGenericTitle =
+                          !title.trim() ||
+                          title.toLowerCase().startsWith("whatsapp") ||
+                          title.toLowerCase().startsWith("img_") ||
+                          title.toLowerCase().startsWith("screenshot") ||
+                          title.toLowerCase().startsWith("document") ||
+                          title.toLowerCase().startsWith("file");
+
+                        if (isGenericTitle) {
+                          setTitle(smartContributeTitle.substring(0, 100));
+                        }
+                      }}
+                      onClear={() => {
+                        setFileUrl("");
+                        setUploadedFileName("");
+                        setUploadedFileSize("");
+                        setLinkStatus("idle");
+                        setLinkMessage("");
+                      }}
+                      initialUrl={fileUrl}
+                      initialFileName={uploadedFileName}
+                      initialFileSize={uploadedFileSize}
+                      titleHint={
+                        title.trim() &&
+                        !title.toLowerCase().startsWith("whatsapp") &&
+                        !title.toLowerCase().startsWith("img_") &&
+                        !title.toLowerCase().startsWith("screenshot")
+                          ? title
+                          : smartFileName
+                      }
+                      language={language}
+                      accentColor="emerald"
+                      maxFileSizeMb={50}
+                    />
+                  );
+                })()}
               </div>
             )}
 

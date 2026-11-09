@@ -157,14 +157,18 @@ export async function mergeFilesToSinglePdf(
   const mergedPdfBytes = await mergedDoc.save();
   const pdfBlob = new Blob([mergedPdfBytes as any], { type: "application/pdf" });
 
-  // Generate a clean filename
-  const sanitizedTitle = (baseTitle || "Document")
+  // Generate a clean filename incorporating course and semester
+  let sanitizedTitle = (baseTitle || "Exam_Material")
     .trim()
     .replace(/[^\w\s\u0980-\u09FF-]/g, "")
     .replace(/\s+/g, "_")
-    .substring(0, 50);
+    .substring(0, 60);
 
-  const finalFileName = `${sanitizedTitle || "Exam_Material"}_Merged_${files.length}Pages.pdf`;
+  if (sanitizedTitle.toLowerCase().endsWith(".pdf")) {
+    sanitizedTitle = sanitizedTitle.substring(0, sanitizedTitle.length - 4);
+  }
+
+  const finalFileName = `${sanitizedTitle || "Exam_Material"}.pdf`;
 
   return new File([pdfBlob], finalFileName, { type: "application/pdf" });
 }

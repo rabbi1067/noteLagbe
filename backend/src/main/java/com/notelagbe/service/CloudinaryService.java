@@ -66,7 +66,22 @@ public class CloudinaryService {
             throw new IllegalStateException("Cloudinary is not configured");
         }
 
-        String resourceType = isImage ? "image" : "auto";
+        String filename = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+        boolean isPdf = filename.endsWith(".pdf") || "application/pdf".equalsIgnoreCase(file.getContentType());
+        boolean isDocOrZip = filename.endsWith(".doc") || filename.endsWith(".docx") || filename.endsWith(".zip") ||
+                filename.endsWith(".ppt") || filename.endsWith(".pptx") || filename.endsWith(".xls") || filename.endsWith(".xlsx");
+
+        // Cloudinary strict security blocks delivery of PDFs under 'image/upload' unless signed.
+        // Uploading PDFs/documents as 'raw' guarantees clean, public, unrestricted access from '/raw/upload/' without any ACL failure!
+        String resourceType;
+        if (isImage && !isPdf && !isDocOrZip) {
+            resourceType = "image";
+        } else if (isPdf || isDocOrZip) {
+            resourceType = "raw";
+        } else {
+            resourceType = "auto";
+        }
+
         Map<String, Object> params = ObjectUtils.asMap(
                 "folder", folder,
                 "resource_type", resourceType,
@@ -82,6 +97,31 @@ public class CloudinaryService {
         }
         Object url = uploadResult.get("url");
         return url != null ? url.toString() : "";
+    }
+
+    /**
+     * Signs a Cloudinary URL to bypass ACL restrictions on private assets
+     */
+    public String getSignedUrl(String rawUrl) {
+        if (!configured || cloudinary == null || rawUrl == null || !rawUrl.contains("cloudinary.com")) {
+            return rawUrl;
+        }
+        try {
+            int uploadIdx = rawUrl.indexOf("/upload/");
+            if (uploadIdx == -1) return rawUrl;
+            String afterUpload = rawUrl.substring(uploadIdx + 8);
+            if (afterUpload.matches("^v\\d+/.*")) {
+                afterUpload = afterUpload.substring(afterUpload.indexOf('/') + 1);
+            }
+            return cloudinary.url()
+                    .resourceType("image")
+                    .type("upload")
+                    .signed(true)
+                    .generate(afterUpload);
+        } catch (Exception e) {
+            log.warn("Could not sign Cloudinary URL: {}", e.getMessage());
+            return rawUrl;
+        }
     }
 
     /**
