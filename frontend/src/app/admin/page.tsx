@@ -262,17 +262,29 @@ const DEFAULT_DEPARTMENT_META: Record<
     school: "School of Arts & Social Sciences",
     gradient: "from-violet-600 to-purple-700",
   },
-  CE: {
-    code: "CE",
-    name: "Civil Engineering",
-    school: "School of Science & Engineering",
-    gradient: "from-amber-700 to-orange-800",
+  BNG: {
+    code: "BNG",
+    name: "Bangla",
+    school: "School of Arts & Social Sciences",
+    gradient: "from-emerald-700 to-green-800",
   },
-  CIVIL: {
-    code: "CE",
-    name: "Civil Engineering",
-    school: "School of Science & Engineering",
-    gradient: "from-amber-700 to-orange-800",
+  BANGLA: {
+    code: "BNG",
+    name: "Bangla",
+    school: "School of Arts & Social Sciences",
+    gradient: "from-emerald-700 to-green-800",
+  },
+  ECO: {
+    code: "ECO",
+    name: "Economics",
+    school: "School of Arts & Social Sciences",
+    gradient: "from-teal-600 to-cyan-700",
+  },
+  ECONOMICS: {
+    code: "ECO",
+    name: "Economics",
+    school: "School of Arts & Social Sciences",
+    gradient: "from-teal-600 to-cyan-700",
   },
   ARCH: {
     code: "ARCH",
@@ -282,31 +294,43 @@ const DEFAULT_DEPARTMENT_META: Record<
   },
 };
 
+// Official 11 departments strictly synced from Southeast University (seu.edu.bd/programs)
 const DEFAULT_DEPARTMENT_CODES = [
   "CSE",
-  "SWE",
-  "ICT",
   "EEE",
+  "ARCH",
   "TEX",
   "PHR",
   "BBA",
   "LAW",
   "ENG",
-  "CE",
-  "ARCH",
+  "BNG",
+  "ECO",
+  "ICT",
 ];
 
 const DEPT_CODE_ALIASES: Record<string, string> = {
-  SOFTWARE: "SWE",
+  SOFTWARE: "CSE",
   ENGLISH: "ENG",
   TEXTILE: "TEX",
+  TE: "TEX",
   PHARMACY: "PHR",
-  CIVIL: "CE",
-  SWE: "SWE",
+  BANGLA: "BNG",
+  BEN: "BNG",
+  ECONOMICS: "ECO",
+  ARCHITECTURE: "ARCH",
+  SWE: "CSE",
   ENG: "ENG",
   TEX: "TEX",
   PHR: "PHR",
-  CE: "CE",
+  BNG: "BNG",
+  ECO: "ECO",
+  ARCH: "ARCH",
+  EEE: "EEE",
+  CSE: "CSE",
+  ICT: "ICT",
+  BBA: "BBA",
+  LAW: "LAW",
 };
 
 const normalizeDeptCode = (code?: string): string => {
@@ -505,8 +529,15 @@ export default function AdminDashboardPage() {
       const saved = localStorage.getItem("notelagbe_admin_custom_departments");
       if (saved) {
         const list: string[] = JSON.parse(saved);
-        const migrated = Array.from(new Set(list.map((d) => normalizeDeptCode(d))));
+        const migrated = Array.from(
+          new Set(
+            list
+              .map((d) => normalizeDeptCode(d))
+              .filter((d) => d && d !== "CE" && d !== "CIVIL")
+          )
+        );
         setCustomDepartments(migrated);
+        localStorage.setItem("notelagbe_admin_custom_departments", JSON.stringify(migrated));
       }
     } catch {}
   }, []);
@@ -525,17 +556,20 @@ export default function AdminDashboardPage() {
     DEFAULT_DEPARTMENT_CODES.forEach((d) => set.add(d.toUpperCase()));
     courses.forEach((c: any) => {
       if (c.department && typeof c.department === "string" && c.department.trim()) {
-        set.add(normalizeDeptCode(c.department));
+        const norm = normalizeDeptCode(c.department);
+        if (norm !== "CE" && norm !== "CIVIL") set.add(norm);
       }
     });
     teachers.forEach((t: any) => {
       if (t.department && typeof t.department === "string" && t.department.trim()) {
-        set.add(normalizeDeptCode(t.department));
+        const norm = normalizeDeptCode(t.department);
+        if (norm !== "CE" && norm !== "CIVIL") set.add(norm);
       }
     });
     customDepartments.forEach((d) => {
       if (d && typeof d === "string" && d.trim()) {
-        set.add(normalizeDeptCode(d));
+        const norm = normalizeDeptCode(d);
+        if (norm !== "CE" && norm !== "CIVIL") set.add(norm);
       }
     });
     return Array.from(set).sort();
@@ -1529,7 +1563,7 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     const cleanDept = newDeptInput.trim().toUpperCase();
     if (!cleanDept) {
-      toast.error("Please enter a department code (e.g. LAW, PHR, CE)");
+      toast.error("Please enter a department code (e.g. LAW, PHR, ARCH)");
       return;
     }
     if (dynamicDepartments.includes(cleanDept)) {
@@ -2395,10 +2429,12 @@ export default function AdminDashboardPage() {
         return "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20";
       case "LAW":
         return "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20";
-      case "CE":
-        return "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20";
       case "ARCH":
         return "bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/20";
+      case "BNG":
+        return "bg-emerald-600/10 text-emerald-700 dark:text-emerald-400 border-emerald-600/20";
+      case "ECO":
+        return "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20";
       default:
         return "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20";
     }
@@ -8508,7 +8544,7 @@ export default function AdminDashboardPage() {
                       required
                       value={courseFormCustomDept}
                       onChange={(e) => setCourseFormCustomDept(e.target.value.toUpperCase())}
-                      placeholder="e.g. LAW, PHR, CE, ENG"
+                      placeholder="e.g. LAW, PHR, ARCH, ENG"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-blue-500/50 text-slate-900 dark:text-white font-mono placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
                   ) : (
@@ -9330,7 +9366,7 @@ export default function AdminDashboardPage() {
                   autoFocus
                   value={newDeptInput}
                   onChange={(e) => setNewDeptInput(e.target.value.toUpperCase())}
-                  placeholder="e.g. LAW, PHR, CE, ARCH, MATH, ENG"
+                  placeholder="e.g. LAW, PHR, ARCH, BNG, ECO"
                   className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-sm placeholder-slate-400 focus:outline-none focus:border-blue-500"
                 />
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
@@ -9776,17 +9812,17 @@ export default function AdminDashboardPage() {
                     onChange={(e) => setContribEditDept(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-blue-500"
                   >
-                    <option value="CSE">CSE (Computer Science)</option>
-                    <option value="EEE">EEE (Electrical)</option>
-                    <option value="TE">TE (Textile)</option>
+                    <option value="CSE">CSE (Computer Science & Engineering)</option>
+                    <option value="EEE">EEE (Electrical & Electronic Engineering)</option>
                     <option value="ARCH">ARCH (Architecture)</option>
-                    <option value="CE">CE (Civil Eng)</option>
-                    <option value="BBA">BBA (Business)</option>
-                    <option value="ECO">ECO (Economics)</option>
-                    <option value="ENG">ENG (English)</option>
+                    <option value="TEX">TEX (Textile Engineering)</option>
+                    <option value="PHR">PHR (Pharmacy)</option>
+                    <option value="BBA">BBA (Business Administration)</option>
                     <option value="LAW">LAW (Law & Justice)</option>
-                    <option value="PHAR">PHAR (Pharmacy)</option>
-                    <option value="BEN">BEN (Bangla)</option>
+                    <option value="ENG">ENG (English)</option>
+                    <option value="BNG">BNG (Bangla)</option>
+                    <option value="ECO">ECO (Economics)</option>
+                    <option value="ICT">ICT (Information & Communication Tech)</option>
                   </select>
                 </div>
 

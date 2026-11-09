@@ -5870,12 +5870,15 @@ export default function StudentToolsPage() {
                         {[
                           { name: "CSE", full: "Department of Computer Science & Engineering" },
                           { name: "EEE", full: "Department of Electrical & Electronic Engineering" },
-                          { name: "BBA", full: "Department of Business Administration (BBA)" },
-                          { name: "Pharmacy", full: "Department of Pharmacy" },
-                          { name: "English", full: "Department of English" },
-                          { name: "Law", full: "Department of Law & Justice" },
+                          { name: "Architecture", full: "Department of Architecture" },
                           { name: "Textile", full: "Department of Textile Engineering" },
-                          { name: "Civil", full: "Department of Civil Engineering" },
+                          { name: "Pharmacy", full: "Department of Pharmacy" },
+                          { name: "BBA", full: "Department of Business Administration (BBA)" },
+                          { name: "Law", full: "Department of Law & Justice" },
+                          { name: "English", full: "Department of English" },
+                          { name: "Bangla", full: "Department of Bangla" },
+                          { name: "Economics", full: "Department of Economics" },
+                          { name: "ICT", full: "Department of Information & Communication Technology" },
                         ].map((d) => (
                           <button
                             key={d.name}

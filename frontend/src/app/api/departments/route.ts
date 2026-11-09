@@ -9,7 +9,8 @@ export async function GET() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-    const backendRes = await fetch("http://localhost:8888/api/departments", {
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8888";
+    const backendRes = await fetch(`${backendUrl}/api/departments`, {
       signal: controller.signal,
       headers: { Accept: "application/json" },
       cache: "no-store",
