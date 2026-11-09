@@ -1,100 +1,798 @@
 [
-  { "code": "CSE141", "title": "Computer Fundamentals", "credits": 3, "semester": 1, "isLab": false, "prerequisite": "Nil" },
-  { "code": "ENG101", "title": "Basic Composition", "credits": 3, "semester": 1, "isLab": false, "prerequisite": "Nil" },
-  { "code": "MAT141", "title": "Differential & Integral Calculus", "credits": 3, "semester": 1, "isLab": false, "prerequisite": "Nil" },
-  { "code": "ACT141", "title": "Introduction to Accounting", "credits": 3, "semester": 1, "isLab": false, "prerequisite": "Nil" },
-
-  { "code": "ENG102", "title": "Intermediate Composition", "credits": 3, "semester": 2, "isLab": false, "prerequisite": "ENG101" },
-  { "code": "PHY161", "title": "Physics - I", "credits": 3, "semester": 2, "isLab": false, "prerequisite": "Nil" },
-  { "code": "CSE161", "title": "Programming Language I (C)", "credits": 3, "semester": 2, "isLab": false, "prerequisite": "CSE141" },
-  { "code": "CSE162", "title": "Programming Language I Lab", "credits": 1, "semester": 2, "isLab": true, "prerequisite": "CSE141" },
-  { "code": "MAT161", "title": "Coordinate Geometry and Vector Analysis", "credits": 3, "semester": 2, "isLab": false, "prerequisite": "MAT141" },
-
-  { "code": "CSE181", "title": "Discrete Mathematics", "credits": 3, "semester": 3, "isLab": false, "prerequisite": "CSE161" },
-  { "code": "ENG103", "title": "Advanced English Skills", "credits": 3, "semester": 3, "isLab": false, "prerequisite": "ENG102" },
-  { "code": "EEE181", "title": "Electrical Circuits Design I", "credits": 3, "semester": 3, "isLab": false, "prerequisite": "Nil" },
-  { "code": "EEE182", "title": "Electrical Circuits Design I Lab", "credits": 1, "semester": 3, "isLab": true, "prerequisite": "Nil" },
-  { "code": "PHY181", "title": "Physics II", "credits": 3, "semester": 3, "isLab": false, "prerequisite": "PHY161" },
-  { "code": "PHY182", "title": "Physics II Lab", "credits": 1, "semester": 3, "isLab": true, "prerequisite": "PHY161" },
-
-  { "code": "CSE241", "title": "Data Structures", "credits": 3, "semester": 4, "isLab": false, "prerequisite": "CSE181" },
-  { "code": "CSE242", "title": "Data Structures Lab", "credits": 1, "semester": 4, "isLab": true, "prerequisite": "CSE181" },
-  { "code": "ENG105", "title": "Public Speaking", "credits": 3, "semester": 4, "isLab": false, "prerequisite": "ENG103" },
-  { "code": "MAT241", "title": "Complex Variables and Transforms", "credits": 3, "semester": 4, "isLab": false, "prerequisite": "MAT141" },
-  { "code": "EEE241", "title": "Electronic Devices & Circuits I", "credits": 3, "semester": 4, "isLab": false, "prerequisite": "EEE181" },
-  { "code": "EEE242", "title": "Electronic Devices & Circuits I Lab", "credits": 1, "semester": 4, "isLab": true, "prerequisite": "EEE181, EEE182" },
-
-  { "code": "CSE261", "title": "Numerical Methods", "credits": 3, "semester": 5, "isLab": false, "prerequisite": "CSE181, MAT161" },
-  { "code": "CSE263", "title": "Digital Logic Design", "credits": 3, "semester": 5, "isLab": false, "prerequisite": "CSE161" },
-  { "code": "CSE264", "title": "Digital Logic Design Lab", "credits": 1, "semester": 5, "isLab": true, "prerequisite": "CSE161" },
-  { "code": "MAT261", "title": "Linear Algebra and Matrices", "credits": 3, "semester": 5, "isLab": false, "prerequisite": "MAT241" },
-  { "code": "CSE265", "title": "Algorithm", "credits": 3, "semester": 5, "isLab": false, "prerequisite": "CSE241" },
-  { "code": "CSE266", "title": "Algorithm Lab", "credits": 1, "semester": 5, "isLab": true, "prerequisite": "CSE241, CSE242" },
-
-  { "code": "MGT281", "title": "Introduction to Business & Management", "credits": 3, "semester": 6, "isLab": false, "prerequisite": "CSE241" },
-  { "code": "CSE281", "title": "Introduction to Programming Language II (Java)", "credits": 3, "semester": 6, "isLab": false, "prerequisite": "CSE161, CSE162" },
-  { "code": "CSE282", "title": "Introduction to Programming Language II (Java) Lab", "credits": 1, "semester": 6, "isLab": true, "prerequisite": "CSE161, CSE162" },
-  { "code": "ETE281", "title": "Communication Theory", "credits": 3, "semester": 6, "isLab": false, "prerequisite": "MAT241, EEE241" },
-  { "code": "ETE282", "title": "Communication Lab", "credits": 1, "semester": 6, "isLab": true, "prerequisite": "MAT241, EEE241" },
-  { "code": "STA281", "title": "Statistical Methods & Probability", "credits": 3, "semester": 6, "isLab": false, "prerequisite": "Nil" },
-
-  { "code": "CSE341", "title": "Computer Networking", "credits": 3, "semester": 7, "isLab": false, "prerequisite": "ETE281" },
-  { "code": "CSE342", "title": "Computer Networking Lab", "credits": 1, "semester": 7, "isLab": true, "prerequisite": "ETE281" },
-  { "code": "CSE343", "title": "Computer Architecture", "credits": 3, "semester": 7, "isLab": false, "prerequisite": "CSE263" },
-  { "code": "CSE345", "title": "Information System Design & Software Engineering", "credits": 3, "semester": 7, "isLab": false, "prerequisite": "CSE281, CSE282" },
-  { "code": "CSE346", "title": "Information System Design & Software Engineering Lab", "credits": 1, "semester": 7, "isLab": true, "prerequisite": "CSE281, CSE282" },
-  { "code": "SOC341", "title": "Engineering Ethics", "credits": 3, "semester": 7, "isLab": false, "prerequisite": "Completion of 80 Credits" },
-
-  { "code": "CSE383", "title": "Database Design", "credits": 3, "semester": 8, "isLab": false, "prerequisite": "CSE281" },
-  { "code": "CSE384", "title": "Database Design Lab", "credits": 1, "semester": 8, "isLab": true, "prerequisite": "CSE281" },
-  { "code": "CSE363", "title": "Microprocessor Design & Assembly Language Programming", "credits": 3, "semester": 8, "isLab": false, "prerequisite": "CSE161, CSE263" },
-  { "code": "CSE364", "title": "Microprocessor Design & Assembly Language Programming Lab", "credits": 1, "semester": 8, "isLab": true, "prerequisite": "CSE161, CSE263" },
-  { "code": "CSE365", "title": "Artificial Intelligence", "credits": 3, "semester": 8, "isLab": false, "prerequisite": "CSE265" },
-
-  { "code": "CSE381", "title": "Introduction to Embedded Systems", "credits": 3, "semester": 9, "isLab": false, "prerequisite": "CSE363" },
-  { "code": "CSE382", "title": "Introduction to Embedded Systems Lab", "credits": 1, "semester": 9, "isLab": true, "prerequisite": "CSE364" },
-  { "code": "CSE361", "title": "Operating Systems", "credits": 3, "semester": 9, "isLab": false, "prerequisite": "CSE343, CSE265" },
-  { "code": "CSE362", "title": "Operating Systems Lab", "credits": 1, "semester": 9, "isLab": true, "prerequisite": "CSE343, CSE266" },
-
-  { "code": "CSE441", "title": "Theory of Computing", "credits": 3, "semester": 10, "isLab": false, "prerequisite": "CSE265" },
-  { "code": "CSE443", "title": "Computer Graphics & Animation", "credits": 3, "semester": 10, "isLab": false, "prerequisite": "CSE281, MAT261" },
-  { "code": "CSE444", "title": "Computer Graphics & Animation Lab", "credits": 1, "semester": 10, "isLab": true, "prerequisite": "CSE281, MAT261" },
-
-  { "code": "CSE459", "title": "Research Methodology", "credits": 3, "semester": 11, "isLab": false, "prerequisite": "Completion of 110 credit hours" },
-  { "code": "ECO461", "title": "Introduction to Economics", "credits": 3, "semester": 11, "isLab": false, "prerequisite": "Nil" },
-
-  { "code": "CSE489", "title": "Project OR Internship", "credits": 6, "semester": 12, "isLab": false, "prerequisite": "CSE459" },
-
-  { "code": "CSE349", "title": "Mathematical Analysis for Computer Science", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "STA281, CSE181", "electiveGroup": "A" },
-  { "code": "CSE469", "title": "Compiler Construction", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE441", "electiveGroup": "A" },
-  { "code": "CSE467", "title": "E-Commerce & E-Governance", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE383, SOC341", "electiveGroup": "A" },
-  { "code": "CSE359", "title": "Graph Theory", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE265", "electiveGroup": "A" },
-  { "code": "CSE355", "title": "Image Processing", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE281, CSE265", "electiveGroup": "A" },
-  { "code": "CSE479", "title": "Cryptography & Network Security", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE341", "electiveGroup": "A" },
-  { "code": "CSE477", "title": "Cloud Computing", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE361", "electiveGroup": "A" },
-  { "code": "CSE475", "title": "Management Information System", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "Completion of 110 Credit Hours", "electiveGroup": "A" },
-  { "code": "CSE445", "title": "Smart Device App Development", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE281, CSE341", "electiveGroup": "A" },
-  { "code": "CSE353", "title": "Introduction to Data Mining", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE265", "electiveGroup": "A" },
-  { "code": "ETE399", "title": "Digital Communication", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "ETE281, MAT261", "electiveGroup": "A" },
-
-  { "code": "ETE357", "title": "Telecommunication Engineering", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "EEE241, ETE281", "electiveGroup": "B" },
-  { "code": "ETE358", "title": "Telecommunication Engineering Lab", "credits": 1, "semester": 0, "isLab": true, "prerequisite": "EEE242, ETE282", "electiveGroup": "B" },
-  { "code": "ETE451", "title": "Digital Signal Processing", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "ETE357", "electiveGroup": "B" },
-  { "code": "ETE452", "title": "Digital Signal Processing Lab", "credits": 1, "semester": 0, "isLab": true, "prerequisite": "ETE358", "electiveGroup": "B" },
-  { "code": "EEE425", "title": "VLSI Design", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE263, CSE264", "electiveGroup": "B" },
-  { "code": "EEE456", "title": "VLSI Design Lab", "credits": 1, "semester": 0, "isLab": true, "prerequisite": "CSE263, CSE264", "electiveGroup": "B" },
-  { "code": "CSE347", "title": "Advanced Networking", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE341", "electiveGroup": "B" },
-  { "code": "CSE348", "title": "Advanced Networking Lab", "credits": 1, "semester": 0, "isLab": true, "prerequisite": "CSE341, CSE342", "electiveGroup": "B" },
-  { "code": "CSE375", "title": "Advanced Algorithm", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE265", "electiveGroup": "B" },
-  { "code": "CSE376", "title": "Advanced Algorithm Lab", "credits": 1, "semester": 0, "isLab": true, "prerequisite": "CSE266", "electiveGroup": "B" },
-  { "code": "CSE457", "title": "Advanced Embedded Systems", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE381", "electiveGroup": "B" },
-  { "code": "CSE458", "title": "Advanced Embedded Systems Lab", "credits": 1, "semester": 0, "isLab": true, "prerequisite": "CSE381", "electiveGroup": "B" },
-  { "code": "CSE471", "title": "Web and Internet Programming", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE345", "electiveGroup": "B" },
-  { "code": "CSE472", "title": "Web and Internet Programming Lab", "credits": 1, "semester": 0, "isLab": true, "prerequisite": "CSE345", "electiveGroup": "B" },
-  { "code": "CSE473", "title": "Software Development and Project Management", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE345", "electiveGroup": "B" },
-  { "code": "CSE474", "title": "Software Development and Project Management Lab", "credits": 1, "semester": 0, "isLab": true, "prerequisite": "CSE345", "electiveGroup": "B" },
-  { "code": "CSE465", "title": "Parallel and Distributed Computing", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE361, CSE381", "electiveGroup": "B" },
-  { "code": "CSE466", "title": "Parallel and Distributed Computing Lab", "credits": 1, "semester": 0, "isLab": true, "prerequisite": "CSE361, CSE381", "electiveGroup": "B" },
-  { "code": "CSE351", "title": "Advanced Java", "credits": 3, "semester": 0, "isLab": false, "prerequisite": "CSE281", "electiveGroup": "B" },
-  { "code": "CSE352", "title": "Advanced Java Lab", "credits": 1, "semester": 0, "isLab": true, "prerequisite": "CSE281", "electiveGroup": "B" }
+  {
+    "code": "CSE141",
+    "title": "Computer Fundamentals",
+    "credits": 3,
+    "semester": 1,
+    "isLab": false,
+    "prerequisite": "Nil",
+    "department": "CSE"
+  },
+  {
+    "code": "ENG101",
+    "title": "Basic Composition",
+    "credits": 3,
+    "semester": 1,
+    "isLab": false,
+    "prerequisite": "Nil",
+    "department": "CSE"
+  },
+  {
+    "code": "MAT141",
+    "title": "Differential & Integral Calculus",
+    "credits": 3,
+    "semester": 1,
+    "isLab": false,
+    "prerequisite": "Nil",
+    "department": "CSE"
+  },
+  {
+    "code": "ACT141",
+    "title": "Introduction to Accounting",
+    "credits": 3,
+    "semester": 1,
+    "isLab": false,
+    "prerequisite": "Nil",
+    "department": "CSE"
+  },
+  {
+    "code": "ENG102",
+    "title": "Intermediate Composition",
+    "credits": 3,
+    "semester": 2,
+    "isLab": false,
+    "prerequisite": "ENG101",
+    "department": "CSE"
+  },
+  {
+    "code": "PHY161",
+    "title": "Physics - I",
+    "credits": 3,
+    "semester": 2,
+    "isLab": false,
+    "prerequisite": "Nil",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE161",
+    "title": "Programming Language I (C)",
+    "credits": 3,
+    "semester": 2,
+    "isLab": false,
+    "prerequisite": "CSE141",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE162",
+    "title": "Programming Language I Lab",
+    "credits": 1,
+    "semester": 2,
+    "isLab": true,
+    "prerequisite": "CSE141",
+    "department": "CSE"
+  },
+  {
+    "code": "MAT161",
+    "title": "Coordinate Geometry and Vector Analysis",
+    "credits": 3,
+    "semester": 2,
+    "isLab": false,
+    "prerequisite": "MAT141",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE181",
+    "title": "Discrete Mathematics",
+    "credits": 3,
+    "semester": 3,
+    "isLab": false,
+    "prerequisite": "CSE161",
+    "department": "CSE"
+  },
+  {
+    "code": "ENG103",
+    "title": "Advanced English Skills",
+    "credits": 3,
+    "semester": 3,
+    "isLab": false,
+    "prerequisite": "ENG102",
+    "department": "CSE"
+  },
+  {
+    "code": "EEE181",
+    "title": "Electrical Circuits Design I",
+    "credits": 3,
+    "semester": 3,
+    "isLab": false,
+    "prerequisite": "Nil",
+    "department": "CSE"
+  },
+  {
+    "code": "EEE182",
+    "title": "Electrical Circuits Design I Lab",
+    "credits": 1,
+    "semester": 3,
+    "isLab": true,
+    "prerequisite": "Nil",
+    "department": "CSE"
+  },
+  {
+    "code": "PHY181",
+    "title": "Physics II",
+    "credits": 3,
+    "semester": 3,
+    "isLab": false,
+    "prerequisite": "PHY161",
+    "department": "CSE"
+  },
+  {
+    "code": "PHY182",
+    "title": "Physics II Lab",
+    "credits": 1,
+    "semester": 3,
+    "isLab": true,
+    "prerequisite": "PHY161",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE241",
+    "title": "Data Structures",
+    "credits": 3,
+    "semester": 4,
+    "isLab": false,
+    "prerequisite": "CSE181",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE242",
+    "title": "Data Structures Lab",
+    "credits": 1,
+    "semester": 4,
+    "isLab": true,
+    "prerequisite": "CSE181",
+    "department": "CSE"
+  },
+  {
+    "code": "ENG105",
+    "title": "Public Speaking",
+    "credits": 3,
+    "semester": 4,
+    "isLab": false,
+    "prerequisite": "ENG103",
+    "department": "CSE"
+  },
+  {
+    "code": "MAT241",
+    "title": "Complex Variables and Transforms",
+    "credits": 3,
+    "semester": 4,
+    "isLab": false,
+    "prerequisite": "MAT141",
+    "department": "CSE"
+  },
+  {
+    "code": "EEE241",
+    "title": "Electronic Devices & Circuits I",
+    "credits": 3,
+    "semester": 4,
+    "isLab": false,
+    "prerequisite": "EEE181",
+    "department": "CSE"
+  },
+  {
+    "code": "EEE242",
+    "title": "Electronic Devices & Circuits I Lab",
+    "credits": 1,
+    "semester": 4,
+    "isLab": true,
+    "prerequisite": "EEE181, EEE182",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE261",
+    "title": "Numerical Methods",
+    "credits": 3,
+    "semester": 5,
+    "isLab": false,
+    "prerequisite": "CSE181, MAT161",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE263",
+    "title": "Digital Logic Design",
+    "credits": 3,
+    "semester": 5,
+    "isLab": false,
+    "prerequisite": "CSE161",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE264",
+    "title": "Digital Logic Design Lab",
+    "credits": 1,
+    "semester": 5,
+    "isLab": true,
+    "prerequisite": "CSE161",
+    "department": "CSE"
+  },
+  {
+    "code": "MAT261",
+    "title": "Linear Algebra and Matrices",
+    "credits": 3,
+    "semester": 5,
+    "isLab": false,
+    "prerequisite": "MAT241",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE265",
+    "title": "Algorithm",
+    "credits": 3,
+    "semester": 5,
+    "isLab": false,
+    "prerequisite": "CSE241",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE266",
+    "title": "Algorithm Lab",
+    "credits": 1,
+    "semester": 5,
+    "isLab": true,
+    "prerequisite": "CSE241, CSE242",
+    "department": "CSE"
+  },
+  {
+    "code": "MGT281",
+    "title": "Introduction to Business & Management",
+    "credits": 3,
+    "semester": 6,
+    "isLab": false,
+    "prerequisite": "CSE241",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE281",
+    "title": "Introduction to Programming Language II (Java)",
+    "credits": 3,
+    "semester": 6,
+    "isLab": false,
+    "prerequisite": "CSE161, CSE162",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE282",
+    "title": "Introduction to Programming Language II (Java) Lab",
+    "credits": 1,
+    "semester": 6,
+    "isLab": true,
+    "prerequisite": "CSE161, CSE162",
+    "department": "CSE"
+  },
+  {
+    "code": "ETE281",
+    "title": "Communication Theory",
+    "credits": 3,
+    "semester": 6,
+    "isLab": false,
+    "prerequisite": "MAT241, EEE241",
+    "department": "CSE"
+  },
+  {
+    "code": "ETE282",
+    "title": "Communication Lab",
+    "credits": 1,
+    "semester": 6,
+    "isLab": true,
+    "prerequisite": "MAT241, EEE241",
+    "department": "CSE"
+  },
+  {
+    "code": "STA281",
+    "title": "Statistical Methods & Probability",
+    "credits": 3,
+    "semester": 6,
+    "isLab": false,
+    "prerequisite": "Nil",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE341",
+    "title": "Computer Networking",
+    "credits": 3,
+    "semester": 7,
+    "isLab": false,
+    "prerequisite": "ETE281",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE342",
+    "title": "Computer Networking Lab",
+    "credits": 1,
+    "semester": 7,
+    "isLab": true,
+    "prerequisite": "ETE281",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE343",
+    "title": "Computer Architecture",
+    "credits": 3,
+    "semester": 7,
+    "isLab": false,
+    "prerequisite": "CSE263",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE345",
+    "title": "Information System Design & Software Engineering",
+    "credits": 3,
+    "semester": 7,
+    "isLab": false,
+    "prerequisite": "CSE281, CSE282",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE346",
+    "title": "Information System Design & Software Engineering Lab",
+    "credits": 1,
+    "semester": 7,
+    "isLab": true,
+    "prerequisite": "CSE281, CSE282",
+    "department": "CSE"
+  },
+  {
+    "code": "SOC341",
+    "title": "Engineering Ethics",
+    "credits": 3,
+    "semester": 7,
+    "isLab": false,
+    "prerequisite": "Completion of 80 Credits",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE383",
+    "title": "Database Design",
+    "credits": 3,
+    "semester": 8,
+    "isLab": false,
+    "prerequisite": "CSE281",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE384",
+    "title": "Database Design Lab",
+    "credits": 1,
+    "semester": 8,
+    "isLab": true,
+    "prerequisite": "CSE281",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE363",
+    "title": "Microprocessor Design & Assembly Language Programming",
+    "credits": 3,
+    "semester": 8,
+    "isLab": false,
+    "prerequisite": "CSE161, CSE263",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE364",
+    "title": "Microprocessor Design & Assembly Language Programming Lab",
+    "credits": 1,
+    "semester": 8,
+    "isLab": true,
+    "prerequisite": "CSE161, CSE263",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE365",
+    "title": "Artificial Intelligence",
+    "credits": 3,
+    "semester": 8,
+    "isLab": false,
+    "prerequisite": "CSE265",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE381",
+    "title": "Introduction to Embedded Systems",
+    "credits": 3,
+    "semester": 9,
+    "isLab": false,
+    "prerequisite": "CSE363",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE382",
+    "title": "Introduction to Embedded Systems Lab",
+    "credits": 1,
+    "semester": 9,
+    "isLab": true,
+    "prerequisite": "CSE364",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE361",
+    "title": "Operating Systems",
+    "credits": 3,
+    "semester": 9,
+    "isLab": false,
+    "prerequisite": "CSE343, CSE265",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE362",
+    "title": "Operating Systems Lab",
+    "credits": 1,
+    "semester": 9,
+    "isLab": true,
+    "prerequisite": "CSE343, CSE266",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE441",
+    "title": "Theory of Computing",
+    "credits": 3,
+    "semester": 10,
+    "isLab": false,
+    "prerequisite": "CSE265",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE443",
+    "title": "Computer Graphics & Animation",
+    "credits": 3,
+    "semester": 10,
+    "isLab": false,
+    "prerequisite": "CSE281, MAT261",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE444",
+    "title": "Computer Graphics & Animation Lab",
+    "credits": 1,
+    "semester": 10,
+    "isLab": true,
+    "prerequisite": "CSE281, MAT261",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE459",
+    "title": "Research Methodology",
+    "credits": 3,
+    "semester": 11,
+    "isLab": false,
+    "prerequisite": "Completion of 110 credit hours",
+    "department": "CSE"
+  },
+  {
+    "code": "ECO461",
+    "title": "Introduction to Economics",
+    "credits": 3,
+    "semester": 11,
+    "isLab": false,
+    "prerequisite": "Nil",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE489",
+    "title": "Project OR Internship",
+    "credits": 6,
+    "semester": 12,
+    "isLab": false,
+    "prerequisite": "CSE459",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE349",
+    "title": "Mathematical Analysis for Computer Science",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "STA281, CSE181",
+    "electiveGroup": "A",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE469",
+    "title": "Compiler Construction",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE441",
+    "electiveGroup": "A",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE467",
+    "title": "E-Commerce & E-Governance",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE383, SOC341",
+    "electiveGroup": "A",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE359",
+    "title": "Graph Theory",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE265",
+    "electiveGroup": "A",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE355",
+    "title": "Image Processing",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE281, CSE265",
+    "electiveGroup": "A",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE479",
+    "title": "Cryptography & Network Security",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE341",
+    "electiveGroup": "A",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE477",
+    "title": "Cloud Computing",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE361",
+    "electiveGroup": "A",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE475",
+    "title": "Management Information System",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "Completion of 110 Credit Hours",
+    "electiveGroup": "A",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE445",
+    "title": "Smart Device App Development",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE281, CSE341",
+    "electiveGroup": "A",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE353",
+    "title": "Introduction to Data Mining",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE265",
+    "electiveGroup": "A",
+    "department": "CSE"
+  },
+  {
+    "code": "ETE399",
+    "title": "Digital Communication",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "ETE281, MAT261",
+    "electiveGroup": "A",
+    "department": "CSE"
+  },
+  {
+    "code": "ETE357",
+    "title": "Telecommunication Engineering",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "EEE241, ETE281",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "ETE358",
+    "title": "Telecommunication Engineering Lab",
+    "credits": 1,
+    "semester": 0,
+    "isLab": true,
+    "prerequisite": "EEE242, ETE282",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "ETE451",
+    "title": "Digital Signal Processing",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "ETE357",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "ETE452",
+    "title": "Digital Signal Processing Lab",
+    "credits": 1,
+    "semester": 0,
+    "isLab": true,
+    "prerequisite": "ETE358",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "EEE425",
+    "title": "VLSI Design",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE263, CSE264",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "EEE456",
+    "title": "VLSI Design Lab",
+    "credits": 1,
+    "semester": 0,
+    "isLab": true,
+    "prerequisite": "CSE263, CSE264",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE347",
+    "title": "Advanced Networking",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE341",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE348",
+    "title": "Advanced Networking Lab",
+    "credits": 1,
+    "semester": 0,
+    "isLab": true,
+    "prerequisite": "CSE341, CSE342",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE375",
+    "title": "Advanced Algorithm",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE265",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE376",
+    "title": "Advanced Algorithm Lab",
+    "credits": 1,
+    "semester": 0,
+    "isLab": true,
+    "prerequisite": "CSE266",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE457",
+    "title": "Advanced Embedded Systems",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE381",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE458",
+    "title": "Advanced Embedded Systems Lab",
+    "credits": 1,
+    "semester": 0,
+    "isLab": true,
+    "prerequisite": "CSE381",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE471",
+    "title": "Web and Internet Programming",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE345",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE472",
+    "title": "Web and Internet Programming Lab",
+    "credits": 1,
+    "semester": 0,
+    "isLab": true,
+    "prerequisite": "CSE345",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE473",
+    "title": "Software Development and Project Management",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE345",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE474",
+    "title": "Software Development and Project Management Lab",
+    "credits": 1,
+    "semester": 0,
+    "isLab": true,
+    "prerequisite": "CSE345",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE465",
+    "title": "Parallel and Distributed Computing",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE361, CSE381",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE466",
+    "title": "Parallel and Distributed Computing Lab",
+    "credits": 1,
+    "semester": 0,
+    "isLab": true,
+    "prerequisite": "CSE361, CSE381",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE351",
+    "title": "Advanced Java",
+    "credits": 3,
+    "semester": 0,
+    "isLab": false,
+    "prerequisite": "CSE281",
+    "electiveGroup": "B",
+    "department": "CSE"
+  },
+  {
+    "code": "CSE352",
+    "title": "Advanced Java Lab",
+    "credits": 1,
+    "semester": 0,
+    "isLab": true,
+    "prerequisite": "CSE281",
+    "electiveGroup": "B",
+    "department": "CSE"
+  }
 ]

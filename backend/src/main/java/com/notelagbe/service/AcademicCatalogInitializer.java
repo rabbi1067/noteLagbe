@@ -132,6 +132,22 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
     }
 
     private void seedCoursesIfEmpty() {
+        // Enforce authentic CSE curriculum: Purge any non-CSE dummy courses (e.g. mock BBA, EEE, LAW, PHAR, ENG courses).
+        // CSE non-major courses (such as ENG101, EEE181, ACT141, etc.) have department = "CSE" and are strictly kept.
+        List<Course> nonCseCourses = courseRepository.findAll().stream()
+                .filter(c -> c.getDepartment() != null && !c.getDepartment().trim().equalsIgnoreCase("CSE"))
+                .toList();
+        if (!nonCseCourses.isEmpty()) {
+            for (Course nc : nonCseCourses) {
+                var mappings = teacherCourseRepository.findByCourseId(nc.getId());
+                if (mappings != null && !mappings.isEmpty()) {
+                    teacherCourseRepository.deleteAll(mappings);
+                }
+                courseRepository.delete(nc);
+            }
+            log.info("Purged {} mock non-CSE courses from database. Only authentic CSE courses are retained.", nonCseCourses.size());
+        }
+
         if (courseRepository.count() > 0) {
             log.info("Courses table already populated ({} courses found). Skipping course init.", courseRepository.count());
             return;

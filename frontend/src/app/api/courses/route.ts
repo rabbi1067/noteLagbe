@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     // Backend timeout or offline -> fallback immediately to bundled official catalog
   }
 
-  // 2. Instant Zero-Latency Fallback using pre-bundled authentic 123 courses
+  // 2. Instant Zero-Latency Fallback using pre-bundled authentic 85 CSE curriculum courses
   let filtered = (catalogCourses as any[]).filter((c) => {
     if (department && department !== "ALL") {
       const cDept = (c.department || "CSE").trim().toUpperCase();
