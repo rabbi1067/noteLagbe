@@ -1,0 +1,6 @@
+frontend/
+tools/
+.git
+.idea
+target/
+node_modules/
