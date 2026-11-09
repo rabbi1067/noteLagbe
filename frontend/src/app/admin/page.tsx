@@ -91,6 +91,7 @@ import SearchableCourseSelect, { sortCoursesNaturally } from "@/components/Searc
 import SearchableTeacherSelect from "@/components/SearchableTeacherSelect";
 import FacultyAvatar from "@/components/FacultyAvatar";
 import { DeleteConfirmationModal, DeleteSuccessModal } from "@/components/DeleteConfirmationModal";
+import MultiPageUploader from "@/components/MultiPageUploader";
 
 interface PaginationProps {
   currentPage: number;
@@ -8478,171 +8479,44 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                 </div>
               </div>
 
-              {/* Direct Device File Upload (PDF, Image, Docs, Slides, ZIP) */}
+              {/* Direct Multi-Page / Device File Upload with Auto-Merge to 1 PDF */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between mb-1.5">
+                  <span className="flex items-center gap-1.5">
                     <span>Attach Material / Examination File *</span>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/20">
-                      Direct Device Upload
+                      Multi-Page Auto-Merge
                     </span>
-                  </label>
-                  {resFileUrl && (
-                    <button
-                      type="button"
-                      onClick={() => resFileInputRef.current?.click()}
-                      className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      <Upload className="w-3 h-3" />
-                      <span>Replace File</span>
-                    </button>
-                  )}
-                </div>
+                  </span>
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+                    Question Paper Page 1 & 2 Auto-Merge into 1 PDF
+                  </span>
+                </label>
 
-                {/* Hidden native input */}
-                <input
-                  type="file"
-                  ref={resFileInputRef}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleMaterialFileUpload(file);
-                    e.target.value = "";
+                <MultiPageUploader
+                  uploadFn={api.admin.uploadMaterialFile}
+                  onUploadSuccess={(res, originalFiles) => {
+                    setResFileUrl(res.url);
+                    setResFileName(res.fileName || "");
+                    setResFileSize(res.fileSize || "");
+                    if (!resTitle.trim() && originalFiles && originalFiles.length > 0) {
+                      const cleanName = originalFiles[0].name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
+                      setResTitle(cleanName);
+                    }
                   }}
-                  accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.ppt,.pptx,.zip,application/pdf,image/*"
-                  className="hidden"
+                  onClear={() => {
+                    setResFileUrl("");
+                    setResFileName("");
+                    setResFileSize("");
+                  }}
+                  initialUrl={resFileUrl}
+                  initialFileName={resFileName}
+                  initialFileSize={resFileSize}
+                  titleHint={resTitle || resCourseCode || "Exam_Material"}
+                  language="en"
+                  accentColor="blue"
+                  maxFileSizeMb={50}
                 />
-
-                {!resFileUrl ? (
-                  /* Dropzone State */
-                  <div
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setIsResDragOver(true);
-                    }}
-                    onDragLeave={(e) => {
-                      e.preventDefault();
-                      setIsResDragOver(false);
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setIsResDragOver(false);
-                      const file = e.dataTransfer.files?.[0];
-                      if (file) handleMaterialFileUpload(file);
-                    }}
-                    onClick={() => {
-                      if (!uploadingResFile) resFileInputRef.current?.click();
-                    }}
-                    className={`relative p-6 sm:p-7 rounded-2xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center group ${
-                      isResDragOver
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 shadow-inner"
-                        : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-slate-50 dark:hover:bg-slate-900"
-                    }`}
-                  >
-                    {uploadingResFile ? (
-                      <div className="flex flex-col items-center justify-center space-y-2.5 py-3">
-                        <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
-                        <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
-                          Uploading document to server...
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          Storing in secure server media repository
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center space-y-2">
-                        <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-xs">
-                          <Upload className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <p className="font-black text-slate-800 dark:text-slate-200 text-xs">
-                            Click to browse or drag & drop file from your device
-                          </p>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                            Upload lecture slides, question papers, notes, or scanned images directly
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1.5 pt-1.5 flex-wrap justify-center">
-                          <span className="text-[10px] px-2 py-0.5 rounded-md font-mono font-bold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
-                            PDF
-                          </span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-md font-mono font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                            PNG / JPG / WEBP
-                          </span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-md font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                            DOCX / PPTX
-                          </span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-md font-mono font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                            ZIP
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-semibold ml-1">
-                            (Max 50 MB)
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  /* Uploaded File Ready Card */
-                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-emerald-500/30 dark:border-emerald-500/20 flex items-center justify-between gap-3 shadow-xs">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
-                        {resFileUrl.toLowerCase().endsWith(".pdf") ? (
-                          <FileText className="w-5 h-5 text-red-500" />
-                        ) : resFileUrl.match(/\.(png|jpg|jpeg|webp)$/i) ? (
-                          <FileText className="w-5 h-5 text-emerald-500" />
-                        ) : (
-                          <FileText className="w-5 h-5 text-blue-500" />
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 dark:text-white text-xs truncate max-w-[220px] sm:max-w-[280px]">
-                            {resFileName || resFileUrl.split("/").pop()}
-                          </span>
-                          <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
-                            <CheckCircle2 className="w-2.5 h-2.5" />
-                            Device Upload
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
-                          {resFileSize && <span>{resFileSize} • </span>}
-                          <a
-                            href={resFileUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 font-bold"
-                          >
-                            <span>Preview File</span>
-                            <ExternalLink className="w-2.5 h-2.5" />
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => resFileInputRef.current?.click()}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                        title="Upload a different file from device"
-                      >
-                        <Upload className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setResFileUrl("");
-                          setResFileName("");
-                          setResFileSize("");
-                        }}
-                        className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                        title="Remove attached file"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">

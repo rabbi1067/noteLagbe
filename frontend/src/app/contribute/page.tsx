@@ -34,6 +34,7 @@ import SearchableTeacherSelect from "@/components/SearchableTeacherSelect";
 import GoogleDrivePublicGuideModal from "@/components/GoogleDrivePublicGuideModal";
 import TopContributorsLeaderboard from "@/components/TopContributorsLeaderboard";
 import LiveRemainingCountdown from "@/components/LiveRemainingCountdown";
+import MultiPageUploader from "@/components/MultiPageUploader";
 import { useDataSync, notifyDataChanged } from "@/lib/sync";
 
 const DEPARTMENTS = [
@@ -862,129 +863,44 @@ export default function ContributePage() {
               </div>
             </div>
 
-            {/* TAB CONTENT 1: DIRECT DEVICE UPLOAD */}
+            {/* TAB CONTENT 1: DIRECT DEVICE UPLOAD WITH MULTI-PAGE AUTO-MERGE */}
             {uploadMode === "DEVICE" && (
               <div className="space-y-3 pt-1">
-                {/* Hidden File Input */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleDeviceFileUpload(file);
-                    e.target.value = "";
+                <MultiPageUploader
+                  uploadFn={async (file: File) => {
+                    if (!isAuthenticated) {
+                      setShowAuthModal(true);
+                      toast.error(language === "bn" ? "ফাইল আপলোড করতে অনুগ্রহ করে সাইন ইন করুন।" : "Please sign in to upload files.");
+                      throw new Error(language === "bn" ? "সাইন ইন প্রয়োজন" : "Authentication required");
+                    }
+                    return await api.contributions.uploadFile(file);
                   }}
-                  accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.ppt,.pptx,.zip,application/pdf,image/*"
-                  className="hidden"
+                  onUploadSuccess={(res, originalFiles) => {
+                    setFileUrl(res.url);
+                    setUploadedFileName(res.fileName || "");
+                    setUploadedFileSize(res.fileSize || "");
+                    setLinkStatus("public");
+                    setLinkMessage(language === "bn" ? "ডিভাইস থেকে ফাইল সফলভাবে আপলোড হয়েছে" : "File successfully uploaded from device");
+                    if (!title.trim() && originalFiles && originalFiles.length > 0) {
+                      const cleanName = originalFiles[0].name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+                      setTitle(cleanName.substring(0, 100));
+                    }
+                  }}
+                  onClear={() => {
+                    setFileUrl("");
+                    setUploadedFileName("");
+                    setUploadedFileSize("");
+                    setLinkStatus("idle");
+                    setLinkMessage("");
+                  }}
+                  initialUrl={fileUrl}
+                  initialFileName={uploadedFileName}
+                  initialFileSize={uploadedFileSize}
+                  titleHint={title || courseCode || "Exam_Material"}
+                  language={language}
+                  accentColor="emerald"
+                  maxFileSizeMb={50}
                 />
-
-                {!fileUrl || fileUrl.startsWith("http") ? (
-                  /* Interactive Dropzone */
-                  <div
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setIsDragOver(true);
-                    }}
-                    onDragLeave={(e) => {
-                      e.preventDefault();
-                      setIsDragOver(false);
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setIsDragOver(false);
-                      const file = e.dataTransfer.files?.[0];
-                      if (file) handleDeviceFileUpload(file);
-                    }}
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`p-6 sm:p-8 rounded-2xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-3 ${
-                      isDragOver
-                        ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20 scale-[1.01]"
-                        : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                    }`}
-                  >
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-xs">
-                      {isUploadingFile ? (
-                        <RefreshCw className="w-6 h-6 animate-spin text-emerald-600" />
-                      ) : (
-                        <Upload className="w-6 h-6" />
-                      )}
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="font-extrabold text-sm text-slate-900 dark:text-white">
-                        {isUploadingFile
-                          ? (language === "bn" ? "ফাইল আপলোড হচ্ছে... অনুগ্রহ করে অপেক্ষা করুন" : "Uploading file... Please wait")
-                          : (language === "bn" ? "ফাইলটি এখানে টেনে আনুন বা ক্লিক করে সিলেক্ট করুন" : "Drag and drop your file here, or click to browse")}
-                      </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md">
-                        {language === "bn"
-                          ? "পিডিএফ (PDF), ছবি (JPG, PNG), ওয়ার্ড ডক (.docx, .doc), স্লাইড বা জিপ (.zip) — সর্বোচ্চ ৫০ MB"
-                          : "Supports PDF, Images (JPG, PNG, WEBP), Word Documents (.docx), Slides & ZIP archives up to 50 MB"}
-                      </p>
-                    </div>
-
-                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold text-xs bg-emerald-600 text-white shadow-xs hover:bg-emerald-700 transition-colors">
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>{language === "bn" ? "ডিভাইস থেকে ফাইল বেছে নিন" : "Select File From Device"}</span>
-                    </span>
-                  </div>
-                ) : (
-                  /* Uploaded File Preview Card */
-                  <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-500/40 dark:border-emerald-500/30 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
-                        <FileText className="w-5 h-5 text-emerald-600" />
-                      </div>
-                      <div className="min-w-0 space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 dark:text-white text-xs truncate max-w-[200px] sm:max-w-[300px]">
-                            {uploadedFileName || fileUrl.split("/").pop()}
-                          </span>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold shrink-0">
-                            ✓ {uploadedFileSize || "Ready"}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                          {language === "bn" ? "সার্ভারে ফাইল নিরাপদে আপলোড সম্পন্ন হয়েছে" : "Uploaded safely to NoteLagbe server"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <a
-                        href={fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1.5 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-colors flex items-center gap-1"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>{language === "bn" ? "প্রিভিউ দেখুন" : "Preview"}</span>
-                      </a>
-
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
-                      >
-                        <Upload className="w-3.5 h-3.5" />
-                        <span>{language === "bn" ? "বদলান" : "Replace"}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFileUrl("");
-                          setUploadedFileName("");
-                          setUploadedFileSize("");
-                        }}
-                        className="p-1.5 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors cursor-pointer"
-                        title={language === "bn" ? "ফাইল রিমুভ করুন" : "Remove file"}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
