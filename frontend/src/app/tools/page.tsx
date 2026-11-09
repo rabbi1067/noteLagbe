@@ -2718,8 +2718,8 @@ export default function StudentToolsPage() {
                   <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <span className="text-[10px] font-mono font-black tracking-wider uppercase px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50 shrink-0">
-                    Soon
-                  </span>
+                  {language === "bn" ? "শীঘ্রই" : "Soon"}
+                </span>
               </div>
 
               <div className="pt-2">
@@ -2745,8 +2745,8 @@ export default function StudentToolsPage() {
                   <GraduationCap className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <span className="text-[10px] font-mono font-black tracking-wider uppercase px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50 shrink-0">
-                    Soon
-                  </span>
+                  {language === "bn" ? "শীঘ্রই" : "Soon"}
+                </span>
               </div>
 
               <div className="pt-2">
@@ -6885,10 +6885,10 @@ export default function StudentToolsPage() {
 
             <div className="space-y-2">
               <span className="text-[10px] font-mono font-extrabold px-3 py-1 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 uppercase tracking-widest">
-                🚀 Coming Soon • Launching Next Intake
+                {language === "bn" ? "🚀 শীঘ্রই আসছে • পরবর্তী সেমিস্টারে উন্মোচিত হচ্ছে" : "🚀 Coming Soon • Launching Next Intake"}
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
-                Find Section Group (Open Credit Hub)
+                {language === "bn" ? "ফাইন্ড সেকশন গ্রুপ (ওপেন ক্রেডিট হাব)" : "Find Section Group (Open Credit Hub)"}
               </h2>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-lg mx-auto leading-relaxed">
                 {language === "bn"
@@ -6900,26 +6900,50 @@ export default function StudentToolsPage() {
             {/* Upcoming Features Teaser Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left pt-2 font-sans">
               <div className="p-3.5 rounded-2xl bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                <span className="text-indigo-600 font-extrabold text-xs">📅 ৩ সেমিস্টার ক্যালেন্ডার</span>
-                <p className="text-[11px] text-slate-500">Spring, Summer & Fall স্বয়ংক্রিয় বছরভিত্তিক ক্যালেন্ডার গ্রুপ।</p>
+                <span className="text-indigo-600 font-extrabold text-xs">
+                  {language === "bn" ? "📅 ৩ সেমিস্টার ক্যালেন্ডার" : "📅 3-Semester Calendar"}
+                </span>
+                <p className="text-[11px] text-slate-500">
+                  {language === "bn"
+                    ? "Spring, Summer & Fall স্বয়ংক্রিয় বছরভিত্তিক ক্যালেন্ডার গ্রুপ।"
+                    : "Automated year-based study and classroom groups for Spring, Summer & Fall."}
+                </p>
               </div>
               <div className="p-3.5 rounded-2xl bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                <span className="text-purple-600 font-extrabold text-xs">🔗 ১-ক্লিক গ্রুপ জয়েন</span>
-                <p className="text-[11px] text-slate-500">ক্লিক করলেই সরাসরি মেসেঞ্জার বা হোয়াটসঅ্যাপে নিয়ে যাবে।</p>
+                <span className="text-purple-600 font-extrabold text-xs">
+                  {language === "bn" ? "🔗 ১-ক্লিক গ্রুপ জয়েন" : "🔗 1-Click Group Join"}
+                </span>
+                <p className="text-[11px] text-slate-500">
+                  {language === "bn"
+                    ? "ক্লিক করলেই সরাসরি মেসেঞ্জার বা হোয়াটসঅ্যাপে নিয়ে যাবে।"
+                    : "One-click instant redirect to verified Messenger or WhatsApp groups."}
+                </p>
               </div>
               <div className="p-3.5 rounded-2xl bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                <span className="text-emerald-600 font-extrabold text-xs">🛡️ ভেরিফায়েড স্টুডেন্ট</span>
-                <p className="text-[11px] text-slate-500">স্প্যাম ও ফেক লিংক প্রতিরোধে স্টুডেন্ট আইডি ভেরিফিকেশন।</p>
+                <span className="text-emerald-600 font-extrabold text-xs">
+                  {language === "bn" ? "🛡️ ভেরিফায়েড শিক্ষার্থী" : "🛡️ Verified Students"}
+                </span>
+                <p className="text-[11px] text-slate-500">
+                  {language === "bn"
+                    ? "স্প্যাম ও ফেক লিংক প্রতিরোধে স্টুডেন্ট আইডি ভেরিফিকেশন।"
+                    : "Student ID verification prevents spam, trolls, and invalid invite links."}
+                </p>
               </div>
             </div>
 
             <div className="pt-2">
               <button
-                onClick={() => toast.success("You are on the priority notification list for the Section Hub launch!")}
+                onClick={() =>
+                  toast.success(
+                    language === "bn"
+                      ? "আপনি সেকশন হাবের প্রায়োরিটি নোটিফিকেশন তালিকায় যুক্ত হয়েছেন!"
+                      : "You are on the priority notification list for the Section Hub launch!"
+                  )
+                }
                 className="py-3 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all inline-flex items-center gap-2 cursor-pointer"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>Notify Me on Launch</span>
+                <span>{language === "bn" ? "লঞ্চের নোটিফিকেশন পান" : "Notify Me on Launch"}</span>
               </button>
             </div>
           </div>
@@ -6927,7 +6951,7 @@ export default function StudentToolsPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 6. SMART ADVISING ROUTINE VIEW (COMING SOON AS REQUESTED) */}
+      {/* 8. SMART ADVISING ROUTINE VIEW (COMING SOON AS REQUESTED) */}
       {/* ========================================================================= */}
       {activeTab === "advising" && (
         <div className="max-w-2xl mx-auto space-y-6">
@@ -6938,10 +6962,10 @@ export default function StudentToolsPage() {
 
             <div className="space-y-2">
               <span className="text-[10px] font-mono font-extrabold px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 uppercase tracking-widest">
-                🚀 Coming Soon • Launching Next Intake
+                {language === "bn" ? "🚀 শীঘ্রই আসছে • পরবর্তী সেমিস্টারে উন্মোচিত হচ্ছে" : "🚀 Coming Soon • Launching Next Intake"}
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
-                {language === "bn" ? "স্মার্ট অ্যাডভাইজিং রুটিন প্ল্যানার" : "Smart Advising Routine"}
+                {language === "bn" ? "স্মার্ট অ্যাডভাইজিং রুটিন প্ল্যানার" : "Smart Advising Routine Planner"}
               </h2>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-lg mx-auto leading-relaxed">
                 {language === "bn"
@@ -6953,26 +6977,50 @@ export default function StudentToolsPage() {
             {/* Upcoming Features Teaser Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left pt-2 font-sans">
               <div className="p-3.5 rounded-2xl bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                <span className="text-blue-600 font-extrabold text-xs">⚡ অটো কম্বিনেশন</span>
-                <p className="text-[11px] text-slate-500">আপনার পছন্দ অনুযায়ী শূন্য ক্ল্যাশ সহ সম্ভাব্য সেরা সেকশন কম্বো সাজাবে।</p>
+                <span className="text-blue-600 font-extrabold text-xs">
+                  {language === "bn" ? "⚡ অটো কম্বিনেশন" : "⚡ Zero-Clash Combos"}
+                </span>
+                <p className="text-[11px] text-slate-500">
+                  {language === "bn"
+                    ? "আপনার পছন্দ অনুযায়ী শূন্য ক্ল্যাশ সহ সম্ভাব্য সেরা সেকশন কম্বো সাজাবে।"
+                    : "Instantly generates conflict-free section combinations based on your preferred faculty and slots."}
+                </p>
               </div>
               <div className="p-3.5 rounded-2xl bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                <span className="text-indigo-600 font-extrabold text-xs">🎯 প্রি-রিকুইজিট চেক</span>
-                <p className="text-[11px] text-slate-500">পূর্বের পাসের গ্রেড অনুযায়ী স্বয়ংক্রিয়ভাবে পরবর্তী কোর্স সাজেস্ট করবে।</p>
+                <span className="text-indigo-600 font-extrabold text-xs">
+                  {language === "bn" ? "🎯 প্রি-রিকুইজিট চেক" : "🎯 Prerequisite Validation"}
+                </span>
+                <p className="text-[11px] text-slate-500">
+                  {language === "bn"
+                    ? "পূর্বের পাসের গ্রেড অনুযায়ী স্বয়ংক্রিয়ভাবে পরবর্তী কোর্স সাজেস্ট করবে।"
+                    : "Validates completed courses and automatically recommends eligible courses for registration."}
+                </p>
               </div>
               <div className="p-3.5 rounded-2xl bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                <span className="text-emerald-600 font-extrabold text-xs">📊 ক্রেডিট ও ফি প্রজেকশন</span>
-                <p className="text-[11px] text-slate-500">অ্যাডভাইজিং সিলেক্ট করলেই আনুমানিক টিউশন ফি ও কিস্তি আগে থেকেই জেনে নিন।</p>
+                <span className="text-emerald-600 font-extrabold text-xs">
+                  {language === "bn" ? "📊 ক্রেডিট ও ফি প্রজেকশন" : "📊 Credit & Tuition Projection"}
+                </span>
+                <p className="text-[11px] text-slate-500">
+                  {language === "bn"
+                    ? "অ্যাডভাইজিং সিলেক্ট করলেই আনুমানিক টিউশন ফি ও কিস্তি আগে থেকেই জেনে নিন।"
+                    : "Computes total credit hours and calculates estimated tuition installments before advising."}
+                </p>
               </div>
             </div>
 
             <div className="pt-2">
               <button
-                onClick={() => toast.success("You are on the priority early-access list for Smart Advising Routine!")}
+                onClick={() =>
+                  toast.success(
+                    language === "bn"
+                      ? "আপনি স্মার্ট অ্যাডভাইজিং রুটিনের প্রায়োরিটি আর্লি এক্সেস তালিকায় যুক্ত হয়েছেন!"
+                      : "You are on the priority early-access list for Smart Advising Routine!"
+                  )
+                }
                 className="py-3 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all inline-flex items-center gap-2 cursor-pointer"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>Notify Me on Launch</span>
+                <span>{language === "bn" ? "লঞ্চের নোটিফিকেশন পান" : "Notify Me on Launch"}</span>
               </button>
             </div>
           </div>
