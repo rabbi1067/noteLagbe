@@ -119,34 +119,6 @@ export default function AuthModal() {
     }
   };
 
-  const handleQuickDemoFill = (role: "student" | "manager" | "admin" | "superadmin") => {
-    setAuthMode("signin");
-    setVerifiedAccount(null);
-
-    switch (role) {
-      case "student":
-        setEmail("student@seu.edu.bd");
-        setPassword("Student@Password123!");
-        toast.info("Loaded Student Demo credentials", { duration: 2000 });
-        break;
-      case "manager":
-        setEmail("manager@seu.edu.bd");
-        setPassword("Manager@Password123!");
-        toast.info("Loaded Manager / Moderator Demo credentials", { duration: 2000 });
-        break;
-      case "admin":
-        setEmail("staff.admin@seu.edu.bd");
-        setPassword("Admin@Password123!");
-        toast.info("Loaded Administrator Demo credentials", { duration: 2000 });
-        break;
-      case "superadmin":
-        setEmail("admin@seu.edu.bd");
-        setPassword("Admin@Password123!");
-        toast.info("Loaded Super Admin Demo credentials", { duration: 2000 });
-        break;
-    }
-  };
-
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanForgotEmail = forgotEmail.trim().toLowerCase();
@@ -255,72 +227,6 @@ export default function AuthModal() {
               : "Southeast University Academic Resource & Question Archive"}
           </p>
         </div>
-
-        {/* Quick Demo Login Credentials Pills (Shown during normal Sign-In / Register) */}
-        {!isForgot && (
-          <div className="mb-4 p-3 rounded-2xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60">
-            <p className="text-[11px] font-semibold text-blue-800 dark:text-blue-300 mb-2 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                Quick 1-Click Demo Logins:
-              </span>
-              <span className="text-[10px] text-blue-600 dark:text-blue-400 font-normal">Auto-fills credentials</span>
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickDemoFill("student")}
-                className="text-[11px] py-1.5 px-2.5 font-semibold rounded-xl bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-sm hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-between"
-                title="Fill Student demo account"
-              >
-                <span className="flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                  Student
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 font-mono text-blue-800 dark:text-blue-200">SEU</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickDemoFill("manager")}
-                className="text-[11px] py-1.5 px-2.5 font-semibold rounded-xl bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-slate-700 hover:border-amber-400 dark:hover:border-amber-500 hover:shadow-sm hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-between"
-                title="Fill Moderator / Manager demo account"
-              >
-                <span className="flex items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  Manager
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 font-mono text-amber-800 dark:text-amber-200">Mod</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickDemoFill("admin")}
-                className="text-[11px] py-1.5 px-2.5 font-semibold rounded-xl bg-white dark:bg-slate-800 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-slate-700 hover:border-purple-400 dark:hover:border-purple-500 hover:shadow-sm hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-between"
-                title="Fill Staff Administrator demo account"
-              >
-                <span className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                  Admin
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/60 font-mono text-purple-800 dark:text-purple-200">Dept</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickDemoFill("superadmin")}
-                className="text-[11px] py-1.5 px-2.5 font-semibold rounded-xl bg-white dark:bg-slate-800 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-slate-700 hover:border-rose-400 dark:hover:border-rose-500 hover:shadow-sm hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-between"
-                title="Fill Super Administrator demo account"
-              >
-                <span className="flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-                  Super Admin
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/60 font-mono text-rose-800 dark:text-rose-200">Root</span>
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Tab Toggle for Sign In / Register (Hidden in Forgot Password view) */}
         {!isForgot && (
