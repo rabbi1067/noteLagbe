@@ -6,6 +6,7 @@ import {
   Download, 
   RefreshCw, 
   Search, 
+  X,
   FileText, 
   Image as ImageIcon, 
   Check, 
@@ -23,11 +24,12 @@ import { toast } from "sonner";
 import { toPng } from "html-to-image";
 import jsPDF from "jspdf";
 import { useLanguage } from "@/context/LanguageContext";
+import academicCalendarsData from "@/data/academic_calendars.json";
 
 interface CalendarItem {
   date: string;
   description: string;
-  category: "exam" | "class" | "holiday" | "admin" | "result" | "semester_break" | "orientation" | "add_drop" | "pre_registration" | "general";
+  category: "exam" | "class" | "holiday" | "admin" | "result" | "semester_break" | "orientation" | "add_drop" | "pre_registration" | "installment" | "general";
   isHighlight: boolean;
 }
 
@@ -313,22 +315,27 @@ const translateSemesterName = (semName: string, lang: "en" | "bn"): string => {
   return toBnDigits(translated);
 };
 
+const getInitialSemesters = (year: string): SemesterData[] => {
+  const cals = (academicCalendarsData as any)?.calendars;
+  return (cals?.[year] || cals?.["2026"] || []) as SemesterData[];
+};
+
 export default function AcademicCalendarTool() {
   const { language } = useLanguage();
 
   const [selectedYear, setSelectedYear] = useState<string>("2026");
   const [availableYears, setAvailableYears] = useState<string[]>(["2026", "2025", "2024", "2023"]);
-  const [semesters, setSemesters] = useState<SemesterData[]>([]);
+  const [semesters, setSemesters] = useState<SemesterData[]>(() => getInitialSemesters("2026"));
   const [selectedSemesterTab, setSelectedSemesterTab] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [lastSyncedTime, setLastSyncedTime] = useState<string>("");
-  const [dataSource, setDataSource] = useState<string>("");
+  const [dataSource, setDataSource] = useState<string>("Verified SEU Academic Database");
 
   const fullCalendarRef = useRef<HTMLDivElement>(null);
   const semesterCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -348,7 +355,14 @@ export default function AcademicCalendarTool() {
             : "Syncing calendar from official SEU website..."
         );
       } else {
-        setIsLoading(true);
+        // Instant view: synchronously set data from local verified dataset if available
+        const localData = (academicCalendarsData as any)?.calendars?.[year];
+        if (localData && localData.length > 0) {
+          setSemesters(localData as SemesterData[]);
+          setIsLoading(false);
+        } else {
+          setIsLoading(true);
+        }
       }
 
       const res = await fetch(`/api/academic-calendar?year=${year}${force ? "&force=true" : ""}`);
@@ -356,9 +370,10 @@ export default function AcademicCalendarTool() {
 
       if (data.success) {
         setSemesters(data.semesters || []);
-        // Restrict strictly to 4 most recent years moving window (e.g. 2026, 2025, 2024, 2023)
+        // Restrict strictly to 4 valid years (2026, 2025, 2024, 2023)
         if (data.availableYears && data.availableYears.length > 0) {
-          setAvailableYears(data.availableYears.slice(0, 4));
+          const valid = data.availableYears.filter((y: string) => Number(y) <= 2026 && Number(y) >= 2023);
+          setAvailableYears(valid.slice(0, 4));
         }
         setDataSource(data.source || "seu.edu.bd");
         setLastSyncedTime(new Date(data.lastSynced).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
@@ -370,7 +385,7 @@ export default function AcademicCalendarTool() {
               : `Academic calendar for ${year} synced successfully from seu.edu.bd!`
           );
         }
-      } else {
+      } else if (force) {
         toast.error(
           language === "bn"
             ? "ক্যালেন্ডার লোড করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।"
@@ -379,9 +394,11 @@ export default function AcademicCalendarTool() {
       }
     } catch (err) {
       console.error(err);
-      toast.error(
-        language === "bn" ? "সার্ভার কানেকশন এরর" : "Server connection error"
-      );
+      if (force) {
+        toast.error(
+          language === "bn" ? "সার্ভার কানেকশন এরর" : "Server connection error"
+        );
+      }
     } finally {
       setIsLoading(false);
       setIsSyncing(false);
@@ -412,10 +429,21 @@ export default function AcademicCalendarTool() {
         d.includes("add drop") ||
         d.includes("semester drop") ||
         (d.includes("drop") && !d.includes("attendance"));
+      const isInstallment =
+        item.category === "installment" ||
+        d.includes("installment") ||
+        d.includes("payment") ||
+        d.includes("tuition") ||
+        d.includes("late fee") ||
+        d.includes("late fine") ||
+        d.includes("waiver") ||
+        d.includes("fine tk");
 
       let matchCategory = selectedCategory === "all";
       if (!matchCategory) {
-        if (selectedCategory === "result") {
+        if (selectedCategory === "installment") {
+          matchCategory = isInstallment;
+        } else if (selectedCategory === "result") {
           matchCategory = isResult;
         } else if (selectedCategory === "exam") {
           matchCategory = isExam;
@@ -473,6 +501,17 @@ export default function AcademicCalendarTool() {
     ) {
       return "bg-teal-50 text-teal-950 font-semibold border-l-4 border-teal-500 shadow-xs";
     }
+    // Installment & Tuition Payment row
+    if (
+      item.category === "installment" ||
+      desc.includes("installment") ||
+      desc.includes("payment") ||
+      desc.includes("late fee") ||
+      desc.includes("late fine") ||
+      desc.includes("waiver")
+    ) {
+      return "bg-cyan-50/90 text-cyan-950 font-bold border-l-4 border-cyan-500 shadow-xs";
+    }
     if (desc.includes("classes begin") || item.category === "class") {
       return "bg-yellow-50 text-yellow-950 font-bold border-l-4 border-yellow-500";
     }
@@ -481,9 +520,7 @@ export default function AcademicCalendarTool() {
     }
     if (
       desc.includes("admit card") ||
-      desc.includes("registration begins") ||
-      desc.includes("last date for payment") ||
-      desc.includes("installment")
+      desc.includes("registration begins")
     ) {
       return "bg-blue-50/70 text-blue-950 font-semibold";
     }
@@ -688,9 +725,10 @@ export default function AcademicCalendarTool() {
     }
   };
 
-  // Category Pills Data (Updated per requirement: Orientation, Add/Drop, Pre-registration added; Admin & Fees removed)
+  // Category Pills Data (Including Installment & Payment)
   const categoriesList = [
     { id: "all", labelEn: "All Events", labelBn: "সব ইভেন্ট" },
+    { id: "installment", labelEn: "Installment & Payment", labelBn: "কিস্তি ও পেমেন্ট" },
     { id: "exam", labelEn: "Examinations", labelBn: "পরীক্ষা (Exams)" },
     { id: "class", labelEn: "Classes", labelBn: "ক্লাস শুরু/শেষ" },
     { id: "holiday", labelEn: "Holidays", labelBn: "ছুটি (Holidays)" },
@@ -847,31 +885,43 @@ export default function AcademicCalendarTool() {
           </div>
         </div>
 
-        {/* Search & Category Filter Pills */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 border-t border-slate-100 dark:border-slate-800/60">
-          <div className="relative w-full sm:w-72 shrink-0">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+        {/* Search & Category Filter Pills - 2 Separate Rows */}
+        <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800/60">
+          {/* Row 1: Full Search Bar on Top */}
+          <div className="relative w-full">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={
                 language === "bn"
-                  ? "ইভেন্ট বা তারিখ খুঁজুন (যেমন: Midterm, Eid, Registration)..."
-                  : "Search event or date (e.g., Midterm, Eid, Registration)..."
+                  ? "ইভেন্ট, তারিখ বা কিস্তির বিবরণ খুঁজুন (যেমন: 1st Installment, Midterm, Eid, Registration)..."
+                  : "Search event, date or installment details (e.g., 1st Installment, Midterm, Eid, Registration)..."
               }
-              className="w-full pl-9 pr-3.5 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-9 pr-9 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs transition-all"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1"
+                title={language === "bn" ? "সার্চ মুছুন" : "Clear search"}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full pb-1 sm:pb-0 scrollbar-none text-xs">
+          {/* Row 2: Filter Tag Pills Beneath */}
+          <div className="flex items-center gap-1.5 overflow-x-auto w-full pb-1 scrollbar-none text-xs flex-wrap sm:flex-nowrap">
             {categoriesList.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`px-3 py-1.5 rounded-xl font-medium transition-all shrink-0 cursor-pointer ${
                   selectedCategory === cat.id
-                    ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold"
+                    ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold shadow-xs"
                     : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
                 }`}
               >

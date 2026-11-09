@@ -106,6 +106,17 @@ const categorizeEvent = (desc: string): string => {
   ) {
     return "add_drop";
   }
+  // Installment & Tuition Fee payment events
+  if (
+    d.includes("installment") ||
+    d.includes("payment") ||
+    d.includes("tuition") ||
+    d.includes("late fee") ||
+    d.includes("late fine") ||
+    d.includes("waiver")
+  ) {
+    return "installment";
+  }
   // Check results strictly for actual exam results & faculty grade submission!
   if (
     d.includes("announcement of exam results") ||
@@ -448,7 +459,7 @@ export async function GET(request: Request) {
     }
 
     // Attempt to scrape live from SEU website
-    let liveAvailableYears: string[] = ["2027", "2026", "2025", "2024", "2023"];
+    let liveAvailableYears: string[] = ["2026", "2025", "2024", "2023"];
     let scrapedSemesters: any[] | null = null;
     let scrapeSuccess = false;
 
@@ -467,7 +478,10 @@ export async function GET(request: Request) {
         const yearMatches = mainHtml.matchAll(/academic-calendar-(202\d)/g);
         const discovered = Array.from(yearMatches, (m) => m[1]);
         if (discovered.length > 0) {
-          liveAvailableYears = Array.from(new Set(discovered)).sort((a, b) => Number(b) - Number(a));
+          const validDiscovered = discovered.filter((y) => Number(y) <= 2026 && Number(y) >= 2023);
+          if (validDiscovered.length > 0) {
+            liveAvailableYears = Array.from(new Set(validDiscovered)).sort((a, b) => Number(b) - Number(a));
+          }
         }
       }
 
@@ -553,7 +567,7 @@ export async function GET(request: Request) {
           ...it,
           description: desc,
           category: cat,
-          isHighlight: cat === "exam" || cat === "class" || cat === "semester_break" || cat === "orientation" || cat === "result",
+          isHighlight: cat === "exam" || cat === "class" || cat === "semester_break" || cat === "orientation" || cat === "result" || cat === "installment",
         };
       }),
     }));
@@ -565,10 +579,10 @@ export async function GET(request: Request) {
       calendarsDb
     );
 
-    // Keep dynamic moving window of the last 4 years (e.g. [2026, 2025, 2024, 2023]. When 2027 comes, 2023 drops)
-    const distinctYears = Array.from(new Set([...liveAvailableYears, ...Object.keys(calendarsDb)])).sort(
-      (a, b) => Number(b) - Number(a)
-    );
+    // Keep dynamic moving window of the 4 valid available years (strictly 2026, 2025, 2024, 2023)
+    const distinctYears = Array.from(new Set([...liveAvailableYears, ...Object.keys(calendarsDb)]))
+      .filter((y) => Number(y) <= 2026 && Number(y) >= 2023)
+      .sort((a, b) => Number(b) - Number(a));
     const last4Years = distinctYears.slice(0, 4);
 
     const responsePayload = {
