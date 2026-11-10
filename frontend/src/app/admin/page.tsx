@@ -1041,9 +1041,16 @@ export default function AdminDashboardPage() {
   const filteredModalCourses = useMemo(() => {
     if (resDeptFilter === "ALL") return courses;
     return courses.filter(
-      (c) => c.department && c.department.trim().toUpperCase() === resDeptFilter.trim().toUpperCase()
+      (c) => (c.department || "CSE").trim().toUpperCase() === resDeptFilter.trim().toUpperCase()
     );
   }, [courses, resDeptFilter]);
+
+  const filteredModalTeachers = useMemo(() => {
+    if (resDeptFilter === "ALL") return teachers;
+    return teachers.filter(
+      (t) => (t.department || "CSE").trim().toUpperCase() === resDeptFilter.trim().toUpperCase()
+    );
+  }, [teachers, resDeptFilter]);
 
   const handleMaterialFileUpload = async (file: File) => {
     if (!file) return;
@@ -7896,32 +7903,41 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
 
             <form onSubmit={handleSaveResource} className="space-y-4 text-xs">
               
-              {/* Target Department Selector to Filter Courses */}
+              {/* Target Department Selector to Filter Courses & Faculty */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="font-bold text-slate-700 dark:text-slate-300">Target Department</label>
-                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">Filters courses below</span>
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                    {resDeptFilter === "ALL" ? "All Departments active" : `Filters ${resDeptFilter} courses & faculty`}
+                  </span>
                 </div>
                 <select
                   value={resDeptFilter}
                   onChange={(e) => {
                     const nextDept = e.target.value;
                     setResDeptFilter(nextDept);
-                    const matching = nextDept === "ALL"
+                    const matchingCourses = nextDept === "ALL"
                       ? courses
-                      : courses.filter((c) => c.department?.toUpperCase() === nextDept.toUpperCase());
-                    if (matching.length > 0) {
-                      setResCourseCode(matching[0].code);
+                      : courses.filter((c) => (c.department || "CSE").trim().toUpperCase() === nextDept.trim().toUpperCase());
+                    if (matchingCourses.length > 0 && (!resCourseCode || !matchingCourses.some((c) => c.code === resCourseCode))) {
+                      setResCourseCode(matchingCourses[0].code);
+                    }
+                    if (nextDept !== "ALL" && resTeacherId) {
+                      const teacher = teachers.find((t) => Number(t.id) === Number(resTeacherId));
+                      if (teacher && (teacher.department || "CSE").trim().toUpperCase() !== nextDept.trim().toUpperCase()) {
+                        setResTeacherId("");
+                      }
                     }
                   }}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-semibold"
                 >
-                  <option value="ALL">All Departments ({courses.length} Total Courses)</option>
+                  <option value="ALL">All Departments ({courses.length} Courses, {teachers.length} Faculty)</option>
                   {dynamicDepartments.map((dept) => {
-                    const count = courses.filter((c) => c.department?.toUpperCase() === dept.toUpperCase()).length;
+                    const countC = courses.filter((c) => (c.department || "CSE").trim().toUpperCase() === dept.trim().toUpperCase()).length;
+                    const countT = teachers.filter((t) => (t.department || "CSE").trim().toUpperCase() === dept.trim().toUpperCase()).length;
                     return (
                       <option key={dept} value={dept}>
-                        {dept} Department ({count} courses)
+                        {dept} Department ({countC} courses, {countT} faculty)
                       </option>
                     );
                   })}
@@ -7935,9 +7951,11 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                   onChange={setResCourseCode}
                   courses={filteredModalCourses}
                   placeholder={
-                    filteredModalCourses.length === 0
+                    resDeptFilter === "ALL"
+                      ? `Search course across all departments (${courses.length} courses)...`
+                      : filteredModalCourses.length === 0
                       ? `No courses found in ${resDeptFilter} department`
-                      : `Select ${resDeptFilter === "ALL" ? "course" : resDeptFilter + " course"} (${filteredModalCourses.length} available)...`
+                      : `Select ${resDeptFilter} course (${filteredModalCourses.length} available)...`
                   }
                 />
               </div>
@@ -7947,8 +7965,14 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                 <SearchableTeacherSelect
                   value={resTeacherId}
                   onChange={setResTeacherId}
-                  teachers={teachers}
-                  placeholder="Select faculty or general..."
+                  teachers={filteredModalTeachers}
+                  placeholder={
+                    resDeptFilter === "ALL"
+                      ? `Search faculty across all departments (${teachers.length} faculty)...`
+                      : filteredModalTeachers.length === 0
+                      ? `No faculty found in ${resDeptFilter} department (or select General)`
+                      : `Select ${resDeptFilter} faculty (${filteredModalTeachers.length} available) or general...`
+                  }
                 />
               </div>
 
@@ -8247,8 +8271,16 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                   <SearchableTeacherSelect
                     value={courseFormTeacherId}
                     onChange={setCourseFormTeacherId}
-                    teachers={teachers}
-                    placeholder="Assign initial faculty member..."
+                    teachers={
+                      courseFormDept && courseFormDept !== "ALL"
+                        ? teachers.filter((t) => (t.department || "CSE").trim().toUpperCase() === courseFormDept.trim().toUpperCase())
+                        : teachers
+                    }
+                    placeholder={
+                      courseFormDept && courseFormDept !== "ALL"
+                        ? `Assign initial ${courseFormDept} faculty member...`
+                        : "Assign initial faculty member..."
+                    }
                   />
                 </div>
               )}
