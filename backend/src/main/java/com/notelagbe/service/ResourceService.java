@@ -286,15 +286,29 @@ public class ResourceService {
 
     @Transactional
     public void deleteResource(Long id) {
-        if (!resourceRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Resource not found: " + id);
-        }
+        Resource r = resourceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Resource not found: " + id));
+        Course course = r.getCourse();
+        Teacher teacher = r.getTeacher();
+
         // Handle any contribution request that references this uploaded resource
         List<ContributionRequest> crs = contributionRequestRepository.findByUploadedResourceId(id);
         contributionRequestRepository.deleteAll(crs);
 
-        resourceRepository.deleteById(id);
+        resourceRepository.delete(r);
+
+        // If no more approved resources exist for this teacher and course, clean up TeacherCourse mapping
+        if (course != null && teacher != null) {
+            boolean hasRemaining = resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
+                    course.getCode(), teacher.getId(), ResourceStatus.APPROVED);
+            if (!hasRemaining) {
+                teacherCourseRepository.deleteByCourseIdAndTeacherId(course.getId(), teacher.getId());
+            }
+        }
+
+        evictCaches();
         liveSyncService.broadcast("resource", "deleted", id);
+        liveSyncService.broadcast("teacher_course", "updated", teacher != null ? teacher.getId() : 0);
         liveSyncService.broadcast("contribution", "deleted", id);
     }
 
@@ -490,21 +504,55 @@ public class ResourceService {
             }
         }
 
-        // As a last resort for legacy Cloudinary single-page rasterized previews:
-        if (targetUrl.contains("cloudinary.com") && targetUrl.toLowerCase().endsWith(".pdf")) {
-            try {
-                String jpgUrl = targetUrl.replaceFirst("(?i)\\.pdf$", ".jpg");
-                java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
-                        .uri(java.net.URI.create(jpgUrl))
-                        .timeout(java.time.Duration.ofSeconds(20))
-                        .GET()
-                        .build();
-                java.net.http.HttpResponse<byte[]> res = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
-                if (res.statusCode() >= 200 && res.statusCode() < 300 && res.body() != null && res.body().length > 0) {
-                    log.info("Successfully fetched rasterized fallback JPEG from Cloudinary: {}", jpgUrl);
-                    return res.body();
+        // As a resilient fallback for Cloudinary multi-page and single-page documents:
+        if (targetUrl.contains("cloudinary.com")) {
+            List<byte[]> collectedPages = new java.util.ArrayList<>();
+            int maxPages = 30;
+
+            // Normalize base URL to point to Cloudinary image pipeline with .jpg extension
+            String baseImgUrl = targetUrl;
+            if (baseImgUrl.contains("/raw/upload/")) {
+                baseImgUrl = baseImgUrl.replace("/raw/upload/", "/image/upload/");
+            }
+            if (baseImgUrl.contains("/upload/fl_attachment/")) {
+                baseImgUrl = baseImgUrl.replace("/upload/fl_attachment/", "/upload/");
+            }
+            if (baseImgUrl.contains("?")) {
+                baseImgUrl = baseImgUrl.substring(0, baseImgUrl.indexOf("?"));
+            }
+            if (baseImgUrl.matches(".*\\.[a-zA-Z0-9]+$")) {
+                baseImgUrl = baseImgUrl.replaceAll("\\.[a-zA-Z0-9]+$", ".jpg");
+            } else {
+                baseImgUrl = baseImgUrl + ".jpg";
+            }
+
+            for (int pg = 1; pg <= maxPages; pg++) {
+                String pgUrl = baseImgUrl.replace("/upload/", "/upload/pg_" + pg + "/");
+                try {
+                    java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+                            .uri(java.net.URI.create(pgUrl))
+                            .timeout(java.time.Duration.ofSeconds(15))
+                            .header("User-Agent", "NoteLagbe-DocumentService/1.0")
+                            .GET()
+                            .build();
+                    java.net.http.HttpResponse<byte[]> res = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+                    if (res.statusCode() >= 200 && res.statusCode() < 300 && res.body() != null && res.body().length > 0) {
+                        collectedPages.add(res.body());
+                        log.info("Fetched page {} ({} bytes) from Cloudinary: {}", pg, res.body().length, pgUrl);
+                    } else {
+                        // End of document pages reached (Cloudinary returns 400 when page index exceeds total document pages)
+                        break;
+                    }
+                } catch (Exception e) {
+                    log.debug("Stopped fetching pages at index {} due to: {}", pg, e.getMessage());
+                    break;
                 }
-            } catch (Exception ignored) {}
+            }
+
+            if (!collectedPages.isEmpty()) {
+                log.info("Successfully fetched {} pages from Cloudinary. Assembling into multi-page PDF...", collectedPages.size());
+                return wrapJpegsToPdf(collectedPages);
+            }
         }
 
         throw new IOException("Remote storage returned HTTP status " + (lastStatusCode > 0 ? lastStatusCode : "error") +
@@ -512,79 +560,104 @@ public class ResourceService {
     }
 
     public static byte[] wrapJpegToPdf(byte[] jpegBytes) throws IOException {
-        int width = 800;
-        int height = 1100;
-        try {
-            java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(jpegBytes));
-            if (img != null) {
-                width = img.getWidth();
-                height = img.getHeight();
-            }
-        } catch (Exception ignored) {}
+        return wrapJpegsToPdf(java.util.List.of(jpegBytes));
+    }
 
-        boolean isLandscape = width > height;
-        float pageWidth = isLandscape ? 841.89f : 595.28f;
-        float pageHeight = isLandscape ? 595.28f : 841.89f;
-
-        float margin = 20f;
-        float availW = pageWidth - margin * 2;
-        float availH = pageHeight - margin * 2;
-        float scale = Math.min(availW / width, availH / height);
-        float drawW = width * scale;
-        float drawH = height * scale;
-        float x = (pageWidth - drawW) / 2;
-        float y = (pageHeight - drawH) / 2;
-
-        String contentStream = String.format(java.util.Locale.US,
-                "q\n%.2f 0 0 %.2f %.2f %.2f cm\n/Im1 Do\nQ\n",
-                drawW, drawH, x, y);
-        byte[] contentBytes = contentStream.getBytes(StandardCharsets.US_ASCII);
+    public static byte[] wrapJpegsToPdf(List<byte[]> pagesJpegBytes) throws IOException {
+        if (pagesJpegBytes == null || pagesJpegBytes.isEmpty()) {
+            throw new IllegalArgumentException("No pages provided to wrap into PDF");
+        }
 
         java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
         java.util.List<Integer> offsets = new java.util.ArrayList<>();
 
-        // Header
+        // PDF Header
         out.write("%PDF-1.4\n%\u00E2\u00E3\u00CF\u00D3\n".getBytes(StandardCharsets.US_ASCII));
+
+        int pageCount = pagesJpegBytes.size();
 
         // 1 0 obj: Catalog
         offsets.add(out.size());
         out.write("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n".getBytes(StandardCharsets.US_ASCII));
 
-        // 2 0 obj: Pages
+        // 2 0 obj: Pages Root
         offsets.add(out.size());
-        out.write("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n".getBytes(StandardCharsets.US_ASCII));
+        StringBuilder kids = new StringBuilder();
+        for (int i = 0; i < pageCount; i++) {
+            kids.append(3 + i * 3).append(" 0 R ");
+        }
+        out.write(String.format(java.util.Locale.US,
+                "2 0 obj\n<< /Type /Pages /Kids [%s] /Count %d >>\nendobj\n",
+                kids.toString().trim(), pageCount).getBytes(StandardCharsets.US_ASCII));
 
-        // 3 0 obj: Page
-        offsets.add(out.size());
-        String pageObj = String.format(java.util.Locale.US,
-                "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2f %.2f] /Contents 4 0 R /Resources << /XObject << /Im1 5 0 R >> >> >>\nendobj\n",
-                pageWidth, pageHeight);
-        out.write(pageObj.getBytes(StandardCharsets.US_ASCII));
+        // Write each page, content stream, and DCT image XObject
+        for (int i = 0; i < pageCount; i++) {
+            byte[] jpegBytes = pagesJpegBytes.get(i);
+            int width = 800;
+            int height = 1100;
+            try {
+                java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(jpegBytes));
+                if (img != null) {
+                    width = img.getWidth();
+                    height = img.getHeight();
+                }
+            } catch (Exception ignored) {}
 
-        // 4 0 obj: Contents
-        offsets.add(out.size());
-        out.write(String.format("4 0 obj\n<< /Length %d >>\nstream\n", contentBytes.length).getBytes(StandardCharsets.US_ASCII));
-        out.write(contentBytes);
-        out.write("\nendstream\nendobj\n".getBytes(StandardCharsets.US_ASCII));
+            boolean isLandscape = width > height;
+            float pageWidth = isLandscape ? 841.89f : 595.28f;
+            float pageHeight = isLandscape ? 595.28f : 841.89f;
 
-        // 5 0 obj: Image XObject with DCTDecode
-        offsets.add(out.size());
-        String imageObjHeader = String.format(
-                "5 0 obj\n<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length %d >>\nstream\n",
-                width, height, jpegBytes.length);
-        out.write(imageObjHeader.getBytes(StandardCharsets.US_ASCII));
-        out.write(jpegBytes);
-        out.write("\nendstream\nendobj\n".getBytes(StandardCharsets.US_ASCII));
+            float margin = 15f;
+            float availW = pageWidth - margin * 2;
+            float availH = pageHeight - margin * 2;
+            float scale = Math.min(availW / width, availH / height);
+            float drawW = width * scale;
+            float drawH = height * scale;
+            float x = (pageWidth - drawW) / 2;
+            float y = (pageHeight - drawH) / 2;
+
+            String contentStream = String.format(java.util.Locale.US,
+                    "q\n%.2f 0 0 %.2f %.2f %.2f cm\n/Im%d Do\nQ\n",
+                    drawW, drawH, x, y, i + 1);
+            byte[] contentBytes = contentStream.getBytes(StandardCharsets.US_ASCII);
+
+            int pageObjId = 3 + i * 3;
+            int contentObjId = 4 + i * 3;
+            int imageObjId = 5 + i * 3;
+
+            // Page Object
+            offsets.add(out.size());
+            String pageObj = String.format(java.util.Locale.US,
+                    "%d 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.2f %.2f] /Contents %d 0 R /Resources << /XObject << /Im%d %d 0 R >> >> >>\nendobj\n",
+                    pageObjId, pageWidth, pageHeight, contentObjId, i + 1, imageObjId);
+            out.write(pageObj.getBytes(StandardCharsets.US_ASCII));
+
+            // Content Stream Object
+            offsets.add(out.size());
+            out.write(String.format(java.util.Locale.US,
+                    "%d 0 obj\n<< /Length %d >>\nstream\n", contentObjId, contentBytes.length).getBytes(StandardCharsets.US_ASCII));
+            out.write(contentBytes);
+            out.write("\nendstream\nendobj\n".getBytes(StandardCharsets.US_ASCII));
+
+            // Image XObject with DCTDecode
+            offsets.add(out.size());
+            String imageObjHeader = String.format(java.util.Locale.US,
+                    "%d 0 obj\n<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length %d >>\nstream\n",
+                    imageObjId, width, height, jpegBytes.length);
+            out.write(imageObjHeader.getBytes(StandardCharsets.US_ASCII));
+            out.write(jpegBytes);
+            out.write("\nendstream\nendobj\n".getBytes(StandardCharsets.US_ASCII));
+        }
 
         // Cross-reference table
         int startXref = out.size();
-        out.write(String.format("xref\n0 %d\n0000000000 65535 f \n", offsets.size() + 1).getBytes(StandardCharsets.US_ASCII));
+        out.write(String.format(java.util.Locale.US, "xref\n0 %d\n0000000000 65535 f \n", offsets.size() + 1).getBytes(StandardCharsets.US_ASCII));
         for (int off : offsets) {
-            out.write(String.format("%010d 00000 n \n", off).getBytes(StandardCharsets.US_ASCII));
+            out.write(String.format(java.util.Locale.US, "%010d 00000 n \n", off).getBytes(StandardCharsets.US_ASCII));
         }
 
         // Trailer
-        out.write(String.format("trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", offsets.size() + 1, startXref).getBytes(StandardCharsets.US_ASCII));
+        out.write(String.format(java.util.Locale.US, "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", offsets.size() + 1, startXref).getBytes(StandardCharsets.US_ASCII));
 
         return out.toByteArray();
     }

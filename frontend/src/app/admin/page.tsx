@@ -367,7 +367,6 @@ export default function AdminDashboardPage() {
     | "resources"
     | "courses"
     | "teachers"
-    | "courseTeachers"
     | "payments"
     | "contributions"
     | "waivers"
@@ -442,7 +441,6 @@ export default function AdminDashboardPage() {
   const [resourcePage, setResourcePage] = useState(1);
   const [coursePage, setCoursePage] = useState(1);
   const [teacherPage, setTeacherPage] = useState(1);
-  const [facultyCoursePage, setFacultyCoursePage] = useState(1);
   const [paymentPage, setPaymentPage] = useState(1);
   const [staffPage, setStaffPage] = useState(1);
   const [contributionPage, setContributionPage] = useState(1);
@@ -461,7 +459,6 @@ export default function AdminDashboardPage() {
   const [teacherSearch, setTeacherSearch] = useState("");
   const [teacherDeptFilter, setTeacherDeptFilter] = useState("ALL");
   const [teacherCategoryFilter, setTeacherCategoryFilter] = useState("ALL");
-  const [matrixDeptFilter, setMatrixDeptFilter] = useState("ALL");
   const [reviewStatusFilter, setReviewStatusFilter] = useState<"ALL" | "PENDING" | "APPROVED" | "REJECTED">("PENDING");
 
   // Campus Notice Board States
@@ -585,12 +582,6 @@ export default function AdminDashboardPage() {
     return Array.from(set).sort();
   }, [courses, teachers, customDepartments]);
 
-  // Course-Faculty Matrix State
-  const [cfMode, setCfMode] = useState<"byCourse" | "byFaculty">("byCourse");
-  const [selectedCourseForFaculty, setSelectedCourseForFaculty] = useState<string>("");
-  const [teacherToAssignId, setTeacherToAssignId] = useState<number | "">("");
-  const [selectedFacultyId, setSelectedFacultyId] = useState<number | "">("");
-  const [courseToAssignCode, setCourseToAssignCode] = useState<string>("");
   const [assigning, setAssigning] = useState(false);
 
   // Modals & Forms
@@ -953,9 +944,6 @@ export default function AdminDashboardPage() {
     setNoticePage(1);
   }, [noticeSearch, noticeTypeFilter]);
 
-  useEffect(() => {
-    setFacultyCoursePage(1);
-  }, [selectedCourseForFaculty, selectedFacultyId, cfMode, matrixDeptFilter]);
 
   useEffect(() => {
     setStaffPage(1);
@@ -1000,9 +988,6 @@ export default function AdminDashboardPage() {
       const sortedCourses = sortCoursesNaturally(cList || []);
       setCourses(sortedCourses);
       setTeachers(tList || []);
-      if (tList && tList.length > 0 && !selectedFacultyId) {
-        setSelectedFacultyId(tList[0].id);
-      }
       setAdminReviews(revData || []);
       setNotices(noticeData || []);
       setChatMessages(chatMsgs || []);
@@ -1634,113 +1619,6 @@ export default function AdminDashboardPage() {
           loadAllAdminData();
         } catch (err: any) {
           toast.error(err.message || "Failed to delete teacher");
-          throw err;
-        }
-      },
-    });
-  };
-
-  // ---------------- Course-Faculty Assignment ----------------
-  const [reassignModal, setReassignModal] = useState<{
-    open: boolean;
-    courseCode: string;
-    courseTitle: string;
-    currentTeacher: any;
-    newTeacherId: number | "";
-  }>({
-    open: false,
-    courseCode: "",
-    courseTitle: "",
-    currentTeacher: null,
-    newTeacherId: "",
-  });
-
-  const handleOpenReassignModal = (courseCode: string, courseTitle: string, currentTeacher: any) => {
-    setReassignModal({
-      open: true,
-      courseCode,
-      courseTitle,
-      currentTeacher,
-      newTeacherId: "",
-    });
-  };
-
-  const handleExecuteReassign = async () => {
-    if (!reassignModal.newTeacherId) {
-      toast.error("Please select a new faculty member");
-      return;
-    }
-    if (Number(reassignModal.newTeacherId) === Number(reassignModal.currentTeacher?.id)) {
-      toast.error("Please select a different faculty member to reassign to");
-      return;
-    }
-    setAssigning(true);
-    try {
-      await api.admin.assignTeacherToCourse(reassignModal.courseCode, Number(reassignModal.newTeacherId));
-      if (reassignModal.currentTeacher?.id) {
-        await api.admin.removeTeacherFromCourse(reassignModal.courseCode, Number(reassignModal.currentTeacher.id));
-      }
-      setSelectedCourseForFaculty(reassignModal.courseCode);
-      notifyDataChanged("matrix", "reassigned", `${reassignModal.courseCode}->${reassignModal.newTeacherId}`);
-      confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
-      toast.success(`Successfully reassigned ${reassignModal.courseCode} to new faculty member!`);
-      setReassignModal({ open: false, courseCode: "", courseTitle: "", currentTeacher: null, newTeacherId: "" });
-      await loadAllAdminData();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to reassign faculty");
-    } finally {
-      setAssigning(false);
-    }
-  };
-
-  const handleAssignTeacher = async (courseCode: string, teacherId: number) => {
-    if (!courseCode || !courseCode.trim()) {
-      toast.error("Please select a target course first");
-      return;
-    }
-    if (!teacherId || isNaN(teacherId) || teacherId <= 0) {
-      toast.error("Please select a faculty member to assign");
-      return;
-    }
-    const cleanCode = courseCode.trim().toUpperCase();
-    setAssigning(true);
-    try {
-      await api.admin.assignTeacherToCourse(cleanCode, teacherId);
-      setSelectedCourseForFaculty(cleanCode);
-      notifyDataChanged("matrix", "assigned", `${cleanCode}->${teacherId}`);
-      confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
-      toast.success(`Faculty member successfully assigned to ${cleanCode}! Conducted tags updated.`);
-      setTeacherToAssignId("");
-      setCourseToAssignCode("");
-      await loadAllAdminData();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to assign faculty to course");
-    } finally {
-      setAssigning(false);
-    }
-  };
-
-  const handleRemoveTeacher = (courseCode: string, teacherId: number, teacherName: string) => {
-    openDeleteConfirm({
-      title: "Remove Faculty Teaching Assignment",
-      itemType: "Allocation",
-      itemName: `${teacherName} → ${courseCode}`,
-      warningText: `Are you sure you want to remove ${teacherName} from conducting course ${courseCode}? Students will no longer see this faculty associated with the course.`,
-      confirmButtonText: "Remove Assignment",
-      onConfirm: async () => {
-        try {
-          await api.admin.removeTeacherFromCourse(courseCode, teacherId);
-          setSelectedCourseForFaculty(courseCode);
-          notifyDataChanged("matrix", "removed", `${courseCode}->${teacherId}`);
-          toast.success(`Removed ${teacherName} from ${courseCode}`);
-          showDeleteSuccess(
-            "Assignment Removed Successfully!",
-            `Faculty allocation of ${teacherName} for course ${courseCode} has been cleared.`,
-            `${teacherName} (${courseCode})`
-          );
-          await loadAllAdminData();
-        } catch (err: any) {
-          toast.error(err.message || "Failed to remove teacher assignment");
           throw err;
         }
       },
@@ -2690,40 +2568,6 @@ export default function AdminDashboardPage() {
   const lecturerCount = teachers.filter((t) => t.designation?.toLowerCase().includes("lecturer")).length;
   const departmentsRepresentedCount = new Set(teachers.map((t) => t.department?.toUpperCase()).filter(Boolean)).size;
 
-  // Matrix KPI metrics dynamically computed
-  const assignedCoursesCount = courses.filter((c) => {
-    const hasTeachersInCourse = (c.teachers || []).length > 0;
-    const hasTeachersInRes = (resources || []).some(
-      (r: any) => (r.course?.code?.toLowerCase() === c.code?.toLowerCase() || r.courseCode?.toLowerCase() === c.code?.toLowerCase()) && r.teacher
-    );
-    return hasTeachersInCourse || hasTeachersInRes;
-  }).length;
-  const unassignedCoursesCount = Math.max(0, courses.length - assignedCoursesCount);
-  const totalFacultyAssignments = courses.reduce((acc, c) => {
-    const teacherIdSet = new Set<number>();
-    (c.teachers || []).forEach((t: any) => {
-      if (t?.id) teacherIdSet.add(Number(t.id));
-    });
-    (resources || []).forEach((r: any) => {
-      const rCode = r.course?.code || r.courseCode;
-      if (rCode?.toLowerCase() === c.code?.toLowerCase() && r.teacher?.id) {
-        teacherIdSet.add(Number(r.teacher.id));
-      }
-    });
-    return acc + teacherIdSet.size;
-  }, 0);
-
-  // Course-Faculty Matrix filtered lists
-  const matrixCourses =
-    matrixDeptFilter === "ALL"
-      ? courses
-      : courses.filter((c) => (c.department || "CSE").toUpperCase() === matrixDeptFilter.toUpperCase());
-
-  const matrixTeachers =
-    matrixDeptFilter === "ALL"
-      ? teachers
-      : teachers.filter((t) => (t.department || "CSE").toUpperCase() === matrixDeptFilter.toUpperCase());
-
   const pendingReviewsCount = adminReviews.filter((r) => r.status === "PENDING").length;
   const filteredAdminReviews = adminReviews.filter((r) => {
     if (reviewStatusFilter === "ALL") return true;
@@ -2858,8 +2702,6 @@ export default function AdminDashboardPage() {
                 ? "Courses Directory"
                 : activeTab === "teachers"
                 ? "Faculty Directory"
-                : activeTab === "courseTeachers"
-                ? "Course-Faculty Matrix"
                 : activeTab === "payments"
                 ? "Subscription Payments"
                 : activeTab === "contributions"
@@ -2934,26 +2776,6 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {activeTab === "courseTeachers" && (
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={openNewCourseModal}
-                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-sm transition-all"
-                title="Create New Academic Course"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Add Course</span>
-              </button>
-              <button
-                onClick={openNewTeacherModal}
-                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow-sm transition-all"
-                title="Register New Faculty Member"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Add Faculty</span>
-              </button>
-            </div>
-          )}
 
           {activeTab === "notices" && (
             <button
@@ -3354,25 +3176,6 @@ export default function AdminDashboardPage() {
                   </span>
                 </button>
 
-                <button
-                  onClick={() => {
-                    setActiveTab("courseTeachers");
-                    setMobileSidebarOpen(false);
-                  }}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all ${
-                    activeTab === "courseTeachers"
-                      ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-600/25"
-                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Layers className="w-4 h-4" />
-                    <span>Course-Faculty Matrix</span>
-                  </div>
-                  <span className="font-mono text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-transparent">
-                    {courses.length}
-                  </span>
-                </button>
 
                 <button
                   onClick={() => {
@@ -3688,7 +3491,6 @@ export default function AdminDashboardPage() {
               {activeTab === "departments" && "Departments & Academic Units Management"}
               {activeTab === "courses" && "Academic Course Catalog Directory"}
               {activeTab === "teachers" && "Faculty Member Directory & Profiles"}
-              {activeTab === "courseTeachers" && "Course-Faculty Teaching Assignment Matrix"}
               {activeTab === "resources" && "Materials & Question Papers Management"}
               {activeTab === "payments" && "Student Subscription Payment Verifications"}
               {activeTab === "contributions" && "Peer Crowdsourcing Submissions & Rewards"}
@@ -3704,7 +3506,6 @@ export default function AdminDashboardPage() {
               {activeTab === "departments" && "Manage university departments, faculty programs, curriculum allocations, and archives."}
               {activeTab === "courses" && "Create, update, and manage official SEU courses and syllabus metadata."}
               {activeTab === "teachers" && "Add new instructors, manage faculty designations, and update rooms & emails."}
-              {activeTab === "courseTeachers" && "Map and assign faculties to specific active semester courses."}
               {activeTab === "resources" && "Search, edit, verify, and remove learning assets and examination archives."}
               {activeTab === "payments" && "Verify bKash / Nagad transaction IDs and approve student premium access."}
               {activeTab === "contributions" && "Review student uploads and grant 2 free course access rewards."}
@@ -4646,7 +4447,7 @@ export default function AdminDashboardPage() {
                                         className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-0.5 font-semibold cursor-pointer"
                                         title="Open interactive viewer with zoom and download"
                                       >
-                                        <span>Direct Link</span>
+                                        <span>Preview Document</span>
                                         <ExternalLink className="w-2.5 h-2.5" />
                                       </button>
                                     )}
@@ -5058,13 +4859,12 @@ export default function AdminDashboardPage() {
                         </Link>
                         <button
                           onClick={() => {
-                            setSelectedCourseForFaculty(c.code);
-                            setActiveTab("courseTeachers");
-                            setCfMode("byCourse");
+                            setResourceSearch(c.code);
+                            setActiveTab("resources");
                           }}
-                          className="text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline"
+                          className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline"
                         >
-                          Manage Faculty &rarr;
+                          View Materials &rarr;
                         </button>
                       </div>
                     </div>
@@ -5363,13 +5163,12 @@ export default function AdminDashboardPage() {
                         </Link>
                         <button
                           onClick={() => {
-                            setSelectedFacultyId(t.id);
-                            setActiveTab("courseTeachers");
-                            setCfMode("byFaculty");
+                            setResourceSearch(t.name);
+                            setActiveTab("resources");
                           }}
-                          className="text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline"
+                          className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline"
                         >
-                          Assign Courses &rarr;
+                          View Materials &rarr;
                         </button>
                       </div>
                     </div>
@@ -5386,461 +5185,6 @@ export default function AdminDashboardPage() {
                   onPageChange={setTeacherPage}
                   itemName="faculty members"
                 />
-              </div>
-            </div>
-          )}
-
-          {/* ========================================================================= */}
-          {/* TAB: COURSE-FACULTY MATRIX                                                */}
-          {/* ========================================================================= */}
-          {activeTab === "courseTeachers" && (
-            <div className="space-y-6">
-              
-              {/* Top Row: 4 KPI Cards for Assignment Matrix */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* 1. Total Courses */}
-                <div className="p-5 rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-sm">
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Curriculum Offerings</p>
-                    <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1">
-                      {courses.length}
-                    </div>
-                    <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-1 font-semibold">
-                      Total Course Modules
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                    <GraduationCap className="w-6 h-6" />
-                  </div>
-                </div>
-
-                {/* 2. Assigned Courses */}
-                <div className="p-5 rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-sm">
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Assigned Courses</p>
-                    <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1">
-                      {assignedCoursesCount}
-                    </div>
-                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-semibold">
-                      Active Faculty Assigned
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="w-6 h-6" />
-                  </div>
-                </div>
-
-                {/* 3. Unassigned Courses */}
-                <div className="p-5 rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-sm">
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Unassigned Courses</p>
-                    <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1">
-                      {unassignedCoursesCount}
-                    </div>
-                    <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 font-semibold">
-                      Awaiting Faculty Link
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                    <AlertCircle className="w-6 h-6" />
-                  </div>
-                </div>
-
-                {/* 4. Total Assignments */}
-                <div className="p-5 rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-sm">
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Allocations</p>
-                    <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1">
-                      {totalFacultyAssignments}
-                    </div>
-                    <p className="text-[11px] text-purple-600 dark:text-purple-400 mt-1 font-semibold">
-                      Course-Teacher Pairs
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
-                    <Layers className="w-6 h-6" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 space-y-5 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <Layers className="w-5 h-5 text-blue-500" />
-                      <span>Course & Faculty Offerings Manager</span>
-                    </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      Configure which instructors teach each course. Conducted tags and study materials will update automatically.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <select
-                      value={matrixDeptFilter}
-                      onChange={(e) => setMatrixDeptFilter(e.target.value)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-semibold"
-                    >
-                      <option value="ALL">All Departments</option>
-                      {dynamicDepartments.map((dept) => (
-                        <option key={dept} value={dept}>
-                          {dept} Department
-                        </option>
-                      ))}
-                    </select>
-
-                    <button
-                      type="button"
-                      onClick={openNewCourseModal}
-                      className="px-3 py-1.5 rounded-xl font-bold text-xs bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 flex items-center gap-1 transition-all shadow-sm"
-                      title="Create New Academic Course"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>+ Course</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={openNewTeacherModal}
-                      className="px-3 py-1.5 rounded-xl font-bold text-xs bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30 flex items-center gap-1 transition-all shadow-sm"
-                      title="Register New Faculty Member"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>+ Faculty</span>
-                    </button>
-
-                    <div className="inline-flex items-center p-1 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold">
-                      <button
-                        onClick={() => setCfMode("byCourse")}
-                        className={`px-3.5 py-1.5 rounded-xl transition-all ${
-                          cfMode === "byCourse"
-                            ? "bg-blue-600 text-white font-bold shadow-sm"
-                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                        }`}
-                      >
-                        Manage by Course
-                      </button>
-                      <button
-                        onClick={() => setCfMode("byFaculty")}
-                        className={`px-3.5 py-1.5 rounded-xl transition-all ${
-                          cfMode === "byFaculty"
-                            ? "bg-blue-600 text-white font-bold shadow-sm"
-                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                        }`}
-                      >
-                        Manage by Faculty
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* MODE 1: BY COURSE */}
-                {cfMode === "byCourse" ? (
-                  <div className="space-y-5">
-                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center gap-3">
-                      <div className="flex-1 w-full">
-                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 block">Select Target Course (All Departments):</label>
-                        <SearchableCourseSelect
-                          value={selectedCourseForFaculty || matrixCourses[0]?.code || courses[0]?.code || ""}
-                          onChange={(code) => setSelectedCourseForFaculty(code)}
-                          courses={courses}
-                          placeholder="Search course across all departments (e.g. CSE141, EEE, Math)..."
-                        />
-                      </div>
-
-                      <div className="flex-1 w-full">
-                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 block">Select Teacher to Assign (All Departments):</label>
-                        <SearchableTeacherSelect
-                          value={teacherToAssignId}
-                          onChange={(tid) => setTeacherToAssignId(tid)}
-                          teachers={teachers}
-                          placeholder="Search faculty across all departments (e.g. Nahid, NAAO, CSE)..."
-                          allowGeneral={false}
-                        />
-                      </div>
-
-                      <button
-                        onClick={() =>
-                          handleAssignTeacher(
-                            selectedCourseForFaculty || matrixCourses[0]?.code || courses[0]?.code,
-                            Number(teacherToAssignId)
-                          )
-                        }
-                        disabled={assigning}
-                        className="w-full md:w-auto px-5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white mt-auto h-[42px] shrink-0 transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/20"
-                      >
-                        {assigning ? (
-                          <>
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            <span>Assigning...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="w-4 h-4" />
-                            <span>Assign Faculty</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Assigned Faculty list for selected course */}
-                    {(() => {
-                      const activeCourseCode = selectedCourseForFaculty || matrixCourses[0]?.code || courses[0]?.code;
-                      const activeCourse = courses.find((c) => c.code?.toLowerCase() === activeCourseCode?.toLowerCase());
-                      const assignedTeachers = (() => {
-                        const map = new Map<number, any>();
-                        (activeCourse?.teachers || []).forEach((t: any) => {
-                          if (t && t.id) map.set(Number(t.id), { ...t });
-                        });
-                        (resources || []).forEach((r: any) => {
-                          const rCourseCode = r.course?.code || r.courseCode;
-                          if (rCourseCode?.toLowerCase() === activeCourseCode?.toLowerCase() && r.teacher && r.teacher.id) {
-                            const existing = map.get(Number(r.teacher.id));
-                            if (!existing) {
-                              map.set(Number(r.teacher.id), {
-                                id: r.teacher.id,
-                                name: r.teacher.name,
-                                initial: r.teacher.initial,
-                                designation: r.teacher.designation || "Faculty",
-                                department: r.teacher.department,
-                                hasNotes: r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "DOC_NOTE",
-                                hasQuestions: r.type === "MID_QUESTION" || r.type === "FINAL_QUESTION" || r.type === "QUIZ_CT",
-                                notesCount: (r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "DOC_NOTE") ? 1 : 0,
-                                questionsCount: (r.type === "MID_QUESTION" || r.type === "FINAL_QUESTION" || r.type === "QUIZ_CT") ? 1 : 0,
-                              });
-                            } else {
-                              if (r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "DOC_NOTE") {
-                                existing.hasNotes = true;
-                                existing.notesCount = (existing.notesCount || 0) + 1;
-                              }
-                              if (r.type === "MID_QUESTION" || r.type === "FINAL_QUESTION" || r.type === "QUIZ_CT") {
-                                existing.hasQuestions = true;
-                                existing.questionsCount = (existing.questionsCount || 0) + 1;
-                              }
-                            }
-                          }
-                        });
-                        return Array.from(map.values()).map((at) => {
-                          const fullTeacher = teachers.find((t) => Number(t.id) === Number(at.id));
-                          return {
-                            ...at,
-                            department: at.department || fullTeacher?.department || "CSE",
-                            initial: at.initial || fullTeacher?.initial || "",
-                            designation: at.designation || fullTeacher?.designation || "Faculty Member",
-                            image: at.image || fullTeacher?.image || "",
-                          };
-                        });
-                      })();
-
-                      return (
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                              <span>Faculty currently conducting {activeCourseCode}</span>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                                {assignedTeachers.length} Assigned
-                              </span>
-                            </h3>
-                          </div>
-
-                          {assignedTeachers.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                              {assignedTeachers.map((t: any) => (
-                                <div
-                                  key={t.id}
-                                  className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-blue-500/40 transition-all flex flex-col justify-between gap-3 group"
-                                >
-                                  <div className="flex items-start justify-between gap-2.5">
-                                    <div className="flex items-center gap-3 min-w-0">
-                                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600/10 to-indigo-600/20 text-blue-600 dark:text-blue-400 font-extrabold text-sm flex items-center justify-center shrink-0 border border-blue-500/20 shadow-inner">
-                                        {t.initial || t.name.charAt(0)}
-                                      </div>
-                                      <div className="min-w-0">
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                          <p className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
-                                            {t.name}
-                                          </p>
-                                          {t.initial && (
-                                            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-50 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                                              [{t.initial}]
-                                            </span>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                                          <span className="truncate">{t.designation || "Faculty Member"}</span>
-                                          <span>•</span>
-                                          <span className="font-semibold text-blue-600 dark:text-blue-400">{t.department || "CSE"}</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Status & Actions */}
-                                  <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-slate-800/80 text-[10px]">
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                      {t.notesCount > 0 || t.questionsCount > 0 ? (
-                                        <span className="font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 truncate">
-                                          <span>📚 {t.notesCount || 0} Notes</span>
-                                          <span>•</span>
-                                          <span>📝 {t.questionsCount || 0} Exams</span>
-                                        </span>
-                                      ) : (
-                                        <span className="text-slate-400 dark:text-slate-500 font-medium italic truncate">
-                                          Assigned (No files yet)
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenReassignModal(activeCourseCode, activeCourse?.title || activeCourseCode, t)}
-                                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/60 transition-colors"
-                                        title="Reassign or change faculty member"
-                                      >
-                                        <ArrowRightLeft className="w-4 h-4" />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleRemoveTeacher(activeCourseCode, t.id, t.name)}
-                                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/60 transition-colors"
-                                        title="Remove faculty assignment"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="p-8 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 text-xs">
-                              No faculty members assigned to {activeCourseCode} yet. Use the dropdown above to assign a faculty member.
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                ) : (
-                  /* MODE 2: BY FACULTY */
-                  <div className="space-y-5">
-                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center gap-3">
-                      <div className="flex-1 w-full">
-                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 block">Select Target Faculty Member (All Departments):</label>
-                        <SearchableTeacherSelect
-                          value={selectedFacultyId || matrixTeachers[0]?.id || teachers[0]?.id || ""}
-                          onChange={(tid) => setSelectedFacultyId(tid)}
-                          teachers={teachers}
-                          placeholder="Select faculty member across all departments..."
-                          allowGeneral={false}
-                        />
-                      </div>
-
-                      <div className="flex-1 w-full">
-                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 block">Select Course to Assign (All Departments):</label>
-                        <SearchableCourseSelect
-                          value={courseToAssignCode}
-                          onChange={(code) => setCourseToAssignCode(code)}
-                          courses={courses}
-                          placeholder="Search & choose course across all departments..."
-                        />
-                      </div>
-
-                      <button
-                        onClick={() =>
-                          handleAssignTeacher(
-                            courseToAssignCode,
-                            Number(selectedFacultyId || matrixTeachers[0]?.id || teachers[0]?.id)
-                          )
-                        }
-                        disabled={assigning}
-                        className="w-full md:w-auto px-5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white mt-auto h-[42px] shrink-0 transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/20"
-                      >
-                        {assigning ? (
-                          <>
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            <span>Assigning...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="w-4 h-4" />
-                            <span>Assign Course</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Courses conducted by selected teacher */}
-                    {(() => {
-                      const activeFacultyId = Number(selectedFacultyId || matrixTeachers[0]?.id || teachers[0]?.id);
-                      const currentFaculty = teachers.find((t) => Number(t.id) === activeFacultyId);
-                      const facultyCourses = (() => {
-                        const codeSet = new Set<string>();
-                        const list: any[] = [];
-                        courses.forEach((c: any) => {
-                          const hasTeacherInCourse = c.teachers?.some((t: any) => Number(t.id) === activeFacultyId);
-                          const hasTeacherInRes = (resources || []).some(
-                            (r: any) =>
-                              (r.course?.code?.toLowerCase() === c.code?.toLowerCase() || r.courseCode?.toLowerCase() === c.code?.toLowerCase()) &&
-                              Number(r.teacher?.id) === activeFacultyId
-                          );
-                          if ((hasTeacherInCourse || hasTeacherInRes) && !codeSet.has(c.code)) {
-                            codeSet.add(c.code);
-                            list.push(c);
-                          }
-                        });
-                        return list;
-                      })();
-
-                      return (
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                              <span>Courses conducted by {currentFaculty?.name || "Faculty Member"}</span>
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                                {facultyCourses.length} Courses
-                              </span>
-                            </h3>
-                          </div>
-
-                          {facultyCourses.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                              {facultyCourses.map((c: any) => (
-                                <div
-                                  key={c.code}
-                                  className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shadow-sm hover:border-blue-500/40 transition-all"
-                                >
-                                  <div>
-                                    <div className="flex items-center gap-1.5">
-                                      <p className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">{c.code}</p>
-                                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                                        {c.department || "CSE"}
-                                      </span>
-                                    </div>
-                                    <p className="font-medium text-xs text-slate-900 dark:text-white truncate max-w-[180px]">{c.title}</p>
-                                  </div>
-
-                                  <button
-                                    onClick={() => handleRemoveTeacher(c.code, activeFacultyId, currentFaculty?.name || "Teacher")}
-                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                                    title="Remove assignment"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="p-8 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 text-xs">
-                              No courses assigned to {currentFaculty?.name || "this faculty member"} yet.
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -8957,106 +8301,7 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL: REASSIGN / UPDATE FACULTY ALLOCATION                               */}
-      {/* ========================================================================= */}
-      {reassignModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                  <ArrowRightLeft className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-black text-base text-slate-900 dark:text-white">
-                    Reassign Faculty Allocation
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Switch teaching instructor for {reassignModal.courseCode}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setReassignModal({ open: false, courseCode: "", courseTitle: "", currentTeacher: null, newTeacherId: "" })}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <div className="space-y-4">
-              {/* Course Info */}
-              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target Academic Course</span>
-                <p className="text-sm font-extrabold text-blue-600 dark:text-blue-400 mt-0.5">
-                  {reassignModal.courseCode} - {reassignModal.courseTitle}
-                </p>
-              </div>
-
-              {/* Current Faculty */}
-              <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40">
-                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider block">Current Assigned Faculty</span>
-                <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mt-0.5 flex items-center gap-1.5 flex-wrap">
-                  <span>{reassignModal.currentTeacher?.name}</span>
-                  {reassignModal.currentTeacher?.initial && (
-                    <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300">
-                      [{reassignModal.currentTeacher?.initial}]
-                    </span>
-                  )}
-                  <span className="text-[11px] text-slate-400 font-normal">
-                    ({reassignModal.currentTeacher?.department || "CSE"})
-                  </span>
-                </div>
-              </div>
-
-              {/* Select New Faculty */}
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                  Select New Faculty Member to Assign (All Departments):
-                </label>
-                <SearchableTeacherSelect
-                  value={reassignModal.newTeacherId}
-                  onChange={(tid) => setReassignModal((prev) => ({ ...prev, newTeacherId: tid }))}
-                  teachers={teachers}
-                  placeholder="Search new faculty across all departments..."
-                  allowGeneral={false}
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={() => setReassignModal({ open: false, courseCode: "", courseTitle: "", currentTeacher: null, newTeacherId: "" })}
-                disabled={assigning}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleExecuteReassign}
-                disabled={assigning || !reassignModal.newTeacherId}
-                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white transition-all shadow-md shadow-blue-600/20 flex items-center gap-1.5"
-              >
-                {assigning ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Reassigning...</span>
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4" />
-                    <span>Confirm Reassignment</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* MODAL 3: ADD / EDIT FACULTY (FULL CRUD & LIGHT/DARK PARITY)               */}

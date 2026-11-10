@@ -156,16 +156,15 @@ public class CourseService {
         // Fetch all approved resources for this course once
         List<Resource> courseResources = resourceRepository.findByCourseIdAndStatus(course.getId(), ResourceStatus.APPROVED);
 
-        // Find associated teachers with detailed per-teacher notes and questions breakdown (strictly deduplicated)
+        // Find associated teachers with detailed per-teacher notes and questions breakdown (strictly based on authentic approved materials)
         List<TeacherCourse> tcs = teacherCourseRepository.findByCourseId(course.getId());
         Map<Long, TeacherCourse> teacherCourseMap = new LinkedHashMap<>();
-        Map<Long, Teacher> distinctTeachers = new LinkedHashMap<>();
         for (TeacherCourse tc : tcs) {
             if (tc.getTeacher() != null) {
-                distinctTeachers.putIfAbsent(tc.getTeacher().getId(), tc.getTeacher());
                 teacherCourseMap.putIfAbsent(tc.getTeacher().getId(), tc);
             }
         }
+        Map<Long, Teacher> distinctTeachers = new LinkedHashMap<>();
         for (Resource r : courseResources) {
             if (r.getTeacher() != null) {
                 distinctTeachers.putIfAbsent(r.getTeacher().getId(), r.getTeacher());

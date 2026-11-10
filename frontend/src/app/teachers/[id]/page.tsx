@@ -113,12 +113,11 @@ export default function TeacherDetailPage() {
       .then(([tData, cData, rData, revData]) => {
         setTeacher(tData);
 
-        // Strict safety filter: only include courses that have real uploaded materials or are admin-assigned
+        // Strict safety filter: only include courses that have authentic uploaded materials in the database
         const realCourses = (cData || []).filter((c: any) => {
           const courseCode = (c.course?.code || c.code || "").toLowerCase();
           const hasResource = (rData || []).some((r: any) => (r.course?.code || "").toLowerCase() === courseCode);
-          const isAdminAssigned = c.scheduleInfo === "ADMIN_ASSIGNED";
-          return hasResource || isAdminAssigned;
+          return hasResource;
         });
 
         // Also dynamically include courses with approved materials if not already in realCourses

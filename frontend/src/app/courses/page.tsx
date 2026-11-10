@@ -38,7 +38,7 @@ export default function CoursesPage() {
         setCourses(validCourses);
         setAllCourses(validCourses);
         try {
-          localStorage.setItem("notelagbe_cached_courses_v5", JSON.stringify(validCourses));
+          localStorage.setItem("notelagbe_cached_courses_v6", JSON.stringify(validCourses));
         } catch {}
       }
     } catch {
@@ -51,7 +51,7 @@ export default function CoursesPage() {
   // Load from local storage cache if available and revalidate silently
   useEffect(() => {
     try {
-      const cached = localStorage.getItem("notelagbe_cached_courses_v5");
+      const cached = localStorage.getItem("notelagbe_cached_courses_v6");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {

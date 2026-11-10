@@ -343,8 +343,7 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
             }
             boolean hasApprovedResource = resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
                     tc.getCourse().getCode(), tc.getTeacher().getId(), ResourceStatus.APPROVED);
-            boolean isAdminAssigned = "ADMIN_ASSIGNED".equalsIgnoreCase(tc.getScheduleInfo());
-            if (!hasApprovedResource && !isAdminAssigned) {
+            if (!hasApprovedResource) {
                 toPurge.add(tc);
             }
         }

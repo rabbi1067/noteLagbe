@@ -71,8 +71,7 @@ public class TeacherService {
             if (tc.getCourse() == null) return true;
             boolean hasResource = resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
                     tc.getCourse().getCode(), teacherId, com.notelagbe.entity.ResourceStatus.APPROVED);
-            boolean isAdminAssigned = "ADMIN_ASSIGNED".equalsIgnoreCase(tc.getScheduleInfo());
-            return !hasResource && !isAdminAssigned;
+            return !hasResource;
         });
 
         java.util.Set<Long> existingCourseIds = list.stream().filter(tc -> tc.getCourse() != null).map(tc -> tc.getCourse().getId()).collect(java.util.stream.Collectors.toSet());
