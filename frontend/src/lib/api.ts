@@ -384,12 +384,14 @@ export const api = {
     toggleStaffStatus: (id: number) => request<any>(`/admin/staff/${id}/toggle-status`, { method: "PUT" }),
     deleteStaff: (id: number) => request<any>(`/admin/staff/${id}`, { method: "DELETE" }),
 
-    // Payments
+    // Payments & Subscriptions
     getPayments: (status?: string) => request<any[]>(`/admin/payments${status ? `?status=${status}` : ""}`),
     approvePayment: (id: number, notes?: string) =>
       request<any>(`/admin/payments/${id}/approve`, { method: "POST", body: JSON.stringify({ notes }) }),
     rejectPayment: (id: number, notes?: string) =>
       request<any>(`/admin/payments/${id}/reject`, { method: "POST", body: JSON.stringify({ notes }) }),
+    getSubscriptions: (active?: boolean) =>
+      request<any[]>(`/admin/subscriptions${active !== undefined ? `?active=${active}` : ""}`),
 
     // Contributions
     getContributions: (status?: string) => request<any[]>(`/admin/contributions${status ? `?status=${status}` : ""}`),

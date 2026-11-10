@@ -334,6 +334,12 @@ public class AdminController {
     }
 
     @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @GetMapping("/subscriptions")
+    public ResponseEntity<List<Subscription>> getSubscriptions(@RequestParam(required = false) Boolean active) {
+        return ResponseEntity.ok(paymentService.getSubscriptions(active));
+    }
+
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @PostMapping("/payments/{id}/approve")
     public ResponseEntity<PaymentRequest> approvePayment(
             @PathVariable Long id,

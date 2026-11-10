@@ -169,7 +169,7 @@ public class ContributionService {
         if (status != null) {
             return contributionRequestRepository.findByStatusOrderByCreatedAtDesc(status);
         }
-        return contributionRequestRepository.findAll();
+        return contributionRequestRepository.findAllByOrderByCreatedAtDesc();
     }
 
     public List<ContributionRequest> getUserContributions(Long userId) {

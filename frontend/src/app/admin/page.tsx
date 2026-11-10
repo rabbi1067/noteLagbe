@@ -14,6 +14,7 @@ import { api, ChatMessageDto } from "@/lib/api";
 import { notifyDataChanged, useDataSync } from "@/lib/sync";
 import {
   ShieldCheck,
+  Crown,
   CreditCard,
   Upload,
   Users,
@@ -460,6 +461,19 @@ export default function AdminDashboardPage() {
   const [teacherDeptFilter, setTeacherDeptFilter] = useState("ALL");
   const [teacherCategoryFilter, setTeacherCategoryFilter] = useState("ALL");
   const [reviewStatusFilter, setReviewStatusFilter] = useState<"ALL" | "PENDING" | "APPROVED" | "REJECTED">("PENDING");
+
+  // Subscription Payments & Active Subscribers States
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<"PENDING" | "APPROVED" | "REJECTED" | "ALL" | "SUBSCRIBERS">("PENDING");
+  const [paymentSearch, setPaymentSearch] = useState("");
+  const [activeSubscribers, setActiveSubscribers] = useState<any[]>([]);
+
+  // Student Submissions States
+  const [contributionStatusFilter, setContributionStatusFilter] = useState<"PENDING" | "APPROVED" | "REJECTED" | "ALL">("PENDING");
+  const [contributionSearch, setContributionSearch] = useState("");
+
+  // Financial Waivers States
+  const [waiverStatusFilter, setWaiverStatusFilter] = useState<"PENDING" | "APPROVED" | "REJECTED" | "ALL">("PENDING");
+  const [waiverSearch, setWaiverSearch] = useState("");
 
   // Campus Notice Board States
   const [noticeSearch, setNoticeSearch] = useState("");
@@ -949,16 +963,28 @@ export default function AdminDashboardPage() {
     setStaffPage(1);
   }, [userSearch, userRoleCategory, userSpecificRole, userStatusFilter]);
 
+  useEffect(() => {
+    setPaymentPage(1);
+  }, [paymentStatusFilter, paymentSearch]);
+
+  useEffect(() => {
+    setContributionPage(1);
+  }, [contributionStatusFilter, contributionSearch]);
+
+  useEffect(() => {
+    setWaiverPage(1);
+  }, [waiverStatusFilter, waiverSearch]);
+
   const loadAllAdminData = async (isInitial = false) => {
     setLoading(true);
     try {
       const [sData, rData, pData, staffData, cData, wData, cList, tList, settingsData, revData, profileData, noticeData, chatMsgs, pinnedChat, chatActiveData] = await Promise.all([
         api.admin.getStats().catch(() => null),
         api.admin.getResources().catch(() => []),
-        isSuperAdmin ? api.admin.getPayments("PENDING").catch(() => []) : Promise.resolve([]),
+        isSuperAdmin ? api.admin.getPayments().catch(() => []) : Promise.resolve([]),
         api.admin.getStaff().catch(() => []),
-        api.admin.getContributions("PENDING").catch(() => []),
-        api.admin.getWaivers("PENDING").catch(() => []),
+        api.admin.getContributions().catch(() => []),
+        api.admin.getWaivers().catch(() => []),
         api.courses.getAll().catch(() => []),
         api.teachers.getAll().catch(() => []),
         api.admin.getSettings().catch(() => ({
@@ -981,6 +1007,11 @@ export default function AdminDashboardPage() {
       setStaffList(staffData || []);
       setContributions(cData || []);
       setWaivers(wData || []);
+      if (isSuperAdmin) {
+        api.admin.getSubscriptions(true).then((subs) => {
+          setActiveSubscribers(subs || []);
+        }).catch(() => {});
+      }
       // Pre-fetch activity logs stats
       api.admin.getActivityLogs({ page: 1, size: 15 }).then((logData) => {
         if (logData) setActivityLogsData(logData);
@@ -2600,8 +2631,73 @@ export default function AdminDashboardPage() {
     teacherPage * TEACHER_PAGE_SIZE
   );
 
-  const totalPaymentPages = Math.max(1, Math.ceil(payments.length / PAYMENT_PAGE_SIZE));
-  const paginatedPayments = payments.slice(
+  // Counts for Badges & KPI summaries
+  const pendingPaymentsCount = useMemo(() => payments.filter((p) => p.status === "PENDING").length, [payments]);
+  const approvedPaymentsCount = useMemo(() => payments.filter((p) => p.status === "APPROVED").length, [payments]);
+  const rejectedPaymentsCount = useMemo(() => payments.filter((p) => p.status === "REJECTED").length, [payments]);
+  const totalApprovedRevenue = useMemo(
+    () => payments.filter((p) => p.status === "APPROVED").reduce((sum, p) => sum + (Number(p.amount) || 0), 0),
+    [payments]
+  );
+
+  const pendingContributionsCount = useMemo(() => contributions.filter((c) => c.status === "PENDING").length, [contributions]);
+  const approvedContributionsCount = useMemo(() => contributions.filter((c) => c.status === "APPROVED").length, [contributions]);
+  const rejectedContributionsCount = useMemo(() => contributions.filter((c) => c.status === "REJECTED").length, [contributions]);
+
+  const pendingWaiversCount = useMemo(() => waivers.filter((w) => w.status === "PENDING").length, [waivers]);
+  const approvedWaiversCount = useMemo(() => waivers.filter((w) => w.status === "APPROVED").length, [waivers]);
+  const rejectedWaiversCount = useMemo(() => waivers.filter((w) => w.status === "REJECTED").length, [waivers]);
+
+  // Filtered Payments
+  const filteredPayments = useMemo(() => {
+    return payments.filter((p) => {
+      if (paymentStatusFilter !== "ALL" && paymentStatusFilter !== "SUBSCRIBERS") {
+        if (p.status !== paymentStatusFilter) return false;
+      }
+      if (paymentSearch.trim()) {
+        const q = paymentSearch.toLowerCase().trim();
+        const studentName = (p.user?.name || "").toLowerCase();
+        const studentEmail = (p.user?.email || "").toLowerCase();
+        const studentId = (p.user?.studentId || "").toLowerCase();
+        const trx = (p.transactionId || "").toLowerCase();
+        const phone = (p.senderPhone || "").toLowerCase();
+        const method = (p.paymentMethod || "").toLowerCase();
+        const plan = (p.planType || "").toLowerCase();
+        if (!studentName.includes(q) && !studentEmail.includes(q) && !studentId.includes(q) && !trx.includes(q) && !phone.includes(q) && !method.includes(q) && !plan.includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [payments, paymentStatusFilter, paymentSearch]);
+
+  // Filtered Active Subscribers
+  const filteredSubscribers = useMemo(() => {
+    return activeSubscribers.filter((s) => {
+      if (!paymentSearch.trim()) return true;
+      const q = paymentSearch.toLowerCase().trim();
+      const name = (s.user?.name || "").toLowerCase();
+      const email = (s.user?.email || "").toLowerCase();
+      const studentId = (s.user?.studentId || "").toLowerCase();
+      const phone = (s.user?.phone || "").toLowerCase();
+      const plan = (s.planType || "").toLowerCase();
+      return name.includes(q) || email.includes(q) || studentId.includes(q) || phone.includes(q) || plan.includes(q);
+    });
+  }, [activeSubscribers, paymentSearch]);
+
+  const totalPaymentPages = Math.max(
+    1,
+    Math.ceil(
+      (paymentStatusFilter === "SUBSCRIBERS" ? filteredSubscribers.length : filteredPayments.length) / PAYMENT_PAGE_SIZE
+    )
+  );
+
+  const paginatedPayments = filteredPayments.slice(
+    (paymentPage - 1) * PAYMENT_PAGE_SIZE,
+    paymentPage * PAYMENT_PAGE_SIZE
+  );
+
+  const paginatedSubscribers = filteredSubscribers.slice(
     (paymentPage - 1) * PAYMENT_PAGE_SIZE,
     paymentPage * PAYMENT_PAGE_SIZE
   );
@@ -2635,14 +2731,56 @@ export default function AdminDashboardPage() {
     staffPage * STAFF_PAGE_SIZE
   );
 
-  const totalContributionPages = Math.max(1, Math.ceil(contributions.length / CONTRIBUTION_PAGE_SIZE));
-  const paginatedContributions = contributions.slice(
+  // Filtered Contributions
+  const filteredContributions = useMemo(() => {
+    return contributions.filter((c) => {
+      if (contributionStatusFilter !== "ALL") {
+        if (c.status !== contributionStatusFilter) return false;
+      }
+      if (contributionSearch.trim()) {
+        const q = contributionSearch.toLowerCase().trim();
+        const title = (c.uploadedResource?.title || "").toLowerCase();
+        const code = (c.uploadedResource?.course?.code || c.courseCode || "").toLowerCase();
+        const dept = (c.uploadedResource?.department || c.uploadedResource?.course?.department || "").toLowerCase();
+        const uploader = (c.user?.name || "").toLowerCase();
+        const email = (c.user?.email || "").toLowerCase();
+        const teacher = (c.uploadedResource?.teacher?.name || c.uploadedResource?.teacher?.initial || "").toLowerCase();
+        if (!title.includes(q) && !code.includes(q) && !dept.includes(q) && !uploader.includes(q) && !email.includes(q) && !teacher.includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [contributions, contributionStatusFilter, contributionSearch]);
+
+  const totalContributionPages = Math.max(1, Math.ceil(filteredContributions.length / CONTRIBUTION_PAGE_SIZE));
+  const paginatedContributions = filteredContributions.slice(
     (contributionPage - 1) * CONTRIBUTION_PAGE_SIZE,
     contributionPage * CONTRIBUTION_PAGE_SIZE
   );
 
-  const totalWaiverPages = Math.max(1, Math.ceil(waivers.length / WAIVER_PAGE_SIZE));
-  const paginatedWaivers = waivers.slice(
+  // Filtered Waivers
+  const filteredWaivers = useMemo(() => {
+    return waivers.filter((w) => {
+      if (waiverStatusFilter !== "ALL") {
+        if (w.status !== waiverStatusFilter) return false;
+      }
+      if (waiverSearch.trim()) {
+        const q = waiverSearch.toLowerCase().trim();
+        const name = (w.user?.name || "").toLowerCase();
+        const email = (w.user?.email || "").toLowerCase();
+        const studentId = (w.studentId || "").toLowerCase();
+        const reason = (w.reason || "").toLowerCase();
+        if (!name.includes(q) && !email.includes(q) && !studentId.includes(q) && !reason.includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [waivers, waiverStatusFilter, waiverSearch]);
+
+  const totalWaiverPages = Math.max(1, Math.ceil(filteredWaivers.length / WAIVER_PAGE_SIZE));
+  const paginatedWaivers = filteredWaivers.slice(
     (waiverPage - 1) * WAIVER_PAGE_SIZE,
     waiverPage * WAIVER_PAGE_SIZE
   );
@@ -3230,12 +3368,12 @@ export default function AdminDashboardPage() {
                     </div>
                     <span
                       className={`font-mono text-[11px] px-2 py-0.5 rounded-lg ${
-                        payments.length > 0
+                        pendingPaymentsCount > 0
                           ? "bg-amber-500 text-black font-extrabold animate-pulse"
                           : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-transparent"
                       }`}
                     >
-                      {payments.length}
+                      {pendingPaymentsCount}
                     </span>
                   </button>
                 )}
@@ -3257,12 +3395,12 @@ export default function AdminDashboardPage() {
                   </div>
                   <span
                     className={`font-mono text-[11px] px-2 py-0.5 rounded-lg ${
-                      contributions.length > 0
+                      pendingContributionsCount > 0
                         ? "bg-emerald-500 text-white font-extrabold"
                         : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-transparent"
                     }`}
                   >
-                    {contributions.length}
+                    {pendingContributionsCount}
                   </span>
                 </button>
 
@@ -3283,12 +3421,12 @@ export default function AdminDashboardPage() {
                   </div>
                   <span
                     className={`font-mono text-[11px] px-2 py-0.5 rounded-lg ${
-                      waivers.length > 0
+                      pendingWaiversCount > 0
                         ? "bg-purple-500 text-white font-extrabold"
                         : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-transparent"
                     }`}
                   >
-                    {waivers.length}
+                    {pendingWaiversCount}
                   </span>
                 </button>
 
@@ -5197,103 +5335,409 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
             ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-sm font-black text-slate-900 dark:text-white">Manual bKash/Nagad Payment Approvals</h2>
-                  <p className="text-xs text-slate-400">Approving unlocks 6 selected quota courses for the student.</p>
+                  <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-blue-500" />
+                    <span>Student Subscription & Payment Verification</span>
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Verify manual bKash/Nagad transactions, track verified revenue history, and manage active premium subscribers.
+                  </p>
                 </div>
-                <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-                  {payments.length} Pending
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                    {pendingPaymentsCount} Pending Action
+                  </span>
+                  <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                    {activeSubscribers.length} Active Subscribers
+                  </span>
+                </div>
               </div>
 
-              {paginatedPayments.length > 0 ? (
-                <div className="space-y-3">
-                  {paginatedPayments.map((p) => {
-                    let selectedCourses: any[] = [];
-                    try {
-                      if (p.selectedCoursesJson) selectedCourses = JSON.parse(p.selectedCoursesJson);
-                    } catch {
-                      selectedCourses = [];
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+                    <Crown className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400">Active Subscribers</p>
+                    <p className="text-lg font-black text-slate-900 dark:text-white">{activeSubscribers.length}</p>
+                    <p className="text-[10px] text-slate-500">Currently using Premium</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400">Pending Requests</p>
+                    <p className="text-lg font-black text-amber-500">{pendingPaymentsCount}</p>
+                    <p className="text-[10px] text-slate-500">Requires verification</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400">Approved Transactions</p>
+                    <p className="text-lg font-black text-emerald-500">{approvedPaymentsCount}</p>
+                    <p className="text-[10px] text-slate-500">Quota unlocked</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0">
+                    <Award className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400">Verified Revenue</p>
+                    <p className="text-lg font-black text-purple-500">৳{totalApprovedRevenue.toLocaleString()}</p>
+                    <p className="text-[10px] text-slate-500">{rejectedPaymentsCount} rejected</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter Tabs & Search Bar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentStatusFilter("PENDING");
+                      setPaymentPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      paymentStatusFilter === "PENDING"
+                        ? "bg-amber-500 text-white shadow-sm shadow-amber-500/25"
+                        : "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>Pending</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">{pendingPaymentsCount}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentStatusFilter("APPROVED");
+                      setPaymentPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      paymentStatusFilter === "APPROVED"
+                        ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/25"
+                        : "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>Approved History</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">{approvedPaymentsCount}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentStatusFilter("REJECTED");
+                      setPaymentPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      paymentStatusFilter === "REJECTED"
+                        ? "bg-rose-600 text-white shadow-sm shadow-rose-600/25"
+                        : "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>Declined</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">{rejectedPaymentsCount}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentStatusFilter("ALL");
+                      setPaymentPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      paymentStatusFilter === "ALL"
+                        ? "bg-blue-600 text-white shadow-sm shadow-blue-600/25"
+                        : "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>All Requests</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">{payments.length}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentStatusFilter("SUBSCRIBERS");
+                      setPaymentPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      paymentStatusFilter === "SUBSCRIBERS"
+                        ? "bg-purple-600 text-white shadow-sm shadow-purple-600/25"
+                        : "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <Crown className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Active Subscribers</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">{activeSubscribers.length}</span>
+                  </button>
+                </div>
+
+                <div className="relative min-w-[240px]">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={paymentSearch}
+                    onChange={(e) => {
+                      setPaymentSearch(e.target.value);
+                      setPaymentPage(1);
+                    }}
+                    placeholder={
+                      paymentStatusFilter === "SUBSCRIBERS"
+                        ? "Search subscriber name, email, ID..."
+                        : "Search student, TrxID, phone, plan..."
                     }
-
-                    return (
-                      <div
-                        key={p.id}
-                        className="p-6 rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-6"
-                      >
-                        <div className="space-y-3 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="px-2.5 py-0.5 rounded-lg text-xs font-black bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                              {p.paymentMethod}
-                            </span>
-                            <span className="text-lg font-black text-slate-900 dark:text-white">৳{p.amount} • {p.planType}</span>
-                          </div>
-
-                          <div className="text-xs text-slate-600 dark:text-slate-300 space-y-1">
-                            <p>Student: <strong className="text-slate-900 dark:text-white">{p.user?.name}</strong> ({p.user?.email})</p>
-                            <p>Phone: <strong className="font-mono text-slate-900 dark:text-white">{p.senderPhone}</strong> • TrxID: <strong className="font-mono text-blue-600 dark:text-blue-400">{p.transactionId}</strong></p>
-                          </div>
-
-                          {selectedCourses.length > 0 && (
-                            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs">
-                              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5">6 Quota Courses Chosen by Student:</p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {selectedCourses.map((c: any, idx: number) => (
-                                  <span key={idx} className="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300/60 dark:border-transparent">
-                                    {c.code || c.courseCode}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {p.slipUrl && (
-                            <a
-                              href={p.slipUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-xs font-bold text-blue-400 hover:underline"
-                            >
-                              <span>View Payment Slip Screenshot</span>
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            onClick={() => handleApprovePayment(p.id)}
-                            className="px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 flex items-center gap-1.5"
-                          >
-                            <Check className="w-4 h-4" />
-                            <span>Approve & Unlock 6</span>
-                          </button>
-                          <button
-                            onClick={() => handleRejectPayment(p.id)}
-                            className="px-4 py-2.5 rounded-xl font-bold text-xs bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  <TablePagination
-                    currentPage={paymentPage}
-                    totalPages={totalPaymentPages}
-                    totalItems={payments.length}
-                    itemsPerPage={PAYMENT_PAGE_SIZE}
-                    onPageChange={setPaymentPage}
-                    itemName="payments"
+                    className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
+                  {paymentSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setPaymentSearch("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
+              </div>
+
+              {/* View 1: Active Subscribers Cards */}
+              {paymentStatusFilter === "SUBSCRIBERS" ? (
+                paginatedSubscribers.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {paginatedSubscribers.map((sub: any) => {
+                        const daysLeft = sub.endDate
+                          ? Math.max(0, Math.ceil((new Date(sub.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+                          : 0;
+                        const isExpiringSoon = daysLeft <= 7;
+
+                        return (
+                          <div
+                            key={sub.id}
+                            className="p-5 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 space-y-3 relative overflow-hidden group hover:border-purple-500/40 transition-all shadow-xs"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-black bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                                  <Crown className="w-3 h-3 text-amber-400" />
+                                  <span>{sub.planType || "PREMIUM_6_COURSES"}</span>
+                                </span>
+                                <h4 className="font-bold text-sm text-slate-900 dark:text-white mt-1">
+                                  {sub.user?.name || "Student User"}
+                                </h4>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  {sub.user?.email}
+                                </p>
+                              </div>
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  isExpiringSoon
+                                    ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                    : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                }`}
+                              >
+                                {daysLeft} days left
+                              </span>
+                            </div>
+
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs space-y-1">
+                              {sub.user?.studentId && (
+                                <p className="text-slate-600 dark:text-slate-300">
+                                  Student ID: <strong className="font-mono text-slate-900 dark:text-white">{sub.user.studentId}</strong>
+                                </p>
+                              )}
+                              <p className="text-slate-600 dark:text-slate-300">
+                                Valid Until: <strong className="font-mono text-slate-900 dark:text-white">{new Date(sub.endDate).toLocaleDateString()}</strong>
+                              </p>
+                              <p className="text-slate-600 dark:text-slate-300">
+                                Course Quota: <strong className="text-emerald-500">{sub.courseAccessCount || 0}</strong> / {sub.maxCourseLimit || 6} courses used
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <TablePagination
+                      currentPage={paymentPage}
+                      totalPages={totalPaymentPages}
+                      totalItems={filteredSubscribers.length}
+                      itemsPerPage={PAYMENT_PAGE_SIZE}
+                      onPageChange={setPaymentPage}
+                      itemName="subscribers"
+                    />
+                  </div>
+                ) : (
+                  <div className="p-16 text-center rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 text-slate-500 text-xs">
+                    {paymentSearch ? "No active subscribers match your search." : "No active premium subscribers found."}
+                  </div>
+                )
               ) : (
-                <div className="p-16 text-center rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 text-slate-500 text-xs">
-                  No pending subscription requests at this time.
-                </div>
+                /* View 2: Payments Requests & History */
+                paginatedPayments.length > 0 ? (
+                  <div className="space-y-3">
+                    {paginatedPayments.map((p) => {
+                      let selectedCourses: any[] = [];
+                      try {
+                        if (p.selectedCoursesJson) selectedCourses = JSON.parse(p.selectedCoursesJson);
+                      } catch {
+                        selectedCourses = [];
+                      }
+
+                      const isPending = p.status === "PENDING";
+                      const isApproved = p.status === "APPROVED";
+                      const isRejected = p.status === "REJECTED";
+
+                      return (
+                        <div
+                          key={p.id}
+                          className={`p-6 rounded-3xl bg-white dark:bg-[#0d1527] border transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-6 ${
+                            isPending
+                              ? "border-amber-500/30 dark:border-amber-500/20 shadow-xs"
+                              : isApproved
+                              ? "border-slate-200 dark:border-slate-800/80 opacity-95"
+                              : "border-slate-200 dark:border-slate-800/50 opacity-75"
+                          }`}
+                        >
+                          <div className="space-y-3 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="px-2.5 py-0.5 rounded-lg text-xs font-black bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                {p.paymentMethod}
+                              </span>
+                              <span className="text-lg font-black text-slate-900 dark:text-white">
+                                ৳{p.amount} • {p.planType}
+                              </span>
+                              {isPending && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  <span>Pending Verification</span>
+                                </span>
+                              )}
+                              {isApproved && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>Verified & Granted</span>
+                                </span>
+                              )}
+                              {isRejected && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1">
+                                  <Ban className="w-3 h-3" />
+                                  <span>Declined</span>
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="text-xs text-slate-600 dark:text-slate-300 space-y-1">
+                              <p>
+                                Student: <strong className="text-slate-900 dark:text-white">{p.user?.name}</strong> ({p.user?.email})
+                                {p.user?.studentId && <span className="text-slate-400"> • ID: <strong className="font-mono text-slate-800 dark:text-slate-200">{p.user.studentId}</strong></span>}
+                              </p>
+                              <p>
+                                Phone: <strong className="font-mono text-slate-900 dark:text-white">{p.senderPhone}</strong> • TrxID:{" "}
+                                <strong className="font-mono text-blue-600 dark:text-blue-400">{p.transactionId}</strong>
+                                <span className="text-slate-400"> • Submitted: {new Date(p.createdAt).toLocaleString()}</span>
+                              </p>
+                            </div>
+
+                            {selectedCourses.length > 0 && (
+                              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs">
+                                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5">
+                                  6 Quota Courses Chosen by Student:
+                                </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {selectedCourses.map((c: any, idx: number) => (
+                                    <span
+                                      key={idx}
+                                      className="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300/60 dark:border-transparent"
+                                    >
+                                      {c.code || c.courseCode}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {p.slipUrl && (
+                              <a
+                                href={p.slipUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-xs font-bold text-blue-400 hover:underline"
+                              >
+                                <span>View Payment Slip Screenshot</span>
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isPending ? (
+                              <>
+                                <button
+                                  onClick={() => handleApprovePayment(p.id)}
+                                  className="px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <Check className="w-4 h-4" />
+                                  <span>Approve & Unlock 6</span>
+                                </button>
+                                <button
+                                  onClick={() => handleRejectPayment(p.id)}
+                                  className="px-4 py-2.5 rounded-xl font-bold text-xs bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60 cursor-pointer"
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            ) : isApproved ? (
+                              <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20 flex items-center gap-1">
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Approved</span>
+                              </span>
+                            ) : (
+                              <span className="text-xs font-bold text-rose-400 bg-rose-500/10 px-3 py-1.5 rounded-xl border border-rose-500/20 flex items-center gap-1">
+                                <X className="w-3.5 h-3.5" />
+                                <span>Declined</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <TablePagination
+                      currentPage={paymentPage}
+                      totalPages={totalPaymentPages}
+                      totalItems={filteredPayments.length}
+                      itemsPerPage={PAYMENT_PAGE_SIZE}
+                      onPageChange={setPaymentPage}
+                      itemName="payments"
+                    />
+                  </div>
+                ) : (
+                  <div className="p-16 text-center rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 text-slate-500 text-xs">
+                    {paymentSearch
+                      ? "No payment records match your search."
+                      : paymentStatusFilter === "PENDING"
+                      ? "No pending subscription requests at this time."
+                      : "No payment records found in this category."}
+                  </div>
+                )
               )}
             </div>
             )
@@ -5303,159 +5747,372 @@ export default function AdminDashboardPage() {
           {/* TAB: STUDENT CONTRIBUTIONS                                                */}
           {/* ========================================================================= */}
           {activeTab === "contributions" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-sm font-black text-slate-900 dark:text-white">Student Academic Contribution Queue</h2>
-                  <p className="text-xs text-slate-400">Approving publishes the material and auto-unlocks 2 reward courses for the uploader.</p>
+                  <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <Upload className="w-5 h-5 text-emerald-500" />
+                    <span>Student Academic Contribution Queue</span>
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Review student uploaded question papers and hand notes. Approving publishes the material and auto-unlocks 2 reward courses for the student.
+                  </p>
                 </div>
-                <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                  {contributions.length} Pending
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                    {pendingContributionsCount} Pending Verification
+                  </span>
+                  <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                    {approvedContributionsCount} Published
+                  </span>
+                </div>
               </div>
 
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400">Pending Submissions</p>
+                    <p className="text-lg font-black text-amber-500">{pendingContributionsCount}</p>
+                    <p className="text-[10px] text-slate-500">Awaiting approval</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400">Published & Rewarded</p>
+                    <p className="text-lg font-black text-emerald-500">{approvedContributionsCount}</p>
+                    <p className="text-[10px] text-slate-500">Live in archive</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
+                    <Ban className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400">Declined Submissions</p>
+                    <p className="text-lg font-black text-rose-500">{rejectedContributionsCount}</p>
+                    <p className="text-[10px] text-slate-500">Quality / duplicate reject</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400">Total Submissions</p>
+                    <p className="text-lg font-black text-blue-500">{contributions.length}</p>
+                    <p className="text-[10px] text-slate-500">All-time uploads</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter Tabs & Search Bar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setContributionStatusFilter("PENDING");
+                      setContributionPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      contributionStatusFilter === "PENDING"
+                        ? "bg-amber-500 text-white shadow-sm shadow-amber-500/25"
+                        : "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>Pending</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">{pendingContributionsCount}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setContributionStatusFilter("APPROVED");
+                      setContributionPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      contributionStatusFilter === "APPROVED"
+                        ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/25"
+                        : "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>Approved / Published</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">{approvedContributionsCount}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setContributionStatusFilter("REJECTED");
+                      setContributionPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      contributionStatusFilter === "REJECTED"
+                        ? "bg-rose-600 text-white shadow-sm shadow-rose-600/25"
+                        : "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>Declined</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">{rejectedContributionsCount}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setContributionStatusFilter("ALL");
+                      setContributionPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      contributionStatusFilter === "ALL"
+                        ? "bg-blue-600 text-white shadow-sm shadow-blue-600/25"
+                        : "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>All Submissions</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">{contributions.length}</span>
+                  </button>
+                </div>
+
+                <div className="relative min-w-[240px]">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={contributionSearch}
+                    onChange={(e) => {
+                      setContributionSearch(e.target.value);
+                      setContributionPage(1);
+                    }}
+                    placeholder="Search title, course code, dept, uploader..."
+                    className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  {contributionSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setContributionSearch("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Submissions List */}
               {paginatedContributions.length > 0 ? (
                 <div className="space-y-3">
-                  {paginatedContributions.map((c) => (
-                    <div
-                      key={c.id}
-                      className="p-6 rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-6"
-                    >
-                      <div className="space-y-2.5 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono font-bold text-xs px-2.5 py-1 rounded bg-blue-500/20 text-blue-600 dark:text-blue-400">
-                            {c.uploadedResource?.course?.code}
-                          </span>
-                          <span className="font-bold text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 uppercase">
-                            Dept: {c.uploadedResource?.department || c.uploadedResource?.course?.department || "CSE"}
-                          </span>
-                          {c.uploadedResource?.teacher ? (
-                            <span className="font-mono font-bold text-xs px-2.5 py-1 rounded bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center gap-1">
-                              <GraduationCap className="w-3.5 h-3.5" />
-                              <span>[{c.uploadedResource.teacher.initial || "FA"}] {c.uploadedResource.teacher.name}</span>
+                  {paginatedContributions.map((c) => {
+                    const isPending = c.status === "PENDING";
+                    const isApproved = c.status === "APPROVED";
+                    const isRejected = c.status === "REJECTED";
+
+                    return (
+                      <div
+                        key={c.id}
+                        className={`p-6 rounded-3xl bg-white dark:bg-[#0d1527] border transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-6 ${
+                          isPending
+                            ? "border-amber-500/30 dark:border-amber-500/20 shadow-xs"
+                            : isApproved
+                            ? "border-slate-200 dark:border-slate-800/80 opacity-95"
+                            : "border-slate-200 dark:border-slate-800/50 opacity-75"
+                        }`}
+                      >
+                        <div className="space-y-2.5 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono font-bold text-xs px-2.5 py-1 rounded bg-blue-500/20 text-blue-600 dark:text-blue-400">
+                              {c.uploadedResource?.course?.code || c.courseCode}
                             </span>
-                          ) : (
-                            <span className="font-mono text-xs px-2.5 py-1 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400">
-                              Central / Unassigned Faculty
+                            <span className="font-bold text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 uppercase">
+                              Dept: {c.uploadedResource?.department || c.uploadedResource?.course?.department || "CSE"}
                             </span>
-                          )}
-                          <h4 className="font-bold text-sm text-slate-900 dark:text-white">{c.uploadedResource?.title}</h4>
-                        </div>
-
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          Uploader: <strong className="text-slate-900 dark:text-white">{c.user?.name}</strong> ({c.user?.email}) • Type: <strong className="text-slate-700 dark:text-slate-300">{c.uploadedResource?.type}</strong>
-                        </p>
-
-                        <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-slate-900 border border-emerald-200 dark:border-slate-800 text-xs text-emerald-800 dark:text-emerald-400">
-                          <p className="font-bold text-emerald-700 dark:text-emerald-400">🎁 2 Reward Courses to be permanently unlocked:</p>
-                          <p className="font-mono text-slate-700 dark:text-slate-300 mt-0.5">
-                            1. {c.requestedCourse1?.code} ({c.requestedCourse1?.title})
-                            <br />
-                            2. {c.requestedCourse2?.code} ({c.requestedCourse2?.title})
-                          </p>
-                        </div>
-
-                        {/* File Preview Thumbnail & Actions */}
-                        {c.uploadedResource?.fileUrl && (
-                          <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                            {isImageFile(c.uploadedResource.fileUrl) ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setImageZoom(1);
-                                  setImageRotate(0);
-                                  setAdminPreviewImage(c.uploadedResource.fileUrl);
-                                }}
-                                className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 shrink-0 group cursor-pointer"
-                                title="Click to view image"
-                              >
-                                <img
-                                  src={c.uploadedResource.fileUrl}
-                                  alt={c.uploadedResource.title}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                                  <Eye className="w-5 h-5" />
-                                </div>
-                              </button>
+                            {c.uploadedResource?.teacher ? (
+                              <span className="font-mono font-bold text-xs px-2.5 py-1 rounded bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                                <GraduationCap className="w-3.5 h-3.5" />
+                                <span>[{c.uploadedResource.teacher.initial || "FA"}] {c.uploadedResource.teacher.name}</span>
+                              </span>
                             ) : (
-                              <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
-                                <FileText className="w-6 h-6" />
-                              </div>
+                              <span className="font-mono text-xs px-2.5 py-1 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                                Central / Unassigned Faculty
+                              </span>
                             )}
+                            <h4 className="font-bold text-sm text-slate-900 dark:text-white">{c.uploadedResource?.title}</h4>
+                            {isPending && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                <span>Pending Approval</span>
+                              </span>
+                            )}
+                            {isApproved && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Published</span>
+                              </span>
+                            )}
+                            {isRejected && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1">
+                                <Ban className="w-3 h-3" />
+                                <span>Declined</span>
+                              </span>
+                            )}
+                          </div>
 
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate" title={c.uploadedResource.fileUrl}>
-                                {c.uploadedResource.fileUrl}
-                              </p>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {isImageFile(c.uploadedResource.fileUrl) ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setImageZoom(1);
-                                      setImageRotate(0);
-                                      setAdminPreviewImage(c.uploadedResource.fileUrl);
-                                    }}
-                                    className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer"
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                    <span>View Image</span>
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => setViewingResource({ ...c.uploadedResource, courseCode: c.courseCode || c.uploadedResource?.course?.code || "SUBMISSION" })}
-                                    className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer"
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                    <span>Inspect Document</span>
-                                  </button>
-                                )}
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Uploader: <strong className="text-slate-900 dark:text-white">{c.user?.name}</strong> ({c.user?.email}) • Type:{" "}
+                            <strong className="text-slate-700 dark:text-slate-300">{c.uploadedResource?.type}</strong>
+                            <span className="text-slate-400"> • Submitted: {new Date(c.createdAt).toLocaleDateString()}</span>
+                          </p>
+
+                          <div className={`p-3 rounded-2xl border text-xs ${
+                            isApproved
+                              ? "bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40 text-emerald-800 dark:text-emerald-400"
+                              : "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
+                          }`}>
+                            <p className="font-bold text-emerald-600 dark:text-emerald-400">
+                              {isApproved ? "✓ 2 Reward Courses permanently unlocked for student:" : "🎁 2 Reward Courses to be permanently unlocked:"}
+                            </p>
+                            <p className="font-mono mt-0.5">
+                              1. {c.requestedCourse1?.code} ({c.requestedCourse1?.title})
+                              <br />
+                              2. {c.requestedCourse2?.code} ({c.requestedCourse2?.title})
+                            </p>
+                          </div>
+
+                          {/* File Preview Thumbnail & Actions */}
+                          {c.uploadedResource?.fileUrl && (
+                            <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                              {isImageFile(c.uploadedResource.fileUrl) ? (
                                 <button
                                   type="button"
-                                  onClick={() => setViewingResource({ ...c.uploadedResource, courseCode: c.courseCode || c.uploadedResource?.course?.code || "SUBMISSION" })}
-                                  className="px-2 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
+                                  onClick={() => {
+                                    setImageZoom(1);
+                                    setImageRotate(0);
+                                    setAdminPreviewImage(c.uploadedResource.fileUrl);
+                                  }}
+                                  className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 shrink-0 group cursor-pointer"
+                                  title="Click to view image"
                                 >
-                                  <ExternalLink className="w-3 h-3" />
-                                  <span>View Document</span>
+                                  <img
+                                    src={c.uploadedResource.fileUrl}
+                                    alt={c.uploadedResource.title}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                  />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                    <Eye className="w-5 h-5" />
+                                  </div>
                                 </button>
+                              ) : (
+                                <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+                                  <FileText className="w-6 h-6" />
+                                </div>
+                              )}
+
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate" title={c.uploadedResource.fileUrl}>
+                                  {c.uploadedResource.fileUrl}
+                                </p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {isImageFile(c.uploadedResource.fileUrl) ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setImageZoom(1);
+                                        setImageRotate(0);
+                                        setAdminPreviewImage(c.uploadedResource.fileUrl);
+                                      }}
+                                      className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                      <span>View Image</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setViewingResource({
+                                          ...c.uploadedResource,
+                                          courseCode: c.courseCode || c.uploadedResource?.course?.code || "SUBMISSION",
+                                        })
+                                      }
+                                      className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                      <span>Inspect Document</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setViewingResource({
+                                        ...c.uploadedResource,
+                                        courseCode: c.courseCode || c.uploadedResource?.course?.code || "SUBMISSION",
+                                      })
+                                    }
+                                    className="px-2 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    <span>View Document</span>
+                                  </button>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
+                          )}
+                        </div>
 
-                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                        <button
-                          onClick={() => handleOpenEditContributionModal(c)}
-                          className="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/25 flex items-center gap-1.5 cursor-pointer"
-                          title="Edit title, faculty initial or details before approving"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                          <span>Edit & Approve</span>
-                        </button>
-                        <button
-                          onClick={() => handleApproveContribution(c.id)}
-                          className="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Quick Approve</span>
-                        </button>
-                        <button
-                          onClick={() => handleRejectContribution(c.id)}
-                          className="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60 cursor-pointer"
-                        >
-                          Reject
-                        </button>
+                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                          {isPending ? (
+                            <>
+                              <button
+                                onClick={() => handleOpenEditContributionModal(c)}
+                                className="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/25 flex items-center gap-1.5 cursor-pointer"
+                                title="Edit title, faculty initial or details before approving"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                                <span>Edit & Approve</span>
+                              </button>
+                              <button
+                                onClick={() => handleApproveContribution(c.id)}
+                                className="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Quick Approve</span>
+                              </button>
+                              <button
+                                onClick={() => handleRejectContribution(c.id)}
+                                className="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60 cursor-pointer"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          ) : isApproved ? (
+                            <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20 flex items-center gap-1">
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Published</span>
+                            </span>
+                          ) : (
+                            <span className="text-xs font-bold text-rose-400 bg-rose-500/10 px-3 py-1.5 rounded-xl border border-rose-500/20 flex items-center gap-1">
+                              <Ban className="w-3.5 h-3.5" />
+                              <span>Declined</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   <TablePagination
                     currentPage={contributionPage}
                     totalPages={totalContributionPages}
-                    totalItems={contributions.length}
+                    totalItems={filteredContributions.length}
                     itemsPerPage={CONTRIBUTION_PAGE_SIZE}
                     onPageChange={setContributionPage}
                     itemName="submissions"
@@ -5463,7 +6120,11 @@ export default function AdminDashboardPage() {
                 </div>
               ) : (
                 <div className="p-16 text-center rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 text-slate-500 text-xs">
-                  No pending student submissions waiting for verification.
+                  {contributionSearch
+                    ? "No student submissions match your search."
+                    : contributionStatusFilter === "PENDING"
+                    ? "No pending student submissions waiting for verification."
+                    : "No student submissions found in this category."}
                 </div>
               )}
             </div>
@@ -5473,64 +6134,261 @@ export default function AdminDashboardPage() {
           {/* TAB: FINANCIAL WAIVERS                                                    */}
           {/* ========================================================================= */}
           {activeTab === "waivers" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-sm font-black text-slate-900 dark:text-white">Financial Aid & Hardship Waiver Applications</h2>
-                  <p className="text-xs text-slate-400">Approving grants the student the ৳99 Package (6 Course Unlocks Quota for 3 months).</p>
+                  <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <GraduationCap className="w-5 h-5 text-purple-500" />
+                    <span>Financial Aid & Hardship Waiver Applications</span>
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Review applications from students requesting financial hardship assistance. Approving grants the student the ৳99 Package (6 Course Unlocks Quota for 3 months).
+                  </p>
                 </div>
-                <span className="text-xs font-bold text-purple-400 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
-                  {waivers.length} Applications
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                    {pendingWaiversCount} Pending Review
+                  </span>
+                  <span className="text-xs font-bold text-purple-500 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
+                    {approvedWaiversCount} Granted
+                  </span>
+                </div>
               </div>
 
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400">Pending Review</p>
+                    <p className="text-lg font-black text-amber-500">{pendingWaiversCount}</p>
+                    <p className="text-[10px] text-slate-500">Awaiting clearance</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400">Granted Waivers</p>
+                    <p className="text-lg font-black text-emerald-500">{approvedWaiversCount}</p>
+                    <p className="text-[10px] text-slate-500">6 courses unlocked</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
+                    <Ban className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400">Declined</p>
+                    <p className="text-lg font-black text-rose-500">{rejectedWaiversCount}</p>
+                    <p className="text-[10px] text-slate-500">Not eligible</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0">
+                    <Award className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400">Total Applications</p>
+                    <p className="text-lg font-black text-purple-500">{waivers.length}</p>
+                    <p className="text-[10px] text-slate-500">All-time applications</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter Tabs & Search Bar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWaiverStatusFilter("PENDING");
+                      setWaiverPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      waiverStatusFilter === "PENDING"
+                        ? "bg-amber-500 text-white shadow-sm shadow-amber-500/25"
+                        : "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>Pending</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">{pendingWaiversCount}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWaiverStatusFilter("APPROVED");
+                      setWaiverPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      waiverStatusFilter === "APPROVED"
+                        ? "bg-emerald-600 text-white shadow-sm shadow-emerald-600/25"
+                        : "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>Granted History</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">{approvedWaiversCount}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWaiverStatusFilter("REJECTED");
+                      setWaiverPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      waiverStatusFilter === "REJECTED"
+                        ? "bg-rose-600 text-white shadow-sm shadow-rose-600/25"
+                        : "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>Declined</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">{rejectedWaiversCount}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWaiverStatusFilter("ALL");
+                      setWaiverPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      waiverStatusFilter === "ALL"
+                        ? "bg-blue-600 text-white shadow-sm shadow-blue-600/25"
+                        : "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <span>All Applications</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">{waivers.length}</span>
+                  </button>
+                </div>
+
+                <div className="relative min-w-[240px]">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={waiverSearch}
+                    onChange={(e) => {
+                      setWaiverSearch(e.target.value);
+                      setWaiverPage(1);
+                    }}
+                    placeholder="Search student, email, ID, or statement..."
+                    className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  {waiverSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setWaiverSearch("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Waivers List */}
               {paginatedWaivers.length > 0 ? (
                 <div className="space-y-3">
-                  {paginatedWaivers.map((w) => (
-                    <div
-                      key={w.id}
-                      className="p-6 rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4"
-                    >
-                      <div className="space-y-2 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-500/20 text-purple-300">
-                            Target: ৳99 Package (6 Courses)
-                          </span>
-                          <span className="text-xs text-slate-400 font-mono">
-                            {new Date(w.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <h4 className="font-bold text-sm text-slate-900 dark:text-white">
-                          {w.user?.name} • Student ID: {w.studentId} {w.cgpa ? `• CGPA: ${w.cgpa}` : ""}
-                        </h4>
-                        <p className="text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 italic">
-                          &quot;{w.reason}&quot;
-                        </p>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Email: {w.user?.email}</p>
-                      </div>
+                  {paginatedWaivers.map((w) => {
+                    const isPending = w.status === "PENDING";
+                    const isApproved = w.status === "APPROVED";
+                    const isRejected = w.status === "REJECTED";
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => handleApproveWaiver(w.id)}
-                          className="px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 flex items-center gap-1.5"
-                        >
-                          <Check className="w-4 h-4" />
-                          <span>Accept & Grant 6</span>
-                        </button>
-                        <button
-                          onClick={() => handleRejectWaiver(w.id)}
-                          className="px-4 py-2.5 rounded-xl font-bold text-xs bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60"
-                        >
-                          Decline
-                        </button>
+                    return (
+                      <div
+                        key={w.id}
+                        className={`p-6 rounded-3xl bg-white dark:bg-[#0d1527] border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                          isPending
+                            ? "border-amber-500/30 dark:border-amber-500/20 shadow-xs"
+                            : isApproved
+                            ? "border-slate-200 dark:border-slate-800/80 opacity-95"
+                            : "border-slate-200 dark:border-slate-800/50 opacity-75"
+                        }`}
+                      >
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-500/20 text-purple-300">
+                              Target: ৳99 Package (6 Courses)
+                            </span>
+                            <span className="text-xs text-slate-400 font-mono">
+                              {new Date(w.createdAt).toLocaleDateString()}
+                            </span>
+                            {isPending && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                <span>Pending Review</span>
+                              </span>
+                            )}
+                            {isApproved && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Granted & Active</span>
+                              </span>
+                            )}
+                            {isRejected && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1">
+                                <Ban className="w-3 h-3" />
+                                <span>Declined</span>
+                              </span>
+                            )}
+                          </div>
+
+                          <h4 className="font-bold text-sm text-slate-900 dark:text-white">
+                            {w.user?.name} • Student ID: {w.studentId} {w.cgpa ? `• CGPA: ${w.cgpa}` : ""}
+                          </h4>
+
+                          <p className="text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 italic">
+                            &quot;{w.reason}&quot;
+                          </p>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">Email: {w.user?.email}</p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isPending ? (
+                            <>
+                              <button
+                                onClick={() => handleApproveWaiver(w.id)}
+                                className="px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <Check className="w-4 h-4" />
+                                <span>Accept & Grant 6</span>
+                              </button>
+                              <button
+                                onClick={() => handleRejectWaiver(w.id)}
+                                className="px-4 py-2.5 rounded-xl font-bold text-xs bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60 cursor-pointer"
+                              >
+                                Decline
+                              </button>
+                            </>
+                          ) : isApproved ? (
+                            <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20 flex items-center gap-1">
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Granted</span>
+                            </span>
+                          ) : (
+                            <span className="text-xs font-bold text-rose-400 bg-rose-500/10 px-3 py-1.5 rounded-xl border border-rose-500/20 flex items-center gap-1">
+                              <X className="w-3.5 h-3.5" />
+                              <span>Declined</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   <TablePagination
                     currentPage={waiverPage}
                     totalPages={totalWaiverPages}
-                    totalItems={waivers.length}
+                    totalItems={filteredWaivers.length}
                     itemsPerPage={WAIVER_PAGE_SIZE}
                     onPageChange={setWaiverPage}
                     itemName="waivers"
@@ -5538,7 +6396,11 @@ export default function AdminDashboardPage() {
                 </div>
               ) : (
                 <div className="p-16 text-center rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 text-slate-500 text-xs">
-                  No pending financial waiver applications.
+                  {waiverSearch
+                    ? "No waiver applications match your search."
+                    : waiverStatusFilter === "PENDING"
+                    ? "No pending financial waiver applications."
+                    : "No waiver applications found in this category."}
                 </div>
               )}
             </div>

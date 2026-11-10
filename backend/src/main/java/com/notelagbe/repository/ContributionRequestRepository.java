@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface ContributionRequestRepository extends JpaRepository<ContributionRequest, Long> {
+    List<ContributionRequest> findAllByOrderByCreatedAtDesc();
     List<ContributionRequest> findByStatusOrderByCreatedAtDesc(ResourceStatus status);
     List<ContributionRequest> findByUserIdOrderByCreatedAtDesc(Long userId);
     List<ContributionRequest> findByUploadedResourceId(Long resourceId);

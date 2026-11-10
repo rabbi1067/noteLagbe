@@ -10,6 +10,7 @@ import com.notelagbe.repository.CourseRepository;
 import com.notelagbe.repository.PaymentRequestRepository;
 import com.notelagbe.repository.SubscriptionRepository;
 import com.notelagbe.repository.UnlockedCourseRepository;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -81,11 +82,19 @@ public class PaymentService {
         if (status != null) {
             return paymentRequestRepository.findByStatusOrderByCreatedAtDesc(status);
         }
-        return paymentRequestRepository.findAll();
+        return paymentRequestRepository.findAllByOrderByCreatedAtDesc();
     }
 
     public List<PaymentRequest> getUserPayments(Long userId) {
         return paymentRequestRepository.findByUserIdOrderByCreatedAtDesc(userId);
+    }
+
+    public List<Subscription> getSubscriptions(Boolean activeOnly) {
+        List<Subscription> list = subscriptionRepository.findAll(Sort.by(Sort.Direction.DESC, "startDate"));
+        if (Boolean.TRUE.equals(activeOnly)) {
+            return list.stream().filter(s -> s.isActive() && !s.isExpired()).toList();
+        }
+        return list;
     }
 
     @Transactional

@@ -115,6 +115,13 @@ public class AdminService {
         double revenue = approvedPayments.stream().mapToDouble(PaymentRequest::getAmount).sum();
         stats.setTotalRevenue(revenue);
 
+        long activeSubscribers = subscriptionRepository.findAll().stream()
+                .filter(s -> s.isActive() && !s.isExpired())
+                .map(s -> s.getUser().getId())
+                .distinct()
+                .count();
+        stats.setActivePremiumUsers(activeSubscribers);
+
         return stats;
     }
 

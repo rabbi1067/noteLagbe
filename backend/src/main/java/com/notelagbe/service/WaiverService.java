@@ -70,7 +70,7 @@ public class WaiverService {
         if (status != null) {
             return waiverRequestRepository.findByStatusOrderByCreatedAtDesc(status);
         }
-        return waiverRequestRepository.findAll();
+        return waiverRequestRepository.findAllByOrderByCreatedAtDesc();
     }
 
     public List<WaiverRequest> getUserWaivers(Long userId) {

@@ -13,6 +13,7 @@ public class AdminDashboardStats {
     private long pendingContributions;
     private long pendingWaivers;
     private long pendingReviews;
+    private long activePremiumUsers;
 
     private double totalRevenue;
 
@@ -50,6 +51,9 @@ public class AdminDashboardStats {
 
     public long getPendingReviews() { return pendingReviews; }
     public void setPendingReviews(long pendingReviews) { this.pendingReviews = pendingReviews; }
+
+    public long getActivePremiumUsers() { return activePremiumUsers; }
+    public void setActivePremiumUsers(long activePremiumUsers) { this.activePremiumUsers = activePremiumUsers; }
 
     public double getTotalRevenue() { return totalRevenue; }
     public void setTotalRevenue(double totalRevenue) { this.totalRevenue = totalRevenue; }
