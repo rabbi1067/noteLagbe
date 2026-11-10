@@ -1,20 +1,23 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   Lock,
   Download,
-  ShieldAlert,
+  ShieldCheck,
   Sparkles,
   BookOpen,
   ExternalLink,
   ZoomIn,
   ZoomOut,
+  RotateCw,
   RotateCcw,
   Maximize2,
   Minimize2,
-  FileText
+  FileText,
+  Columns,
+  Maximize
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
@@ -28,6 +31,7 @@ interface PDFViewerModalProps {
   courseCode: string;
   isUnlocked: boolean;
   onUnlockedSuccess: () => void;
+  isAdminMode?: boolean;
 }
 
 export default function PDFViewerModal({
@@ -37,11 +41,56 @@ export default function PDFViewerModal({
   courseCode,
   isUnlocked,
   onUnlockedSuccess,
+  isAdminMode = false,
 }: PDFViewerModalProps) {
   const { user, isAuthenticated, setShowAuthModal } = useAuth();
   const [unlocking, setUnlocking] = useState(false);
   const [zoom, setZoom] = useState(100);
+  const [rotation, setRotation] = useState(0); // 0, 90, 180, 270 degrees
+  const [viewWidthMode, setViewWidthMode] = useState<"narrow" | "wide">("wide");
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Admins get download and external new-tab privileges. Regular students read securely on-site.
+  const isAdmin = user?.role === "ROLE_ADMIN" || user?.role === "ROLE_SUPER_ADMIN" || user?.role === "ROLE_MANAGER";
+  const canDownloadAndOpen = Boolean(isAdminMode || isAdmin);
+
+  // Keyboard accessibility & hotkeys for reading
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === "Escape") {
+        if (isFullscreen) {
+          setIsFullscreen(false);
+        } else {
+          onClose();
+        }
+      } else if (e.key === "+" || e.key === "=") {
+        setZoom((prev) => Math.min(prev + 20, 300));
+      } else if (e.key === "-" || e.key === "_") {
+        setZoom((prev) => Math.max(prev - 20, 50));
+      } else if (e.key === "0") {
+        setZoom(100);
+      } else if (e.key === "r" || e.key === "R") {
+        setRotation((prev) => (prev + 90) % 360);
+      } else if (e.key === "f" || e.key === "F") {
+        setIsFullscreen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isFullscreen, onClose]);
+
+  // Reset controls whenever a new resource is opened
+  useEffect(() => {
+    if (isOpen) {
+      setZoom(100);
+      setRotation(0);
+    }
+  }, [isOpen, resource?.id]);
 
   if (!isOpen || !resource) return null;
 
@@ -64,26 +113,17 @@ export default function PDFViewerModal({
     }
   };
 
-  const handleZoomIn = () => {
-    setZoom((prev) => Math.min(prev + 25, 250));
-  };
-
-  const handleZoomOut = () => {
-    setZoom((prev) => Math.max(prev - 25, 50));
-  };
-
-  const handleResetZoom = () => {
-    setZoom(100);
-  };
-
-  const toggleFullscreen = () => {
-    setIsFullscreen((prev) => !prev);
-  };
+  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 20, 300));
+  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 20, 50));
+  const handleResetZoom = () => setZoom(100);
+  const handleRotateClockwise = () => setRotation((prev) => (prev + 90) % 360);
+  const handleResetRotation = () => setRotation(0);
+  const toggleFullscreen = () => setIsFullscreen((prev) => !prev);
 
   const secureFileUrl = resource?.id ? `/api/resources/${resource.id}/file` : resource?.fileUrl;
 
   const handleDownload = async () => {
-    if (!resource) return;
+    if (!resource || !canDownloadAndOpen) return;
     try {
       if (resource.id) await api.resources.trackDownload(resource.id);
     } catch {}
@@ -96,6 +136,7 @@ export default function PDFViewerModal({
   };
 
   const displayTitle = resource.title || `${courseCode} Academic Document`;
+  const isRotated = rotation % 180 !== 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
@@ -103,11 +144,13 @@ export default function PDFViewerModal({
         className={`w-full transition-all duration-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden relative ${
           isFullscreen
             ? "fixed inset-0 max-w-none h-full rounded-none"
-            : "max-w-5xl h-[92vh] rounded-2xl"
+            : viewWidthMode === "narrow"
+            ? "max-w-3xl h-[92vh] rounded-2xl"
+            : "max-w-6xl h-[92vh] rounded-2xl"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* Header Bar */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/70">
           <div className="flex items-center gap-2.5 min-w-0 mr-4">
             <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 shrink-0">
@@ -117,21 +160,35 @@ export default function PDFViewerModal({
               <h3 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 truncate" title={displayTitle}>
                 {displayTitle}
               </h3>
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
-                {resource.type ? resource.type.replace(/_/g, " ") : "Document"} • {resource.semesterName || "Semester Exam"}
-              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                  {resource.type ? resource.type.replace(/_/g, " ") : "Document"} • {resource.semesterName || "Semester Exam"}
+                </span>
+                {canDownloadAndOpen ? (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    <ShieldCheck className="w-2.5 h-2.5" />
+                    Admin Access
+                  </span>
+                ) : (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                    <BookOpen className="w-2.5 h-2.5" />
+                    Student Reader
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {isUnlocked && (resource.fileUrl || resource.id) && (
+            {/* ONLY ADMINS GET DIRECT OPEN & DOWNLOAD BUTTONS */}
+            {canDownloadAndOpen && isUnlocked && (resource.fileUrl || resource.id) && (
               <>
                 <a
                   href={`${secureFileUrl}?preview=true`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
-                  title="Open in new window"
+                  title="Open in new window (Admin only)"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">New Tab</span>
@@ -140,18 +197,19 @@ export default function PDFViewerModal({
                   type="button"
                   onClick={handleDownload}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-all shadow-md shadow-blue-600/25 cursor-pointer"
-                  title="Download File to Device"
+                  title="Download Raw File to Device (Admin only)"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Download</span>
                 </button>
               </>
             )}
+
             <button
               type="button"
               onClick={toggleFullscreen}
               className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
-              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+              title={isFullscreen ? "Exit Fullscreen (Esc)" : "Fullscreen Mode (F)"}
             >
               {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </button>
@@ -166,85 +224,163 @@ export default function PDFViewerModal({
           </div>
         </div>
 
-        {/* Sub-toolbar: Zoom Controls & Fit */}
+        {/* Interactive Reader Controls Toolbar: Zoom, Rotate ("Side Korao"), View Width Mode */}
         {isUnlocked && (resource.fileUrl || resource.id) && (
-          <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-900/80 text-xs">
-            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-              <FileText className="w-3.5 h-3.5 text-blue-500" />
-              <span className="font-medium text-[11px]">Interactive Document Viewer</span>
+          <div className="flex items-center justify-between px-3 sm:px-6 py-2 border-b border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/90 text-xs flex-wrap gap-2">
+            
+            {/* Left: View Width Switcher (Narrow vs Full Page) */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 hidden md:inline">
+                View:
+              </span>
+              <div className="flex items-center bg-white dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                <button
+                  type="button"
+                  onClick={() => setViewWidthMode("narrow")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                    viewWidthMode === "narrow" && !isFullscreen
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                  title="Narrow Reading Container (Book Style)"
+                >
+                  <Columns className="w-3 h-3" />
+                  <span>Narrow</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewWidthMode("wide")}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                    viewWidthMode === "wide" && !isFullscreen
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                  title="Full Page Wide Container"
+                >
+                  <Maximize className="w-3 h-3" />
+                  <span>Full Page</span>
+                </button>
+              </div>
             </div>
 
-            {/* Centered Zoom Bar */}
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-              <button
-                type="button"
-                onClick={handleZoomOut}
-                disabled={zoom <= 50}
-                className="p-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors cursor-pointer"
-                title="Zoom Out (-25%)"
-              >
-                <ZoomOut className="w-3.5 h-3.5" />
-              </button>
+            {/* Center: Zoom and Rotate ("Side Korao") Controls */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Zoom Bar */}
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <button
+                  type="button"
+                  onClick={handleZoomOut}
+                  disabled={zoom <= 50}
+                  className="p-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors cursor-pointer"
+                  title="Zoom Out (-)"
+                >
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </button>
 
-              <button
-                type="button"
-                onClick={handleResetZoom}
-                className="px-2 py-0.5 text-[11px] font-mono font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors"
-                title="Reset Zoom to 100%"
-              >
-                {zoom}%
-              </button>
+                <button
+                  type="button"
+                  onClick={handleResetZoom}
+                  className="px-2 py-0.5 text-[11px] font-mono font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors"
+                  title="Reset Zoom to 100% (0)"
+                >
+                  {zoom}%
+                </button>
 
-              <button
-                type="button"
-                onClick={handleZoomIn}
-                disabled={zoom >= 250}
-                className="p-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors cursor-pointer"
-                title="Zoom In (+25%)"
-              >
-                <ZoomIn className="w-3.5 h-3.5" />
-              </button>
+                <button
+                  type="button"
+                  onClick={handleZoomIn}
+                  disabled={zoom >= 300}
+                  className="p-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors cursor-pointer"
+                  title="Zoom In (+)"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </button>
 
-              <button
-                type="button"
-                onClick={handleResetZoom}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border-l border-slate-200 dark:border-slate-700 ml-0.5"
-                title="Reset Fit (100%)"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
+                <button
+                  type="button"
+                  onClick={handleResetZoom}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border-l border-slate-200 dark:border-slate-700 ml-0.5"
+                  title="Reset Scale to 100%"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Rotate ("Side Korao") Button */}
+              <div className="flex items-center bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <button
+                  type="button"
+                  onClick={handleRotateClockwise}
+                  className="px-2.5 py-1 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 font-bold text-[11px] cursor-pointer"
+                  title="Rotate document 90° clockwise (Side korao) [Key: R]"
+                >
+                  <RotateCw className="w-3.5 h-3.5 text-blue-500" />
+                  <span>{rotation === 0 ? "Rotate 90°" : `${rotation}°`}</span>
+                </button>
+
+                {rotation !== 0 && (
+                  <button
+                    type="button"
+                    onClick={handleResetRotation}
+                    className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border-l border-slate-200 dark:border-slate-700 ml-0.5"
+                    title="Reset rotation to 0°"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="text-[11px] text-slate-400 hidden sm:block">
-              {isFullscreen ? "Press Esc to exit" : "Use + / - to scale"}
+            {/* Right: Security & Reader Status Notice */}
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              {!canDownloadAndOpen ? (
+                <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400 font-medium">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>Website Study View</span>
+                </span>
+              ) : (
+                <span className="font-mono text-[10px] text-slate-400 hidden sm:inline">
+                  Admin Full Mode
+                </span>
+              )}
             </div>
+
           </div>
         )}
 
         {/* Content Body */}
-        <div className="flex-1 relative overflow-auto bg-slate-200/60 dark:bg-slate-950 flex items-start justify-center p-2 sm:p-4">
+        <div
+          className="flex-1 relative overflow-auto bg-slate-200/80 dark:bg-slate-950 flex items-start justify-center p-2 sm:p-4 select-none"
+          onContextMenu={(e) => {
+            if (!canDownloadAndOpen) {
+              e.preventDefault(); // Stop right-click saving for students
+            }
+          }}
+        >
           {isUnlocked && (resource.fileUrl || resource.id) ? (
             <div
-              className="w-full h-full relative flex items-center justify-center transition-transform duration-150 ease-out origin-top"
+              className="relative flex items-center justify-center transition-all duration-200 ease-out origin-center"
               style={{
-                transform: zoom !== 100 ? `scale(${zoom / 100})` : undefined,
-                transformOrigin: "top center",
-                minHeight: zoom > 100 ? `${zoom}%` : "100%",
-                minWidth: zoom > 100 ? `${zoom}%` : "100%",
+                transform: `rotate(${rotation}deg) scale(${zoom / 100})`,
+                transformOrigin: "center center",
+                width: isRotated ? "80vh" : "100%",
+                height: isRotated ? "80vw" : "100%",
+                minHeight: zoom > 100 ? `${zoom}%` : isRotated ? "80vw" : "100%",
+                minWidth: zoom > 100 ? `${zoom}%` : isRotated ? "80vh" : "100%",
               }}
             >
-              {/* Security Watermark Overlay */}
+              {/* Security Watermark Overlay for Student Anti-Scraping */}
               <div className="absolute inset-0 pointer-events-none z-10 flex flex-wrap items-center justify-around opacity-[0.05] select-none overflow-hidden">
-                {Array.from({ length: 20 }).map((_, i) => (
-                  <div key={i} className="transform -rotate-45 font-mono text-base font-extrabold text-slate-900 dark:text-white whitespace-nowrap p-8">
-                    NoteLagbe • {user?.email || "Student Access"}
+                {Array.from({ length: 24 }).map((_, i) => (
+                  <div key={i} className="transform -rotate-45 font-mono text-sm sm:text-base font-extrabold text-slate-900 dark:text-white whitespace-nowrap p-8">
+                    NoteLagbe Protected • {user?.email || "Student Academic Portal"}
                   </div>
                 ))}
               </div>
 
-              {/* Embedded Document Frame */}
+              {/* Embedded Document Frame (with #toolbar=0 to suppress browser PDF download/print tools) */}
               <iframe
-                src={`${secureFileUrl}?preview=true#toolbar=1&navpanes=0&zoom=${zoom}`}
+                src={`${secureFileUrl}?preview=true#toolbar=0&navpanes=0`}
                 className="w-full h-full border-none rounded-xl shadow-lg bg-white"
                 title={displayTitle}
               />

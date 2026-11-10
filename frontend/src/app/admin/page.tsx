@@ -10462,6 +10462,7 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
           courseCode={viewingResource.course?.code || viewingResource.courseCode || "CSE361"}
           isUnlocked={true}
           onUnlockedSuccess={() => {}}
+          isAdminMode={true}
         />
       )}
     </div>
