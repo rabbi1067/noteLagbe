@@ -97,14 +97,18 @@ export default function SearchableTeacherSelect({
         const init = (t.initial || "").toLowerCase();
         const name = (t.name || "").toLowerCase();
         const desig = (t.designation || "").toLowerCase();
+        const dept = (t.department || "").toLowerCase();
 
         let score = 0;
         if (init === q) score = 100; // exact initial match e.g. SM == sm
         else if (init.startsWith(q)) score = 85; // initial prefix e.g. S in SM
         else if (name.startsWith(q)) score = 70; // name starts with query
         else if (name.split(/\s+/).some((w) => w.startsWith(q))) score = 60; // name word starts with query
+        else if (dept === q) score = 55; // exact department match e.g. cse, eee
+        else if (dept.startsWith(q)) score = 50; // department prefix
         else if (init.includes(q)) score = 45;
         else if (name.includes(q)) score = 30;
+        else if (dept.includes(q)) score = 25;
         else if (desig.includes(q)) score = 15;
 
         return { teacher: t, score };
@@ -270,13 +274,16 @@ export default function SearchableTeacherSelect({
                         <div className="flex items-center gap-1.5 truncate">
                           <span className="font-semibold truncate">{t.name}</span>
                           {t.initial && (
-                            <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shrink-0">
+                            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-50 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shrink-0">
                               [{t.initial}]
                             </span>
                           )}
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 shrink-0">
+                            {t.department || "CSE"}
+                          </span>
                         </div>
                         <span className="text-[10px] text-slate-400 font-normal truncate block">
-                          {t.designation || "Faculty Member"} {t.department ? `• ${t.department}` : ""}
+                          {t.designation || "Faculty Member"}
                         </span>
                       </div>
                     </div>

@@ -10,6 +10,7 @@ public interface TeacherCourseRepository extends JpaRepository<TeacherCourse, Lo
     List<TeacherCourse> findByTeacherId(Long teacherId);
     List<TeacherCourse> findByCourseCodeIgnoreCase(String code);
     Optional<TeacherCourse> findByCourseIdAndTeacherId(Long courseId, Long teacherId);
+    List<TeacherCourse> findAllByCourseIdAndTeacherId(Long courseId, Long teacherId);
     boolean existsByCourseIdAndTeacherId(Long courseId, Long teacherId);
     void deleteByCourseIdAndTeacherId(Long courseId, Long teacherId);
 }

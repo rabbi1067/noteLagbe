@@ -359,13 +359,13 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
         int added = 0;
         for (Resource r : approved) {
             if (r.getTeacher() != null && r.getCourse() != null) {
-                java.util.Optional<TeacherCourse> tcOpt = teacherCourseRepository.findByCourseIdAndTeacherId(r.getCourse().getId(), r.getTeacher().getId());
-                if (tcOpt.isEmpty()) {
+                List<TeacherCourse> tcList = teacherCourseRepository.findAllByCourseIdAndTeacherId(r.getCourse().getId(), r.getTeacher().getId());
+                if (tcList.isEmpty()) {
                     TeacherCourse tc = new TeacherCourse(r.getTeacher(), r.getCourse(), "General", "ADMIN_ASSIGNED");
                     teacherCourseRepository.save(tc);
                     added++;
                 } else {
-                    TeacherCourse tc = tcOpt.get();
+                    TeacherCourse tc = tcList.get(0);
                     if (!"ADMIN_ASSIGNED".equalsIgnoreCase(tc.getScheduleInfo())) {
                         tc.setScheduleInfo("ADMIN_ASSIGNED");
                         teacherCourseRepository.save(tc);

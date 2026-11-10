@@ -278,10 +278,13 @@ export default function SearchableCourseSelect({
                       <span className="font-mono font-bold text-xs px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 shrink-0">
                         {c.code}
                       </span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 shrink-0">
+                        {c.department || "CSE"}
+                      </span>
                       <div className="truncate">
                         <span className="font-semibold block truncate">{c.title}</span>
                         <span className="text-[10px] text-slate-400 font-normal">
-                          {c.department || "CSE"} {c.semester ? `• Sem ${c.semester}` : ""} {c.credits ? `• ${c.credits} cr` : ""}
+                          {c.semester ? `Semester ${c.semester}` : "Curriculum"} {c.credits ? `• ${c.credits} Credits` : ""}
                         </span>
                       </div>
                     </div>

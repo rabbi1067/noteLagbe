@@ -26,6 +26,7 @@ import {
   Trash2,
   Edit3,
   Pencil,
+  ArrowRightLeft,
   ExternalLink,
   Check,
   X,
@@ -1638,6 +1639,58 @@ export default function AdminDashboardPage() {
   };
 
   // ---------------- Course-Faculty Assignment ----------------
+  const [reassignModal, setReassignModal] = useState<{
+    open: boolean;
+    courseCode: string;
+    courseTitle: string;
+    currentTeacher: any;
+    newTeacherId: number | "";
+  }>({
+    open: false,
+    courseCode: "",
+    courseTitle: "",
+    currentTeacher: null,
+    newTeacherId: "",
+  });
+
+  const handleOpenReassignModal = (courseCode: string, courseTitle: string, currentTeacher: any) => {
+    setReassignModal({
+      open: true,
+      courseCode,
+      courseTitle,
+      currentTeacher,
+      newTeacherId: "",
+    });
+  };
+
+  const handleExecuteReassign = async () => {
+    if (!reassignModal.newTeacherId) {
+      toast.error("Please select a new faculty member");
+      return;
+    }
+    if (Number(reassignModal.newTeacherId) === Number(reassignModal.currentTeacher?.id)) {
+      toast.error("Please select a different faculty member to reassign to");
+      return;
+    }
+    setAssigning(true);
+    try {
+      await api.admin.assignTeacherToCourse(reassignModal.courseCode, Number(reassignModal.newTeacherId));
+      if (reassignModal.currentTeacher?.id) {
+        await api.admin.removeTeacherFromCourse(reassignModal.courseCode, Number(reassignModal.currentTeacher.id));
+      }
+      setSelectedCourseForFaculty(reassignModal.courseCode);
+      notifyDataChanged("matrix", "reassigned", `${reassignModal.courseCode}->${reassignModal.newTeacherId}`);
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
+      toast.success(`Successfully reassigned ${reassignModal.courseCode} to new faculty member!`);
+      setReassignModal({ open: false, courseCode: "", courseTitle: "", currentTeacher: null, newTeacherId: "" });
+      await loadAllAdminData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reassign faculty");
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   const handleAssignTeacher = async (courseCode: string, teacherId: number) => {
     if (!courseCode || !courseCode.trim()) {
       toast.error("Please select a target course first");
@@ -1647,12 +1700,14 @@ export default function AdminDashboardPage() {
       toast.error("Please select a faculty member to assign");
       return;
     }
+    const cleanCode = courseCode.trim().toUpperCase();
     setAssigning(true);
     try {
-      await api.admin.assignTeacherToCourse(courseCode.trim(), teacherId);
-      notifyDataChanged("matrix", "assigned", `${courseCode.trim()}->${teacherId}`);
+      await api.admin.assignTeacherToCourse(cleanCode, teacherId);
+      setSelectedCourseForFaculty(cleanCode);
+      notifyDataChanged("matrix", "assigned", `${cleanCode}->${teacherId}`);
       confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
-      toast.success(`Faculty member successfully assigned to ${courseCode.trim()}! Conducted tags updated.`);
+      toast.success(`Faculty member successfully assigned to ${cleanCode}! Conducted tags updated.`);
       setTeacherToAssignId("");
       setCourseToAssignCode("");
       await loadAllAdminData();
@@ -1673,6 +1728,7 @@ export default function AdminDashboardPage() {
       onConfirm: async () => {
         try {
           await api.admin.removeTeacherFromCourse(courseCode, teacherId);
+          setSelectedCourseForFaculty(courseCode);
           notifyDataChanged("matrix", "removed", `${courseCode}->${teacherId}`);
           toast.success(`Removed ${teacherName} from ${courseCode}`);
           showDeleteSuccess(
@@ -1680,7 +1736,7 @@ export default function AdminDashboardPage() {
             `Faculty allocation of ${teacherName} for course ${courseCode} has been cleared.`,
             `${teacherName} (${courseCode})`
           );
-          loadAllAdminData();
+          await loadAllAdminData();
         } catch (err: any) {
           toast.error(err.message || "Failed to remove teacher assignment");
           throw err;
@@ -5472,22 +5528,22 @@ export default function AdminDashboardPage() {
                   <div className="space-y-5">
                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center gap-3">
                       <div className="flex-1 w-full">
-                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 block">Select Target Course:</label>
+                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 block">Select Target Course (All Departments):</label>
                         <SearchableCourseSelect
                           value={selectedCourseForFaculty || matrixCourses[0]?.code || courses[0]?.code || ""}
                           onChange={(code) => setSelectedCourseForFaculty(code)}
-                          courses={matrixCourses}
-                          placeholder="Select course..."
+                          courses={courses}
+                          placeholder="Search course across all departments (e.g. CSE141, EEE, Math)..."
                         />
                       </div>
 
                       <div className="flex-1 w-full">
-                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 block">Select Teacher to Assign:</label>
+                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 block">Select Teacher to Assign (All Departments):</label>
                         <SearchableTeacherSelect
                           value={teacherToAssignId}
                           onChange={(tid) => setTeacherToAssignId(tid)}
-                          teachers={matrixTeachers}
-                          placeholder="Search & select faculty..."
+                          teachers={teachers}
+                          placeholder="Search faculty across all departments (e.g. Nahid, NAAO, CSE)..."
                           allowGeneral={false}
                         />
                       </div>
@@ -5523,62 +5579,132 @@ export default function AdminDashboardPage() {
                       const assignedTeachers = (() => {
                         const map = new Map<number, any>();
                         (activeCourse?.teachers || []).forEach((t: any) => {
-                          if (t && t.id) map.set(Number(t.id), t);
+                          if (t && t.id) map.set(Number(t.id), { ...t });
                         });
                         (resources || []).forEach((r: any) => {
                           const rCourseCode = r.course?.code || r.courseCode;
                           if (rCourseCode?.toLowerCase() === activeCourseCode?.toLowerCase() && r.teacher && r.teacher.id) {
-                            if (!map.has(Number(r.teacher.id))) {
+                            const existing = map.get(Number(r.teacher.id));
+                            if (!existing) {
                               map.set(Number(r.teacher.id), {
                                 id: r.teacher.id,
                                 name: r.teacher.name,
                                 initial: r.teacher.initial,
                                 designation: r.teacher.designation || "Faculty",
+                                department: r.teacher.department,
                                 hasNotes: r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "DOC_NOTE",
                                 hasQuestions: r.type === "MID_QUESTION" || r.type === "FINAL_QUESTION" || r.type === "QUIZ_CT",
+                                notesCount: (r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "DOC_NOTE") ? 1 : 0,
+                                questionsCount: (r.type === "MID_QUESTION" || r.type === "FINAL_QUESTION" || r.type === "QUIZ_CT") ? 1 : 0,
                               });
+                            } else {
+                              if (r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "DOC_NOTE") {
+                                existing.hasNotes = true;
+                                existing.notesCount = (existing.notesCount || 0) + 1;
+                              }
+                              if (r.type === "MID_QUESTION" || r.type === "FINAL_QUESTION" || r.type === "QUIZ_CT") {
+                                existing.hasQuestions = true;
+                                existing.questionsCount = (existing.questionsCount || 0) + 1;
+                              }
                             }
                           }
                         });
-                        return Array.from(map.values());
+                        return Array.from(map.values()).map((at) => {
+                          const fullTeacher = teachers.find((t) => Number(t.id) === Number(at.id));
+                          return {
+                            ...at,
+                            department: at.department || fullTeacher?.department || "CSE",
+                            initial: at.initial || fullTeacher?.initial || "",
+                            designation: at.designation || fullTeacher?.designation || "Faculty Member",
+                            image: at.image || fullTeacher?.image || "",
+                          };
+                        });
                       })();
 
                       return (
                         <div className="space-y-3">
-                          <h3 className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-                            Faculty currently conducting {activeCourseCode} ({assignedTeachers.length}):
-                          </h3>
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                              <span>Faculty currently conducting {activeCourseCode}</span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                                {assignedTeachers.length} Assigned
+                              </span>
+                            </h3>
+                          </div>
 
                           {assignedTeachers.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                               {assignedTeachers.map((t: any) => (
                                 <div
                                   key={t.id}
-                                  className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shadow-sm"
+                                  className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-blue-500/40 transition-all flex flex-col justify-between gap-3 group"
                                 >
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-8 h-8 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold text-xs flex items-center justify-center shrink-0 border border-blue-500/20">
-                                      {t.initial || t.name.charAt(0)}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <p className="font-bold text-xs text-slate-900 dark:text-white truncate">{t.name}</p>
-                                      <p className="text-[10px] text-slate-500 dark:text-slate-400">{t.designation || "Faculty"}</p>
+                                  <div className="flex items-start justify-between gap-2.5">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600/10 to-indigo-600/20 text-blue-600 dark:text-blue-400 font-extrabold text-sm flex items-center justify-center shrink-0 border border-blue-500/20 shadow-inner">
+                                        {t.initial || t.name.charAt(0)}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <p className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
+                                            {t.name}
+                                          </p>
+                                          {t.initial && (
+                                            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-50 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                              [{t.initial}]
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                          <span className="truncate">{t.designation || "Faculty Member"}</span>
+                                          <span>•</span>
+                                          <span className="font-semibold text-blue-600 dark:text-blue-400">{t.department || "CSE"}</span>
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
 
-                                  <button
-                                    onClick={() => handleRemoveTeacher(activeCourseCode, t.id, t.name)}
-                                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                                    title="Remove assignment"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                                  {/* Status & Actions */}
+                                  <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-slate-800/80 text-[10px]">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      {t.notesCount > 0 || t.questionsCount > 0 ? (
+                                        <span className="font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1 truncate">
+                                          <span>📚 {t.notesCount || 0} Notes</span>
+                                          <span>•</span>
+                                          <span>📝 {t.questionsCount || 0} Exams</span>
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400 dark:text-slate-500 font-medium italic truncate">
+                                          Assigned (No files yet)
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenReassignModal(activeCourseCode, activeCourse?.title || activeCourseCode, t)}
+                                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/60 transition-colors"
+                                        title="Reassign or change faculty member"
+                                      >
+                                        <ArrowRightLeft className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveTeacher(activeCourseCode, t.id, t.name)}
+                                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/60 transition-colors"
+                                        title="Remove faculty assignment"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
                                 </div>
                               ))}
                             </div>
                           ) : (
                             <div className="p-8 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 text-xs">
-                              No faculty members assigned to {activeCourseCode} yet.
+                              No faculty members assigned to {activeCourseCode} yet. Use the dropdown above to assign a faculty member.
                             </div>
                           )}
                         </div>
@@ -5590,23 +5716,23 @@ export default function AdminDashboardPage() {
                   <div className="space-y-5">
                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center gap-3">
                       <div className="flex-1 w-full">
-                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 block">Select Target Faculty Member:</label>
+                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 block">Select Target Faculty Member (All Departments):</label>
                         <SearchableTeacherSelect
                           value={selectedFacultyId || matrixTeachers[0]?.id || teachers[0]?.id || ""}
                           onChange={(tid) => setSelectedFacultyId(tid)}
-                          teachers={matrixTeachers}
-                          placeholder="Select faculty member..."
+                          teachers={teachers}
+                          placeholder="Select faculty member across all departments..."
                           allowGeneral={false}
                         />
                       </div>
 
                       <div className="flex-1 w-full">
-                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 block">Select Course to Assign:</label>
+                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 block">Select Course to Assign (All Departments):</label>
                         <SearchableCourseSelect
                           value={courseToAssignCode}
                           onChange={(code) => setCourseToAssignCode(code)}
-                          courses={matrixCourses}
-                          placeholder="Search & choose course..."
+                          courses={courses}
+                          placeholder="Search & choose course across all departments..."
                         />
                       </div>
 
@@ -5658,19 +5784,29 @@ export default function AdminDashboardPage() {
 
                       return (
                         <div className="space-y-3">
-                          <h3 className="text-xs font-black uppercase text-slate-500 dark:text-slate-400">
-                            Courses conducted by {currentFaculty?.name || "Faculty Member"} ({facultyCourses.length}):
-                          </h3>
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                              <span>Courses conducted by {currentFaculty?.name || "Faculty Member"}</span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                                {facultyCourses.length} Courses
+                              </span>
+                            </h3>
+                          </div>
 
                           {facultyCourses.length > 0 ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                               {facultyCourses.map((c: any) => (
                                 <div
                                   key={c.code}
-                                  className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shadow-sm"
+                                  className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shadow-sm hover:border-blue-500/40 transition-all"
                                 >
                                   <div>
-                                    <p className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">{c.code}</p>
+                                    <div className="flex items-center gap-1.5">
+                                      <p className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">{c.code}</p>
+                                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                                        {c.department || "CSE"}
+                                      </span>
+                                    </div>
                                     <p className="font-medium text-xs text-slate-900 dark:text-white truncate max-w-[180px]">{c.title}</p>
                                   </div>
 
@@ -8808,6 +8944,107 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: REASSIGN / UPDATE FACULTY ALLOCATION                               */}
+      {/* ========================================================================= */}
+      {reassignModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <ArrowRightLeft className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-slate-900 dark:text-white">
+                    Reassign Faculty Allocation
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Switch teaching instructor for {reassignModal.courseCode}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReassignModal({ open: false, courseCode: "", courseTitle: "", currentTeacher: null, newTeacherId: "" })}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Course Info */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target Academic Course</span>
+                <p className="text-sm font-extrabold text-blue-600 dark:text-blue-400 mt-0.5">
+                  {reassignModal.courseCode} - {reassignModal.courseTitle}
+                </p>
+              </div>
+
+              {/* Current Faculty */}
+              <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40">
+                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider block">Current Assigned Faculty</span>
+                <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mt-0.5 flex items-center gap-1.5 flex-wrap">
+                  <span>{reassignModal.currentTeacher?.name}</span>
+                  {reassignModal.currentTeacher?.initial && (
+                    <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300">
+                      [{reassignModal.currentTeacher?.initial}]
+                    </span>
+                  )}
+                  <span className="text-[11px] text-slate-400 font-normal">
+                    ({reassignModal.currentTeacher?.department || "CSE"})
+                  </span>
+                </div>
+              </div>
+
+              {/* Select New Faculty */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                  Select New Faculty Member to Assign (All Departments):
+                </label>
+                <SearchableTeacherSelect
+                  value={reassignModal.newTeacherId}
+                  onChange={(tid) => setReassignModal((prev) => ({ ...prev, newTeacherId: tid }))}
+                  teachers={teachers}
+                  placeholder="Search new faculty across all departments..."
+                  allowGeneral={false}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setReassignModal({ open: false, courseCode: "", courseTitle: "", currentTeacher: null, newTeacherId: "" })}
+                disabled={assigning}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteReassign}
+                disabled={assigning || !reassignModal.newTeacherId}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white transition-all shadow-md shadow-blue-600/20 flex items-center gap-1.5"
+              >
+                {assigning ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Reassigning...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Confirm Reassignment</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

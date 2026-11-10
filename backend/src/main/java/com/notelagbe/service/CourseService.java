@@ -162,13 +162,6 @@ public class CourseService {
         Map<Long, Teacher> distinctTeachers = new LinkedHashMap<>();
         for (TeacherCourse tc : tcs) {
             if (tc.getTeacher() != null) {
-                boolean hasRes = resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
-                        course.getCode(), tc.getTeacher().getId(), ResourceStatus.APPROVED);
-                boolean isAdminAssigned = tc.getScheduleInfo() != null &&
-                        ("ADMIN_ASSIGNED".equalsIgnoreCase(tc.getScheduleInfo()) || "Course Material Archive".equalsIgnoreCase(tc.getScheduleInfo()));
-                if (!hasRes && !isAdminAssigned) {
-                    continue; // Skip any demo or unverified auto-assignments
-                }
                 distinctTeachers.putIfAbsent(tc.getTeacher().getId(), tc.getTeacher());
                 teacherCourseMap.putIfAbsent(tc.getTeacher().getId(), tc);
             }
@@ -275,11 +268,17 @@ public class CourseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with code: " + courseCode));
         Teacher teacher = teacherRepository.findById(teacherId)
                 .orElseThrow(() -> new ResourceNotFoundException("Teacher not found with id: " + teacherId));
-        java.util.Optional<TeacherCourse> existingOpt = teacherCourseRepository.findByCourseIdAndTeacherId(course.getId(), teacher.getId());
-        if (existingOpt.isPresent()) {
-            TeacherCourse tc = existingOpt.get();
-            tc.setScheduleInfo("ADMIN_ASSIGNED");
-            teacherCourseRepository.save(tc);
+        List<TeacherCourse> existingList = teacherCourseRepository.findAllByCourseIdAndTeacherId(course.getId(), teacher.getId());
+        if (!existingList.isEmpty()) {
+            TeacherCourse primary = existingList.get(0);
+            primary.setScheduleInfo("ADMIN_ASSIGNED");
+            primary.setSection("General");
+            teacherCourseRepository.save(primary);
+            if (existingList.size() > 1) {
+                for (int i = 1; i < existingList.size(); i++) {
+                    teacherCourseRepository.delete(existingList.get(i));
+                }
+            }
         } else {
             TeacherCourse tc = new TeacherCourse();
             tc.setCourse(course);
@@ -297,6 +296,10 @@ public class CourseService {
     public void removeTeacherFromCourse(String courseCode, Long teacherId) {
         Course course = courseRepository.findByCodeIgnoreCase(courseCode.trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with code: " + courseCode));
+        List<TeacherCourse> existingList = teacherCourseRepository.findAllByCourseIdAndTeacherId(course.getId(), teacherId);
+        if (!existingList.isEmpty()) {
+            teacherCourseRepository.deleteAll(existingList);
+        }
         teacherCourseRepository.deleteByCourseIdAndTeacherId(course.getId(), teacherId);
         List<Resource> teacherRes = resourceRepository.findByCourseIdAndTeacherId(course.getId(), teacherId);
         for (Resource r : teacherRes) {
