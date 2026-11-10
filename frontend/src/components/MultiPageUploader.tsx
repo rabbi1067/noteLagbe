@@ -61,6 +61,7 @@ export default function MultiPageUploader({
         }
       : null
   );
+  const [localMergedBlobUrl, setLocalMergedBlobUrl] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -95,8 +96,11 @@ export default function MultiPageUploader({
       previews.forEach((url) => {
         if (url) URL.revokeObjectURL(url);
       });
+      if (localMergedBlobUrl) {
+        URL.revokeObjectURL(localMergedBlobUrl);
+      }
     };
-  }, [previews]);
+  }, [previews, localMergedBlobUrl]);
 
   // Theme styling helpers
   const isEmerald = accentColor === "emerald";
@@ -172,6 +176,13 @@ export default function MultiPageUploader({
             finalFileToUpload = single;
           }
         }
+
+        // Cache local blob URL so client can preview all merged pages instantly
+        const blobUrl = URL.createObjectURL(finalFileToUpload);
+        setLocalMergedBlobUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return blobUrl;
+        });
 
         setProcessStatus(
           language === "bn"
@@ -274,6 +285,10 @@ export default function MultiPageUploader({
   const handleFullClear = () => {
     setPageFiles([]);
     setUploadedResult(null);
+    if (localMergedBlobUrl) {
+      URL.revokeObjectURL(localMergedBlobUrl);
+      setLocalMergedBlobUrl(null);
+    }
     if (onClear) onClear();
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (addMoreInputRef.current) addMoreInputRef.current.value = "";
@@ -579,10 +594,11 @@ export default function MultiPageUploader({
               <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
                 {uploadedResult.fileSize && <span>{uploadedResult.fileSize} • </span>}
                 <a
-                  href={uploadedResult.url}
+                  href={localMergedBlobUrl || uploadedResult.url}
                   target="_blank"
                   rel="noreferrer"
                   className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 font-bold"
+                  title="Open merged multi-page PDF"
                 >
                   <span>{language === "bn" ? "প্রিভিউ দেখুন" : "Preview PDF"}</span>
                   <ExternalLink className="w-2.5 h-2.5" />

@@ -431,44 +431,84 @@ public class ResourceService {
             throw new FileNotFoundException("Local file not found on disk: " + targetUrl);
         }
 
-        String fetchUrl = targetUrl;
-        if (cloudinaryService.isConfigured() && targetUrl.contains("cloudinary.com")) {
-            fetchUrl = cloudinaryService.getSignedUrl(targetUrl);
+        // Build list of candidate URLs to try in order of highest success probability:
+        List<String> candidates = new java.util.ArrayList<>();
+        
+        // 1. The original target URL directly (clean raw Cloudinary URLs or external URLs)
+        candidates.add(targetUrl);
+
+        if (targetUrl.contains("cloudinary.com")) {
+            if (targetUrl.contains("/raw/upload/")) {
+                // If stored as raw/upload, also try /image/upload/ variant as backup
+                candidates.add(targetUrl.replace("/raw/upload/", "/image/upload/"));
+            } else if (targetUrl.contains("/image/upload/")) {
+                // If stored as image/upload, try /raw/upload/ variant first!
+                candidates.add(targetUrl.replace("/image/upload/", "/raw/upload/"));
+                // Try signed image URL via Cloudinary SDK
+                if (cloudinaryService.isConfigured()) {
+                    String signed = cloudinaryService.getSignedUrl(targetUrl);
+                    if (signed != null && !candidates.contains(signed)) {
+                        candidates.add(signed);
+                    }
+                }
+                // Try fl_attachment to force raw stream download
+                candidates.add(targetUrl.replace("/image/upload/", "/image/upload/fl_attachment/"));
+            }
         }
 
-        // Remote URL (Cloudinary, Drive, or external CDN)
+        // HTTP Client with redirects enabled
         java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
                 .followRedirects(java.net.http.HttpClient.Redirect.ALWAYS)
-                .build();
-        java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
-                .uri(java.net.URI.create(fetchUrl))
-                .GET()
+                .connectTimeout(java.time.Duration.ofSeconds(15))
                 .build();
 
-        try {
-            java.net.http.HttpResponse<byte[]> res = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
-            if (res.statusCode() >= 200 && res.statusCode() < 300) {
-                return res.body();
-            }
+        int lastStatusCode = 0;
+        String lastErrorMsg = "";
 
-            // Cloudinary 401 ACL fallback for legacy image/upload/*.pdf:
-            if (targetUrl.contains("cloudinary.com") && targetUrl.contains("/image/upload/") && res.statusCode() == 401) {
-                String jpgUrl = targetUrl.replaceFirst("\\.pdf$", ".jpg");
-                java.net.http.HttpRequest jpgReq = java.net.http.HttpRequest.newBuilder()
-                        .uri(java.net.URI.create(jpgUrl))
+        for (String url : candidates) {
+            if (url == null || url.isBlank()) continue;
+            try {
+                java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(url))
+                        .timeout(java.time.Duration.ofSeconds(20))
+                        .header("User-Agent", "NoteLagbe-DocumentService/1.0")
                         .GET()
                         .build();
-                java.net.http.HttpResponse<byte[]> jpgRes = client.send(jpgReq, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
-                if (jpgRes.statusCode() >= 200 && jpgRes.statusCode() < 300) {
-                    return jpgRes.body();
-                }
-            }
 
-            throw new IOException("Remote storage returned HTTP status " + res.statusCode());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("File download interrupted", e);
+                java.net.http.HttpResponse<byte[]> res = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+                lastStatusCode = res.statusCode();
+
+                if (res.statusCode() >= 200 && res.statusCode() < 300 && res.body() != null && res.body().length > 0) {
+                    log.info("Successfully fetched {} bytes for material from candidate URL: {}", res.body().length, url);
+                    return res.body();
+                } else {
+                    log.debug("Candidate URL returned HTTP {}: {}", res.statusCode(), url);
+                }
+            } catch (Exception e) {
+                lastErrorMsg = e.getMessage();
+                log.debug("Exception fetching candidate {}: {}", url, e.getMessage());
+            }
         }
+
+        // As a last resort for legacy Cloudinary single-page rasterized previews:
+        if (targetUrl.contains("cloudinary.com") && targetUrl.toLowerCase().endsWith(".pdf")) {
+            try {
+                String jpgUrl = targetUrl.replaceFirst("(?i)\\.pdf$", ".jpg");
+                java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(jpgUrl))
+                        .timeout(java.time.Duration.ofSeconds(20))
+                        .GET()
+                        .build();
+                java.net.http.HttpResponse<byte[]> res = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+                if (res.statusCode() >= 200 && res.statusCode() < 300 && res.body() != null && res.body().length > 0) {
+                    log.info("Successfully fetched rasterized fallback JPEG from Cloudinary: {}", jpgUrl);
+                    return res.body();
+                }
+            } catch (Exception ignored) {}
+        }
+
+        throw new IOException("Remote storage returned HTTP status " + (lastStatusCode > 0 ? lastStatusCode : "error") +
+                (lastErrorMsg.isEmpty() ? "" : " (" + lastErrorMsg + ")"));
     }
 
     public static byte[] wrapJpegToPdf(byte[] jpegBytes) throws IOException {

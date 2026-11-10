@@ -100,7 +100,8 @@ public class CloudinaryService {
     }
 
     /**
-     * Signs a Cloudinary URL to bypass ACL restrictions on private assets
+     * Signs a Cloudinary URL to bypass ACL restrictions on private assets.
+     * Preserves resource_type (raw vs image) and never breaks raw file downloads!
      */
     public String getSignedUrl(String rawUrl) {
         if (!configured || cloudinary == null || rawUrl == null || !rawUrl.contains("cloudinary.com")) {
@@ -109,12 +110,27 @@ public class CloudinaryService {
         try {
             int uploadIdx = rawUrl.indexOf("/upload/");
             if (uploadIdx == -1) return rawUrl;
+
+            // Detect actual resource type from URL: raw, video, or image
+            String resourceType = "image";
+            if (rawUrl.contains("/raw/upload/")) {
+                resourceType = "raw";
+            } else if (rawUrl.contains("/video/upload/")) {
+                resourceType = "video";
+            }
+
+            // Raw uploads on Cloudinary (PDFs, ZIPs, Docs) are already directly accessible
+            // and do not require image ACL signing. Return raw URL intact!
+            if ("raw".equals(resourceType)) {
+                return rawUrl;
+            }
+
             String afterUpload = rawUrl.substring(uploadIdx + 8);
             if (afterUpload.matches("^v\\d+/.*")) {
                 afterUpload = afterUpload.substring(afterUpload.indexOf('/') + 1);
             }
             return cloudinary.url()
-                    .resourceType("image")
+                    .resourceType(resourceType)
                     .type("upload")
                     .signed(true)
                     .generate(afterUpload);
