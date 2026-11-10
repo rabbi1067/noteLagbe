@@ -4447,7 +4447,7 @@ export default function AdminDashboardPage() {
                                         className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-0.5 font-semibold cursor-pointer"
                                         title="Open interactive viewer with zoom and download"
                                       >
-                                        <span>Preview Document</span>
+                                        <span>Direct Link</span>
                                         <ExternalLink className="w-2.5 h-2.5" />
                                       </button>
                                     )}
@@ -4494,26 +4494,6 @@ export default function AdminDashboardPage() {
 
                               <td className="px-6 py-4 text-right">
                                 <div className="flex items-center justify-end gap-1.5">
-                                  {(r.fileUrl || r.id) && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() => setViewingResource(r)}
-                                        className="p-2 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:text-slate-400 dark:hover:text-blue-400 dark:hover:bg-blue-950/50 transition-colors cursor-pointer"
-                                        title="View Material with Zoom & Download"
-                                      >
-                                        <Eye className="w-4 h-4" />
-                                      </button>
-                                      <a
-                                        href={r.id ? `/api/resources/${r.id}/file?download=true` : (r.fileUrl || "#")}
-                                        download=""
-                                        className="p-2 rounded-xl text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:text-slate-400 dark:hover:text-emerald-400 dark:hover:bg-emerald-950/50 transition-colors cursor-pointer"
-                                        title="Download File directly to Device"
-                                      >
-                                        <Download className="w-4 h-4" />
-                                      </a>
-                                    </>
-                                  )}
                                   <button
                                     onClick={() => openEditResourceModal(r)}
                                     className="p-2 rounded-xl text-slate-500 hover:text-amber-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-amber-400 dark:hover:bg-slate-800 transition-colors"
