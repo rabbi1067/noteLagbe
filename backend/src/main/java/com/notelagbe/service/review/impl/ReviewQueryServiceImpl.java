@@ -9,6 +9,7 @@ import com.notelagbe.repository.CourseRepository;
 import com.notelagbe.repository.ReviewRepository;
 import com.notelagbe.service.review.ReviewMapper;
 import com.notelagbe.service.review.ReviewQueryService;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +36,7 @@ public class ReviewQueryServiceImpl implements ReviewQueryService {
     }
 
     @Override
+    @Cacheable(value = "course_reviews", key = "#courseCode.toLowerCase()", unless = "#result == null")
     public List<ReviewResponseDto> getApprovedReviewsForCourse(String courseCode) {
         Course course = courseRepository.findByCodeIgnoreCase(courseCode.trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found: " + courseCode));
@@ -45,6 +47,7 @@ public class ReviewQueryServiceImpl implements ReviewQueryService {
     }
 
     @Override
+    @Cacheable(value = "teacher_reviews", key = "#teacherId", unless = "#result == null")
     public List<ReviewResponseDto> getApprovedReviewsForTeacher(Long teacherId) {
         List<Review> reviews = reviewRepository.findByTeacherIdAndStatusOrderByCreatedAtDesc(
                 teacherId, ReviewStatus.APPROVED);

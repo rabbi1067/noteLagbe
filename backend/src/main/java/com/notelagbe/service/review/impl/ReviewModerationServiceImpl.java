@@ -7,6 +7,7 @@ import com.notelagbe.exception.ResourceNotFoundException;
 import com.notelagbe.repository.ReviewRepository;
 import com.notelagbe.service.review.ReviewMapper;
 import com.notelagbe.service.review.ReviewModerationService;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +46,7 @@ public class ReviewModerationServiceImpl implements ReviewModerationService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {"course_reviews", "teacher_reviews"}, allEntries = true)
     public ReviewResponseDto approveReview(Long id) {
         Review review = findReviewOrThrow(id);
         review.setStatus(ReviewStatus.APPROVED);
@@ -55,6 +57,7 @@ public class ReviewModerationServiceImpl implements ReviewModerationService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {"course_reviews", "teacher_reviews"}, allEntries = true)
     public ReviewResponseDto rejectReview(Long id) {
         Review review = findReviewOrThrow(id);
         review.setStatus(ReviewStatus.REJECTED);
@@ -65,6 +68,7 @@ public class ReviewModerationServiceImpl implements ReviewModerationService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {"course_reviews", "teacher_reviews"}, allEntries = true)
     public void deleteReview(Long id) {
         if (!reviewRepository.existsById(id)) {
             throw new ResourceNotFoundException("Review not found with id: " + id);

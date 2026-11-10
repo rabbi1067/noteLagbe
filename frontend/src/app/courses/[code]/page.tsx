@@ -55,6 +55,7 @@ import {
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 import { CourseDetailSkeleton } from "@/components/skeletons/CardSkeletons";
+import coursesCatalogData from "@/data/courses_catalog.json";
 
 export default function CourseDetailPage() {
   const params = useParams();
@@ -62,11 +63,46 @@ export default function CourseDetailPage() {
   const { user, isAuthenticated, hasUnlocked, setShowAuthModal, refreshProfile } = useAuth();
   const { language, t } = useLanguage();
 
-  const [course, setCourse] = useState<any>(null);
+  // Instant 0ms Pre-population from client storage or verified SEU curriculum catalog
+  const [course, setCourse] = useState<any>(() => {
+    if (!code) return null;
+    const cleanCode = code.toUpperCase();
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("notelagbe_cached_courses_v6");
+        if (cached) {
+          const list = JSON.parse(cached);
+          const found = list.find((c: any) => c.code?.toUpperCase() === cleanCode);
+          if (found) return found;
+        }
+      } catch {}
+    }
+    const fromCatalog = (coursesCatalogData as any[]).find((c) => c.code?.toUpperCase() === cleanCode);
+    return fromCatalog || null;
+  });
+
   const [companionCourse, setCompanionCourse] = useState<any>(null);
-  const [resources, setResources] = useState<any[]>([]);
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  const [resources, setResources] = useState<any[]>(() => {
+    if (!code || typeof window === "undefined") return [];
+    try {
+      const cached = localStorage.getItem(`notelagbe_res_${code.toUpperCase()}`);
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
+
+  const [reviews, setReviews] = useState<any[]>(() => {
+    if (!code || typeof window === "undefined") return [];
+    try {
+      const cached = localStorage.getItem(`notelagbe_rev_${code.toUpperCase()}`);
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
+
+  // Zero-latency: If course details exist in cache or catalog, do not show full-page skeleton
+  const [loading, setLoading] = useState<boolean>(() => !course);
 
   // Active Selected Faculty Filter & Material Tab Filter
   const [selectedFacultyId, setSelectedFacultyId] = useState<number | "ALL">("ALL");
@@ -93,45 +129,66 @@ export default function CourseDetailPage() {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [hasReviewedCourse, setHasReviewedCourse] = useState(false);
 
-  const loadCourseData = useCallback(async () => {
+  // Silent background revalidation without blocking user or resetting UI
+  const loadCourseData = useCallback(async (isSilent = false) => {
     if (!code) return;
-    setLoading(true);
+    if (!isSilent && !course) {
+      setLoading(true);
+    }
     try {
       const [cData, rData, revData] = await Promise.all([
         api.courses.getByCode(code),
         api.resources.getByCourse(code),
         api.reviews.getByCourse(code),
       ]);
-      setCourse(cData);
-      setResources(rData);
-      setReviews(revData);
 
-      // Try discovering companion theory <-> lab course
+      if (cData) {
+        setCourse(cData);
+      }
+      if (Array.isArray(rData)) {
+        setResources(rData);
+        try {
+          localStorage.setItem(`notelagbe_res_${code.toUpperCase()}`, JSON.stringify(rData));
+        } catch {}
+      }
+      if (Array.isArray(revData)) {
+        setReviews(revData);
+        try {
+          localStorage.setItem(`notelagbe_rev_${code.toUpperCase()}`, JSON.stringify(revData));
+        } catch {}
+      }
+
+      // Try discovering companion theory <-> lab course in-memory
       tryFindCompanionCourse(code);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to load course details");
+    } catch {
+      // Gracefully preserve cached/pre-populated catalog on network lag
     } finally {
       setLoading(false);
     }
-  }, [code]);
+  }, [code, course]);
 
   useEffect(() => {
     if (code) {
-      loadCourseData();
+      // Discover companion course immediately from local catalog in 0ms
+      tryFindCompanionCourse(code);
+
+      // Revalidate live data silently in background
+      loadCourseData(true);
+
       if (isAuthenticated) {
         api.reviews.check(code)
           .then((res) => setHasReviewedCourse(Boolean(res?.hasReviewed)))
           .catch(() => {});
       }
     }
-  }, [code, isAuthenticated, loadCourseData]);
+  }, [code, isAuthenticated]);
 
   // Enterprise Live Sync: Refreshes course details and materials immediately when admin updates
   useDataSync(() => {
-    loadCourseData();
+    loadCourseData(true);
   });
 
-  const tryFindCompanionCourse = async (currentCode: string) => {
+  const tryFindCompanionCourse = (currentCode: string) => {
     // E.g., CSE347 <-> CSE348, CSE241 <-> CSE242, CSE141 <-> CSE161
     const match = currentCode.match(/^([A-Z]+)(\d+)$/);
     if (!match) return;
@@ -150,14 +207,17 @@ export default function CourseDetailPage() {
       if (num === 161) candidates.push("CSE141");
     }
 
-    try {
-      const allCourses = await api.courses.getAll();
-      const comp = allCourses.find((c: any) => candidates.includes(c.code));
-      if (comp && comp.code) {
-        setCompanionCourse(comp);
-      }
-    } catch {
-      // In-memory discovery failed gracefully
+    let allList: any[] = coursesCatalogData as any[];
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("notelagbe_cached_courses_v6");
+        if (cached) allList = JSON.parse(cached);
+      } catch {}
+    }
+
+    const comp = allList.find((c: any) => candidates.includes(c.code?.toUpperCase()));
+    if (comp && comp.code) {
+      setCompanionCourse(comp);
     }
   };
 
@@ -428,7 +488,7 @@ export default function CourseDetailPage() {
     };
   };
 
-  if (loading) {
+  if (loading && !course) {
     return <CourseDetailSkeleton />;
   }
 

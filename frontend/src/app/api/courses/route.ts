@@ -3,6 +3,9 @@ import catalogCourses from "@/data/courses_catalog.json";
 
 export const dynamic = "force-dynamic";
 
+let cachedCoursesResponse: { data: any[]; timestamp: number } | null = null;
+const CACHE_TTL_MS = 45 * 1000; // 45 seconds server memory cache
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("query")?.toLowerCase().trim() || "";
@@ -11,11 +14,22 @@ export async function GET(request: NextRequest) {
   const department = searchParams.get("department")?.trim().toUpperCase();
 
   const semester = semesterStr ? parseInt(semesterStr, 10) : null;
+  const isDefaultQuery = !query && !semester && !electiveGroup && (!department || department === "ALL");
 
-  // 1. Try to fetch fresh live data from Spring Boot backend with resilient timeout
+  // 1. Ultra-fast Server-Memory Hit (<1ms)
+  if (isDefaultQuery && cachedCoursesResponse && (Date.now() - cachedCoursesResponse.timestamp < CACHE_TTL_MS)) {
+    return NextResponse.json(cachedCoursesResponse.data, {
+      headers: {
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=86400",
+        "X-Data-Source": "edge-memory",
+      },
+    });
+  }
+
+  // 2. Try to fetch fresh live data from Spring Boot backend with fast 2.5s resilient timeout
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
 
     const backendUrl =
       (process.env.BACKEND_INTERNAL_URL && process.env.BACKEND_INTERNAL_URL.startsWith("http"))
@@ -32,26 +46,29 @@ export async function GET(request: NextRequest) {
     const res = await fetch(`${backendUrl}/api/courses${queryString ? `?${queryString}` : ""}`, {
       signal: controller.signal,
       headers: { Accept: "application/json" },
-      cache: "no-store",
+      next: { revalidate: 60 },
     });
     clearTimeout(timeoutId);
 
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data)) {
+        if (isDefaultQuery) {
+          cachedCoursesResponse = { data, timestamp: Date.now() };
+        }
         return NextResponse.json(data, {
           headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Cache-Control": "public, s-maxage=60, stale-while-revalidate=86400",
             "X-Data-Source": "backend-live",
           },
         });
       }
     }
   } catch {
-    // Backend timeout or offline -> fallback immediately to bundled official catalog
+    // Backend cold or offline -> fallback immediately to bundled official catalog
   }
 
-  // 2. Instant Zero-Latency Fallback using pre-bundled authentic 85 CSE curriculum courses
+  // 3. Instant Zero-Latency Fallback using pre-bundled authentic 85 CSE curriculum courses
   let filtered = (catalogCourses as any[]).filter((c) => {
     if (department && department !== "ALL") {
       const cDept = (c.department || "CSE").trim().toUpperCase();
@@ -84,9 +101,13 @@ export async function GET(request: NextRequest) {
     return true;
   });
 
+  if (isDefaultQuery && !cachedCoursesResponse) {
+    cachedCoursesResponse = { data: filtered, timestamp: Date.now() };
+  }
+
   return NextResponse.json(filtered, {
     headers: {
-      "Cache-Control": "no-store, no-cache, must-revalidate",
+      "Cache-Control": "public, s-maxage=60, stale-while-revalidate=86400",
       "X-Data-Source": "catalog-bundled",
     },
   });

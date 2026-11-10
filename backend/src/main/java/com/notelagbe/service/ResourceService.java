@@ -13,6 +13,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
@@ -73,13 +74,14 @@ public class ResourceService {
 
     private void evictCaches() {
         if (cacheManager != null) {
-            for (String cacheName : List.of("courses", "course_details", "teachers", "teacher_details", "teacher_courses")) {
+            for (String cacheName : List.of("courses", "course_details", "teachers", "teacher_details", "teacher_courses", "course_resources", "teacher_resources")) {
                 var c = cacheManager.getCache(cacheName);
                 if (c != null) c.clear();
             }
         }
     }
 
+    @Cacheable(value = "course_resources", key = "(#user != null ? #user.id : 0) + '_' + #courseCode.toLowerCase()", unless = "#result == null")
     public List<Resource> getResourcesForCourse(String courseCode, User user) {
         Course course = courseRepository.findByCodeIgnoreCase(courseCode.trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found: " + courseCode));
@@ -111,6 +113,7 @@ public class ResourceService {
         return resources;
     }
 
+    @Cacheable(value = "teacher_resources", key = "(#user != null ? #user.id : 0) + '_' + #teacherId", unless = "#result == null")
     public List<Resource> getResourcesForTeacher(Long teacherId, User user) {
         List<Resource> resources = resourceRepository.findByTeacherIdAndStatus(teacherId, ResourceStatus.APPROVED);
         return resources.stream().map(r -> {

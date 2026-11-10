@@ -3,15 +3,30 @@ import teachersDirectory from "@/data/teachers_directory.json";
 
 export const dynamic = "force-dynamic";
 
+let cachedTeachersResponse: { data: any[]; timestamp: number } | null = null;
+const CACHE_TTL_MS = 60 * 1000; // 60 seconds server memory cache
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("query")?.toLowerCase().trim() || "";
   const category = searchParams.get("category")?.trim().toUpperCase();
 
-  // 1. Try to fetch fresh live data from Spring Boot backend with resilient timeout
+  const isDefaultQuery = !query && (!category || category === "ALL");
+
+  // 1. Ultra-fast Server-Memory Hit (<1ms)
+  if (isDefaultQuery && cachedTeachersResponse && (Date.now() - cachedTeachersResponse.timestamp < CACHE_TTL_MS)) {
+    return NextResponse.json(cachedTeachersResponse.data, {
+      headers: {
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=86400",
+        "X-Data-Source": "edge-memory",
+      },
+    });
+  }
+
+  // 2. Try to fetch fresh live data from Spring Boot backend with fast 2.5s resilient timeout
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
 
     const backendUrl =
       (process.env.BACKEND_INTERNAL_URL && process.env.BACKEND_INTERNAL_URL.startsWith("http"))
@@ -28,16 +43,19 @@ export async function GET(request: NextRequest) {
     const res = await fetch(`${backendUrl}/api/teachers${queryString ? `?${queryString}` : ""}`, {
       signal: controller.signal,
       headers: { Accept: "application/json" },
-      cache: "no-store",
+      next: { revalidate: 60 },
     });
     clearTimeout(timeoutId);
 
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data)) {
+        if (isDefaultQuery) {
+          cachedTeachersResponse = { data, timestamp: Date.now() };
+        }
         return NextResponse.json(data, {
           headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Cache-Control": "public, s-maxage=60, stale-while-revalidate=86400",
             "X-Data-Source": "backend-live",
           },
         });
@@ -47,7 +65,7 @@ export async function GET(request: NextRequest) {
     // Backend timeout or offline -> fallback immediately to bundled official directory
   }
 
-  // 2. Instant Zero-Latency Fallback using pre-bundled authentic 397 faculty members
+  // 3. Instant Zero-Latency Fallback using pre-bundled authentic 397 faculty members
   let filtered = (teachersDirectory as any[]).filter((t) => {
     if (category && category !== "ALL") {
       const tCat = (t.category || "").trim().toUpperCase();
@@ -75,9 +93,13 @@ export async function GET(request: NextRequest) {
     return true;
   });
 
+  if (isDefaultQuery && !cachedTeachersResponse) {
+    cachedTeachersResponse = { data: filtered, timestamp: Date.now() };
+  }
+
   return NextResponse.json(filtered, {
     headers: {
-      "Cache-Control": "no-store, no-cache, must-revalidate",
+      "Cache-Control": "public, s-maxage=60, stale-while-revalidate=86400",
       "X-Data-Source": "directory-bundled",
     },
   });

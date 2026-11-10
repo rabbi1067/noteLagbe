@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
 import { useDataSync } from "@/lib/sync";
 import { TeacherDetailSkeleton } from "@/components/skeletons/CardSkeletons";
+import teachersDirectoryData from "@/data/teachers_directory.json";
 import { 
   User, 
   Mail, 
@@ -73,11 +74,52 @@ export default function TeacherDetailPage() {
   const { language, t } = useLanguage();
   const { user, isAuthenticated, setShowAuthModal } = useAuth();
 
-  const [teacher, setTeacher] = useState<any>(null);
-  const [courses, setCourses] = useState<any[]>([]);
-  const [resources, setResources] = useState<any[]>([]);
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Instant 0ms Pre-population from client storage or verified SEU faculty directory
+  const [teacher, setTeacher] = useState<any>(() => {
+    if (!id) return null;
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("notelagbe_cached_teachers");
+        if (cached) {
+          const list = JSON.parse(cached);
+          const found = list.find((t: any) => String(t.id) === String(id));
+          if (found) return found;
+        }
+      } catch {}
+    }
+    const fromDirectory = (teachersDirectoryData as any[]).find((t: any) => String(t.id) === String(id));
+    return fromDirectory || null;
+  });
+
+  const [courses, setCourses] = useState<any[]>(() => {
+    if (!id || typeof window === "undefined") return [];
+    try {
+      const cached = localStorage.getItem(`notelagbe_tch_courses_${id}`);
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
+
+  const [resources, setResources] = useState<any[]>(() => {
+    if (!id || typeof window === "undefined") return [];
+    try {
+      const cached = localStorage.getItem(`notelagbe_tch_res_${id}`);
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
+
+  const [reviews, setReviews] = useState<any[]>(() => {
+    if (!id || typeof window === "undefined") return [];
+    try {
+      const cached = localStorage.getItem(`notelagbe_tch_rev_${id}`);
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
+
+  // Zero-latency: If teacher details exist in directory or cache, start without full-page blocking
+  const [loading, setLoading] = useState<boolean>(() => !teacher);
   const [imageFailed, setImageFailed] = useState(false);
 
   // Review & Rating Modal States
@@ -102,8 +144,11 @@ export default function TeacherDetailPage() {
   // PDF Preview Modal
   const [activeResource, setActiveResource] = useState<any | null>(null);
 
-  const loadTeacherData = useCallback(() => {
+  const loadTeacherData = useCallback((isSilent = false) => {
     if (!id) return;
+    if (!isSilent && !teacher) {
+      setLoading(true);
+    }
     Promise.all([
       api.teachers.getById(id).catch(() => null),
       api.teachers.getCourses(id).catch(() => []),
@@ -111,7 +156,7 @@ export default function TeacherDetailPage() {
       api.reviews.getByTeacher(id).catch(() => []),
     ])
       .then(([tData, cData, rData, revData]) => {
-        setTeacher(tData);
+        if (tData) setTeacher(tData);
 
         // Strict safety filter: only include courses that have authentic uploaded materials in the database
         const realCourses = (cData || []).filter((c: any) => {
@@ -132,7 +177,7 @@ export default function TeacherDetailPage() {
             courseMap.set(code, {
               id: `mat-${r.id}`,
               course: r.course,
-              teacher: tData,
+              teacher: tData || teacher,
               section: "General",
               scheduleInfo: null,
             });
@@ -143,6 +188,13 @@ export default function TeacherDetailPage() {
         setCourses(sortedCourses);
         setResources(rData || []);
         setReviews(revData || []);
+
+        // Cache for instant 0ms retrieval on next visit
+        try {
+          localStorage.setItem(`notelagbe_tch_courses_${id}`, JSON.stringify(sortedCourses));
+          if (rData) localStorage.setItem(`notelagbe_tch_res_${id}`, JSON.stringify(rData));
+          if (revData) localStorage.setItem(`notelagbe_tch_rev_${id}`, JSON.stringify(revData));
+        } catch {}
 
         // Auto-expand the first course with materials by default
         if (sortedCourses.length > 0) {
@@ -157,15 +209,15 @@ export default function TeacherDetailPage() {
         }
       })
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, teacher]);
 
   useEffect(() => {
-    loadTeacherData();
+    loadTeacherData(true);
   }, [loadTeacherData]);
 
   // Enterprise Live Sync: Instantly updates teacher info, courses, and materials
   useDataSync(() => {
-    loadTeacherData();
+    loadTeacherData(true);
   });
 
   const toggleCourseExpand = (code: string) => {
@@ -310,7 +362,7 @@ export default function TeacherDetailPage() {
     }
   };
 
-  if (loading) {
+  if (loading && !teacher) {
     return <TeacherDetailSkeleton />;
   }
 

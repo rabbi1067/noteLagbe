@@ -73,6 +73,19 @@ export function removeToken() {
 const inFlightMutations = new Map<string, Promise<any>>();
 const lastMutationTimestamps = new Map<string, number>();
 
+// In-memory zero-latency cache & request deduplication for read-only GET calls
+const clientGetCache = new Map<string, { data: any; expiry: number }>();
+const inFlightGetRequests = new Map<string, Promise<any>>();
+
+export function clearClientApiCache() {
+  clientGetCache.clear();
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("notelagbe:sync-data", () => clearClientApiCache());
+  window.addEventListener("notelagbe:session-expired", () => clearClientApiCache());
+}
+
 async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -127,6 +140,9 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   // Client-side double-click shield & mutation deduplication
   if (isMutation && typeof window !== "undefined") {
+    // Invalidate client read cache on any data change
+    clearClientApiCache();
+
     const now = Date.now();
     const lastTime = lastMutationTimestamps.get(endpoint) || 0;
     
@@ -153,6 +169,48 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
     inFlightMutations.set(mutationKey, promise);
     return promise;
+  }
+
+  // Zero-latency in-memory cache & request deduplication for read-only GET calls
+  if (method === "GET") {
+    const token = getToken();
+    const isCacheable =
+      endpoint.startsWith("/courses") ||
+      endpoint.startsWith("/teachers") ||
+      endpoint.startsWith("/resources/course") ||
+      endpoint.startsWith("/resources/teacher") ||
+      endpoint.startsWith("/reviews/course") ||
+      endpoint.startsWith("/reviews/teacher") ||
+      endpoint.startsWith("/notices");
+
+    const cacheKey = `${token ? "auth" : "guest"}:${endpoint}`;
+
+    if (isCacheable && typeof window !== "undefined") {
+      const cached = clientGetCache.get(cacheKey);
+      if (cached && cached.expiry > Date.now()) {
+        return Promise.resolve(cached.data as T);
+      }
+    }
+
+    // Deduplicate in-flight concurrent requests for the exact same GET
+    if (inFlightGetRequests.has(cacheKey)) {
+      return inFlightGetRequests.get(cacheKey)!;
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const result = await executeFetch<T>(endpoint, options);
+        if (isCacheable && typeof window !== "undefined") {
+          clientGetCache.set(cacheKey, { data: result, expiry: Date.now() + 30000 });
+        }
+        return result;
+      } finally {
+        inFlightGetRequests.delete(cacheKey);
+      }
+    })();
+
+    inFlightGetRequests.set(cacheKey, fetchPromise);
+    return fetchPromise;
   }
 
   return executeFetch<T>(endpoint, options);
