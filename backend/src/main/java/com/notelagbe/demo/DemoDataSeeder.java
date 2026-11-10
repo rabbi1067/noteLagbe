@@ -690,23 +690,14 @@ public class DemoDataSeeder implements CommandLineRunner {
     }
 
     private void seedSampleReviews() {
-        if (reviewRepository.count() > 0) return;
-
-        User student = userRepository.findByEmail("student@seu.edu.bd").orElse(null);
-        if (student == null) return;
-
-        courseRepository.findByCodeIgnoreCase("CSE241").ifPresent(c -> {
-            Review rev = new Review();
-            rev.setUser(student);
-            rev.setCourse(c);
-            rev.setRating(5);
-            rev.setComment("The course notes and exam question bank made tree and graph algorithms crystal clear before the exam! Highly recommended.");
-            rev.setPersonality("Mid Degree (Sem 4-6)");
-            rev.setMarking("Moderate / Balanced");
-            rev.setDifficulty("Medium");
-            rev.setStatus(com.notelagbe.entity.ReviewStatus.APPROVED);
-            rev.setAnonymous(false);
-            reviewRepository.save(rev);
+        // Clean authentic production: Never seed fake/demo student reviews.
+        // Purge any legacy sample reviews seeded by demo accounts.
+        userRepository.findByEmail("student@seu.edu.bd").ifPresent(student -> {
+            List<Review> demoReviews = reviewRepository.findByUserId(student.getId());
+            if (!demoReviews.isEmpty()) {
+                reviewRepository.deleteAll(demoReviews);
+                log.info("Purged {} legacy demo reviews by student@seu.edu.bd", demoReviews.size());
+            }
         });
     }
 

@@ -343,19 +343,19 @@ export default function CourseDetailPage() {
     ? "Sem 7-8 (Final Year)"
     : "Sem 4-6 (Mid Degree)";
   const timingStats = getMajorityChoice(normalizedTimings);
-  const dynamicTiming = timingStats.choice || fallbackTiming;
-  const timingPercent = reviewCount > 0 ? timingStats.percent : 100;
+  const dynamicTiming = reviewCount > 0 ? (timingStats.choice || fallbackTiming) : null;
+  const timingPercent = reviewCount > 0 ? timingStats.percent : 0;
 
   const normalizedWorkloads = reviews.map((r) => normalizeWorkload(r.marking));
   const workloadStats = getMajorityChoice(normalizedWorkloads);
-  const dynamicWorkload = workloadStats.choice || "Moderate / Balanced";
-  const workloadPercent = reviewCount > 0 ? workloadStats.percent : 100;
+  const dynamicWorkload = reviewCount > 0 ? (workloadStats.choice || "Moderate / Balanced") : null;
+  const workloadPercent = reviewCount > 0 ? workloadStats.percent : 0;
 
   const isCurrentLab = Boolean(course?.lab);
   const normalizedDifficulties = reviews.map((r) => normalizeDifficulty(r.difficulty));
   const diffStats = getMajorityChoice(normalizedDifficulties);
-  const dynamicDifficulty = diffStats.choice || (isCurrentLab ? "Practical" : "Medium");
-  const diffPercent = reviewCount > 0 ? diffStats.percent : 100;
+  const dynamicDifficulty = reviewCount > 0 ? (diffStats.choice || (isCurrentLab ? "Practical" : "Medium")) : null;
+  const diffPercent = reviewCount > 0 ? diffStats.percent : 0;
 
   const formatReviewDate = (dateStr?: string) => {
     if (!dateStr) return "4/16/2026";
@@ -373,21 +373,23 @@ export default function CourseDetailPage() {
       return {
         verdictTitle: isLab
           ? (language === "bn" ? "ল্যাব কোর্স সিকোয়েন্সিং গাইড" : "Companion Lab Sequence Guidance")
-          : (language === "bn" ? `সেমিস্টার ${course?.semester || 4} প্রস্তাবিত (সিলেবাস অনুসারে)` : `Semester ${course?.semester || 4} Recommended (Curriculum)`),
+          : (course?.semester 
+              ? (language === "bn" ? `সেমিস্টার ${course.semester} প্রস্তাবিত (সিলেবাস অনুসারে)` : `Semester ${course.semester} Recommended (Curriculum)`)
+              : (language === "bn" ? "সিলেবাস সিকোয়েন্সিং গাইড" : "Curriculum Sequence Guidance")),
         adviceText: isLab
           ? (language === "bn" 
               ? "এটি একটি ব্যবহারিক ল্যাব কোর্স। ওপেন ক্রেডিট নিয়মে সংশ্লিষ্ট থিওরি কোর্সের সাথে একই সেমিস্টারে নিলে বিষয়বস্তু দ্রুত আয়ত্ত করা যায় এবং ফাইনাল গ্রেড উন্নত হয়।"
               : "This is a practical lab course. Under SEU's open credit system, taking this concurrently with its theory subject ensures maximum conceptual clarity and easier grade optimization.")
           : (language === "bn"
-              ? "এখনও কোনো শিক্ষার্থী এই কোর্সের জন্য রিভিউ দেননি। সিলেবাসের ক্রমধারা অনুযায়ী এটি সময়মতো নিয়ে নিন এবং প্রথম রিভিউটি দিয়ে জুনিয়রদের সাহায্য করুন।"
+              ? "এখনও কোনো শিক্ষার্থী এই কোর্সের জন্য রিভিউ দেননি। সিলেবাসের ক্রমধারা অনুযায়ী এটি সময়মতো নিয়ে নিন এবং প্রথম রিভিউটি দিয়ে সহপাঠীদের সাহায্য করুন।"
               : "No student evaluations yet. Follow curriculum sequencing and be the first to submit a review to help your peers plan their degree!"),
-        timingLabel: fallbackTiming,
-        recommendLevel: "BALANCED",
+        timingLabel: course?.semester ? (language === "bn" ? `সেমিস্টার ${course.semester}` : `Semester ${course.semester}`) : "—",
+        recommendLevel: "PENDING",
       };
     }
 
-    const timing = dynamicTiming;
-    const workload = dynamicWorkload;
+    const timing = dynamicTiming || fallbackTiming;
+    const workload = dynamicWorkload || "Moderate / Balanced";
 
     let guidance = "";
     if (timing.includes("Early") || timing.includes("1-3")) {
@@ -1494,49 +1496,108 @@ export default function CourseDetailPage() {
 
               {/* 4-Metric Grid (Difficulty, Workload Demand, Recommended Timing, Course Rating) calculated from all reviews */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-center text-xs">
+                {/* Difficulty */}
                 <div className="p-3 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-sm">
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
                     {language === "bn" ? "কাঠিন্য" : "Difficulty"}
                   </span>
-                  <span className="font-extrabold text-amber-600 dark:text-amber-400 block mt-0.5 truncate">
-                    {dynamicDifficulty}
-                  </span>
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    {reviewCount > 0 ? (language === "bn" ? `${diffPercent}% শিক্ষার্থীর মত` : `${diffPercent}% consensus`) : (language === "bn" ? "স্ট্যান্ডার্ড" : "Standard")}
-                  </span>
+                  {reviewCount > 0 && dynamicDifficulty ? (
+                    <>
+                      <span className="font-extrabold text-amber-600 dark:text-amber-400 block mt-0.5 truncate">
+                        {dynamicDifficulty}
+                      </span>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">
+                        {diffPercent}% {language === "bn" ? "শিক্ষার্থীর মত" : "consensus"}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-bold text-slate-400 dark:text-slate-500 block mt-0.5">
+                        {language === "bn" ? "মূল্যায়ন নেই" : "Not Rated"}
+                      </span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block">
+                        {language === "bn" ? "কোনো রিভিউ নেই" : "No evaluations yet"}
+                      </span>
+                    </>
+                  )}
                 </div>
+
+                {/* Workload Demand */}
                 <div className="p-3 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-sm">
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
                     {language === "bn" ? "পড়ার চাপ" : "Workload Demand"}
                   </span>
-                  <span className="font-extrabold text-emerald-600 dark:text-emerald-400 block mt-0.5 truncate">
-                    {dynamicWorkload}
-                  </span>
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    {reviewCount > 0 ? (language === "bn" ? `${workloadPercent}% শিক্ষার্থীর মত` : `${workloadPercent}% consensus`) : (language === "bn" ? "ভারসাম্যপূর্ণ" : "Balanced")}
-                  </span>
+                  {reviewCount > 0 && dynamicWorkload ? (
+                    <>
+                      <span className="font-extrabold text-emerald-600 dark:text-emerald-400 block mt-0.5 truncate">
+                        {dynamicWorkload}
+                      </span>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">
+                        {workloadPercent}% {language === "bn" ? "শিক্ষার্থীর মত" : "consensus"}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-bold text-slate-400 dark:text-slate-500 block mt-0.5">
+                        {language === "bn" ? "মূল্যায়ন নেই" : "Not Rated"}
+                      </span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block">
+                        {language === "bn" ? "কোনো রিভিউ নেই" : "No evaluations yet"}
+                      </span>
+                    </>
+                  )}
                 </div>
+
+                {/* Recommended Timing */}
                 <div className="p-3 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-sm">
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
                     {language === "bn" ? "উপযুক্ত সময়" : "Recommended Timing"}
                   </span>
-                  <span className="font-extrabold text-purple-600 dark:text-purple-400 block mt-0.5 truncate">
-                    {advice.timingLabel}
-                  </span>
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    {reviewCount > 0 ? (language === "bn" ? `${timingPercent}% শিক্ষার্থীর মত` : `${timingPercent}% consensus`) : (language === "bn" ? `সেমিস্টার ${course?.semester || 4}` : `Semester ${course?.semester || 4}`)}
-                  </span>
+                  {reviewCount > 0 ? (
+                    <>
+                      <span className="font-extrabold text-purple-600 dark:text-purple-400 block mt-0.5 truncate">
+                        {advice.timingLabel}
+                      </span>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">
+                        {timingPercent}% {language === "bn" ? "শিক্ষার্থীর মত" : "consensus"}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-bold text-slate-700 dark:text-slate-300 block mt-0.5 truncate">
+                        {course?.semester ? (language === "bn" ? `সেমিস্টার ${course.semester}` : `Semester ${course.semester}`) : "—"}
+                      </span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block">
+                        {course?.semester ? (language === "bn" ? "সিলেবাস অনুসারে" : "Curriculum Sequence") : (language === "bn" ? "কোনো রিভিউ নেই" : "No evaluations yet")}
+                      </span>
+                    </>
+                  )}
                 </div>
+
+                {/* Course Rating */}
                 <div className="p-3 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-sm">
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
                     {language === "bn" ? "কোর্স রেটিং" : "Course Rating"}
                   </span>
-                  <span className="font-extrabold text-amber-500 block mt-0.5 truncate flex items-center justify-center gap-1">
-                    {avgRating ? `${avgRating} / 5.0` : "5.0 / 5.0"} <Star className="w-3.5 h-3.5 fill-amber-500" />
-                  </span>
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    {reviewCount > 0 ? (language === "bn" ? `${reviewCount} টি রিভিউ হতে` : `From ${reviewCount} review${reviewCount > 1 ? 's' : ''}`) : (language === "bn" ? "রেটিং উপলব্ধ নেই" : "No ratings yet")}
-                  </span>
+                  {reviewCount > 0 && avgRating ? (
+                    <>
+                      <span className="font-extrabold text-amber-500 block mt-0.5 truncate flex items-center justify-center gap-1">
+                        {avgRating} / 5.0 <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                      </span>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">
+                        {reviewCount} {language === "bn" ? "টি রিভিউ হতে" : reviewCount > 1 ? "reviews" : "review"}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-bold text-slate-400 dark:text-slate-500 block mt-0.5 flex items-center justify-center gap-1">
+                        — / 5.0 <Star className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" />
+                      </span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block">
+                        {language === "bn" ? "কোনো রেটিং নেই" : "No ratings yet"}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
