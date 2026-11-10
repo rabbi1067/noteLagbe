@@ -36,13 +36,16 @@ interface AdminAnalyticsViewProps {
   onNavigateTab?: (tab: string) => void;
 }
 
+// Persistent in-memory cache to guarantee zero-delay instant tab switching
+let globalCachedAnalyticsData: any = null;
+
 export default function AdminAnalyticsView({
   language = "en",
   isSuperAdmin = false,
   onNavigateTab,
 }: AdminAnalyticsViewProps) {
-  const [data, setData] = useState<any | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [data, setData] = useState<any | null>(globalCachedAnalyticsData);
+  const [loading, setLoading] = useState<boolean>(!globalCachedAnalyticsData);
   const [timeRange, setTimeRange] = useState<"30d" | "6m">("30d");
   const [categoryFilter, setCategoryFilter] = useState<"all" | "financial" | "users" | "academic">("all");
   const [transactionSearch, setTransactionSearch] = useState<string>("");
@@ -55,18 +58,23 @@ export default function AdminAnalyticsView({
     chart: "revenue" | "users";
   } | null>(null);
 
-  const fetchAnalytics = useCallback(async () => {
+  const fetchAnalytics = useCallback(async (isManual = false) => {
     try {
-      setLoading(true);
+      if (isManual || !globalCachedAnalyticsData) {
+        setLoading(true);
+      }
       const res = await api.admin.getAnalytics();
+      globalCachedAnalyticsData = res;
       setData(res);
     } catch (err: any) {
       console.error("Failed to fetch analytics:", err);
-      toast.error(
-        language === "bn"
-          ? "অ্যানালিটিক্স ডেটা লোড করতে ব্যর্থ হয়েছে।"
-          : "Failed to load analytics telemetry data."
-      );
+      if (!globalCachedAnalyticsData) {
+        toast.error(
+          language === "bn"
+            ? "অ্যানালিটিক্স ডেটা লোড করতে ব্যর্থ হয়েছে।"
+            : "Failed to load analytics telemetry data."
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -297,7 +305,7 @@ export default function AdminAnalyticsView({
             {/* Refresh */}
             <button
               type="button"
-              onClick={fetchAnalytics}
+              onClick={() => fetchAnalytics(true)}
               disabled={loading}
               title={language === "bn" ? "ডেটা রিফ্রেশ করুন" : "Refresh Analytics"}
               className="p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"

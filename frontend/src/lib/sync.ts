@@ -175,13 +175,16 @@ export function useDataSync(onSync: (payload?: SyncPayload) => void, filterEntit
 
     const unsubscribe = subscribeToSync(handleSync);
 
-    // Revalidate on tab focus or visibility return
+    // Revalidate on tab focus or visibility return (throttled to at most once per 45s)
+    let lastFocusRevalidate = 0;
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
+      const now = Date.now();
+      if (document.visibilityState === "visible" && now - lastFocusRevalidate > 45000) {
+        lastFocusRevalidate = now;
         callbackRef.current({
           entity: "focus",
           action: "revalidate",
-          timestamp: Date.now(),
+          timestamp: now,
         });
       }
     };

@@ -942,7 +942,7 @@ export default function AdminDashboardPage() {
   // Enterprise Live Sync: Keep admin dashboard synchronized if changes happen in other tabs or server
   useDataSync((payload) => {
     if (isAdmin && payload?.action !== "admin_broadcast") {
-      loadAllAdminData(true);
+      loadAllAdminData(false);
       if (activeTab === "activityLogs" || payload?.entity === "activity_log") {
         loadActivityLogs(activityLogPage, activityLogSearch, activityLogCategory);
       }
@@ -988,7 +988,9 @@ export default function AdminDashboardPage() {
   }, [waiverStatusFilter, waiverSearch]);
 
   const loadAllAdminData = async (isInitial = false) => {
-    setLoading(true);
+    if (isInitial) {
+      setLoading(true);
+    }
     try {
       const [sData, rData, pData, staffData, cData, wData, cList, tList, settingsData, revData, profileData, noticeData, chatMsgs, pinnedChat, chatActiveData] = await Promise.all([
         api.admin.getStats().catch(() => null),
@@ -2946,6 +2948,8 @@ export default function AdminDashboardPage() {
             <span className="text-blue-600 dark:text-blue-400 font-bold capitalize">
               {activeTab === "overview"
                 ? "Executive Dashboard"
+                : activeTab === "analytics"
+                ? "Reports & Platform Analytics"
                 : activeTab === "departments"
                 ? "Departments & Academic Units"
                 : activeTab === "resources"
@@ -3088,7 +3092,7 @@ export default function AdminDashboardPage() {
           )}
 
           <button
-            onClick={() => loadAllAdminData()}
+            onClick={() => loadAllAdminData(true)}
             disabled={loading}
             className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors border border-slate-200 dark:border-slate-700/60"
             title="Refresh All Data"
@@ -3740,6 +3744,7 @@ export default function AdminDashboardPage() {
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
               {activeTab === "overview" && "Executive Overview & Health"}
+              {activeTab === "analytics" && "Reports & Platform Analytics"}
               {activeTab === "departments" && "Departments & Academic Units Management"}
               {activeTab === "courses" && "Academic Course Catalog Directory"}
               {activeTab === "teachers" && "Faculty Member Directory & Profiles"}
@@ -3755,6 +3760,7 @@ export default function AdminDashboardPage() {
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               {activeTab === "overview" && "Real-time key performance indicators and university operational metrics."}
+              {activeTab === "analytics" && "Real-time visual telemetry, financial velocity curves, subscription metrics, cohort acquisition, and academic asset distribution."}
               {activeTab === "departments" && "Manage university departments, faculty programs, curriculum allocations, and archives."}
               {activeTab === "courses" && "Create, update, and manage official SEU courses and syllabus metadata."}
               {activeTab === "teachers" && "Add new instructors, manage faculty designations, and update rooms & emails."}

@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -69,21 +70,6 @@ public class CourseService {
         // Sort naturally: CSE courses first, numerically by course number (CSE141, CSE161, CSE181, CSE241...)
         courses = courses.stream().sorted((c1, c2) -> compareCoursesNaturally(c1.getCode(), c2.getCode())).toList();
 
-        if (query != null && !query.trim().isEmpty()) {
-            String q = query.trim().toLowerCase();
-            // Match course code, course title, or any teacher teaching the course
-            courses = courses.stream().filter(c -> {
-                if (c.getCode().toLowerCase().contains(q) || c.getTitle().toLowerCase().contains(q)) {
-                    return true;
-                }
-                List<TeacherCourse> tcs = teacherCourseRepository.findByCourseId(c.getId());
-                return tcs.stream().anyMatch(tc ->
-                        tc.getTeacher().getName().toLowerCase().contains(q) ||
-                        (tc.getTeacher().getInitial() != null && tc.getTeacher().getInitial().toLowerCase().contains(q))
-                );
-            }).toList();
-        }
-
         if (semester != null) {
             courses = courses.stream().filter(c -> c.getSemester() == semester).toList();
         }
@@ -94,7 +80,65 @@ public class CourseService {
                     .toList();
         }
 
-        return courses.stream().map(c -> toSearchResponse(c, user)).toList();
+        // Batch pre-fetch all dependencies in bulk queries instead of 340+ sequential queries!
+        List<Resource> allApproved = resourceRepository.findByStatusOrderByCreatedAtDesc(ResourceStatus.APPROVED);
+        Map<Long, List<Resource>> resourcesByCourseId = allApproved.stream()
+                .filter(r -> r.getCourse() != null)
+                .collect(Collectors.groupingBy(r -> r.getCourse().getId()));
+
+        List<TeacherCourse> allTeacherCourses = teacherCourseRepository.findAll();
+        Map<Long, List<TeacherCourse>> teacherCoursesByCourseId = allTeacherCourses.stream()
+                .filter(tc -> tc.getCourse() != null)
+                .collect(Collectors.groupingBy(tc -> tc.getCourse().getId()));
+
+        Map<Long, Long> unlockCounts = unlockedCourseRepository.findAll().stream()
+                .filter(u -> u.getCourse() != null)
+                .collect(Collectors.groupingBy(u -> u.getCourse().getId(), Collectors.counting()));
+
+        // Pre-compute user unlocked course IDs
+        Set<Long> userUnlockedCourseIds = new HashSet<>();
+        boolean isStaff = user != null && user.getRole() != null &&
+                (user.getRole() == Role.ROLE_ADMIN || user.getRole() == Role.ROLE_SUPER_ADMIN || user.getRole() == Role.ROLE_MANAGER);
+        boolean isAllUnlocked = isStaff;
+
+        if (user != null && !isStaff) {
+            Optional<Subscription> validSub = subscriptionService.getValidActiveSubscription(user.getId());
+            if (validSub.isPresent() && validSub.get().isUnlimited()) {
+                isAllUnlocked = true;
+            } else {
+                List<UnlockedCourse> userUnlocks = unlockedCourseRepository.findByUserId(user.getId());
+                java.time.LocalDateTime now = java.time.LocalDateTime.now();
+                for (UnlockedCourse uc : userUnlocks) {
+                    if (uc.getCourse() != null && (uc.getExpiresAt() == null || !now.isAfter(uc.getExpiresAt()))) {
+                        userUnlockedCourseIds.add(uc.getCourse().getId());
+                    }
+                }
+            }
+        }
+
+        final boolean allUnlockedFinal = isAllUnlocked;
+
+        if (query != null && !query.trim().isEmpty()) {
+            String q = query.trim().toLowerCase();
+            courses = courses.stream().filter(c -> {
+                if (c.getCode().toLowerCase().contains(q) || c.getTitle().toLowerCase().contains(q)) {
+                    return true;
+                }
+                List<TeacherCourse> tcs = teacherCoursesByCourseId.getOrDefault(c.getId(), Collections.emptyList());
+                return tcs.stream().anyMatch(tc ->
+                        (tc.getTeacher() != null && tc.getTeacher().getName() != null && tc.getTeacher().getName().toLowerCase().contains(q)) ||
+                        (tc.getTeacher() != null && tc.getTeacher().getInitial() != null && tc.getTeacher().getInitial().toLowerCase().contains(q))
+                );
+            }).toList();
+        }
+
+        return courses.stream().map(c -> toSearchResponseOptimized(
+                c,
+                resourcesByCourseId.getOrDefault(c.getId(), Collections.emptyList()),
+                teacherCoursesByCourseId.getOrDefault(c.getId(), Collections.emptyList()),
+                unlockCounts.getOrDefault(c.getId(), 0L),
+                allUnlockedFinal || userUnlockedCourseIds.contains(c.getId())
+        )).toList();
     }
 
     @Cacheable(value = "course_details", key = "(#user != null ? #user.id : 0) + '_' + #code.toLowerCase()", unless = "#result == null")
@@ -254,6 +298,120 @@ public class CourseService {
 
         // Real database unlock count (Zero fake/demo offsets)
         long realCount = unlockedCourseRepository.countByCourseId(course.getId());
+        res.setUnlockCount((int) realCount);
+        res.setTrending(realCount >= 10);
+
+        return res;
+    }
+
+    private CourseSearchResponse toSearchResponseOptimized(
+            Course course,
+            List<Resource> courseResources,
+            List<TeacherCourse> tcs,
+            long realCount,
+            boolean isUnlocked) {
+        CourseSearchResponse res = new CourseSearchResponse();
+        res.setId(course.getId());
+        res.setCode(course.getCode());
+        res.setTitle(course.getTitle());
+        res.setCredits(course.getCredits());
+        res.setSemester(course.getSemester());
+        res.setLab(course.isLab());
+        res.setPrerequisite(course.getPrerequisite());
+        res.setElectiveGroup(course.getElectiveGroup());
+        res.setDepartment(course.getDepartment() != null ? course.getDepartment() : "CSE");
+
+        Map<Long, TeacherCourse> teacherCourseMap = new LinkedHashMap<>();
+        for (TeacherCourse tc : tcs) {
+            if (tc.getTeacher() != null) {
+                teacherCourseMap.putIfAbsent(tc.getTeacher().getId(), tc);
+            }
+        }
+        Map<Long, Teacher> distinctTeachers = new LinkedHashMap<>();
+        for (Resource r : courseResources) {
+            if (r.getTeacher() != null) {
+                distinctTeachers.putIfAbsent(r.getTeacher().getId(), r.getTeacher());
+            }
+        }
+
+        List<TeacherBriefDto> teacherDtos = distinctTeachers.values().stream().map(teacher -> {
+            TeacherCourse matchedTc = teacherCourseMap.get(teacher.getId());
+            String sched = matchedTc != null ? matchedTc.getScheduleInfo() : null;
+            TeacherBriefDto dto = new TeacherBriefDto(
+                    teacher.getId(),
+                    teacher.getName(),
+                    teacher.getInitial(),
+                    teacher.getDesignation(),
+                    teacher.getRoom(),
+                    teacher.getEmail(),
+                    teacher.getImage(),
+                    sched
+            );
+
+            long tNotes = courseResources.stream()
+                    .filter(r -> r.getTeacher() != null && r.getTeacher().getId().equals(dto.getId()))
+                    .filter(r -> r.getType() == ResourceType.NOTE || r.getType() == ResourceType.LAB_HAND_NOTE || r.getType() == ResourceType.LAB_REPORT || r.getType() == ResourceType.DOC_NOTE || r.getType() == ResourceType.PROJECT_LINK || r.getType() == ResourceType.OTHERS || r.getType() == ResourceType.SYLLABUS)
+                    .count();
+
+            long tQuestions = courseResources.stream()
+                    .filter(r -> r.getTeacher() != null && r.getTeacher().getId().equals(dto.getId()))
+                    .filter(r -> r.getType() == ResourceType.QUESTION_COURSE_IN ||
+                                 r.getType() == ResourceType.MID_QUESTION ||
+                                 r.getType() == ResourceType.FINAL_QUESTION ||
+                                 r.getType() == ResourceType.QUIZ_CT ||
+                                 r.getType() == ResourceType.LAB_QUIZ ||
+                                 r.getType() == ResourceType.LAB_FINAL ||
+                                 r.getType() == ResourceType.LAB_MANUAL)
+                    .count();
+
+            dto.setNotesCount((int) tNotes);
+            dto.setQuestionsCount((int) tQuestions);
+            dto.setHasNotes(tNotes > 0);
+            dto.setHasQuestions(tQuestions > 0);
+
+            if (tNotes > 0 && tQuestions > 0) {
+                dto.setStatusBadge("BOTH");
+            } else if (tNotes > 0) {
+                dto.setStatusBadge("NOTES_ONLY");
+            } else if (tQuestions > 0) {
+                dto.setStatusBadge("QUESTIONS_ONLY");
+            } else {
+                dto.setStatusBadge("NONE");
+            }
+
+            return dto;
+        }).toList();
+
+        res.setTeachers(teacherDtos);
+
+        long totalNotes = courseResources.stream()
+                .filter(r -> r.getType() == ResourceType.NOTE || r.getType() == ResourceType.LAB_HAND_NOTE || r.getType() == ResourceType.LAB_REPORT || r.getType() == ResourceType.DOC_NOTE || r.getType() == ResourceType.PROJECT_LINK || r.getType() == ResourceType.OTHERS || r.getType() == ResourceType.SYLLABUS)
+                .count();
+        long totalQuestions = courseResources.stream().filter(r ->
+                r.getType() == ResourceType.QUESTION_COURSE_IN ||
+                r.getType() == ResourceType.MID_QUESTION ||
+                r.getType() == ResourceType.FINAL_QUESTION ||
+                r.getType() == ResourceType.QUIZ_CT ||
+                r.getType() == ResourceType.LAB_QUIZ ||
+                r.getType() == ResourceType.LAB_FINAL ||
+                r.getType() == ResourceType.LAB_MANUAL).count();
+
+        res.setHasNotes(totalNotes > 0);
+        res.setHasQuestions(totalQuestions > 0);
+        res.setNotesCount((int) totalNotes);
+        res.setQuestionsCount((int) totalQuestions);
+
+        if (totalNotes > 0 && totalQuestions > 0) {
+            res.setStatusBadge("BOTH");
+        } else if (totalNotes > 0) {
+            res.setStatusBadge("NOTES_ONLY");
+        } else if (totalQuestions > 0) {
+            res.setStatusBadge("QUESTIONS_ONLY");
+        } else {
+            res.setStatusBadge("NONE");
+        }
+
+        res.setUnlocked(isUnlocked);
         res.setUnlockCount((int) realCount);
         res.setTrending(realCount >= 10);
 

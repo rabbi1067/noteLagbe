@@ -16,6 +16,7 @@ import com.notelagbe.service.*;
 import com.notelagbe.service.review.ReviewModerationService;
 import jakarta.validation.Valid;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -133,12 +134,23 @@ public class AdminController {
         return ResponseEntity.ok(Map.of("message", "All activity logs have been cleared successfully."));
     }
 
+    private void evictAnalyticsCache() {
+        if (cacheManager != null) {
+            var c1 = cacheManager.getCache("admin_analytics");
+            if (c1 != null) c1.clear();
+            var c2 = cacheManager.getCache("admin_stats");
+            if (c2 != null) c2.clear();
+        }
+    }
+
     @GetMapping("/analytics")
+    @Cacheable(value = "admin_analytics", unless = "#result == null")
     public ResponseEntity<AdminAnalyticsDto> getAnalytics() {
         return ResponseEntity.ok(adminService.getAnalyticsData());
     }
 
     @GetMapping("/stats")
+    @Cacheable(value = "admin_stats", unless = "#result == null")
     public ResponseEntity<AdminDashboardStats> getStats() {
         return ResponseEntity.ok(adminService.getDashboardStats());
     }
@@ -265,6 +277,7 @@ public class AdminController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Resource created = resourceService.createResource(request, userDetails != null ? userDetails.getUser() : null);
         logAdminAction("RESOURCE_UPLOAD", "CONTENT", "Admin uploaded material: " + created.getTitle() + (created.getCourse() != null ? " for course " + created.getCourse().getCode() : ""));
+        evictAnalyticsCache();
         return ResponseEntity.ok(created);
     }
 
@@ -272,13 +285,16 @@ public class AdminController {
     public ResponseEntity<Resource> updateResource(
             @PathVariable Long id,
             @RequestBody ResourceCreateRequest request) {
-        return ResponseEntity.ok(resourceService.updateResource(id, request));
+        Resource updated = resourceService.updateResource(id, request);
+        evictAnalyticsCache();
+        return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/resources/{id}")
     public ResponseEntity<Map<String, Object>> deleteResource(@PathVariable Long id) {
         resourceService.deleteResource(id);
         logAdminAction("RESOURCE_DELETE", "CONTENT", "Admin deleted study material ID #" + id);
+        evictAnalyticsCache();
         return ResponseEntity.ok(Map.of("success", true, "message", "Resource deleted successfully"));
     }
 
@@ -336,6 +352,7 @@ public class AdminController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Map<String, Object> res = adminService.giftCourseToStudent(userId, request, userDetails.getUser());
         logAdminAction("COURSE_GIFT", "USER_MANAGEMENT", "Super Admin gifted course " + request.getCourseCode() + " to student ID #" + userId);
+        evictAnalyticsCache();
         return ResponseEntity.ok(res);
     }
 
@@ -354,6 +371,7 @@ public class AdminController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Map<String, Object> res = adminService.revokeStudentUnlockedCourse(userId, courseId, userDetails.getUser());
         logAdminAction("COURSE_REVOKE", "USER_MANAGEMENT", "Super Admin revoked course ID #" + courseId + " from student ID #" + userId);
+        evictAnalyticsCache();
         return ResponseEntity.ok(res);
     }
 
@@ -380,6 +398,7 @@ public class AdminController {
         String notes = body != null && body.containsKey("notes") ? body.get("notes") : "Approved by Admin";
         PaymentRequest p = paymentService.approvePayment(id, notes);
         logAdminAction("PAYMENT_APPROVE", "BILLING", "Super Admin approved subscription payment ID #" + id + " (" + notes + ")");
+        evictAnalyticsCache();
         return ResponseEntity.ok(p);
     }
 
@@ -391,6 +410,7 @@ public class AdminController {
         String notes = body != null && body.containsKey("notes") ? body.get("notes") : "Rejected by Admin";
         PaymentRequest p = paymentService.rejectPayment(id, notes);
         logAdminAction("PAYMENT_REJECT", "BILLING", "Super Admin rejected subscription payment ID #" + id + " (" + notes + ")");
+        evictAnalyticsCache();
         return ResponseEntity.ok(p);
     }
 
@@ -470,6 +490,7 @@ public class AdminController {
         }
         WaiverRequest w = waiverService.approveWaiver(id, quota, notes);
         logAdminAction("WAIVER_APPROVE", "BILLING", "Admin approved 100% financial waiver request ID #" + id + " (Quota: " + quota + " courses)");
+        evictAnalyticsCache();
         return ResponseEntity.ok(w);
     }
 
@@ -480,6 +501,7 @@ public class AdminController {
         String notes = body != null && body.containsKey("notes") ? body.get("notes") : "Application declined.";
         WaiverRequest w = waiverService.rejectWaiver(id, notes);
         logAdminAction("WAIVER_REJECT", "BILLING", "Admin rejected financial waiver request ID #" + id);
+        evictAnalyticsCache();
         return ResponseEntity.ok(w);
     }
 

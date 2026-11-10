@@ -23,6 +23,8 @@ public class CacheConfig {
     public static final String CACHE_TEACHER_DETAILS = "teacher_details";
     public static final String CACHE_TEACHER_COURSES = "teacher_courses";
     public static final String CACHE_NOTICES = "active_notices";
+    public static final String CACHE_ADMIN_ANALYTICS = "admin_analytics";
+    public static final String CACHE_ADMIN_STATS = "admin_stats";
 
     @Bean
     public CacheManager cacheManager() {
@@ -33,7 +35,9 @@ public class CacheConfig {
                 CACHE_TEACHERS,
                 CACHE_TEACHER_DETAILS,
                 CACHE_TEACHER_COURSES,
-                CACHE_NOTICES
+                CACHE_NOTICES,
+                CACHE_ADMIN_ANALYTICS,
+                CACHE_ADMIN_STATS
         ));
         log.info("[NoteLagbe Architecture] Enterprise In-Memory Cache Manager initialized for: {}", manager.getCacheNames());
         return manager;

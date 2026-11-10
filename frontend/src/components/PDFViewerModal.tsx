@@ -50,9 +50,9 @@ export default function PDFViewerModal({
   const [viewWidthMode, setViewWidthMode] = useState<"narrow" | "wide">("wide");
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Admins get download and external new-tab privileges. Regular students read securely on-site.
-  const isAdmin = user?.role === "ROLE_ADMIN" || user?.role === "ROLE_SUPER_ADMIN" || user?.role === "ROLE_MANAGER";
-  const canDownloadAndOpen = Boolean(isAdminMode || isAdmin);
+  // Download and external new-tab privileges are ONLY enabled in Admin mode (inside /admin console).
+  // On student course pages (/courses/[code]), all users (students & staff) experience the pure in-website reader!
+  const canDownloadAndOpen = Boolean(isAdminMode);
 
   // Keyboard accessibility & hotkeys for reading
   useEffect(() => {

@@ -7,68 +7,93 @@ export interface MergeProgressCallback {
 /**
  * Loads an image File, normalizes it to JPEG bytes via HTML Canvas to avoid
  * orientation, color profile, or format incompatibilities (supports PNG, JPG, WEBP, etc.).
+ * Uses createImageBitmap when supported for hardware acceleration and correct EXIF orientation.
  */
 export async function convertImageToJpegBytes(
   file: File
 ): Promise<{ bytes: Uint8Array; width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    // In browser environment
-    if (typeof window === "undefined" || typeof document === "undefined") {
-      reject(new Error("Browser environment required for image processing"));
-      return;
-    }
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    throw new Error("Browser environment required for image processing");
+  }
 
+  let imgSource: ImageBitmap | HTMLImageElement;
+  let width = 0;
+  let height = 0;
+
+  if (typeof createImageBitmap === "function") {
+    try {
+      imgSource = await createImageBitmap(file);
+      width = imgSource.width;
+      height = imgSource.height;
+    } catch {
+      imgSource = await loadImageElement(file);
+      width = imgSource.naturalWidth || imgSource.width;
+      height = imgSource.naturalHeight || imgSource.height;
+    }
+  } else {
+    imgSource = await loadImageElement(file);
+    width = imgSource.naturalWidth || imgSource.width;
+    height = imgSource.naturalHeight || imgSource.height;
+  }
+
+  // Cap max dimension to 3000px to maintain crisp quality while keeping file size optimal
+  let targetW = width;
+  let targetH = height;
+  const maxDim = 3000;
+  if (targetW > maxDim || targetH > maxDim) {
+    if (targetW > targetH) {
+      targetH = Math.round((targetH * maxDim) / targetW);
+      targetW = maxDim;
+    } else {
+      targetW = Math.round((targetW * maxDim) / targetH);
+      targetH = maxDim;
+    }
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas 2D context not available");
+  }
+
+  // Draw pure white background in case of transparent PNGs
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, targetW, targetH);
+  ctx.drawImage(imgSource, 0, 0, targetW, targetH);
+
+  if ("close" in imgSource && typeof (imgSource as any).close === "function") {
+    (imgSource as any).close();
+  }
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      async (blob) => {
+        if (!blob) {
+          reject(new Error(`Failed to process image: ${file.name}`));
+          return;
+        }
+        const buffer = await blob.arrayBuffer();
+        resolve({
+          bytes: new Uint8Array(buffer),
+          width: targetW,
+          height: targetH,
+        });
+      },
+      "image/jpeg",
+      0.90
+    );
+  });
+}
+
+function loadImageElement(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const width = img.naturalWidth || img.width;
-      const height = img.naturalHeight || img.height;
-
-      // Cap max dimension to 3200px to maintain crisp quality while keeping file size optimal
-      let targetW = width;
-      let targetH = height;
-      const maxDim = 3200;
-      if (targetW > maxDim || targetH > maxDim) {
-        if (targetW > targetH) {
-          targetH = Math.round((targetH * maxDim) / targetW);
-          targetW = maxDim;
-        } else {
-          targetW = Math.round((targetW * maxDim) / targetH);
-          targetH = maxDim;
-        }
-      }
-
-      const canvas = document.createElement("canvas");
-      canvas.width = targetW;
-      canvas.height = targetH;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("Canvas 2D context not available"));
-        return;
-      }
-
-      // Draw pure white background in case of transparent PNGs
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, targetW, targetH);
-      ctx.drawImage(img, 0, 0, targetW, targetH);
-
-      canvas.toBlob(
-        async (blob) => {
-          if (!blob) {
-            reject(new Error(`Failed to process image: ${file.name}`));
-            return;
-          }
-          const buffer = await blob.arrayBuffer();
-          resolve({
-            bytes: new Uint8Array(buffer),
-            width: targetW,
-            height: targetH,
-          });
-        },
-        "image/jpeg",
-        0.92
-      );
+      resolve(img);
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
