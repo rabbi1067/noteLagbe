@@ -116,7 +116,7 @@ public class SubscriptionService {
                 return false;
             }
             UnlockSource src = uc.getSource();
-            if (src == UnlockSource.CONTRIBUTION_REWARD || src == UnlockSource.FREE_WAIVER) {
+            if (src == UnlockSource.CONTRIBUTION_REWARD || src == UnlockSource.FREE_WAIVER || src == UnlockSource.ADMIN_GIFT) {
                 return true;
             } else {
                 // Relock orphaned quota unlock because subscription has expired

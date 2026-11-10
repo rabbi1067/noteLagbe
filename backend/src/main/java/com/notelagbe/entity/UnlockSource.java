@@ -4,5 +4,6 @@ public enum UnlockSource {
     PURCHASED_QUOTA,
     YEAR_UNLIMITED,
     CONTRIBUTION_REWARD,
-    FREE_WAIVER
+    FREE_WAIVER,
+    ADMIN_GIFT
 }

@@ -383,6 +383,11 @@ export const api = {
     updateStaff: (id: number, data: any) => request<any>(`/admin/staff/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     toggleStaffStatus: (id: number) => request<any>(`/admin/staff/${id}/toggle-status`, { method: "PUT" }),
     deleteStaff: (id: number) => request<any>(`/admin/staff/${id}`, { method: "DELETE" }),
+    giftCourseToStudent: (userId: number, data: { courseCode: string; validityMonths?: number | null; note?: string }) =>
+      request<any>(`/admin/users/${userId}/gift-course`, { method: "POST", body: JSON.stringify(data) }),
+    getStudentUnlockedCourses: (userId: number) => request<any[]>(`/admin/users/${userId}/unlocked-courses`),
+    revokeStudentUnlockedCourse: (userId: number, courseId: number) =>
+      request<any>(`/admin/users/${userId}/unlocked-courses/${courseId}`, { method: "DELETE" }),
 
     // Payments & Subscriptions
     getPayments: (status?: string) => request<any[]>(`/admin/payments${status ? `?status=${status}` : ""}`),

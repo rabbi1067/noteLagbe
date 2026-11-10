@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.stream.Collectors;
+import com.notelagbe.dto.GiftCourseRequest;
 import com.notelagbe.dto.StaffCreateRequest;
 import com.notelagbe.dto.StaffResponseDto;
 import com.notelagbe.entity.*;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class AdminService {
@@ -329,6 +331,118 @@ public class AdminService {
         userRepository.delete(u);
         liveSyncService.broadcast("user", "deleted", userId);
         liveSyncService.broadcast("staff", "deleted", userId);
+    }
+
+    @Transactional
+    public Map<String, Object> giftCourseToStudent(Long studentId, GiftCourseRequest req, User currentUser) {
+        // Security: Strictly restricted to Super Admin
+        if (currentUser.getRole() != Role.ROLE_SUPER_ADMIN) {
+            throw new ApiException("Access Denied: Only Super Administrators have authority to gift course access to students.");
+        }
+
+        User student = userRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student user not found with ID: " + studentId));
+
+        if (student.getRole() != Role.ROLE_STUDENT) {
+            throw new ApiException("Course gifts can only be granted to Student accounts.");
+        }
+
+        if (req.getCourseCode() == null || req.getCourseCode().trim().isEmpty()) {
+            throw new ApiException("Target course code is required.");
+        }
+
+        Course course = courseRepository.findByCodeIgnoreCase(req.getCourseCode().trim())
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with code: " + req.getCourseCode()));
+
+        LocalDateTime expiresAt = null;
+        if (req.getValidityMonths() != null && req.getValidityMonths() > 0) {
+            expiresAt = LocalDateTime.now().plusMonths(req.getValidityMonths());
+        }
+
+        Optional<UnlockedCourse> existingOpt = unlockedCourseRepository.findByUserIdAndCourseId(student.getId(), course.getId());
+        UnlockedCourse uc;
+        boolean isExtension = false;
+        if (existingOpt.isPresent()) {
+            uc = existingOpt.get();
+            uc.setSource(UnlockSource.ADMIN_GIFT);
+            uc.setExpiresAt(expiresAt);
+            uc.setUnlockedAt(LocalDateTime.now());
+            isExtension = true;
+        } else {
+            uc = new UnlockedCourse(student, course, UnlockSource.ADMIN_GIFT, expiresAt);
+        }
+        unlockedCourseRepository.save(uc);
+
+        // In-App Notification to student
+        try {
+            String validityText = expiresAt == null ? "permanent lifetime access" : "full access for " + req.getValidityMonths() + " months";
+            String noteText = (req.getNote() != null && !req.getNote().trim().isEmpty()) 
+                    ? " Admin Message: \"" + req.getNote().trim() + "\"" 
+                    : "";
+            Notification notification = new Notification(
+                    student,
+                    "Course Access Gift from Administration! 🎁",
+                    "Super Admin has gifted you " + validityText + " to " + course.getCode() + " (" + course.getTitle() + ")!" + noteText,
+                    "COURSE_GIFT",
+                    "/courses/" + course.getCode()
+            );
+            notificationRepository.save(notification);
+        } catch (Exception ignored) {}
+
+        liveSyncService.broadcast("course_unlock", "gifted", student.getId());
+
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("success", true);
+        res.put("message", "Course " + course.getCode() + " successfully gifted to " + student.getName() + "!");
+        res.put("courseId", course.getId());
+        res.put("courseCode", course.getCode());
+        res.put("courseTitle", course.getTitle());
+        res.put("studentId", student.getId());
+        res.put("studentName", student.getName());
+        res.put("studentEmail", student.getEmail());
+        res.put("expiresAt", expiresAt);
+        res.put("isExtension", isExtension);
+        return res;
+    }
+
+    public List<Map<String, Object>> getStudentUnlockedCourses(Long studentId, User currentUser) {
+        if (currentUser.getRole() != Role.ROLE_SUPER_ADMIN && currentUser.getRole() != Role.ROLE_ADMIN) {
+            throw new ApiException("Access Denied: Administrative clearance required.");
+        }
+
+        User student = userRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student user not found with ID: " + studentId));
+
+        List<UnlockedCourse> list = unlockedCourseRepository.findByUserId(student.getId());
+        return list.stream().map(uc -> {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", uc.getId());
+            item.put("courseId", uc.getCourse().getId());
+            item.put("courseCode", uc.getCourse().getCode());
+            item.put("courseTitle", uc.getCourse().getTitle());
+            item.put("department", uc.getCourse().getDepartment());
+            item.put("source", uc.getSource().name());
+            item.put("unlockedAt", uc.getUnlockedAt());
+            item.put("expiresAt", uc.getExpiresAt());
+            item.put("isExpired", uc.getExpiresAt() != null && LocalDateTime.now().isAfter(uc.getExpiresAt()));
+            return item;
+        }).toList();
+    }
+
+    @Transactional
+    public Map<String, Object> revokeStudentUnlockedCourse(Long studentId, Long courseId, User currentUser) {
+        if (currentUser.getRole() != Role.ROLE_SUPER_ADMIN) {
+            throw new ApiException("Access Denied: Only Super Administrators can revoke unlocked course access.");
+        }
+
+        Optional<UnlockedCourse> ucOpt = unlockedCourseRepository.findByUserIdAndCourseId(studentId, courseId);
+        if (ucOpt.isPresent()) {
+            unlockedCourseRepository.delete(ucOpt.get());
+            liveSyncService.broadcast("course_unlock", "revoked", studentId);
+            return Map.of("success", true, "message", "Course access revoked successfully.");
+        } else {
+            throw new ResourceNotFoundException("Course was not unlocked for this student.");
+        }
     }
 
     public Map<String, Object> getAdminProfile(User currentUser) {

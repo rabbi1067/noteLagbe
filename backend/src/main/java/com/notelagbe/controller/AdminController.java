@@ -4,6 +4,7 @@ import com.notelagbe.dto.AdminDashboardStats;
 import com.notelagbe.dto.AdminAnalyticsDto;
 import com.notelagbe.dto.ActivityLogPageResponse;
 import com.notelagbe.dto.ChatMessageDto;
+import com.notelagbe.dto.GiftCourseRequest;
 import com.notelagbe.dto.NoticeRequest;
 import com.notelagbe.dto.ResourceCreateRequest;
 import com.notelagbe.dto.ReviewResponseDto;
@@ -322,6 +323,38 @@ public class AdminController {
         adminService.deleteStaff(id, userDetails.getUser());
         logAdminAction("STAFF_DELETE", "STAFF", "Super Admin removed staff account ID #" + id);
         return ResponseEntity.ok(Map.of("success", true, "message", "Staff account removed successfully"));
+    }
+
+    // ==========================================
+    // Course Gifting to Student (Super Admin only)
+    // ==========================================
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PostMapping("/users/{userId}/gift-course")
+    public ResponseEntity<Map<String, Object>> giftCourseToStudent(
+            @PathVariable Long userId,
+            @Valid @RequestBody GiftCourseRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        Map<String, Object> res = adminService.giftCourseToStudent(userId, request, userDetails.getUser());
+        logAdminAction("COURSE_GIFT", "USER_MANAGEMENT", "Super Admin gifted course " + request.getCourseCode() + " to student ID #" + userId);
+        return ResponseEntity.ok(res);
+    }
+
+    @GetMapping("/users/{userId}/unlocked-courses")
+    public ResponseEntity<List<Map<String, Object>>> getStudentUnlockedCourses(
+            @PathVariable Long userId,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(adminService.getStudentUnlockedCourses(userId, userDetails.getUser()));
+    }
+
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @DeleteMapping("/users/{userId}/unlocked-courses/{courseId}")
+    public ResponseEntity<Map<String, Object>> revokeStudentUnlockedCourse(
+            @PathVariable Long userId,
+            @PathVariable Long courseId,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        Map<String, Object> res = adminService.revokeStudentUnlockedCourse(userId, courseId, userDetails.getUser());
+        logAdminAction("COURSE_REVOKE", "USER_MANAGEMENT", "Super Admin revoked course ID #" + courseId + " from student ID #" + userId);
+        return ResponseEntity.ok(res);
     }
 
     // ==========================================

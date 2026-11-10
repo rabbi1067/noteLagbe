@@ -15,6 +15,7 @@ import { notifyDataChanged, useDataSync } from "@/lib/sync";
 import {
   ShieldCheck,
   Crown,
+  Gift,
   CreditCard,
   Upload,
   Users,
@@ -796,6 +797,17 @@ export default function AdminDashboardPage() {
   const [userRoleCategory, setUserRoleCategory] = useState<"ALL" | "STUDENTS" | "STAFF">("ALL");
   const [userSpecificRole, setUserSpecificRole] = useState("ALL");
   const [userStatusFilter, setUserStatusFilter] = useState("ALL");
+
+  // Gift Course to Student State (Super Admin Only)
+  const [showGiftCourseModal, setShowGiftCourseModal] = useState(false);
+  const [giftTargetStudent, setGiftTargetStudent] = useState<any | null>(null);
+  const [giftCourseCode, setGiftCourseCode] = useState("");
+  const [giftValidityMonths, setGiftValidityMonths] = useState<number | null>(4);
+  const [giftNote, setGiftNote] = useState("");
+  const [giftingCourse, setGiftingCourse] = useState(false);
+  const [studentUnlockedCourses, setStudentUnlockedCourses] = useState<any[]>([]);
+  const [loadingStudentUnlocks, setLoadingStudentUnlocks] = useState(false);
+  const [revokingCourseId, setRevokingCourseId] = useState<number | null>(null);
 
   // Admin Profile & Security State
   const [adminProfile, setAdminProfile] = useState<any>(null);
@@ -1827,6 +1839,101 @@ export default function AdminDashboardPage() {
           throw err;
         } finally {
           setTogglingStaffId(null);
+        }
+      },
+    });
+  };
+
+  // ---------------- Course Gifting Handlers (Super Admin Only) ----------------
+  const handleOpenGiftModal = async (student: any) => {
+    if (!isSuperAdmin) {
+      toast.error("Access Denied: Only Super Administrators have clearance to gift course access.");
+      return;
+    }
+    if (student.role !== "ROLE_STUDENT") {
+      toast.error("Courses can only be gifted to Student accounts.");
+      return;
+    }
+    setGiftTargetStudent(student);
+    setGiftCourseCode("");
+    setGiftValidityMonths(4);
+    setGiftNote("");
+    setShowGiftCourseModal(true);
+    fetchStudentUnlockedCourses(student.id);
+  };
+
+  const fetchStudentUnlockedCourses = async (studentId: number) => {
+    setLoadingStudentUnlocks(true);
+    try {
+      const data = await api.admin.getStudentUnlockedCourses(studentId);
+      setStudentUnlockedCourses(data || []);
+    } catch (err: any) {
+      console.error("Failed to load student unlocked courses", err);
+    } finally {
+      setLoadingStudentUnlocks(false);
+    }
+  };
+
+  const handleGiftCourseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSuperAdmin) {
+      toast.error("Access Denied: Super Admin clearance required.");
+      return;
+    }
+    if (!giftTargetStudent) return;
+    if (!giftCourseCode) {
+      toast.error("Please select a target course to gift.");
+      return;
+    }
+
+    setGiftingCourse(true);
+    try {
+      const res = await api.admin.giftCourseToStudent(giftTargetStudent.id, {
+        courseCode: giftCourseCode,
+        validityMonths: giftValidityMonths,
+        note: giftNote.trim() || undefined,
+      });
+
+      confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
+      toast.success(res.message || `Course ${giftCourseCode} gifted successfully!`);
+      // Reset course selector so admin can immediately gift another course if desired
+      setGiftCourseCode("");
+      setGiftNote("");
+      // Refresh the student's unlocked courses list in real-time
+      fetchStudentUnlockedCourses(giftTargetStudent.id);
+      notifyDataChanged("course_unlock", "gifted", giftTargetStudent.id);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to gift course.");
+    } finally {
+      setGiftingCourse(false);
+    }
+  };
+
+  const handleRevokeUnlockedCourse = (unlockedCourse: any) => {
+    if (!isSuperAdmin) {
+      toast.error("Access Denied: Super Admin clearance required.");
+      return;
+    }
+    if (!giftTargetStudent) return;
+
+    openDeleteConfirm({
+      title: "Revoke Gifted Course Access",
+      itemType: "Course Access",
+      itemName: `${unlockedCourse.courseCode} (${unlockedCourse.courseTitle})`,
+      warningText: `Are you sure you want to revoke access to ${unlockedCourse.courseCode} for ${giftTargetStudent.name}? The student will immediately lose access to this course's materials unless they unlock it through a subscription.`,
+      confirmButtonText: "Revoke Access",
+      onConfirm: async () => {
+        setRevokingCourseId(unlockedCourse.courseId);
+        try {
+          await api.admin.revokeStudentUnlockedCourse(giftTargetStudent.id, unlockedCourse.courseId);
+          toast.success(`Access to ${unlockedCourse.courseCode} has been revoked.`);
+          fetchStudentUnlockedCourses(giftTargetStudent.id);
+          notifyDataChanged("course_unlock", "revoked", giftTargetStudent.id);
+        } catch (err: any) {
+          toast.error(err.message || "Failed to revoke course access.");
+          throw err;
+        } finally {
+          setRevokingCourseId(null);
         }
       },
     });
@@ -6809,6 +6916,17 @@ export default function AdminDashboardPage() {
 
                             <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end gap-1">
+                                {/* Gift Course Button (Super Admin Only, for Students Only) */}
+                                {isStudent && isSuperAdmin && (
+                                  <button
+                                    onClick={() => handleOpenGiftModal(s)}
+                                    className="p-2 rounded-xl text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                                    title={`Gift Course Access to ${s.name} (Super Admin Only)`}
+                                  >
+                                    <Gift className="w-4 h-4" />
+                                  </button>
+                                )}
+
                                 {/* Edit Account Details */}
                                 <button
                                   onClick={() => handleOpenEditStaff(s)}
@@ -9833,6 +9951,203 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 4C: GIFT COURSE ACCESS TO STUDENT (SUPER ADMIN ONLY)                */}
+      {/* ========================================================================= */}
+      {showGiftCourseModal && giftTargetStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6 scrollbar-none">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                  <Gift className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Gift Course Access</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                      Super Admin Clearance
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Directly grant course unlocks to this student account without subscription
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowGiftCourseModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Student Info Card */}
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-500 font-black text-sm flex items-center justify-center shrink-0">
+                  {giftTargetStudent.name?.charAt(0) || "S"}
+                </div>
+                <div>
+                  <p className="font-bold text-sm text-slate-900 dark:text-white">{giftTargetStudent.name}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">{giftTargetStudent.email}</p>
+                  {giftTargetStudent.studentId && (
+                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono font-bold mt-0.5">
+                      Student ID: {giftTargetStudent.studentId}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="text-right shrink-0">
+                <span className="text-[11px] font-bold text-slate-400 block">Active Unlocks</span>
+                <span className="text-sm font-black text-amber-500">
+                  {studentUnlockedCourses.length} Courses
+                </span>
+              </div>
+            </div>
+
+            {/* Gift Form */}
+            <form onSubmit={handleGiftCourseSubmit} className="space-y-4 text-xs">
+              {/* Course Selector (1 Course at a time) */}
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span>Target Course to Gift * (1 Course per gift)</span>
+                  <span className="text-[10px] text-slate-400">Can gift multiple courses sequentially</span>
+                </label>
+                <SearchableCourseSelect
+                  courses={courses}
+                  value={giftCourseCode}
+                  onChange={(code: string) => setGiftCourseCode(code)}
+                  placeholder="Search and select course to gift..."
+                />
+              </div>
+
+              {/* Validity Duration */}
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 mb-1.5 block">
+                  Gift Access Validity Period *
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { label: "1 Semester (4 Mo)", val: 4 },
+                    { label: "3 Months", val: 3 },
+                    { label: "1 Year (12 Mo)", val: 12 },
+                    { label: "Permanent / Lifetime", val: null },
+                  ].map((opt) => (
+                    <button
+                      key={String(opt.val)}
+                      type="button"
+                      onClick={() => setGiftValidityMonths(opt.val)}
+                      className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer font-bold ${
+                        giftValidityMonths === opt.val
+                          ? "bg-amber-500/20 border-amber-500 text-amber-500 dark:text-amber-400 shadow-sm"
+                          : "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700"
+                      }`}
+                    >
+                      <span className="block text-xs">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Optional Administrative Note */}
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 mb-1.5 block">
+                  Admin Note / Award Reason (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={giftNote}
+                  onChange={(e) => setGiftNote(e.target.value)}
+                  placeholder="e.g. Merit Award, Special Grant, Hackathon Winner, Class Rep"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {/* Submit Button */}
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGiftCourseModal(false)}
+                  className="px-4 py-2.5 rounded-xl font-bold text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  disabled={giftingCourse || !giftCourseCode}
+                  className="px-5 py-2.5 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/25 disabled:opacity-50 flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Gift className="w-4 h-4" />
+                  <span>{giftingCourse ? "Gifting Course..." : "Confirm & Gift Course 🎁"}</span>
+                </button>
+              </div>
+            </form>
+
+            {/* Currently Unlocked Courses by Student */}
+            <div className="border-t border-slate-200 dark:border-slate-800 pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Currently Unlocked Courses ({studentUnlockedCourses.length})</span>
+                </h4>
+                {loadingStudentUnlocks && (
+                  <span className="text-[11px] text-slate-400 animate-pulse">Loading...</span>
+                )}
+              </div>
+
+              {studentUnlockedCourses.length > 0 ? (
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {studentUnlockedCourses.map((uc: any) => (
+                    <div
+                      key={uc.id}
+                      className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                            {uc.courseCode}
+                          </span>
+                          <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                            {uc.courseTitle}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded font-bold uppercase bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                            {uc.source}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                          {uc.expiresAt
+                            ? `Valid until: ${new Date(uc.expiresAt).toLocaleDateString()}`
+                            : "Permanent Lifetime Access"}
+                        </p>
+                      </div>
+
+                      {isSuperAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => handleRevokeUnlockedCourse(uc)}
+                          disabled={revokingCourseId === uc.courseId}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-rose-500 hover:text-white hover:bg-rose-600 border border-rose-500/30 transition-all shrink-0 cursor-pointer disabled:opacity-40"
+                          title="Revoke student course access"
+                        >
+                          Revoke
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 dark:text-slate-400 italic text-center py-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200/60 dark:border-slate-800/60">
+                  No courses unlocked yet for this student. Use the form above to gift their first course!
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
