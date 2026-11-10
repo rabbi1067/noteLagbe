@@ -67,7 +67,7 @@ export default function MultiPageUploader({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const addMoreInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Sync initial values if parent updates them (e.g. edit mode in modal)
+  // Sync initial values if parent updates them (e.g. edit mode in modal or form reset)
   useEffect(() => {
     if (initialUrl && (!uploadedResult || uploadedResult.url !== initialUrl)) {
       setUploadedResult({
@@ -75,8 +75,13 @@ export default function MultiPageUploader({
         fileName: initialFileName,
         fileSize: initialFileSize,
       });
-    } else if (!initialUrl && pageFiles.length === 0) {
+    } else if (!initialUrl) {
       setUploadedResult(null);
+      setPageFiles([]);
+      if (localMergedBlobUrl) {
+        URL.revokeObjectURL(localMergedBlobUrl);
+        setLocalMergedBlobUrl(null);
+      }
     }
   }, [initialUrl, initialFileName, initialFileSize]);
 

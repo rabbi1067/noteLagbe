@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { api } from "@/lib/api";
@@ -25,7 +26,12 @@ import {
   GraduationCap,
   Link as LinkIcon,
   Eye,
-  Trash2
+  Trash2,
+  Gift,
+  BadgeCheck,
+  RotateCcw,
+  Compass,
+  CheckCheck
 } from "lucide-react";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
@@ -51,6 +57,18 @@ const DEPARTMENTS = [
   { id: "ICT", code: "ICT", name: "Information & Communication Technology", icon: "🌐", badge: "Coming Soon" },
 ];
 
+export const RESOURCE_TYPE_LABELS: Record<string, { en: string; bn: string }> = {
+  NOTE: { en: "Lecture Hand Note", bn: "লেকচার হ্যান্ড নোট" },
+  MID_QUESTION: { en: "Midterm Question Paper", bn: "মিডটার্ম পরীক্ষার প্রশ্ন" },
+  FINAL_QUESTION: { en: "Final Exam Paper", bn: "ফাইনাল পরীক্ষার প্রশ্ন" },
+  QUIZ_CT: { en: "Quiz & Class Test (CT)", bn: "কুইজ ও ক্লাস টেস্ট (CT)" },
+  LAB_MANUAL: { en: "Lab Manual / Code", bn: "ল্যাব ম্যানুয়াল / কোড" },
+  LAB_QUIZ: { en: "Lab Quiz / Viva", bn: "ল্যাব কুইজ / ভাইভা" },
+  LAB_FINAL: { en: "Lab Final Exam", bn: "ল্যাব ফাইনাল পরীক্ষা" },
+  LAB_REPORT: { en: "Lab Report Sheet", bn: "ল্যাব রিপোর্ট" },
+  LAB_HAND_NOTE: { en: "Lab Hand Note", bn: "ল্যাব হ্যান্ড নোট" },
+};
+
 export default function ContributePage() {
   const { user, isAuthenticated, setShowAuthModal, refreshProfile } = useAuth();
   const { language } = useLanguage();
@@ -68,6 +86,54 @@ export default function ContributePage() {
   const [courseCode, setCourseCode] = useState("");
   const [requestedCourseCode1, setRequestedCourseCode1] = useState("");
   const [requestedCourseCode2, setRequestedCourseCode2] = useState("");
+  const [uploaderKey, setUploaderKey] = useState(0);
+
+  // Enterprise Submission Success State & Receipt Tracking
+  const [submissionSuccessData, setSubmissionSuccessData] = useState<{
+    id?: number | string;
+    title: string;
+    courseCode: string;
+    courseTitle?: string;
+    department: string;
+    facultyName?: string;
+    facultyInitial?: string;
+    semester: string;
+    resourceType: string;
+    requestedCourse1: { code: string; title?: string };
+    requestedCourse2: { code: string; title?: string };
+    submittedAt: string;
+  } | null>(null);
+
+  const handleResetForm = () => {
+    setSubmissionSuccessData(null);
+    setTitle("");
+    setFileUrl("");
+    setPreviewUrl("");
+    setUploadedFileName("");
+    setUploadedFileSize("");
+    setLinkStatus("idle");
+    setLinkMessage("");
+    setSemester("");
+    setSelectedTeacherId("");
+    setUploaderKey((prev) => prev + 1);
+
+    const deptCourses = courses.filter(
+      (c) => (c.department || "CSE").toUpperCase() === selectedDepartment.toUpperCase()
+    );
+    if (deptCourses.length > 0) {
+      setCourseCode(deptCourses[0].code);
+      if (deptCourses.length >= 3) {
+        setRequestedCourseCode1(deptCourses[1].code);
+        setRequestedCourseCode2(deptCourses[2].code);
+      } else if (deptCourses.length === 2) {
+        setRequestedCourseCode1(deptCourses[0].code);
+        setRequestedCourseCode2(deptCourses[1].code);
+      } else if (deptCourses.length === 1) {
+        setRequestedCourseCode1(deptCourses[0].code);
+        setRequestedCourseCode2(deptCourses[0].code);
+      }
+    }
+  };
 
   const targetCourses = React.useMemo(() => {
     return courses.filter(
@@ -513,7 +579,7 @@ export default function ContributePage() {
 
     setLoading(true);
     try {
-      await api.contributions.submit({
+      const res = await api.contributions.submit({
         title: cleanTitle,
         resourceType,
         fileUrl: cleanUrl,
@@ -527,18 +593,49 @@ export default function ContributePage() {
         year: finalYear,
       });
 
-      confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+      confetti({ particleCount: 120, spread: 80, origin: { y: 0.5 } });
       toast.success(
         language === "bn"
-          ? "আপনার অ্যাকাডেমিক ম্যাটেরিয়াল সফলভাবে জমা হয়েছে! অ্যাডমিন অনুমোদন করলেই নির্বাচিত ২টি কোর্স ৩ মাসের জন্য (১টি পূর্ণ সেমিস্টার) স্বয়ংক্রিয়ভাবে ফ্রি আনলক হয়ে যাবে।"
-          : "Contribution submitted successfully! Once verified by an admin, your 2 selected reward courses will unlock for 3 months (1 Full Semester) free."
+          ? "আপনার অ্যাকাডেমিক ম্যাটেরিয়াল সফলভাবে জমা হয়েছে! অ্যাডমিন অনুমোদন করলেই নির্বাচিত ২টি কোর্স ৩ মাসের জন্য সম্পূর্ণ ফ্রিতে আনলক হয়ে যাবে।"
+          : "Contribution submitted successfully! Once verified by an admin, your 2 selected reward courses will unlock for 3 months free."
       );
+
+      const req1Obj = courses.find((c) => c.code?.toLowerCase() === requestedCourseCode1?.toLowerCase());
+      const req2Obj = courses.find((c) => c.code?.toLowerCase() === requestedCourseCode2?.toLowerCase());
+
+      setSubmissionSuccessData({
+        id: res?.id || `CR-${Date.now().toString().slice(-4)}`,
+        title: cleanTitle,
+        courseCode: courseCode,
+        courseTitle: selectedCourseObj?.title || courseCode,
+        department: selectedDepartment,
+        facultyName: selectedTeacherObj?.name || (selectedTeacherId === "CENTRAL" || Number(selectedTeacherId) === -1 ? (language === "bn" ? "সেন্ট্রাল পরীক্ষা (সকল সেকশন)" : "Central Exam (All Sections)") : ""),
+        facultyInitial: selectedTeacherObj?.initial || "",
+        semester: cleanSemester,
+        resourceType,
+        requestedCourse1: {
+          code: requestedCourseCode1,
+          title: req1Obj?.title || requestedCourseCode1,
+        },
+        requestedCourse2: {
+          code: requestedCourseCode2,
+          title: req2Obj?.title || requestedCourseCode2,
+        },
+        submittedAt: new Date().toISOString(),
+      });
+
+      // Completely clear all input fields, files, and multi-page buffer
       setTitle("");
       setFileUrl("");
       setPreviewUrl("");
+      setUploadedFileName("");
+      setUploadedFileSize("");
       setLinkStatus("idle");
+      setLinkMessage("");
       setSemester("");
       setSelectedTeacherId("");
+      setUploaderKey((prev) => prev + 1);
+
       loadMyContributions();
       notifyDataChanged("contribution", "created");
     } catch (err: any) {
@@ -573,19 +670,197 @@ export default function ContributePage() {
         </p>
       </div>
 
-      {/* 2. Main Upload Form */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-          <div className="flex items-center gap-2">
-            <Upload className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            <h2 className="text-lg font-black text-slate-900 dark:text-white">
-              {language === "bn" ? "অ্যাকাডেমিক ম্যাটেরিয়াল সাবমিশন ফর্ম" : "Academic Submission Form"}
-            </h2>
+      {/* 2. Main Upload Form OR Submission Success Receipt */}
+      {submissionSuccessData ? (
+        <div className="p-6 sm:p-10 rounded-3xl bg-slate-900 border border-emerald-500/40 shadow-2xl relative overflow-hidden space-y-8 animate-in fade-in zoom-in-95 duration-300">
+          {/* Subtle Ambient Radial Glow */}
+          <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20" />
+
+          {/* Header & Verification Ticket */}
+          <div className="relative text-center space-y-4 max-w-2xl mx-auto">
+            <div className="relative inline-flex items-center justify-center">
+              <span className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping duration-1000" />
+              <div className="relative w-20 h-20 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-white shadow-xl shadow-emerald-500/30 flex items-center justify-center">
+                <CheckCheck className="w-10 h-10 stroke-[2.5]" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-black shadow-xs">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span>Ticket #{submissionSuccessData.id} • {language === "bn" ? "অ্যাডমিন ভেরিফিকেশন পেন্ডিং" : "Admin Review Pending"}</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                {language === "bn" ? "অ্যাকাডেমিক ম্যাটেরিয়াল সফলভাবে জমা হয়েছে!" : "Academic Material Submitted Successfully!"}
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl mx-auto">
+                {language === "bn"
+                  ? "সাউথইস্ট বিশ্ববিদ্যালয়ের সহপাঠীদের সহযোগিতা করার জন্য ধন্যবাদ! আপনার দেওয়া নথিটি আমাদের ভেরিফিকেশন কিউতে যুক্ত হয়েছে। সিলেবাস ও পাঠ্যক্রম অনুযায়ী তথ্য যাচাই সম্পন্ন হলেই আপনার নির্বাচিত ২টি কোর্স ৩ মাসের জন্য সম্পূর্ণ ফ্রিতে স্বয়ংক্রিয়ভাবে আনলক হয়ে যাবে।"
+                  : "Thank you for contributing to fellow Southeast University students! Your submission has been placed into our verification queue. Once verified for syllabus alignment and legibility, your 2 chosen courses will automatically unlock for 3 months (1 full semester) completely free."}
+              </p>
+            </div>
           </div>
-          <span className="text-[11px] font-semibold text-slate-400">
-            {language === "bn" ? "* চিহ্নিত তথ্য দেওয়া বাধ্যতামূলক" : "* Required fields"}
-          </span>
+
+          {/* Receipt Breakdown Card */}
+          <div className="relative rounded-2xl bg-slate-800/80 border border-slate-700/80 p-5 sm:p-7 backdrop-blur-md space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-700/60">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-black text-slate-300 uppercase tracking-wider">
+                  {language === "bn" ? "জমাকৃত নথির বিবরণ (Submission Receipt)" : "Submission Receipt"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono text-emerald-400 font-bold bg-emerald-950/80 border border-emerald-800/60 px-3 py-0.5 rounded-full">
+                  {submissionSuccessData.department} Dept • {submissionSuccessData.semester}
+                </span>
+              </div>
+            </div>
+
+            {/* Document Details Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div className="space-y-1 p-3.5 rounded-xl bg-slate-900/60 border border-slate-700/40">
+                <span className="text-slate-400 text-[11px] font-semibold">{language === "bn" ? "টার্গেট কোর্স" : "Target Course"}</span>
+                <div className="font-bold text-white flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono text-xs">{submissionSuccessData.courseCode}</span>
+                  <span className="truncate">{submissionSuccessData.courseTitle || submissionSuccessData.courseCode}</span>
+                </div>
+              </div>
+
+              <div className="space-y-1 p-3.5 rounded-xl bg-slate-900/60 border border-slate-700/40">
+                <span className="text-slate-400 text-[11px] font-semibold">{language === "bn" ? "ম্যাটেরিয়াল টাইটেল ও ধরণ" : "Title & Material Category"}</span>
+                <p className="font-bold text-white truncate">{submissionSuccessData.title}</p>
+                <p className="text-[11px] text-emerald-400 font-medium">
+                  {RESOURCE_TYPE_LABELS[submissionSuccessData.resourceType]?.[language] || submissionSuccessData.resourceType}
+                </p>
+              </div>
+
+              <div className="space-y-1 p-3.5 rounded-xl bg-slate-900/60 border border-slate-700/40">
+                <span className="text-slate-400 text-[11px] font-semibold">{language === "bn" ? "কোর্স শিক্ষক / ফ্যাকাল্টি" : "Course Faculty / Instructor"}</span>
+                <p className="font-bold text-purple-300 flex items-center gap-1.5 truncate">
+                  <GraduationCap className="w-4 h-4 shrink-0" />
+                  {submissionSuccessData.facultyInitial ? `[${submissionSuccessData.facultyInitial}] ` : ""}
+                  {submissionSuccessData.facultyName || "General / All Sections"}
+                </p>
+              </div>
+
+              <div className="space-y-1 p-3.5 rounded-xl bg-slate-900/60 border border-slate-700/40">
+                <span className="text-slate-400 text-[11px] font-semibold">{language === "bn" ? "যাচাইয়ের সম্ভাব্য সময়" : "Estimated Review Time"}</span>
+                <p className="font-bold text-amber-300 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 shrink-0 text-amber-400" />
+                  {language === "bn" ? "১ থেকে ৬ ঘণ্টা (অ্যাডমিন ভেরিফিকেশন)" : "1 to 6 Hours (Fast Admin Review)"}
+                </p>
+              </div>
+            </div>
+
+            {/* Selected 2 Reward Courses Showcase */}
+            <div className="pt-2 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-black text-emerald-400 flex items-center gap-1.5">
+                  <Gift className="w-4 h-4 text-emerald-400" />
+                  {language === "bn" ? "আপনার নির্বাচিত ২টি ফ্রি রিওয়ার্ড কোর্স (৩ মাস ফ্রি অ্যাক্সেস):" : "Your 2 Selected Reward Courses (3 Months Free Access):"}
+                </span>
+                <span className="text-[11px] font-bold text-emerald-300 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                  {language === "bn" ? "অনুমোদনের সাথে সাথে আনলক" : "Auto-Unlocks Upon Verification"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-950/60 to-slate-900/80 border border-emerald-500/40 flex items-center gap-3.5 shadow-sm">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-black text-sm shrink-0 border border-emerald-500/30">
+                    1
+                  </div>
+                  <div className="min-w-0">
+                    <span className="font-mono text-xs font-black text-emerald-300 block">{submissionSuccessData.requestedCourse1?.code}</span>
+                    <p className="text-xs text-slate-100 font-bold truncate">{submissionSuccessData.requestedCourse1?.title || submissionSuccessData.requestedCourse1?.code}</p>
+                    <span className="text-[10px] text-emerald-400/90 font-semibold flex items-center gap-1 mt-0.5">
+                      <Sparkles className="w-3 h-3" /> {language === "bn" ? "৩ মাস (১ সেমিস্টার) ফ্রি" : "3 Months (1 Semester) Free"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-gradient-to-br from-teal-950/60 to-slate-900/80 border border-teal-500/40 flex items-center gap-3.5 shadow-sm">
+                  <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center font-black text-sm shrink-0 border border-teal-500/30">
+                    2
+                  </div>
+                  <div className="min-w-0">
+                    <span className="font-mono text-xs font-black text-teal-300 block">{submissionSuccessData.requestedCourse2?.code}</span>
+                    <p className="text-xs text-slate-100 font-bold truncate">{submissionSuccessData.requestedCourse2?.title || submissionSuccessData.requestedCourse2?.code}</p>
+                    <span className="text-[10px] text-teal-400/90 font-semibold flex items-center gap-1 mt-0.5">
+                      <Sparkles className="w-3 h-3" /> {language === "bn" ? "৩ মাস (১ সেমিস্টার) ফ্রি" : "3 Months (1 Semester) Free"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Next Steps Progress Guide */}
+            <div className="p-4 rounded-xl bg-slate-900/70 border border-slate-700/60 text-xs space-y-2">
+              <span className="font-bold text-slate-300 block">
+                {language === "bn" ? "পরবর্তী পদক্ষেপ (What Happens Next?):" : "What Happens Next?"}
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px] text-slate-400">
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-200 font-bold flex items-center justify-center shrink-0 border border-slate-700">1</span>
+                  <span>{language === "bn" ? "ফ্যাকাল্টি/অ্যাডমিন টিম নথির মান ও সেমিস্টার সিলেবাস চেক করবে।" : "Admin verifies document quality and semester syllabus."}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-200 font-bold flex items-center justify-center shrink-0 border border-slate-700">2</span>
+                  <span>{language === "bn" ? "অনুমোদন হওয়ামাত্র লাইভ নোটিফিকেশন পাবেন।" : "Receive live notification as soon as approved."}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-200 font-bold flex items-center justify-center shrink-0 border border-slate-700">3</span>
+                  <span>{language === "bn" ? "নির্বাচিত ২টি কোর্স ৯০ দিনের জন্য ইনস্ট্যান্ট আনলক হয়ে যাবে।" : "Your 2 chosen courses unlock for 90 days immediately."}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleResetForm}
+              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <Upload className="w-4 h-4" />
+              <span>{language === "bn" ? "আরেকটি ম্যাটেরিয়াল আপলোড করুন" : "Contribute Another Resource"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                document.getElementById("my-submissions-section")?.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer transition-all hover:text-white"
+            >
+              <Clock className="w-4 h-4 text-amber-400" />
+              <span>{language === "bn" ? "আমার জমাদান ইতিহাস দেখুন" : "View My Submissions"}</span>
+            </button>
+
+            <Link
+              href="/dashboard"
+              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all"
+            >
+              <span>{language === "bn" ? "স্টুডেন্ট ড্যাশবোর্ড" : "Student Dashboard"}</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
+      ) : (
+        <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+            <div className="flex items-center gap-2">
+              <Upload className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <h2 className="text-lg font-black text-slate-900 dark:text-white">
+                {language === "bn" ? "অ্যাকাডেমিক ম্যাটেরিয়াল সাবমিশন ফর্ম" : "Academic Submission Form"}
+              </h2>
+            </div>
+            <span className="text-[11px] font-semibold text-slate-400">
+              {language === "bn" ? "* চিহ্নিত তথ্য দেওয়া বাধ্যতামূলক" : "* Required fields"}
+            </span>
+          </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           
@@ -885,6 +1160,7 @@ export default function ContributePage() {
 
                   return (
                     <MultiPageUploader
+                      key={uploaderKey}
                       uploadFn={async (file: File) => {
                         if (!isAuthenticated) {
                           setShowAuthModal(true);
@@ -1113,22 +1389,24 @@ export default function ContributePage() {
           </button>
         </form>
       </div>
+      )}
 
       {/* 3. Top 50 Academic Contributors Leaderboard */}
       <TopContributorsLeaderboard />
 
       {/* 4. Student's Contribution History */}
       {isAuthenticated && (
-        <div className="space-y-4">
+        <div className="space-y-4" id="my-submissions-section">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-black text-slate-900 dark:text-white">
-              {language === "bn"
-                ? `আমার জমাদান ইতিহাস (${myContributions.length})`
-                : `My Submission History (${myContributions.length})`}
+            <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <span>{language === "bn" ? "আমার জমাদান ইতিহাস" : "My Submission History"}</span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                {myContributions.length}
+              </span>
             </h3>
             <button
               onClick={loadMyContributions}
-              className="text-xs font-semibold text-blue-500 hover:underline flex items-center gap-1"
+              className="text-xs font-semibold text-blue-500 hover:underline flex items-center gap-1 cursor-pointer"
             >
               <RefreshCw className="w-3 h-3" /> {language === "bn" ? "রিফ্রেশ" : "Refresh"}
             </button>
@@ -1136,52 +1414,74 @@ export default function ContributePage() {
 
           {myContributions.length > 0 ? (
             <div className="space-y-3">
-              {myContributions.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
-                        {item.uploadedResource?.course?.code}
-                      </span>
-                      <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                        {item.uploadedResource?.title}
-                      </h4>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      {language === "bn" ? "পুরস্কার কোর্স:" : "Reward Courses:"} <strong>{item.requestedCourse1?.code}</strong> & <strong>{item.requestedCourse2?.code}</strong>
-                    </p>
-                    {item.adminFeedback && (
-                      <p className="text-xs text-slate-600 dark:text-slate-400 italic bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">
-                          {language === "bn" ? "অ্যাডমিন মন্তব্য: " : "Admin Feedback: "}
+              {myContributions.map((item) => {
+                const isJustSubmitted = submissionSuccessData && String(item.id) === String(submissionSuccessData.id);
+                return (
+                  <div
+                    key={item.id}
+                    className={`p-5 rounded-2xl bg-white dark:bg-slate-900 border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                      isJustSubmitted
+                        ? "border-emerald-500 shadow-md ring-2 ring-emerald-500/20 bg-emerald-50/10 dark:bg-emerald-950/20"
+                        : "border-slate-200 dark:border-slate-800 shadow-sm"
+                    }`}
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+                          {item.uploadedResource?.course?.code}
                         </span>
-                        {item.adminFeedback}
-                      </p>
-                    )}
-                  </div>
+                        <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                          {item.uploadedResource?.title}
+                        </h4>
+                        {isJustSubmitted && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-900/60 px-2 py-0.5 rounded-full">
+                            <Sparkles className="w-3 h-3" />
+                            {language === "bn" ? "সদ্য জমাকৃত" : "Just Submitted"}
+                          </span>
+                        )}
+                      </div>
 
-                  <div className="flex items-center gap-2">
-                    {item.status === "APPROVED" && (
-                      <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-3 py-1 rounded-full">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> {language === "bn" ? "অনুমোদিত ও আনলকড!" : "Approved & Unlocked!"}
-                      </span>
-                    )}
-                    {item.status === "PENDING" && (
-                      <span className="flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 px-3 py-1 rounded-full">
-                        <Clock className="w-3.5 h-3.5" /> {language === "bn" ? "অ্যাডমিন পর্যালোচনায় আছে" : "Under Admin Review"}
-                      </span>
-                    )}
-                    {item.status === "REJECTED" && (
-                      <span className="flex items-center gap-1 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 px-3 py-1 rounded-full">
-                        <XCircle className="w-3.5 h-3.5" /> {language === "bn" ? "প্রত্যাখ্যাত" : "Rejected"}
-                      </span>
-                    )}
+                      <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
+                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                          <Gift className="w-3.5 h-3.5" />
+                          {language === "bn" ? "পুরস্কার কোর্স:" : "Reward Courses:"}
+                          <strong>{item.requestedCourse1?.code}</strong> & <strong>{item.requestedCourse2?.code}</strong>
+                        </span>
+                        {item.uploadedResource?.semesterName && (
+                          <span className="text-slate-400">• {item.uploadedResource.semesterName}</span>
+                        )}
+                      </div>
+
+                      {item.adminFeedback && (
+                        <p className="text-xs text-slate-600 dark:text-slate-400 italic bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            {language === "bn" ? "অ্যাডমিন মন্তব্য: " : "Admin Feedback: "}
+                          </span>
+                          {item.adminFeedback}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {item.status === "APPROVED" && (
+                        <span className="flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-3 py-1 rounded-full border border-emerald-500/20">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> {language === "bn" ? "অনুমোদিত ও আনলকড!" : "Approved & Unlocked!"}
+                        </span>
+                      )}
+                      {item.status === "PENDING" && (
+                        <span className="flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 px-3 py-1 rounded-full border border-amber-500/20">
+                          <Clock className="w-3.5 h-3.5 animate-pulse" /> {language === "bn" ? "অ্যাডমিন পর্যালোচনায় আছে" : "Under Admin Review"}
+                        </span>
+                      )}
+                      {item.status === "REJECTED" && (
+                        <span className="flex items-center gap-1 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 px-3 py-1 rounded-full border border-red-500/20">
+                          <XCircle className="w-3.5 h-3.5" /> {language === "bn" ? "প্রত্যাখ্যাত" : "Rejected"}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="p-8 text-center rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-500">
