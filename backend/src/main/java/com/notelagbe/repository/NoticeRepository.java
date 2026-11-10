@@ -13,10 +13,10 @@ import java.util.List;
 public interface NoticeRepository extends JpaRepository<Notice, Long> {
 
     @Query("SELECT n FROM Notice n WHERE n.active = true " +
-           "AND (n.startsAt IS NULL OR n.startsAt <= :now) " +
+           "AND (n.startsAt IS NULL OR n.startsAt <= :skewNow) " +
            "AND (n.expiresAt IS NULL OR n.expiresAt >= :now) " +
            "ORDER BY n.priority DESC, n.createdAt DESC")
-    List<Notice> findCurrentlyActiveNotices(@Param("now") LocalDateTime now);
+    List<Notice> findCurrentlyActiveNotices(@Param("now") LocalDateTime now, @Param("skewNow") LocalDateTime skewNow);
 
     @Query("SELECT n FROM Notice n WHERE n.active = true AND n.expiresAt IS NOT NULL AND n.expiresAt < :now")
     List<Notice> findExpiredActiveNotices(@Param("now") LocalDateTime now);

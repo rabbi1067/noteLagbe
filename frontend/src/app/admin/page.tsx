@@ -488,6 +488,7 @@ export default function AdminDashboardPage() {
   const [noticePriority, setNoticePriority] = useState(0);
   const [noticeStartsAt, setNoticeStartsAt] = useState<string>("");
   const [noticeExpiresAt, setNoticeExpiresAt] = useState<string>("");
+  const [noticeHasSchedule, setNoticeHasSchedule] = useState(false);
   const [savingNotice, setSavingNotice] = useState(false);
 
   // Live Chat Moderation States
@@ -2263,6 +2264,7 @@ export default function AdminDashboardPage() {
     setNoticePriority(0);
     setNoticeStartsAt("");
     setNoticeExpiresAt("");
+    setNoticeHasSchedule(false);
     setShowNoticeModal(true);
   };
 
@@ -2273,6 +2275,8 @@ export default function AdminDashboardPage() {
     setNoticeLink(notice.link || "");
     setNoticeActive(notice.active ?? true);
     setNoticePriority(notice.priority || 0);
+    const hasSched = Boolean(notice.startsAt || notice.expiresAt);
+    setNoticeHasSchedule(hasSched);
     setNoticeStartsAt(notice.startsAt ? String(notice.startsAt).substring(0, 16) : "");
     setNoticeExpiresAt(notice.expiresAt ? String(notice.expiresAt).substring(0, 16) : "");
     setShowNoticeModal(true);
@@ -2284,6 +2288,28 @@ export default function AdminDashboardPage() {
       toast.error("Notice announcement text cannot be empty");
       return;
     }
+
+    let finalStartsAt: string | undefined = undefined;
+    let finalExpiresAt: string | undefined = undefined;
+
+    if (noticeHasSchedule) {
+      if (noticeExpiresAt) {
+        const expTime = new Date(noticeExpiresAt).getTime();
+        if (expTime <= Date.now()) {
+          toast.error("Auto-pause expiration date must be in the future");
+          return;
+        }
+        if (noticeStartsAt && expTime <= new Date(noticeStartsAt).getTime()) {
+          toast.error("Expiration date must be strictly after the start time");
+          return;
+        }
+        finalExpiresAt = noticeExpiresAt;
+      }
+      if (noticeStartsAt) {
+        finalStartsAt = noticeStartsAt;
+      }
+    }
+
     setSavingNotice(true);
     try {
       if (editingNoticeId) {
@@ -2293,8 +2319,8 @@ export default function AdminDashboardPage() {
           link: noticeLink.trim() || undefined,
           active: noticeActive,
           priority: Number(noticePriority) || 0,
-          startsAt: noticeStartsAt ? noticeStartsAt : undefined,
-          expiresAt: noticeExpiresAt ? noticeExpiresAt : undefined,
+          startsAt: finalStartsAt,
+          expiresAt: finalExpiresAt,
         });
         toast.success("Notice updated successfully");
         notifyDataChanged("notice", "update", editingNoticeId);
@@ -2305,8 +2331,8 @@ export default function AdminDashboardPage() {
           link: noticeLink.trim() || undefined,
           active: noticeActive,
           priority: Number(noticePriority) || 0,
-          startsAt: noticeStartsAt ? noticeStartsAt : undefined,
-          expiresAt: noticeExpiresAt ? noticeExpiresAt : undefined,
+          startsAt: finalStartsAt,
+          expiresAt: finalExpiresAt,
         });
         toast.success("Notice published to live banner successfully");
         notifyDataChanged("notice", "create");
@@ -10336,125 +10362,142 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                 </div>
               </div>
 
-              {/* Date & Time Scheduling with Auto-Pause */}
-              <div className="space-y-2 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-blue-500" />
-                    <span>Display Schedule & Auto-Pause Window</span>
-                  </label>
-                  <span className="text-[10px] text-slate-400 font-medium">Auto-hides when expired</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Starts At */}
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                      Starts From (Publish Time)
-                    </label>
+              {/* Date & Time Scheduling with Auto-Pause (Optional) */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <div className="flex items-center gap-2.5">
                     <input
-                      type="datetime-local"
-                      min={new Date().toISOString().slice(0, 16)}
-                      value={noticeStartsAt}
-                      onChange={(e) => setNoticeStartsAt(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                    />
-                  </div>
-
-                  {/* Expires At */}
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                      Auto-Pause At (Expiration)
-                    </label>
-                    <input
-                      type="datetime-local"
-                      min={noticeStartsAt || new Date().toISOString().slice(0, 16)}
-                      value={noticeExpiresAt}
-                      onChange={(e) => setNoticeExpiresAt(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                    />
-                  </div>
-                </div>
-
-                {/* Quick Presets */}
-                <div className="pt-1">
-                  <p className="text-[10px] font-semibold text-slate-400 mb-1">Quick Presets:</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const now = new Date();
-                        const today8pm = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 20, 0, 0);
-                        const pad = (n: number) => String(n).padStart(2, "0");
-                        setNoticeExpiresAt(`${today8pm.getFullYear()}-${pad(today8pm.getMonth() + 1)}-${pad(today8pm.getDate())}T20:00`);
-                      }}
-                      className="px-2 py-1 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
-                    >
-                      Today until 8:00 PM
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const d = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
-                        const pad = (n: number) => String(n).padStart(2, "0");
-                        setNoticeExpiresAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
-                      }}
-                      className="px-2 py-1 rounded-lg text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
-                    >
-                      +1 Day (24 hrs)
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const d = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
-                        const pad = (n: number) => String(n).padStart(2, "0");
-                        setNoticeExpiresAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
-                      }}
-                      className="px-2 py-1 rounded-lg text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition-colors"
-                    >
-                      +3 Days
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const d = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
-                        const pad = (n: number) => String(n).padStart(2, "0");
-                        setNoticeExpiresAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
-                      }}
-                      className="px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
-                    >
-                      +5 Days
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-                        const pad = (n: number) => String(n).padStart(2, "0");
-                        setNoticeExpiresAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
-                      }}
-                      className="px-2 py-1 rounded-lg text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors"
-                    >
-                      +7 Days (1 Week)
-                    </button>
-
-                    {(noticeStartsAt || noticeExpiresAt) && (
-                      <button
-                        type="button"
-                        onClick={() => {
+                      type="checkbox"
+                      checked={noticeHasSchedule}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setNoticeHasSchedule(checked);
+                        if (!checked) {
                           setNoticeStartsAt("");
                           setNoticeExpiresAt("");
-                        }}
-                        className="px-2 py-1 rounded-lg text-[10px] font-bold text-red-500 hover:bg-red-500/10 transition-colors"
-                      >
-                        Clear Schedule (Permanent)
-                      </button>
-                    )}
+                        }
+                      }}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-blue-500" />
+                        <span>Schedule For Later or Set Auto-Pause Expiry</span>
+                      </p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                        {noticeHasSchedule
+                          ? "Custom display time window active"
+                          : "Default: Goes LIVE immediately & remains permanent indefinitely"}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    noticeHasSchedule
+                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                      : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                  }`}>
+                    {noticeHasSchedule ? "Scheduled" : "Live Always"}
+                  </span>
+                </label>
+
+                {noticeHasSchedule && (
+                  <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 space-y-3 animate-in fade-in duration-150">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Starts At */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                          Starts From (Publish Time)
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={noticeStartsAt}
+                          onChange={(e) => setNoticeStartsAt(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                        />
+                      </div>
+
+                      {/* Expires At */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                          Auto-Pause At (Expiration)
+                        </label>
+                        <input
+                          type="datetime-local"
+                          min={noticeStartsAt || new Date().toISOString().slice(0, 16)}
+                          value={noticeExpiresAt}
+                          onChange={(e) => setNoticeExpiresAt(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quick Relative Presets */}
+                    <div className="pt-1">
+                      <p className="text-[10px] font-semibold text-slate-400 mb-1">Quick Relative Presets:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
+                            const pad = (n: number) => String(n).padStart(2, "0");
+                            setNoticeExpiresAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                          }}
+                          className="px-2 py-1 rounded-lg text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors cursor-pointer"
+                        >
+                          +24 Hours (1 Day)
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+                            const pad = (n: number) => String(n).padStart(2, "0");
+                            setNoticeExpiresAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                          }}
+                          className="px-2 py-1 rounded-lg text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition-colors cursor-pointer"
+                        >
+                          +3 Days
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+                            const pad = (n: number) => String(n).padStart(2, "0");
+                            setNoticeExpiresAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                          }}
+                          className="px-2 py-1 rounded-lg text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors cursor-pointer"
+                        >
+                          +7 Days (1 Week)
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+                            const pad = (n: number) => String(n).padStart(2, "0");
+                            setNoticeExpiresAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                          }}
+                          className="px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                        >
+                          +30 Days (1 Month)
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNoticeStartsAt("");
+                            setNoticeExpiresAt("");
+                            setNoticeHasSchedule(false);
+                          }}
+                          className="px-2 py-1 rounded-lg text-[10px] font-bold text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                        >
+                          Clear (Permanent)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Display Priority & Status Toggle Grid */}

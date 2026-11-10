@@ -112,6 +112,13 @@ export default function HeroNoticeBoard() {
       }
     } catch {}
     loadNotices();
+    const interval = setInterval(loadNotices, 30000);
+    const handleFocus = () => loadNotices();
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, []);
 
   // Universal Live Sync: instantly update ticker when admin adds, edits, or deletes a notice
@@ -123,9 +130,11 @@ export default function HeroNoticeBoard() {
 
   // Filter active and unexpired notices on client as well for safety
   const now = Date.now();
+  // 30-minute skew tolerance so slight timezone/clock discrepancies don't hide newly created notices
+  const SKEW_TOLERANCE_MS = 30 * 60 * 1000;
   const activeNotices = (notices || []).filter((n) => {
     if (!n.active) return false;
-    if (n.startsAt && new Date(n.startsAt).getTime() > now) return false;
+    if (n.startsAt && (new Date(n.startsAt).getTime() - SKEW_TOLERANCE_MS) > now) return false;
     if (n.expiresAt && new Date(n.expiresAt).getTime() < now) return false;
     return true;
   });

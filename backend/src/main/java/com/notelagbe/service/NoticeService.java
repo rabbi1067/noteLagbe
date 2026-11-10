@@ -29,7 +29,10 @@ public class NoticeService {
     @Transactional
     public List<Notice> getActiveNotices() {
         autoPauseExpiredNotices();
-        return noticeRepository.findCurrentlyActiveNotices(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        // Allow up to 1-hour timezone/clock skew tolerance for newly scheduled notices
+        LocalDateTime skewNow = now.plusHours(1);
+        return noticeRepository.findCurrentlyActiveNotices(now, skewNow);
     }
 
     @Transactional
@@ -42,6 +45,7 @@ public class NoticeService {
      * Auto-pauses notices that have passed their expiresAt timestamp.
      * Runs every 30 seconds and also invoked synchronously on notice fetches.
      */
+    @CacheEvict(value = "active_notices", allEntries = true)
     @Scheduled(fixedRate = 30000)
     @Transactional
     public void autoPauseExpiredNotices() {
@@ -66,15 +70,25 @@ public class NoticeService {
         notice.setLink(req.getLink() != null && !req.getLink().trim().isEmpty() ? req.getLink().trim() : null);
         notice.setActive(req.isActive());
         notice.setPriority(req.getPriority());
-        notice.setStartsAt(req.getStartsAt());
-        notice.setExpiresAt(req.getExpiresAt());
-        notice.setCreatedAt(LocalDateTime.now());
-        notice.setUpdatedAt(LocalDateTime.now());
 
-        // Check if created with past expiration
-        if (notice.getExpiresAt() != null && notice.getExpiresAt().isBefore(LocalDateTime.now())) {
-            notice.setActive(false);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startsAt = req.getStartsAt();
+        LocalDateTime expiresAt = req.getExpiresAt();
+
+        // If startsAt is in the past or within 15 minutes of now, treat as immediately live
+        if (startsAt != null && startsAt.isBefore(now.plusMinutes(15))) {
+            startsAt = null;
         }
+
+        // If expiresAt is in the past or before startsAt, clear it to prevent immediate auto-pause
+        if (expiresAt != null && (expiresAt.isBefore(now) || (startsAt != null && expiresAt.isBefore(startsAt)))) {
+            expiresAt = null;
+        }
+
+        notice.setStartsAt(startsAt);
+        notice.setExpiresAt(expiresAt);
+        notice.setCreatedAt(now);
+        notice.setUpdatedAt(now);
 
         Notice saved = noticeRepository.save(notice);
         liveSyncService.broadcast("notice", "created", saved.getId());
@@ -94,14 +108,24 @@ public class NoticeService {
         notice.setLink(req.getLink() != null && !req.getLink().trim().isEmpty() ? req.getLink().trim() : null);
         notice.setActive(req.isActive());
         notice.setPriority(req.getPriority());
-        notice.setStartsAt(req.getStartsAt());
-        notice.setExpiresAt(req.getExpiresAt());
-        notice.setUpdatedAt(LocalDateTime.now());
 
-        // Check if updated with past expiration
-        if (notice.getExpiresAt() != null && notice.getExpiresAt().isBefore(LocalDateTime.now())) {
-            notice.setActive(false);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startsAt = req.getStartsAt();
+        LocalDateTime expiresAt = req.getExpiresAt();
+
+        // If startsAt is in the past or within 15 minutes of now, treat as immediate
+        if (startsAt != null && startsAt.isBefore(now.plusMinutes(15))) {
+            startsAt = null;
         }
+
+        // If expiresAt is in the past or before startsAt, clear it
+        if (expiresAt != null && (expiresAt.isBefore(now) || (startsAt != null && expiresAt.isBefore(startsAt)))) {
+            expiresAt = null;
+        }
+
+        notice.setStartsAt(startsAt);
+        notice.setExpiresAt(expiresAt);
+        notice.setUpdatedAt(now);
 
         Notice updated = noticeRepository.save(notice);
         liveSyncService.broadcast("notice", "updated", id);
@@ -125,13 +149,26 @@ public class NoticeService {
                 .orElseThrow(() -> new ResourceNotFoundException("Notice not found with ID: " + id));
 
         boolean nextState = !notice.isActive();
-        // If enabling an already expired notice, clear the past expiration date
-        if (nextState && notice.getExpiresAt() != null && notice.getExpiresAt().isBefore(LocalDateTime.now())) {
-            notice.setExpiresAt(null);
+        LocalDateTime now = LocalDateTime.now();
+
+        if (nextState) {
+            // Admin clicked "Go Live": ensure notice is immediately active on the site
+            // 1. Clear any past or invalid expiration date
+            if (notice.getExpiresAt() != null && notice.getExpiresAt().isBefore(now)) {
+                notice.setExpiresAt(null);
+            }
+            // 2. If startsAt was set in the future, reset to null so it is active right now
+            if (notice.getStartsAt() != null && notice.getStartsAt().isAfter(now)) {
+                notice.setStartsAt(null);
+            }
+            // 3. If expiresAt is before startsAt, clear expiresAt
+            if (notice.getExpiresAt() != null && notice.getStartsAt() != null && notice.getExpiresAt().isBefore(notice.getStartsAt())) {
+                notice.setExpiresAt(null);
+            }
         }
 
         notice.setActive(nextState);
-        notice.setUpdatedAt(LocalDateTime.now());
+        notice.setUpdatedAt(now);
         noticeRepository.save(notice);
 
         liveSyncService.broadcast("notice", "updated", id);

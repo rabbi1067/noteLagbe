@@ -16,10 +16,26 @@ import {
   Trash2,
   LogIn,
   Layers,
-  Inbox
+  Inbox,
+  Megaphone,
+  Radio
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useDataSync } from "@/lib/sync";
+
+export interface CampusNoticeItem {
+  id: number;
+  text: string;
+  type: string;
+  link?: string | null;
+  active: boolean;
+  priority: number;
+  startsAt?: string | null;
+  expiresAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 function formatRelativeTime(dateString?: string): string {
   if (!dateString) return "Just now";
@@ -47,10 +63,28 @@ export default function NotificationBell() {
   const router = useRouter();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [campusNotices, setCampusNotices] = useState<CampusNoticeItem[]>([]);
+  const [readCampusNoticeIds, setReadCampusNoticeIds] = useState<number[]>([]);
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [filterTab, setFilterTab] = useState<"all" | "unread">("all");
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const fetchCampusNotices = async () => {
+    try {
+      const data = await api.notices.getActive();
+      if (Array.isArray(data)) {
+        setCampusNotices(data);
+        try {
+          if (data.length > 0) {
+            localStorage.setItem("notelagbe_cached_notices", JSON.stringify(data));
+          }
+        } catch {}
+      }
+    } catch {
+      // Ignore background fetch error
+    }
+  };
 
   const fetchUnreadCount = async () => {
     if (!isAuthenticated) return;
@@ -78,12 +112,37 @@ export default function NotificationBell() {
     }
   };
 
-  // Poll for notifications when authenticated
+  // Initial load: campus notices & read IDs
+  useEffect(() => {
+    try {
+      const storedRead = localStorage.getItem("notelagbe_read_campus_notices");
+      if (storedRead) {
+        setReadCampusNoticeIds(JSON.parse(storedRead));
+      }
+      const cached = localStorage.getItem("notelagbe_cached_notices");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const isMock = parsed.some((p: any) => p.text && p.text.includes("Fall 2026 Midterm"));
+          if (!isMock) setCampusNotices(parsed);
+        }
+      }
+    } catch {}
+
+    fetchCampusNotices();
+    const noticeInterval = setInterval(fetchCampusNotices, 25000);
+    return () => clearInterval(noticeInterval);
+  }, []);
+
+  // Poll for personal notifications when authenticated
   useEffect(() => {
     if (isAuthenticated) {
       fetchUnreadCount();
       const interval = setInterval(fetchUnreadCount, 20000); // 20s polling
-      const handleFocus = () => fetchUnreadCount();
+      const handleFocus = () => {
+        fetchUnreadCount();
+        fetchCampusNotices();
+      };
       window.addEventListener("focus", handleFocus);
       return () => {
         clearInterval(interval);
@@ -94,6 +153,17 @@ export default function NotificationBell() {
       setUnreadCount(0);
     }
   }, [isAuthenticated]);
+
+  // Real-time synchronization
+  useDataSync((payload) => {
+    if (!payload || payload.entity === "notice" || payload.entity === "all") {
+      fetchCampusNotices();
+    }
+    if (isAuthenticated && (!payload || payload.entity === "notification" || payload.entity === "all")) {
+      fetchUnreadCount();
+      if (isOpen) fetchNotifications();
+    }
+  });
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -111,10 +181,65 @@ export default function NotificationBell() {
   }, [isOpen]);
 
   const handleToggle = () => {
-    if (!isOpen && isAuthenticated) {
-      fetchNotifications();
+    if (!isOpen) {
+      fetchCampusNotices();
+      if (isAuthenticated) {
+        fetchNotifications();
+      }
     }
     setIsOpen(!isOpen);
+  };
+
+  // Filter active and unexpired campus notices
+  const now = Date.now();
+  const SKEW_TOLERANCE_MS = 30 * 60 * 1000;
+  const activeCampusNotices = (campusNotices || []).filter((n) => {
+    if (!n.active) return false;
+    if (n.startsAt && (new Date(n.startsAt).getTime() - SKEW_TOLERANCE_MS) > now) return false;
+    if (n.expiresAt && new Date(n.expiresAt).getTime() < now) return false;
+    return true;
+  });
+
+  const unreadCampusCount = activeCampusNotices.filter((n) => !readCampusNoticeIds.includes(n.id)).length;
+  const totalBadgeCount = unreadCount + unreadCampusCount;
+
+  const handleCampusNoticeClick = (notice: CampusNoticeItem) => {
+    // Mark as read
+    if (!readCampusNoticeIds.includes(notice.id)) {
+      const updated = [...readCampusNoticeIds, notice.id];
+      setReadCampusNoticeIds(updated);
+      try {
+        localStorage.setItem("notelagbe_read_campus_notices", JSON.stringify(updated));
+      } catch {}
+    }
+
+    setIsOpen(false);
+    if (notice.link && notice.link.trim()) {
+      const link = notice.link.trim();
+      if (link.startsWith("http://") || link.startsWith("https://")) {
+        window.open(link, "_blank", "noopener,noreferrer");
+      } else {
+        router.push(link);
+      }
+      return;
+    }
+
+    const textLower = (notice.text || "").toLowerCase();
+    if (
+      textLower.includes("course") ||
+      textLower.includes("note") ||
+      textLower.includes("exam") ||
+      textLower.includes("midterm") ||
+      textLower.includes("final") ||
+      textLower.includes("routine") ||
+      textLower.includes("question") ||
+      textLower.includes("paper") ||
+      textLower.includes("কোর্স") ||
+      textLower.includes("নোট") ||
+      textLower.includes("পরীক্ষা")
+    ) {
+      router.push("/courses");
+    }
   };
 
   const handleMarkAsRead = async (id: number, link?: string, e?: React.MouseEvent) => {
@@ -138,12 +263,21 @@ export default function NotificationBell() {
   };
 
   const handleMarkAllRead = async () => {
+    // Mark campus notices as read
+    const allNoticeIds = activeCampusNotices.map((n) => n.id);
+    const merged = Array.from(new Set([...readCampusNoticeIds, ...allNoticeIds]));
+    setReadCampusNoticeIds(merged);
     try {
-      await api.notifications.markAllAsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true, isRead: true })));
-      setUnreadCount(0);
-    } catch {
-      // Ignore
+      localStorage.setItem("notelagbe_read_campus_notices", JSON.stringify(merged));
+    } catch {}
+
+    // Mark personal notifications as read
+    if (isAuthenticated) {
+      try {
+        await api.notifications.markAllAsRead();
+        setNotifications((prev) => prev.map((n) => ({ ...n, read: true, isRead: true })));
+        setUnreadCount(0);
+      } catch {}
     }
   };
 
@@ -154,7 +288,6 @@ export default function NotificationBell() {
       setNotifications((prev) => prev.filter((n) => n.id !== id));
       fetchUnreadCount();
     } catch {
-      // Fallback local remove
       setNotifications((prev) => prev.filter((n) => n.id !== id));
     }
   };
@@ -165,13 +298,12 @@ export default function NotificationBell() {
       setNotifications([]);
       setUnreadCount(0);
     } catch {
-      // Fallback
       setNotifications([]);
       setUnreadCount(0);
     }
   };
 
-  // Filtered list
+  // Filtered personal notifications list
   const filteredNotifications = notifications.filter((n) => {
     const isRead = n.isRead === true || n.read === true;
     if (filterTab === "unread") return !isRead;
@@ -186,17 +318,17 @@ export default function NotificationBell() {
         className={`relative p-2 rounded-xl border transition-all ${
           isOpen
             ? "bg-blue-50 dark:bg-blue-950/60 border-blue-400 text-blue-600 dark:text-blue-400 shadow-sm"
-            : unreadCount > 0
+            : totalBadgeCount > 0
             ? "border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:border-blue-500 shadow-sm"
             : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-blue-400 hover:text-blue-600"
         }`}
-        title={unreadCount > 0 ? `${unreadCount} unread notification(s)` : "Notifications"}
+        title={totalBadgeCount > 0 ? `${totalBadgeCount} unread notification(s)` : "Notifications"}
         aria-label="View notifications"
       >
         <Bell className="w-4 h-4" />
-        {unreadCount > 0 && (
+        {totalBadgeCount > 0 && (
           <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-red-600 text-[10px] font-black text-white shadow-md animate-pulse">
-            {unreadCount > 9 ? "9+" : unreadCount}
+            {totalBadgeCount > 9 ? "9+" : totalBadgeCount}
           </span>
         )}
       </button>
@@ -212,14 +344,14 @@ export default function NotificationBell() {
                 <Bell className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 Notifications
               </span>
-              {unreadCount > 0 && (
+              {totalBadgeCount > 0 && (
                 <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                  {unreadCount} new
+                  {totalBadgeCount} new
                 </span>
               )}
             </div>
 
-            {isAuthenticated && unreadCount > 0 && (
+            {totalBadgeCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
                 className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors"
@@ -231,31 +363,122 @@ export default function NotificationBell() {
             )}
           </div>
 
+          {/* SECTION: CAMPUS LIVE ANNOUNCEMENTS (Visible to Everyone) */}
+          {activeCampusNotices.length > 0 && (
+            <div className="border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-[#0b1220]/60">
+              <div className="px-4 py-2 flex items-center justify-between border-b border-slate-100 dark:border-slate-800/40">
+                <span className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Megaphone className="w-3 h-3 text-amber-500 animate-pulse" />
+                  <span>Campus Announcements ({activeCampusNotices.length})</span>
+                </span>
+                <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  LIVE
+                </span>
+              </div>
+              <div className="divide-y divide-slate-100 dark:divide-slate-800/40 max-h-[180px] overflow-y-auto">
+                {activeCampusNotices.map((n) => {
+                  const isRead = readCampusNoticeIds.includes(n.id);
+                  const isAlert = n.type === "ALERT";
+                  const isImportant = n.type === "IMPORTANT";
+                  const isUpdate = n.type === "UPDATE";
+
+                  return (
+                    <div
+                      key={`campus-${n.id}`}
+                      onClick={() => handleCampusNoticeClick(n)}
+                      className={`p-3 transition-colors cursor-pointer flex items-start gap-2.5 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 ${
+                        !isRead ? "bg-amber-500/[0.04] dark:bg-amber-500/[0.08]" : ""
+                      }`}
+                    >
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                        isAlert
+                          ? "bg-rose-500/15 text-rose-500"
+                          : isImportant
+                          ? "bg-amber-500/15 text-amber-500"
+                          : isUpdate
+                          ? "bg-emerald-500/15 text-emerald-500"
+                          : "bg-blue-500/15 text-blue-500"
+                      }`}>
+                        <Megaphone className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-0.5">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded font-mono ${
+                            isAlert
+                              ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                              : isImportant
+                              ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                              : isUpdate
+                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                              : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                          }`}>
+                            {n.type || "INFO"}
+                          </span>
+                          {!isRead && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 ring-2 ring-amber-200 dark:ring-amber-900 shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-snug line-clamp-2">
+                          {n.text}
+                        </p>
+                        <div className="flex items-center justify-between pt-0.5 text-[10px] text-slate-400">
+                          <span>{formatRelativeTime(n.createdAt)}</span>
+                          <span className="text-blue-600 dark:text-blue-400 font-bold flex items-center gap-0.5 hover:underline">
+                            Open <ExternalLink className="w-2.5 h-2.5" />
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Unauthenticated Visitor State */}
           {!isAuthenticated ? (
-            <div className="p-6 text-center space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900/60 flex items-center justify-center mx-auto text-blue-600 dark:text-blue-400 shadow-sm">
-                <Bell className="w-6 h-6 animate-pulse" />
-              </div>
-              <div className="space-y-1">
-                <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
-                  SEU Campus Notifications
-                </h4>
+            activeCampusNotices.length > 0 ? (
+              <div className="p-4 text-center space-y-2 bg-slate-50/40 dark:bg-slate-900/40">
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">
-                  Sign in with your student ID to receive instant alerts on course note uploads, solved papers, and payment approvals.
+                  Sign in with your student account to get personal alerts for your course notes & payment receipts.
                 </p>
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    setShowAuthModal(true);
+                  }}
+                  className="py-1.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Student Sign In</span>
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  setIsOpen(false);
-                  setShowAuthModal(true);
-                }}
-                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99]"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Sign In to NoteLagbe</span>
-              </button>
-            </div>
+            ) : (
+              <div className="p-6 text-center space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900/60 flex items-center justify-center mx-auto text-blue-600 dark:text-blue-400 shadow-sm">
+                  <Bell className="w-6 h-6 animate-pulse" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                    SEU Campus Notifications
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">
+                    Sign in with your student ID to receive instant alerts on course note uploads, solved papers, and payment approvals.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    setShowAuthModal(true);
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Sign In to NoteLagbe</span>
+                </button>
+              </div>
+            )
           ) : (
             <>
               {/* Filter Tabs & Quick Actions */}
