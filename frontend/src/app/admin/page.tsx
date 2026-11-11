@@ -87,6 +87,7 @@ import {
   Volume2,
   Play,
   UserX,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
@@ -488,6 +489,7 @@ export default function AdminDashboardPage() {
   // Financial Waivers States
   const [waiverStatusFilter, setWaiverStatusFilter] = useState<"PENDING" | "APPROVED" | "REJECTED" | "ALL">("PENDING");
   const [waiverSearch, setWaiverSearch] = useState("");
+  const [processingQueueKey, setProcessingQueueKey] = useState<string | null>(null);
 
   // Campus Notice Board States
   const [noticeSearch, setNoticeSearch] = useState("");
@@ -708,8 +710,9 @@ export default function AdminDashboardPage() {
     }
 
     setSavingContributionEdit(true);
+    setProcessingQueueKey(`contribution-${editingContribution.id}`);
     try {
-      await api.admin.approveContribution(editingContribution.id, {
+      const updated = await api.admin.approveContribution(editingContribution.id, {
         title: contribEditTitle.trim(),
         teacherId: contribEditTeacherId === "0" || !contribEditTeacherId ? null : Number(contribEditTeacherId),
         resourceType: contribEditType,
@@ -719,17 +722,31 @@ export default function AdminDashboardPage() {
         feedback: contribEditFeedback.trim(),
       });
 
-      notifyDataChanged("contribution", "approved", editingContribution.id);
-      notifyDataChanged("subscription", "unlocked", editingContribution.id);
-      notifyDataChanged("resource", "approved", editingContribution.uploadedResource?.id);
+      const targetId = editingContribution.id;
+      const resourceId = updated?.uploadedResource?.id ?? editingContribution.uploadedResource?.id;
+      setContributions((prev) =>
+        prev.map((c) => (c.id === targetId ? (updated ?? { ...c, status: "APPROVED" }) : c))
+      );
+      if (updated?.uploadedResource?.id) {
+        setResources((prev) =>
+          prev.some((r) => r.id === updated.uploadedResource.id)
+            ? prev.map((r) => (r.id === updated.uploadedResource.id ? updated.uploadedResource : r))
+            : [updated.uploadedResource, ...prev]
+        );
+      }
+      lastSelfQueueMutationAtRef.current = Date.now();
+      notifyDataChanged("contribution", "approved", targetId);
+      notifyDataChanged("subscription", "unlocked", targetId);
+      notifyDataChanged("resource", "approved", resourceId);
       confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
       toast.success("Contribution updated and approved! Published with correct details.");
       setEditingContribution(null);
-      loadAllAdminData();
+      void refreshVerificationQueues({ includeResources: true });
     } catch (err: any) {
       toast.error(err.message || "Failed to update and approve contribution");
     } finally {
       setSavingContributionEdit(false);
+      setProcessingQueueKey(null);
     }
   };
 
@@ -1013,14 +1030,103 @@ export default function AdminDashboardPage() {
     }
   }, [isSuperAdmin, activeTab]);
 
-  // Enterprise Live Sync: Keep admin dashboard synchronized if changes happen in other tabs or server
-  useDataSync((payload) => {
-    if (isAdmin && payload?.action !== "admin_broadcast") {
-      loadAllAdminData(false);
-      if (activeTab === "activityLogs" || payload?.entity === "activity_log") {
-        loadActivityLogs(activityLogPage, activityLogSearch, activityLogCategory);
+  const isLoadingAdminRef = useRef(false);
+  const pendingFullReloadRef = useRef(false);
+  const isRefreshingQueuesRef = useRef(false);
+  const pendingQueueRefreshOptsRef = useRef<{ includeResources: boolean; includeSubscribers: boolean } | null>(null);
+  const queueSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSelfQueueMutationAtRef = useRef(0);
+
+  const QUEUE_SYNC_ENTITIES = useMemo(
+    () => new Set(["review", "payment", "waiver", "contribution", "subscription"]),
+    []
+  );
+
+  const refreshVerificationQueues = useCallback(
+    async (opts?: { includeResources?: boolean; includeSubscribers?: boolean }) => {
+      const includeResources = Boolean(opts?.includeResources);
+      const includeSubscribers = Boolean(opts?.includeSubscribers) && isSuperAdmin;
+
+      if (isRefreshingQueuesRef.current) {
+        const prev = pendingQueueRefreshOptsRef.current;
+        pendingQueueRefreshOptsRef.current = {
+          includeResources: Boolean(prev?.includeResources || includeResources),
+          includeSubscribers: Boolean(prev?.includeSubscribers || includeSubscribers),
+        };
+        return;
       }
+
+      isRefreshingQueuesRef.current = true;
+      try {
+        const [pData, cData, wData, revData, resData, subData] = await Promise.all([
+          isSuperAdmin ? api.admin.getPayments().catch(() => null) : Promise.resolve(null),
+          api.admin.getContributions().catch(() => null),
+          api.admin.getWaivers().catch(() => null),
+          api.admin.getReviews().catch(() => null),
+          includeResources ? api.admin.getResources().catch(() => null) : Promise.resolve(null),
+          includeSubscribers ? api.admin.getSubscriptions(true).catch(() => null) : Promise.resolve(null),
+        ]);
+
+        if (Array.isArray(pData)) setPayments(pData);
+        if (Array.isArray(cData)) setContributions(cData);
+        if (Array.isArray(wData)) setWaivers(wData);
+        if (Array.isArray(revData)) setAdminReviews(revData);
+        if (Array.isArray(resData)) setResources(resData);
+        if (Array.isArray(subData)) setActiveSubscribers(subData);
+      } finally {
+        isRefreshingQueuesRef.current = false;
+        const queued = pendingQueueRefreshOptsRef.current;
+        pendingQueueRefreshOptsRef.current = null;
+        if (queued) {
+          void refreshVerificationQueues(queued);
+        }
+      }
+    },
+    [isSuperAdmin]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (queueSyncTimerRef.current) {
+        clearTimeout(queueSyncTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Enterprise Live Sync: Coalesced refresh so backend SSE bursts never trigger redundant 18-request storms
+  useDataSync((payload) => {
+    if (!isAdmin || !payload) return;
+    if (payload.action === "admin_broadcast" || payload.action === "connected") return;
+
+    const entity = payload.entity || "all";
+    const isQueueEvent = QUEUE_SYNC_ENTITIES.has(entity);
+
+    // Ignore SSE echoes triggered by our own local moderation action (state is already updated instantly)
+    if (isQueueEvent && Date.now() - lastSelfQueueMutationAtRef.current < 1500) {
+      return;
     }
+
+    if (activeTab === "activityLogs" || entity === "activity_log") {
+      loadActivityLogs(activityLogPage, activityLogSearch, activityLogCategory);
+    }
+
+    if (isQueueEvent || entity === "focus") {
+      const needResources = entity === "contribution" || entity === "focus";
+      const needSubscribers = isSuperAdmin && (entity === "payment" || entity === "waiver" || entity === "subscription" || entity === "focus");
+      if (queueSyncTimerRef.current) clearTimeout(queueSyncTimerRef.current);
+      queueSyncTimerRef.current = setTimeout(() => {
+        void refreshVerificationQueues({
+          includeResources: needResources,
+          includeSubscribers: needSubscribers,
+        });
+      }, 300);
+      return;
+    }
+
+    if (queueSyncTimerRef.current) clearTimeout(queueSyncTimerRef.current);
+    queueSyncTimerRef.current = setTimeout(() => {
+      void loadAllAdminData(false);
+    }, 350);
   });
 
   // Reset pagination on filter changes (defined before any returns)
@@ -1062,6 +1168,11 @@ export default function AdminDashboardPage() {
   }, [waiverStatusFilter, waiverSearch]);
 
   const loadAllAdminData = async (isInitial = false) => {
+    if (!isInitial && isLoadingAdminRef.current) {
+      pendingFullReloadRef.current = true;
+      return;
+    }
+    isLoadingAdminRef.current = true;
     if (isInitial) {
       setLoading(true);
     }
@@ -1175,7 +1286,12 @@ export default function AdminDashboardPage() {
     } catch (err: any) {
       toast.error(err.message || "Failed to load admin data");
     } finally {
+      isLoadingAdminRef.current = false;
       setLoading(false);
+      if (pendingFullReloadRef.current) {
+        pendingFullReloadRef.current = false;
+        void loadAllAdminData(false);
+      }
     }
   };
 
@@ -2219,19 +2335,40 @@ export default function AdminDashboardPage() {
   };
 
   // ---------------- Verification Queues ----------------
+  const applyStatusUpdate = <T extends { id: number }>(
+    setter: React.Dispatch<React.SetStateAction<T[]>>,
+    id: number,
+    updated: Partial<T> | null | undefined,
+    fallbackStatus: "APPROVED" | "REJECTED"
+  ) => {
+    setter((prev) =>
+      prev.map((item) =>
+        item.id === id ? (updated && updated.id === id ? (updated as T) : { ...item, status: fallbackStatus }) : item
+      )
+    );
+  };
+
   const handleApprovePayment = async (id: number) => {
+    const actionKey = `payment-${id}`;
+    if (processingQueueKey) return;
+    setProcessingQueueKey(actionKey);
     try {
-      await api.admin.approvePayment(id);
+      const updated = await api.admin.approvePayment(id);
+      applyStatusUpdate(setPayments, id, updated, "APPROVED");
+      lastSelfQueueMutationAtRef.current = Date.now();
       notifyDataChanged("payment", "approved", id);
       confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
       toast.success("Payment approved! 6 courses unlocked for student.");
-      loadAllAdminData();
+      void refreshVerificationQueues({ includeSubscribers: true });
     } catch (err: any) {
       toast.error(err.message || "Failed to approve payment");
+    } finally {
+      setProcessingQueueKey(null);
     }
   };
 
   const handleRejectPayment = (id: number) => {
+    if (processingQueueKey) return;
     openDeleteConfirm({
       title: "Reject Payment Request",
       itemType: "Payment",
@@ -2239,35 +2376,55 @@ export default function AdminDashboardPage() {
       warningText: "Are you sure you want to decline this subscription payment request? The student will be notified and subscription will remain inactive.",
       confirmButtonText: "Reject Payment",
       onConfirm: async () => {
+        setProcessingQueueKey(`payment-${id}`);
         try {
-          await api.admin.rejectPayment(id);
+          const updated = await api.admin.rejectPayment(id);
+          applyStatusUpdate(setPayments, id, updated, "REJECTED");
+          lastSelfQueueMutationAtRef.current = Date.now();
           notifyDataChanged("payment", "rejected", id);
           toast.success("Payment rejected");
           showDeleteSuccess("Payment Request Rejected", "The subscription payment transaction has been declined.", `Payment #${id}`);
-          loadAllAdminData();
+          void refreshVerificationQueues();
         } catch (err: any) {
           toast.error(err.message || "Failed to reject payment");
           throw err;
+        } finally {
+          setProcessingQueueKey(null);
         }
       },
     });
   };
 
   const handleApproveContribution = async (id: number) => {
+    const actionKey = `contribution-${id}`;
+    if (processingQueueKey) return;
+    setProcessingQueueKey(actionKey);
     try {
-      await api.admin.approveContribution(id);
+      const updated = await api.admin.approveContribution(id);
+      applyStatusUpdate(setContributions, id, updated, "APPROVED");
+      if (updated?.uploadedResource?.id) {
+        setResources((prev) =>
+          prev.some((r) => r.id === updated.uploadedResource.id)
+            ? prev.map((r) => (r.id === updated.uploadedResource.id ? updated.uploadedResource : r))
+            : [updated.uploadedResource, ...prev]
+        );
+      }
+      lastSelfQueueMutationAtRef.current = Date.now();
       notifyDataChanged("contribution", "approved", id);
       notifyDataChanged("subscription", "unlocked", id);
       notifyDataChanged("resource", "approved", id);
       confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
       toast.success("Contribution approved! Resource is published and student's 2 reward courses unlocked.");
-      loadAllAdminData();
+      void refreshVerificationQueues({ includeResources: true });
     } catch (err: any) {
       toast.error(err.message || "Failed to approve contribution");
+    } finally {
+      setProcessingQueueKey(null);
     }
   };
 
   const handleRejectContribution = (id: number) => {
+    if (processingQueueKey) return;
     openDeleteConfirm({
       title: "Reject Student Submission",
       itemType: "Contribution",
@@ -2275,34 +2432,47 @@ export default function AdminDashboardPage() {
       warningText: "Are you sure you want to reject this student submission? The material will not be published.",
       confirmButtonText: "Reject Submission",
       onConfirm: async () => {
+        setProcessingQueueKey(`contribution-${id}`);
         try {
-          await api.admin.rejectContribution(id);
+          const updated = await api.admin.rejectContribution(id);
+          applyStatusUpdate(setContributions, id, updated, "REJECTED");
+          lastSelfQueueMutationAtRef.current = Date.now();
           notifyDataChanged("contribution", "rejected", id);
           notifyDataChanged("resource", "rejected", id);
           toast.success("Contribution rejected");
           showDeleteSuccess("Contribution Rejected", "The student submission has been rejected and archived.", `Submission #${id}`);
-          loadAllAdminData();
+          void refreshVerificationQueues({ includeResources: true });
         } catch (err: any) {
           toast.error(err.message || "Failed to reject contribution");
           throw err;
+        } finally {
+          setProcessingQueueKey(null);
         }
       },
     });
   };
 
   const handleApproveWaiver = async (id: number) => {
+    const actionKey = `waiver-${id}`;
+    if (processingQueueKey) return;
+    setProcessingQueueKey(actionKey);
     try {
-      await api.admin.approveWaiver(id, 6, "Approved ৳99 package with 6 course unlock quota by Administrator");
+      const updated = await api.admin.approveWaiver(id, 6, "Approved ৳99 package with 6 course unlock quota by Administrator");
+      applyStatusUpdate(setWaivers, id, updated, "APPROVED");
+      lastSelfQueueMutationAtRef.current = Date.now();
       notifyDataChanged("waiver", "approved", id);
       confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
       toast.success("Financial waiver approved! Student granted 1-Semester 6 Course Unlocks.");
-      loadAllAdminData();
+      void refreshVerificationQueues({ includeSubscribers: true });
     } catch (err: any) {
       toast.error(err.message || "Failed to approve waiver");
+    } finally {
+      setProcessingQueueKey(null);
     }
   };
 
   const handleRejectWaiver = (id: number) => {
+    if (processingQueueKey) return;
     openDeleteConfirm({
       title: "Decline Financial Waiver",
       itemType: "Waiver",
@@ -2310,43 +2480,63 @@ export default function AdminDashboardPage() {
       warningText: "Are you sure you want to decline this financial waiver application?",
       confirmButtonText: "Decline Application",
       onConfirm: async () => {
+        setProcessingQueueKey(`waiver-${id}`);
         try {
-          await api.admin.rejectWaiver(id, "Declined based on quota availability.");
+          const updated = await api.admin.rejectWaiver(id, "Declined based on quota availability.");
+          applyStatusUpdate(setWaivers, id, updated, "REJECTED");
+          lastSelfQueueMutationAtRef.current = Date.now();
           notifyDataChanged("waiver", "rejected", id);
           toast.success("Waiver application declined");
           showDeleteSuccess("Waiver Declined", "The financial waiver application has been declined.", `Waiver #${id}`);
-          loadAllAdminData();
+          void refreshVerificationQueues();
         } catch (err: any) {
           toast.error(err.message || "Failed to decline waiver");
           throw err;
+        } finally {
+          setProcessingQueueKey(null);
         }
       },
     });
   };
 
   const handleApproveReview = async (id: number) => {
+    const actionKey = `review-${id}`;
+    if (processingQueueKey) return;
+    setProcessingQueueKey(actionKey);
     try {
-      await api.admin.approveReview(id);
+      const updated = await api.admin.approveReview(id);
+      applyStatusUpdate(setAdminReviews, id, updated, "APPROVED");
+      lastSelfQueueMutationAtRef.current = Date.now();
       notifyDataChanged("review", "approved", id);
       toast.success("Review approved and published to public faculty profile!");
-      loadAllAdminData();
+      void refreshVerificationQueues();
     } catch (err: any) {
       toast.error(err.message || "Failed to approve review");
+    } finally {
+      setProcessingQueueKey(null);
     }
   };
 
   const handleRejectReview = async (id: number) => {
+    const actionKey = `review-${id}`;
+    if (processingQueueKey) return;
+    setProcessingQueueKey(actionKey);
     try {
-      await api.admin.rejectReview(id);
+      const updated = await api.admin.rejectReview(id);
+      applyStatusUpdate(setAdminReviews, id, updated, "REJECTED");
+      lastSelfQueueMutationAtRef.current = Date.now();
       notifyDataChanged("review", "rejected", id);
       toast.success("Review rejected / unpublished from public view.");
-      loadAllAdminData();
+      void refreshVerificationQueues();
     } catch (err: any) {
       toast.error(err.message || "Failed to reject review");
+    } finally {
+      setProcessingQueueKey(null);
     }
   };
 
   const handleDeleteReview = (id: number) => {
+    if (processingQueueKey) return;
     openDeleteConfirm({
       title: "Permanently Delete Faculty Review",
       itemType: "Review",
@@ -2354,15 +2544,20 @@ export default function AdminDashboardPage() {
       warningText: "Are you sure you want to permanently delete this faculty review? It will be completely removed from public view and database.",
       confirmButtonText: "Delete Review",
       onConfirm: async () => {
+        setProcessingQueueKey(`review-${id}`);
         try {
           await api.admin.deleteReview(id);
+          setAdminReviews((prev) => prev.filter((r) => r.id !== id));
+          lastSelfQueueMutationAtRef.current = Date.now();
           notifyDataChanged("review", "deleted", id);
           toast.success("Review deleted permanently");
           showDeleteSuccess("Review Deleted Successfully!", "The faculty review has been permanently erased.", `Review #${id}`);
-          loadAllAdminData();
+          void refreshVerificationQueues();
         } catch (err: any) {
           toast.error(err.message || "Failed to delete review");
           throw err;
+        } finally {
+          setProcessingQueueKey(null);
         }
       },
     });
@@ -2943,7 +3138,8 @@ export default function AdminDashboardPage() {
   const lecturerCount = teachers.filter((t) => t.designation?.toLowerCase().includes("lecturer")).length;
   const departmentsRepresentedCount = new Set(teachers.map((t) => t.department?.toUpperCase()).filter(Boolean)).size;
 
-  const pendingReviewsCount = adminReviews.filter((r) => r.status === "PENDING").length;
+  const pendingReviewsList = useMemo(() => adminReviews.filter((r) => r.status === "PENDING"), [adminReviews]);
+  const pendingReviewsCount = pendingReviewsList.length;
   const filteredAdminReviews = adminReviews.filter((r) => {
     if (reviewStatusFilter === "ALL") return true;
     return r.status === reviewStatusFilter;
@@ -3145,9 +3341,29 @@ export default function AdminDashboardPage() {
     reviewPage * REVIEW_PAGE_SIZE
   );
 
-  // Total pending items requiring immediate action
+  // Clamp pagination whenever queue items are approved/rejected/deleted
+  useEffect(() => {
+    if (paymentPage > totalPaymentPages) setPaymentPage(totalPaymentPages);
+  }, [paymentPage, totalPaymentPages]);
+
+  useEffect(() => {
+    if (contributionPage > totalContributionPages) setContributionPage(totalContributionPages);
+  }, [contributionPage, totalContributionPages]);
+
+  useEffect(() => {
+    if (waiverPage > totalWaiverPages) setWaiverPage(totalWaiverPages);
+  }, [waiverPage, totalWaiverPages]);
+
+  useEffect(() => {
+    if (reviewPage > totalReviewPages) setReviewPage(totalReviewPages);
+  }, [reviewPage, totalReviewPages]);
+
+  // Total strictly-PENDING items requiring immediate administrative action
   const totalPendingActionItems =
-    (isSuperAdmin ? payments.length : 0) + contributions.length + waivers.length + pendingReviewsCount;
+    (isSuperAdmin ? pendingPaymentsCount : 0) +
+    pendingContributionsCount +
+    pendingWaiversCount +
+    pendingReviewsCount;
 
   return (
     <div className="h-screen max-h-screen overflow-hidden bg-slate-100 dark:bg-[#0a0f1d] text-slate-900 dark:text-slate-100 flex flex-col antialiased transition-colors duration-200">
@@ -3784,7 +4000,7 @@ export default function AdminDashboardPage() {
                         : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-transparent"
                     }`}
                   >
-                    {pendingReviewsCount > 0 ? `${pendingReviewsCount} new` : adminReviews.length}
+                    {pendingReviewsCount}
                   </span>
                 </button>
               </div>
@@ -4016,26 +4232,55 @@ export default function AdminDashboardPage() {
                     </div>
                     <div>
                       <h3 className="font-black text-sm text-amber-950 dark:text-amber-200">
-                        {totalPendingActionItems} Action Items Requiring Administrative Review
+                        {totalPendingActionItems} Action {totalPendingActionItems === 1 ? "Item" : "Items"} Requiring Administrative Review
                       </h3>
                       <p className="text-xs text-amber-800 dark:text-amber-400/80 mt-0.5">
-                        {payments.length} pending payments • {contributions.length} material submissions • {waivers.length} financial waivers • {pendingReviewsCount} reviews to moderate
+                        {isSuperAdmin ? `${pendingPaymentsCount} pending payments • ` : ""}
+                        {pendingContributionsCount} material submissions • {pendingWaiversCount} financial waivers • {pendingReviewsCount} reviews to moderate
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
-                    {payments.length > 0 && (
+                    {isSuperAdmin && pendingPaymentsCount > 0 && (
                       <button
-                        onClick={() => setActiveTab("payments")}
+                        onClick={() => {
+                          setPaymentStatusFilter("PENDING");
+                          setActiveTab("payments");
+                        }}
                         className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-black hover:bg-amber-400 transition-colors shadow-sm"
                       >
-                        Review Payments ({payments.length})
+                        Review Payments ({pendingPaymentsCount})
+                      </button>
+                    )}
+                    {pendingContributionsCount > 0 && (
+                      <button
+                        onClick={() => {
+                          setContributionStatusFilter("PENDING");
+                          setActiveTab("contributions");
+                        }}
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-500 transition-colors shadow-sm"
+                      >
+                        Verify Submissions ({pendingContributionsCount})
+                      </button>
+                    )}
+                    {pendingWaiversCount > 0 && (
+                      <button
+                        onClick={() => {
+                          setWaiverStatusFilter("PENDING");
+                          setActiveTab("waivers");
+                        }}
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-600 text-white hover:bg-purple-500 transition-colors shadow-sm"
+                      >
+                        Review Waivers ({pendingWaiversCount})
                       </button>
                     )}
                     {pendingReviewsCount > 0 && (
                       <button
-                        onClick={() => setActiveTab("reviews")}
+                        onClick={() => {
+                          setReviewStatusFilter("PENDING");
+                          setActiveTab("reviews");
+                        }}
                         className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-amber-100 text-amber-900 dark:bg-slate-800 dark:text-amber-300 dark:hover:bg-slate-700 transition-colors border border-amber-500/30 shadow-xs"
                       >
                         Moderate Reviews ({pendingReviewsCount})
@@ -4121,9 +4366,9 @@ export default function AdminDashboardPage() {
                       </div>
                     </div>
                     <div>
-                      <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">{payments.length}</div>
+                      <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">{pendingPaymentsCount}</div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
-                        <span>Manual bKash/Nagad</span>
+                        <span>{pendingPaymentsCount > 0 ? "Awaiting bKash/Nagad approval" : "Manual bKash/Nagad • All clear"}</span>
                         <ArrowUpRight className="w-3 h-3 text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </p>
                     </div>
@@ -4269,7 +4514,7 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
 
-                {/* Pending Student Reviews Preview */}
+                {/* Pending Student Reviews Preview (Strictly Pending Only) */}
                 <div className="p-6 rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
@@ -4277,51 +4522,84 @@ export default function AdminDashboardPage() {
                       <span>Student Reviews Queue</span>
                     </h3>
                     <button
-                      onClick={() => setActiveTab("reviews")}
+                      onClick={() => {
+                        setReviewStatusFilter(pendingReviewsCount > 0 ? "PENDING" : "ALL");
+                        setActiveTab("reviews");
+                      }}
                       className="text-xs font-bold text-amber-500 dark:text-amber-400 hover:underline"
                     >
-                      {pendingReviewsCount > 0 ? `Review Pending (${pendingReviewsCount})` : `Moderate (${adminReviews.length})`}
+                      {pendingReviewsCount > 0 ? `Review Pending (${pendingReviewsCount})` : `View History (${adminReviews.length})`}
                     </button>
                   </div>
 
-                  <div className="space-y-2.5">
-                    {[...adminReviews]
-                      .sort((a, b) => (a.status === "PENDING" ? 0 : 1) - (b.status === "PENDING" ? 0 : 1))
-                      .slice(0, 5)
-                      .map((rev) => (
-                      <div
-                        key={rev.id}
-                        className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs hover:bg-slate-100/80 dark:hover:bg-slate-800/50 transition-colors shadow-xs"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{rev.courseCode || "CSE"}</span>
-                            {(rev.teacherName || rev.teacher?.name) && (
-                              <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 truncate max-w-[140px]">
-                                • {rev.teacherName || rev.teacher?.name}
-                              </span>
-                            )}
-                            <span
-                              className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                                rev.status === "PENDING"
-                                  ? "bg-amber-500/20 text-amber-700 dark:text-amber-300"
-                                  : rev.status === "APPROVED"
-                                  ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
-                                  : "bg-rose-500/20 text-rose-700 dark:text-rose-300"
-                              }`}
+                  {pendingReviewsList.length > 0 ? (
+                    <div className="space-y-2.5">
+                      {pendingReviewsList.slice(0, 5).map((rev) => {
+                        const isBusy = processingQueueKey === `review-${rev.id}`;
+                        return (
+                          <div
+                            key={rev.id}
+                            className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs hover:bg-slate-100/80 dark:hover:bg-slate-800/50 transition-colors shadow-xs"
+                          >
+                            <div
+                              onClick={() => {
+                                setReviewStatusFilter("PENDING");
+                                setActiveTab("reviews");
+                              }}
+                              className="min-w-0 flex-1 cursor-pointer"
                             >
-                              {rev.status}
-                            </span>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{rev.courseCode || "CSE"}</span>
+                                {(rev.teacherName || rev.teacher?.name) && (
+                                  <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 truncate max-w-[140px]">
+                                    • {rev.teacherName || rev.teacher?.name}
+                                  </span>
+                                )}
+                                <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                                  PENDING
+                                </span>
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-500 dark:text-amber-400">
+                                  <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                                  {rev.rating || 5}
+                                </span>
+                              </div>
+                              <p className="text-slate-600 dark:text-slate-300 truncate mt-0.5 italic">&quot;{rev.comment}&quot;</p>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                disabled={Boolean(processingQueueKey)}
+                                onClick={() => handleApproveReview(rev.id)}
+                                title="Approve & Publish"
+                                className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-colors cursor-pointer"
+                              >
+                                {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={Boolean(processingQueueKey)}
+                                onClick={() => handleRejectReview(rev.id)}
+                                title="Reject"
+                                className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 disabled:opacity-50 text-rose-500 dark:text-rose-400 border border-rose-500/30 transition-colors cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
-                          <p className="text-slate-600 dark:text-slate-300 truncate mt-0.5 italic">&quot;{rev.comment}&quot;</p>
-                        </div>
-                        <div className="flex items-center gap-1 text-amber-500 dark:text-amber-400 shrink-0">
-                          <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                          <span className="font-bold text-slate-800 dark:text-white">{rev.rating || 5}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-8 px-4 text-center rounded-2xl bg-slate-50/70 dark:bg-slate-900/40 border border-dashed border-slate-200 dark:border-slate-800 space-y-1.5">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto" />
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                        All Caught Up!
+                      </p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        No pending student reviews awaiting moderation right now.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
               </div>
@@ -6049,15 +6327,23 @@ export default function AdminDashboardPage() {
                             {isPending ? (
                               <>
                                 <button
+                                  type="button"
+                                  disabled={Boolean(processingQueueKey)}
                                   onClick={() => handleApprovePayment(p.id)}
-                                  className="px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer"
+                                  className="px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer"
                                 >
-                                  <Check className="w-4 h-4" />
-                                  <span>Approve & Unlock 6</span>
+                                  {processingQueueKey === `payment-${p.id}` ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Check className="w-4 h-4" />
+                                  )}
+                                  <span>{processingQueueKey === `payment-${p.id}` ? "Processing..." : "Approve & Unlock 6"}</span>
                                 </button>
                                 <button
+                                  type="button"
+                                  disabled={Boolean(processingQueueKey)}
                                   onClick={() => handleRejectPayment(p.id)}
-                                  className="px-4 py-2.5 rounded-xl font-bold text-xs bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60 cursor-pointer"
+                                  className="px-4 py-2.5 rounded-xl font-bold text-xs bg-rose-950/40 hover:bg-rose-900/60 disabled:opacity-50 text-rose-400 border border-rose-800/60 cursor-pointer"
                                 >
                                   Reject
                                 </button>
@@ -6403,23 +6689,33 @@ export default function AdminDashboardPage() {
                           {isPending ? (
                             <>
                               <button
+                                type="button"
+                                disabled={Boolean(processingQueueKey)}
                                 onClick={() => handleOpenEditContributionModal(c)}
-                                className="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/25 flex items-center gap-1.5 cursor-pointer"
+                                className="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white shadow-md shadow-blue-600/25 flex items-center gap-1.5 cursor-pointer"
                                 title="Edit title, faculty initial or details before approving"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                                 <span>Edit & Approve</span>
                               </button>
                               <button
+                                type="button"
+                                disabled={Boolean(processingQueueKey)}
                                 onClick={() => handleApproveContribution(c.id)}
-                                className="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer"
+                                className="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer"
                               >
-                                <Check className="w-3.5 h-3.5" />
-                                <span>Quick Approve</span>
+                                {processingQueueKey === `contribution-${c.id}` ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Check className="w-3.5 h-3.5" />
+                                )}
+                                <span>{processingQueueKey === `contribution-${c.id}` ? "Approving..." : "Quick Approve"}</span>
                               </button>
                               <button
+                                type="button"
+                                disabled={Boolean(processingQueueKey)}
                                 onClick={() => handleRejectContribution(c.id)}
-                                className="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60 cursor-pointer"
+                                className="px-3.5 py-2.5 rounded-xl font-bold text-xs bg-rose-950/40 hover:bg-rose-900/60 disabled:opacity-50 text-rose-400 border border-rose-800/60 cursor-pointer"
                               >
                                 Reject
                               </button>
@@ -6687,15 +6983,23 @@ export default function AdminDashboardPage() {
                           {isPending ? (
                             <>
                               <button
+                                type="button"
+                                disabled={Boolean(processingQueueKey)}
                                 onClick={() => handleApproveWaiver(w.id)}
-                                className="px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer"
+                                className="px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer"
                               >
-                                <Check className="w-4 h-4" />
-                                <span>Accept & Grant 6</span>
+                                {processingQueueKey === `waiver-${w.id}` ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Check className="w-4 h-4" />
+                                )}
+                                <span>{processingQueueKey === `waiver-${w.id}` ? "Granting..." : "Accept & Grant 6"}</span>
                               </button>
                               <button
+                                type="button"
+                                disabled={Boolean(processingQueueKey)}
                                 onClick={() => handleRejectWaiver(w.id)}
-                                className="px-4 py-2.5 rounded-xl font-bold text-xs bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60 cursor-pointer"
+                                className="px-4 py-2.5 rounded-xl font-bold text-xs bg-rose-950/40 hover:bg-rose-900/60 disabled:opacity-50 text-rose-400 border border-rose-800/60 cursor-pointer"
                               >
                                 Decline
                               </button>
@@ -6872,32 +7176,44 @@ export default function AdminDashboardPage() {
                       <div className="flex items-center gap-2 shrink-0">
                         {rev.status !== "APPROVED" && (
                           <button
+                            type="button"
+                            disabled={Boolean(processingQueueKey)}
                             onClick={() => handleApproveReview(rev.id)}
-                            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 shadow-sm"
+                            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white flex items-center gap-1.5 shadow-sm cursor-pointer"
                           >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Approve & Publish</span>
+                            {processingQueueKey === `review-${rev.id}` ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Check className="w-3.5 h-3.5" />
+                            )}
+                            <span>{processingQueueKey === `review-${rev.id}` ? "Publishing..." : "Approve & Publish"}</span>
                           </button>
                         )}
                         {rev.status === "APPROVED" && (
                           <button
+                            type="button"
+                            disabled={Boolean(processingQueueKey)}
                             onClick={() => handleRejectReview(rev.id)}
-                            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-600/20 hover:bg-amber-600/30 text-amber-700 dark:text-amber-300 border border-amber-600/40"
+                            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-600/20 hover:bg-amber-600/30 disabled:opacity-50 text-amber-700 dark:text-amber-300 border border-amber-600/40 cursor-pointer"
                           >
                             Unpublish
                           </button>
                         )}
                         {rev.status === "PENDING" && (
                           <button
+                            type="button"
+                            disabled={Boolean(processingQueueKey)}
                             onClick={() => handleRejectReview(rev.id)}
-                            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/30"
+                            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 disabled:opacity-50 text-rose-700 dark:text-rose-400 border border-rose-500/30 cursor-pointer"
                           >
                             Reject
                           </button>
                         )}
                         <button
+                          type="button"
+                          disabled={Boolean(processingQueueKey)}
                           onClick={() => handleDeleteReview(rev.id)}
-                          className="p-2 rounded-xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          className="p-2 rounded-xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 disabled:opacity-50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                           title="Delete permanently"
                         >
                           <Trash2 className="w-4 h-4" />
