@@ -80,6 +80,11 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
+    public ReviewResponseDto deleteReviewWithDetails(Long id) {
+        return moderationService.deleteReviewWithDetails(id);
+    }
+
+    @Override
     public long countPendingReviews() {
         return moderationService.countPendingReviews();
     }

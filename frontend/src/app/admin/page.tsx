@@ -748,6 +748,11 @@ export default function AdminDashboardPage() {
   const [activityLogSearch, setActivityLogSearch] = useState("");
   const [activityLogCategory, setActivityLogCategory] = useState("ALL");
   const [loadingActivityLogs, setLoadingActivityLogs] = useState(false);
+  const [showClearLogsModal, setShowClearLogsModal] = useState(false);
+  const [clearLogsPassword, setClearLogsPassword] = useState("");
+  const [showClearLogsPassword, setShowClearLogsPassword] = useState(false);
+  const [clearingLogs, setClearingLogs] = useState(false);
+  const [clearLogsError, setClearLogsError] = useState("");
 
   const loadActivityLogs = useCallback(
     async (page = 1, search = "", category = "ALL") => {
@@ -770,6 +775,48 @@ export default function AdminDashboardPage() {
     },
     []
   );
+
+  const handleOpenClearLogsModal = () => {
+    if (!isSuperAdmin || activeTab !== "activityLogs") {
+      toast.error("Access Denied: Only Super Administrators can clear audit logs from the Super Panel.");
+      return;
+    }
+    setClearLogsPassword("");
+    setClearLogsError("");
+    setShowClearLogsPassword(false);
+    setShowClearLogsModal(true);
+  };
+
+  const handleConfirmClearLogs = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSuperAdmin || activeTab !== "activityLogs") {
+      toast.error("Access Denied: Super Admin clearance required.");
+      setShowClearLogsModal(false);
+      return;
+    }
+    if (!clearLogsPassword.trim()) {
+      setClearLogsError("Please enter your Super Admin password to confirm clearing logs.");
+      return;
+    }
+
+    setClearingLogs(true);
+    setClearLogsError("");
+    try {
+      await api.admin.clearActivityLogs(clearLogsPassword);
+      setShowClearLogsModal(false);
+      setClearLogsPassword("");
+      setActivityLogPage(1);
+      setActivityLogSearch("");
+      setActivityLogCategory("ALL");
+      toast.success("All security & activity audit logs have been cleared.");
+      loadActivityLogs(1, "", "ALL");
+      notifyDataChanged("activity_log", "cleared", 0);
+    } catch (err: any) {
+      setClearLogsError(err?.message || "Invalid Super Admin password or permission denied.");
+    } finally {
+      setClearingLogs(false);
+    }
+  };
 
 
   // User Accounts & RBAC State
@@ -1916,6 +1963,7 @@ export default function AdminDashboardPage() {
       // Refresh the student's unlocked courses list in real-time
       fetchStudentUnlockedCourses(giftTargetStudent.id);
       notifyDataChanged("course_unlock", "gifted", giftTargetStudent.id);
+      loadActivityLogs(1, activityLogSearch, activityLogCategory);
     } catch (err: any) {
       toast.error(err.message || "Failed to gift course.");
     } finally {
@@ -1952,6 +2000,7 @@ export default function AdminDashboardPage() {
           toast.success(`Access to ${unlockedCourse.courseCode}${facultyLabel} has been revoked.`);
           fetchStudentUnlockedCourses(giftTargetStudent.id);
           notifyDataChanged("course_unlock", "revoked", giftTargetStudent.id);
+          loadActivityLogs(1, activityLogSearch, activityLogCategory);
         } catch (err: any) {
           toast.error(err.message || "Failed to revoke course access.");
           throw err;
@@ -3018,6 +3067,8 @@ export default function AdminDashboardPage() {
                 ? "Campus Live Chatroom Moderation"
                 : activeTab === "staff"
                 ? "User Accounts & RBAC"
+                : activeTab === "activityLogs"
+                ? "Security & Activity Logs"
                 : "System Settings"}
             </span>
           </div>
@@ -3092,20 +3143,11 @@ export default function AdminDashboardPage() {
           {/* Header Action: Security & Activity Logs */}
           {activeTab === "activityLogs" && (
             <div className="flex items-center gap-2">
-              {isSuperAdmin && (
+              {isSuperAdmin && user?.role === "ROLE_SUPER_ADMIN" && (
                 <button
-                  onClick={async () => {
-                    if (confirm("Are you sure you want to clear all activity audit logs?")) {
-                      try {
-                        await api.admin.clearActivityLogs();
-                        loadActivityLogs(1, "", "ALL");
-                      } catch (err: any) {
-                        alert(err?.message || "Failed to clear logs");
-                      }
-                    }
-                  }}
+                  onClick={handleOpenClearLogsModal}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-900/50 shadow-xs transition-all"
-                  title="Clear All Activity Logs"
+                  title="Clear All Activity Logs (Super Admin Panel Only)"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Clear Logs</span>
@@ -8763,6 +8805,7 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                         <option value="ACADEMIC">Curriculum & Faculty (ACADEMIC)</option>
                         <option value="STAFF">Staff & User RBAC (STAFF)</option>
                         <option value="BILLING">Subscription & Payments (BILLING)</option>
+                        <option value="USER_MANAGEMENT">Course Gifts & Revocations (USER_MANAGEMENT)</option>
                         <option value="SYSTEM">System Notices & Automated (SYSTEM)</option>
                       </select>
                     </div>
@@ -8811,7 +8854,9 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                               {/* Action Badge */}
                               <td className="px-5 py-3.5 whitespace-nowrap">
                                 <span className={`px-2.5 py-1 rounded-md text-[10px] font-black font-mono border ${
-                                  log.actionType === "AUTH"
+                                  log.action === "LOGS_CLEAR_DENIED"
+                                    ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25"
+                                    : log.actionType === "AUTH"
                                     ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
                                     : log.actionType === "CONTENT"
                                     ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25"
@@ -8821,6 +8866,8 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                                     ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25"
                                     : log.actionType === "BILLING"
                                     ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
+                                    : log.actionType === "USER_MANAGEMENT"
+                                    ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/25"
                                     : "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/25"
                                 }`}>
                                   {log.action}
@@ -8835,11 +8882,22 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                                 <div className="text-[11px] font-mono text-slate-400 mt-0.5">
                                   {log.userEmail || "system@seu.edu.bd"}
                                 </div>
-                                {log.userRole && (
-                                  <span className="text-[9px] font-mono font-bold uppercase text-slate-500 dark:text-slate-400 mt-0.5 block">
-                                    {log.userRole.replace("ROLE_", "")}
-                                  </span>
-                                )}
+                                {log.userRole && (() => {
+                                  const cleanRole = log.userRole.replace("ROLE_", "");
+                                  const roleBadgeClass =
+                                    cleanRole === "SUPER_ADMIN"
+                                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
+                                      : cleanRole === "ADMIN"
+                                      ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25"
+                                      : cleanRole === "MANAGER"
+                                      ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25"
+                                      : "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/25";
+                                  return (
+                                    <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase border ${roleBadgeClass}`}>
+                                      {cleanRole}
+                                    </span>
+                                  );
+                                })()}
                               </td>
 
                               {/* Details */}
@@ -8867,10 +8925,24 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
 
                               {/* Status */}
                               <td className="px-5 py-3.5 whitespace-nowrap text-center">
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                                  <Check className="w-3 h-3 text-emerald-500" />
-                                  {log.status || "SUCCESS"}
-                                </span>
+                                {(() => {
+                                  const statusText = (log.status || "SUCCESS").toUpperCase();
+                                  const isFailure = statusText === "FAILED" || statusText === "DENIED";
+                                  return (
+                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
+                                      isFailure
+                                        ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
+                                        : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                    }`}>
+                                      {isFailure ? (
+                                        <AlertCircle className="w-3 h-3 text-rose-500" />
+                                      ) : (
+                                        <Check className="w-3 h-3 text-emerald-500" />
+                                      )}
+                                      {statusText}
+                                    </span>
+                                  );
+                                })()}
                               </td>
                             </tr>
                           );
@@ -11091,6 +11163,125 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
           onUnlockedSuccess={() => {}}
           isAdminMode={true}
         />
+      )}
+
+      {/* Super Admin Password Confirmation Modal for Clearing Activity Logs */}
+      {showClearLogsModal && isSuperAdmin && user?.role === "ROLE_SUPER_ADMIN" && activeTab === "activityLogs" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md">
+          <div className="w-full max-w-md rounded-2xl border border-rose-500/30 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between gap-3 px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-rose-500/5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-500 shrink-0">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-slate-900 dark:text-white">
+                      Clear Activity Audit Logs
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                      Super Panel
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Super Admin password verification required
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={clearingLogs}
+                onClick={() => {
+                  setShowClearLogsModal(false);
+                  setClearLogsPassword("");
+                  setClearLogsError("");
+                }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-40"
+                aria-label="Close Clear Logs verification modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmClearLogs} className="p-6 space-y-4">
+              <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-700 dark:text-rose-300 leading-relaxed flex items-start gap-2.5">
+                <Lock className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold block">Permanent Audit Log Purge</span>
+                  <span>
+                    This will permanently delete all{" "}
+                    <strong className="font-mono">{activityLogsData.totalItems || 0}</strong>{" "}
+                    recorded security &amp; activity entries. This operation is itself audited under{" "}
+                    <span className="font-mono">{user?.email}</span>.
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                  <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Confirm with Super Admin Password</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showClearLogsPassword ? "text" : "password"}
+                    value={clearLogsPassword}
+                    onChange={(e) => {
+                      setClearLogsPassword(e.target.value);
+                      if (clearLogsError) setClearLogsError("");
+                    }}
+                    placeholder="Enter your Super Admin password..."
+                    autoFocus
+                    disabled={clearingLogs}
+                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40 focus:border-rose-500 transition-all disabled:opacity-60"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowClearLogsPassword((prev) => !prev)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                    aria-label={showClearLogsPassword ? "Hide password" : "Show password"}
+                  >
+                    {showClearLogsPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {clearLogsError && (
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/25 text-xs text-rose-600 dark:text-rose-400 font-medium">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{clearLogsError}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  disabled={clearingLogs}
+                  onClick={() => {
+                    setShowClearLogsModal(false);
+                    setClearLogsPassword("");
+                    setClearLogsError("");
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={clearingLogs || !clearLogsPassword.trim()}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 shadow-lg shadow-rose-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{clearingLogs ? "Verifying & Clearing..." : "Verify & Clear All Logs"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

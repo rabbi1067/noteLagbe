@@ -18,5 +18,7 @@ public interface ReviewModerationService {
 
     void deleteReview(Long id);
 
+    ReviewResponseDto deleteReviewWithDetails(Long id);
+
     long countPendingReviews();
 }

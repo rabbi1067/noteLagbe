@@ -11,6 +11,8 @@ import com.notelagbe.dto.ReviewResponseDto;
 import com.notelagbe.dto.StaffCreateRequest;
 import com.notelagbe.dto.StaffResponseDto;
 import com.notelagbe.entity.*;
+import com.notelagbe.exception.ApiException;
+import com.notelagbe.repository.UserRepository;
 import com.notelagbe.security.CustomUserDetails;
 import com.notelagbe.service.*;
 import com.notelagbe.service.review.ReviewModerationService;
@@ -46,6 +48,7 @@ public class AdminController {
     private final ChatService chatService;
     private final ActivityLogService activityLogService;
     private final SeuFacultySyncService seuFacultySyncService;
+    private final UserRepository userRepository;
     private final CacheManager cacheManager;
     private final HttpServletRequest httpRequest;
 
@@ -63,6 +66,7 @@ public class AdminController {
                            ChatService chatService,
                            ActivityLogService activityLogService,
                            SeuFacultySyncService seuFacultySyncService,
+                           UserRepository userRepository,
                            CacheManager cacheManager,
                            HttpServletRequest httpRequest) {
         this.adminService = adminService;
@@ -79,24 +83,76 @@ public class AdminController {
         this.chatService = chatService;
         this.activityLogService = activityLogService;
         this.seuFacultySyncService = seuFacultySyncService;
+        this.userRepository = userRepository;
         this.cacheManager = cacheManager;
         this.httpRequest = httpRequest;
     }
 
     private User getCurrentAdminUser() {
+        return resolveActor(null);
+    }
+
+    private User resolveActor(CustomUserDetails userDetails) {
+        if (userDetails != null && userDetails.getUser() != null) {
+            return userDetails.getUser();
+        }
         try {
             var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof CustomUserDetails cud) {
-                return cud.getUser();
+            if (auth != null) {
+                if (auth.getPrincipal() instanceof CustomUserDetails cud && cud.getUser() != null) {
+                    return cud.getUser();
+                }
+                if (auth.isAuthenticated() && auth.getName() != null && !"anonymousUser".equalsIgnoreCase(auth.getName())) {
+                    return userRepository.findByEmail(auth.getName()).orElse(null);
+                }
             }
         } catch (Exception ignored) {}
         return null;
     }
 
+    private String formatActorPrefix(User actor) {
+        if (actor == null) {
+            return "[ADMIN] System Admin";
+        }
+        String roleShort = actor.getRole() != null ? actor.getRole().name().replace("ROLE_", "") : "ADMIN";
+        return "[" + roleShort + "] " + actor.getName() + " (" + actor.getEmail() + ")";
+    }
+
+    private String formatStudentLabel(User student) {
+        if (student == null) {
+            return "Unknown Student";
+        }
+        return student.getName() + " (" + student.getEmail() + ")";
+    }
+
     private void logAdminAction(String action, String actionType, String details) {
+        logAdminAction(null, action, actionType, details);
+    }
+
+    private void logAdminAction(User actor, String action, String actionType, String details) {
         try {
-            User user = getCurrentAdminUser();
-            activityLogService.logActivity(action, actionType, details, user, httpRequest);
+            User resolved = actor != null ? actor : getCurrentAdminUser();
+            activityLogService.logActivity(action, actionType, details, resolved, httpRequest);
+        } catch (Exception ignored) {}
+    }
+
+    private void logAdminFailure(User actor, String action, String actionType, String details) {
+        try {
+            User resolved = actor != null ? actor : getCurrentAdminUser();
+            String email = resolved != null ? resolved.getEmail() : "unknown@seu.edu.bd";
+            String name = resolved != null ? resolved.getName() : "Unknown Actor";
+            String role = (resolved != null && resolved.getRole() != null) ? resolved.getRole().name() : "UNKNOWN";
+            activityLogService.logActivity(
+                    action,
+                    actionType,
+                    details,
+                    email,
+                    name,
+                    role,
+                    ActivityLogService.getClientIp(httpRequest),
+                    ActivityLogService.getDeviceInfo(httpRequest),
+                    "FAILED"
+            );
         } catch (Exception ignored) {}
     }
 
@@ -126,12 +182,40 @@ public class AdminController {
         return ResponseEntity.ok(Map.of("message", "All application caches cleared successfully."));
     }
 
+    private ResponseEntity<Map<String, String>> handleClearActivityLogs(
+            CustomUserDetails userDetails,
+            Map<String, String> body) {
+        User actor = resolveActor(userDetails);
+        String password = body != null ? body.get("password") : null;
+        try {
+            adminService.verifySuperAdminPassword(actor, password);
+        } catch (ApiException ex) {
+            logAdminFailure(
+                    actor,
+                    "LOGS_CLEAR_DENIED",
+                    "SYSTEM",
+                    formatActorPrefix(actor) + " failed Super Admin password confirmation to clear audit logs: " + ex.getMessage()
+            );
+            throw ex;
+        }
+        activityLogService.clearAllLogs();
+        return ResponseEntity.ok(Map.of("message", "All activity & security audit logs have been cleared successfully."));
+    }
+
+    @PostMapping("/activity-logs/clear")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<Map<String, String>> clearActivityLogsWithPassword(
+            @RequestBody(required = false) Map<String, String> body,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return handleClearActivityLogs(userDetails, body);
+    }
+
     @DeleteMapping("/activity-logs")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ResponseEntity<Map<String, String>> clearActivityLogs() {
-        logAdminAction("LOGS_CLEAR", "SYSTEM", "Super Admin cleared activity audit logs");
-        activityLogService.clearAllLogs();
-        return ResponseEntity.ok(Map.of("message", "All activity logs have been cleared successfully."));
+    public ResponseEntity<Map<String, String>> clearActivityLogs(
+            @RequestBody(required = false) Map<String, String> body,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return handleClearActivityLogs(userDetails, body);
     }
 
     private void evictAnalyticsCache() {
@@ -284,16 +368,25 @@ public class AdminController {
     @PutMapping("/resources/{id}")
     public ResponseEntity<Resource> updateResource(
             @PathVariable Long id,
-            @RequestBody ResourceCreateRequest request) {
+            @RequestBody ResourceCreateRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         Resource updated = resourceService.updateResource(id, request);
+        logAdminAction(actor, "RESOURCE_UPDATE", "CONTENT",
+                formatActorPrefix(actor) + " updated material #" + id + ": \"" + updated.getTitle() + "\"" +
+                (updated.getCourse() != null ? " (" + updated.getCourse().getCode() + ")" : ""));
         evictAnalyticsCache();
         return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/resources/{id}")
-    public ResponseEntity<Map<String, Object>> deleteResource(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> deleteResource(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         resourceService.deleteResource(id);
-        logAdminAction("RESOURCE_DELETE", "CONTENT", "Admin deleted study material ID #" + id);
+        logAdminAction(actor, "RESOURCE_DELETE", "CONTENT",
+                formatActorPrefix(actor) + " deleted study material ID #" + id);
         evictAnalyticsCache();
         return ResponseEntity.ok(Map.of("success", true, "message", "Resource deleted successfully"));
     }
@@ -310,8 +403,10 @@ public class AdminController {
     public ResponseEntity<StaffResponseDto> createStaff(
             @Valid @RequestBody StaffCreateRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        StaffResponseDto staff = adminService.createStaff(request, userDetails.getUser());
-        logAdminAction("STAFF_CREATE", "STAFF", "Super Admin provisioned staff account: " + request.getEmail() + " as " + request.getRole());
+        User actor = resolveActor(userDetails);
+        StaffResponseDto staff = adminService.createStaff(request, actor);
+        logAdminAction(actor, "STAFF_CREATE", "STAFF",
+                formatActorPrefix(actor) + " created account: " + request.getEmail() + " as " + request.getRole());
         return ResponseEntity.ok(staff);
     }
 
@@ -320,15 +415,21 @@ public class AdminController {
             @PathVariable Long id,
             @RequestBody Map<String, Object> payload,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ResponseEntity.ok(adminService.updateStaff(id, payload, userDetails.getUser()));
+        User actor = resolveActor(userDetails);
+        StaffResponseDto updated = adminService.updateStaff(id, payload, actor);
+        logAdminAction(actor, "STAFF_UPDATE", "STAFF",
+                formatActorPrefix(actor) + " updated user account #" + id + " (" + updated.getEmail() + " • Role: " + updated.getRole() + ")");
+        return ResponseEntity.ok(updated);
     }
 
     @PutMapping("/staff/{id}/toggle-status")
     public ResponseEntity<Map<String, Object>> toggleStaffStatus(
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        Map<String, Object> res = adminService.toggleStaffBlock(id, userDetails.getUser());
-        logAdminAction("STAFF_STATUS_TOGGLE", "STAFF", "Super Admin toggled account active status for staff member ID #" + id);
+        User actor = resolveActor(userDetails);
+        Map<String, Object> res = adminService.toggleStaffBlock(id, actor);
+        logAdminAction(actor, "STAFF_STATUS_TOGGLE", "STAFF",
+                formatActorPrefix(actor) + " toggled active status (enabled=" + res.get("enabled") + ") for account ID #" + id);
         return ResponseEntity.ok(res);
     }
 
@@ -336,8 +437,10 @@ public class AdminController {
     public ResponseEntity<Map<String, Object>> deleteStaff(
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        adminService.deleteStaff(id, userDetails.getUser());
-        logAdminAction("STAFF_DELETE", "STAFF", "Super Admin removed staff account ID #" + id);
+        User actor = resolveActor(userDetails);
+        adminService.deleteStaff(id, actor);
+        logAdminAction(actor, "STAFF_DELETE", "STAFF",
+                formatActorPrefix(actor) + " deleted user account ID #" + id);
         return ResponseEntity.ok(Map.of("success", true, "message", "Staff account removed successfully"));
     }
 
@@ -350,9 +453,23 @@ public class AdminController {
             @PathVariable Long userId,
             @Valid @RequestBody GiftCourseRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        Map<String, Object> res = adminService.giftCourseToStudent(userId, request, userDetails.getUser());
-        String facultyTag = res.get("teacherName") != null ? " (Faculty: " + res.get("teacherName") + ")" : "";
-        logAdminAction("COURSE_GIFT", "USER_MANAGEMENT", "Super Admin gifted course " + request.getCourseCode() + facultyTag + " to student ID #" + userId);
+        User actor = resolveActor(userDetails);
+        Map<String, Object> res = adminService.giftCourseToStudent(userId, request, actor);
+        String facultyLabel = res.get("teacherName") != null
+                ? res.get("teacherName") + (res.get("teacherInitial") != null ? " [" + res.get("teacherInitial") + "]" : "")
+                : "Course Access";
+        String validityLabel = (request.getValidityMonths() == null || request.getValidityMonths() <= 0)
+                ? "Lifetime"
+                : request.getValidityMonths() + " months";
+        String studentLabel = (res.get("studentName") != null ? res.get("studentName") : "Student #" + userId)
+                + (res.get("studentEmail") != null ? " (" + res.get("studentEmail") + ")" : "");
+        String actionVerb = Boolean.TRUE.equals(res.get("isExtension")) ? "extended gift for" : "gifted";
+        String notePart = (request.getNote() != null && !request.getNote().isBlank())
+                ? " — Note: " + request.getNote().trim()
+                : "";
+        logAdminAction(actor, "COURSE_GIFT", "USER_MANAGEMENT",
+                formatActorPrefix(actor) + " " + actionVerb + " " + request.getCourseCode().toUpperCase()
+                        + " (Faculty: " + facultyLabel + ", " + validityLabel + ") to " + studentLabel + notePart);
         evictAnalyticsCache();
         return ResponseEntity.ok(res);
     }
@@ -361,7 +478,7 @@ public class AdminController {
     public ResponseEntity<List<Map<String, Object>>> getStudentUnlockedCourses(
             @PathVariable Long userId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ResponseEntity.ok(adminService.getStudentUnlockedCourses(userId, userDetails.getUser()));
+        return ResponseEntity.ok(adminService.getStudentUnlockedCourses(userId, resolveActor(userDetails)));
     }
 
     @PreAuthorize("hasRole('SUPER_ADMIN')")
@@ -372,8 +489,17 @@ public class AdminController {
             @RequestParam(required = false) Long unlockId,
             @RequestParam(required = false) Long teacherId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        Map<String, Object> res = adminService.revokeStudentUnlockedCourse(userId, courseId, unlockId, teacherId, userDetails.getUser());
-        logAdminAction("COURSE_REVOKE", "USER_MANAGEMENT", "Super Admin revoked unlock for course ID #" + courseId + (teacherId != null ? " (faculty #" + teacherId + ")" : "") + " from student ID #" + userId);
+        User actor = resolveActor(userDetails);
+        Map<String, Object> res = adminService.revokeStudentUnlockedCourse(userId, courseId, unlockId, teacherId, actor);
+        String courseLabel = res.get("courseCode") != null ? String.valueOf(res.get("courseCode")) : ("Course #" + courseId);
+        String scopeLabel = res.get("teacherName") != null
+                ? "Faculty: " + res.get("teacherName") + (res.get("teacherInitial") != null ? " [" + res.get("teacherInitial") + "]" : "")
+                : "Full Course";
+        String sourceLabel = res.get("source") != null ? String.valueOf(res.get("source")) : "UNLOCK";
+        String studentLabel = (res.get("studentName") != null ? res.get("studentName") : "Student #" + userId)
+                + (res.get("studentEmail") != null ? " (" + res.get("studentEmail") + ")" : "");
+        logAdminAction(actor, "COURSE_REVOKE", "USER_MANAGEMENT",
+                formatActorPrefix(actor) + " revoked " + courseLabel + " (" + scopeLabel + " • " + sourceLabel + ") from " + studentLabel);
         evictAnalyticsCache();
         return ResponseEntity.ok(res);
     }
@@ -397,10 +523,16 @@ public class AdminController {
     @PostMapping("/payments/{id}/approve")
     public ResponseEntity<PaymentRequest> approvePayment(
             @PathVariable Long id,
-            @RequestBody(required = false) Map<String, String> body) {
+            @RequestBody(required = false) Map<String, String> body,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         String notes = body != null && body.containsKey("notes") ? body.get("notes") : "Approved by Admin";
         PaymentRequest p = paymentService.approvePayment(id, notes);
-        logAdminAction("PAYMENT_APPROVE", "BILLING", "Super Admin approved subscription payment ID #" + id + " (" + notes + ")");
+        String planLabel = p.getPlanType() != null ? p.getPlanType().name() : "PLAN";
+        String trxLabel = p.getTransactionId() != null ? p.getTransactionId() : "N/A";
+        logAdminAction(actor, "PAYMENT_APPROVE", "BILLING",
+                formatActorPrefix(actor) + " approved Payment #" + id + " [" + planLabel + " • ৳" + Math.round(p.getAmount())
+                        + " • Trx: " + trxLabel + "] for " + formatStudentLabel(p.getUser()) + " (" + notes + ")");
         evictAnalyticsCache();
         return ResponseEntity.ok(p);
     }
@@ -409,10 +541,16 @@ public class AdminController {
     @PostMapping("/payments/{id}/reject")
     public ResponseEntity<PaymentRequest> rejectPayment(
             @PathVariable Long id,
-            @RequestBody(required = false) Map<String, String> body) {
+            @RequestBody(required = false) Map<String, String> body,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         String notes = body != null && body.containsKey("notes") ? body.get("notes") : "Rejected by Admin";
         PaymentRequest p = paymentService.rejectPayment(id, notes);
-        logAdminAction("PAYMENT_REJECT", "BILLING", "Super Admin rejected subscription payment ID #" + id + " (" + notes + ")");
+        String planLabel = p.getPlanType() != null ? p.getPlanType().name() : "PLAN";
+        String trxLabel = p.getTransactionId() != null ? p.getTransactionId() : "N/A";
+        logAdminAction(actor, "PAYMENT_REJECT", "BILLING",
+                formatActorPrefix(actor) + " rejected Payment #" + id + " [" + planLabel + " • ৳" + Math.round(p.getAmount())
+                        + " • Trx: " + trxLabel + "] for " + formatStudentLabel(p.getUser()) + " (" + notes + ")");
         evictAnalyticsCache();
         return ResponseEntity.ok(p);
     }
@@ -428,7 +566,9 @@ public class AdminController {
     @PostMapping("/contributions/{id}/approve")
     public ResponseEntity<ContributionRequest> approveContribution(
             @PathVariable Long id,
-            @RequestBody(required = false) Map<String, Object> body) {
+            @RequestBody(required = false) Map<String, Object> body,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         String feedback = body != null && body.containsKey("feedback") && body.get("feedback") != null
                 ? String.valueOf(body.get("feedback")) : "Approved! Your 2 reward courses have been unlocked.";
         String title = body != null && body.containsKey("title") && body.get("title") != null
@@ -449,23 +589,49 @@ public class AdminController {
                 ? String.valueOf(body.get("department")) : null;
 
         ContributionRequest c = contributionService.approveContribution(id, feedback, title, teacherId, resourceType, semesterName, courseCode, department);
-        logAdminAction("CONTRIBUTION_APPROVE", "CONTENT", "Admin approved student study contribution ID #" + id + (courseCode != null ? " for course " + courseCode : ""));
+        Resource res = c.getUploadedResource();
+        String finalTitle = res != null ? res.getTitle() : (title != null ? title : "Material");
+        String finalCourse = (res != null && res.getCourse() != null) ? res.getCourse().getCode() : (courseCode != null ? courseCode : "N/A");
+        String finalTeacher = (res != null && res.getTeacher() != null) ? res.getTeacher().getName() : "Central/General";
+        String reward1 = c.getRequestedCourse1() != null ? c.getRequestedCourse1().getCode() : "N/A";
+        String reward2 = c.getRequestedCourse2() != null ? c.getRequestedCourse2().getCode() : "N/A";
+        logAdminAction(actor, "CONTRIBUTION_APPROVE", "CONTENT",
+                formatActorPrefix(actor) + " approved Student Submission #" + id + " (\"" + finalTitle + "\" • " + finalCourse
+                        + " • Faculty: " + finalTeacher + ") from " + formatStudentLabel(c.getUser())
+                        + " — Rewards: " + reward1 + ", " + reward2);
+        evictAnalyticsCache();
         return ResponseEntity.ok(c);
     }
 
     @PostMapping("/contributions/{id}/reject")
     public ResponseEntity<ContributionRequest> rejectContribution(
             @PathVariable Long id,
-            @RequestBody(required = false) Map<String, String> body) {
+            @RequestBody(required = false) Map<String, String> body,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         String feedback = body != null && body.containsKey("feedback") ? body.get("feedback") : "Resource does not meet quality requirements.";
         ContributionRequest c = contributionService.rejectContribution(id, feedback);
-        logAdminAction("CONTRIBUTION_REJECT", "CONTENT", "Admin rejected student contribution ID #" + id + " (" + feedback + ")");
+        Resource res = c.getUploadedResource();
+        String finalTitle = res != null ? res.getTitle() : "Material";
+        String finalCourse = (res != null && res.getCourse() != null) ? res.getCourse().getCode() : "N/A";
+        logAdminAction(actor, "CONTRIBUTION_REJECT", "CONTENT",
+                formatActorPrefix(actor) + " rejected Student Submission #" + id + " (\"" + finalTitle + "\" • " + finalCourse
+                        + ") from " + formatStudentLabel(c.getUser()) + " (" + feedback + ")");
+        evictAnalyticsCache();
         return ResponseEntity.ok(c);
     }
 
     @DeleteMapping("/contributions/{id}")
-    public ResponseEntity<Map<String, Object>> deleteContribution(@PathVariable Long id) {
-        contributionService.deleteContribution(id);
+    public ResponseEntity<Map<String, Object>> deleteContribution(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
+        Map<String, Object> summary = contributionService.deleteContributionWithDetails(id);
+        logAdminAction(actor, "CONTRIBUTION_DELETE", "CONTENT",
+                formatActorPrefix(actor) + " deleted Student Submission #" + id
+                        + " (\"" + summary.get("title") + "\" • " + summary.get("courseCode") + ") from "
+                        + summary.get("studentName") + " (" + summary.get("studentEmail") + ")");
+        evictAnalyticsCache();
         return ResponseEntity.ok(Map.of("success", true, "message", "Contribution request deleted successfully"));
     }
 
@@ -488,7 +654,9 @@ public class AdminController {
     @PostMapping("/waivers/{id}/approve")
     public ResponseEntity<WaiverRequest> approveWaiver(
             @PathVariable Long id,
-            @RequestBody(required = false) Map<String, Object> body) {
+            @RequestBody(required = false) Map<String, Object> body,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         int quota = 6;
         String notes = "Approved by Admin";
         if (body != null) {
@@ -500,7 +668,10 @@ public class AdminController {
             }
         }
         WaiverRequest w = waiverService.approveWaiver(id, quota, notes);
-        logAdminAction("WAIVER_APPROVE", "BILLING", "Admin approved 100% financial waiver request ID #" + id + " (Quota: " + quota + " courses)");
+        String studentIdTag = (w.getStudentId() != null && !w.getStudentId().isBlank()) ? " [ID: " + w.getStudentId() + "]" : "";
+        logAdminAction(actor, "WAIVER_APPROVE", "BILLING",
+                formatActorPrefix(actor) + " approved Financial Waiver #" + id + " (Quota: " + quota + " courses) for "
+                        + formatStudentLabel(w.getUser()) + studentIdTag + " — Note: " + notes);
         evictAnalyticsCache();
         return ResponseEntity.ok(w);
     }
@@ -508,10 +679,15 @@ public class AdminController {
     @PostMapping("/waivers/{id}/reject")
     public ResponseEntity<WaiverRequest> rejectWaiver(
             @PathVariable Long id,
-            @RequestBody(required = false) Map<String, String> body) {
+            @RequestBody(required = false) Map<String, String> body,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         String notes = body != null && body.containsKey("notes") ? body.get("notes") : "Application declined.";
         WaiverRequest w = waiverService.rejectWaiver(id, notes);
-        logAdminAction("WAIVER_REJECT", "BILLING", "Admin rejected financial waiver request ID #" + id);
+        String studentIdTag = (w.getStudentId() != null && !w.getStudentId().isBlank()) ? " [ID: " + w.getStudentId() + "]" : "";
+        logAdminAction(actor, "WAIVER_REJECT", "BILLING",
+                formatActorPrefix(actor) + " rejected Financial Waiver #" + id + " for "
+                        + formatStudentLabel(w.getUser()) + studentIdTag + " — Reason: " + notes);
         evictAnalyticsCache();
         return ResponseEntity.ok(w);
     }
@@ -526,25 +702,46 @@ public class AdminController {
     }
 
     @PostMapping("/reviews/{id}/approve")
-    public ResponseEntity<ReviewResponseDto> approveReview(@PathVariable Long id) {
+    public ResponseEntity<ReviewResponseDto> approveReview(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         ReviewResponseDto dto = reviewModerationService.approveReview(id);
-        logAdminAction("REVIEW_APPROVE", "ACADEMIC", "Admin approved & published review ID #" + id);
+        logAdminAction(actor, "REVIEW_APPROVE", "ACADEMIC",
+                formatActorPrefix(actor) + " approved & published Faculty Review #" + id + " ("
+                        + (dto.getCourseCode() != null ? dto.getCourseCode() : "Course")
+                        + (dto.getTeacherName() != null ? " • " + dto.getTeacherName() : "")
+                        + " • " + dto.getRating() + "★ by " + dto.getAuthorName() + ")");
         evictAnalyticsCache();
         return ResponseEntity.ok(dto);
     }
 
     @PostMapping("/reviews/{id}/reject")
-    public ResponseEntity<ReviewResponseDto> rejectReview(@PathVariable Long id) {
+    public ResponseEntity<ReviewResponseDto> rejectReview(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         ReviewResponseDto dto = reviewModerationService.rejectReview(id);
-        logAdminAction("REVIEW_REJECT", "ACADEMIC", "Admin rejected/unpublished review ID #" + id);
+        logAdminAction(actor, "REVIEW_REJECT", "ACADEMIC",
+                formatActorPrefix(actor) + " rejected/unpublished Faculty Review #" + id + " ("
+                        + (dto.getCourseCode() != null ? dto.getCourseCode() : "Course")
+                        + (dto.getTeacherName() != null ? " • " + dto.getTeacherName() : "")
+                        + " • " + dto.getRating() + "★ by " + dto.getAuthorName() + ")");
         evictAnalyticsCache();
         return ResponseEntity.ok(dto);
     }
 
     @DeleteMapping("/reviews/{id}")
-    public ResponseEntity<Void> deleteReview(@PathVariable Long id) {
-        reviewModerationService.deleteReview(id);
-        logAdminAction("REVIEW_DELETE", "ACADEMIC", "Admin permanently deleted review ID #" + id);
+    public ResponseEntity<Void> deleteReview(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
+        ReviewResponseDto dto = reviewModerationService.deleteReviewWithDetails(id);
+        logAdminAction(actor, "REVIEW_DELETE", "ACADEMIC",
+                formatActorPrefix(actor) + " permanently deleted Faculty Review #" + id + " ("
+                        + (dto.getCourseCode() != null ? dto.getCourseCode() : "Course")
+                        + (dto.getTeacherName() != null ? " • " + dto.getTeacherName() : "")
+                        + " • " + dto.getRating() + "★ by " + dto.getAuthorName() + ")");
         evictAnalyticsCache();
         return ResponseEntity.ok().build();
     }
@@ -635,7 +832,11 @@ public class AdminController {
     public ResponseEntity<Map<String, Object>> changeAdminPassword(
             @RequestBody Map<String, String> body,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ResponseEntity.ok(adminService.changeAdminPassword(userDetails.getUser(), body.get("currentPassword"), body.get("newPassword")));
+        User actor = resolveActor(userDetails);
+        Map<String, Object> res = adminService.changeAdminPassword(actor, body.get("currentPassword"), body.get("newPassword"));
+        logAdminAction(actor, "PASSWORD_CHANGE", "AUTH",
+                formatActorPrefix(actor) + " updated their administrative account password");
+        return ResponseEntity.ok(res);
     }
 
     // ==========================================
@@ -647,28 +848,47 @@ public class AdminController {
     }
 
     @PostMapping("/notices")
-    public ResponseEntity<Notice> createNotice(@Valid @RequestBody NoticeRequest request) {
+    public ResponseEntity<Notice> createNotice(
+            @Valid @RequestBody NoticeRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         Notice n = noticeService.createNotice(request);
-        logAdminAction("NOTICE_CREATE", "SYSTEM", "Admin published campus notice: " + (n.getText() != null && n.getText().length() > 50 ? n.getText().substring(0, 50) + "..." : n.getText()));
+        logAdminAction(actor, "NOTICE_CREATE", "SYSTEM",
+                formatActorPrefix(actor) + " published campus notice: " + (n.getText() != null && n.getText().length() > 50 ? n.getText().substring(0, 50) + "..." : n.getText()));
         return ResponseEntity.ok(n);
     }
 
     @PutMapping("/notices/{id}")
-    public ResponseEntity<Notice> updateNotice(@PathVariable Long id, @Valid @RequestBody NoticeRequest request) {
-        return ResponseEntity.ok(noticeService.updateNotice(id, request));
+    public ResponseEntity<Notice> updateNotice(
+            @PathVariable Long id,
+            @Valid @RequestBody NoticeRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
+        Notice updated = noticeService.updateNotice(id, request);
+        logAdminAction(actor, "NOTICE_UPDATE", "SYSTEM",
+                formatActorPrefix(actor) + " updated campus notice ID #" + id);
+        return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/notices/{id}")
-    public ResponseEntity<Map<String, Object>> deleteNotice(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> deleteNotice(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         noticeService.deleteNotice(id);
-        logAdminAction("NOTICE_DELETE", "SYSTEM", "Admin deleted campus notice ID #" + id);
+        logAdminAction(actor, "NOTICE_DELETE", "SYSTEM",
+                formatActorPrefix(actor) + " deleted campus notice ID #" + id);
         return ResponseEntity.ok(Map.of("success", true, "message", "Notice deleted successfully"));
     }
 
     @PutMapping("/notices/{id}/toggle-status")
-    public ResponseEntity<Map<String, Object>> toggleNoticeStatus(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> toggleNoticeStatus(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         Map<String, Object> res = noticeService.toggleNoticeStatus(id);
-        logAdminAction("NOTICE_TOGGLE", "SYSTEM", "Admin toggled campus notice status ID #" + id);
+        logAdminAction(actor, "NOTICE_TOGGLE", "SYSTEM",
+                formatActorPrefix(actor) + " toggled campus notice status ID #" + id);
         return ResponseEntity.ok(res);
     }
 
@@ -676,8 +896,13 @@ public class AdminController {
     // Community Live Chat Moderation
     // ==========================================
     @DeleteMapping("/chat/messages/{id}")
-    public ResponseEntity<Map<String, Object>> deleteChatMessage(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> deleteChatMessage(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         chatService.deleteMessage(id);
+        logAdminAction(actor, "CHAT_DELETE", "CONTENT",
+                formatActorPrefix(actor) + " deleted community chat message ID #" + id);
         return ResponseEntity.ok(Map.of("success", true, "message", "Message deleted successfully"));
     }
 
@@ -685,22 +910,43 @@ public class AdminController {
     public ResponseEntity<ChatMessageDto> pinChatMessage(
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ResponseEntity.ok(chatService.pinMessage(id, userDetails.getUser()));
+        User actor = resolveActor(userDetails);
+        ChatMessageDto dto = chatService.pinMessage(id, actor);
+        logAdminAction(actor, "CHAT_PIN", "CONTENT",
+                formatActorPrefix(actor) + " pinned community chat message ID #" + id);
+        return ResponseEntity.ok(dto);
     }
 
     @PostMapping("/chat/messages/{id}/unpin")
-    public ResponseEntity<Map<String, Object>> unpinChatMessage(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> unpinChatMessage(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         chatService.unpinMessage(id);
+        logAdminAction(actor, "CHAT_UNPIN", "CONTENT",
+                formatActorPrefix(actor) + " unpinned community chat message ID #" + id);
         return ResponseEntity.ok(Map.of("success", true, "message", "Message unpinned successfully"));
     }
 
     @PostMapping("/chat/users/{userId}/block")
-    public ResponseEntity<Map<String, Object>> blockUserFromChat(@PathVariable Long userId) {
-        return ResponseEntity.ok(chatService.setUserChatBlocked(userId, true));
+    public ResponseEntity<Map<String, Object>> blockUserFromChat(
+            @PathVariable Long userId,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
+        Map<String, Object> res = chatService.setUserChatBlocked(userId, true);
+        logAdminAction(actor, "CHAT_BLOCK", "STAFF",
+                formatActorPrefix(actor) + " blocked user ID #" + userId + " from community live chat");
+        return ResponseEntity.ok(res);
     }
 
     @PostMapping("/chat/users/{userId}/unblock")
-    public ResponseEntity<Map<String, Object>> unblockUserFromChat(@PathVariable Long userId) {
-        return ResponseEntity.ok(chatService.setUserChatBlocked(userId, false));
+    public ResponseEntity<Map<String, Object>> unblockUserFromChat(
+            @PathVariable Long userId,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
+        Map<String, Object> res = chatService.setUserChatBlocked(userId, false);
+        logAdminAction(actor, "CHAT_UNBLOCK", "STAFF",
+                formatActorPrefix(actor) + " unblocked user ID #" + userId + " in community live chat");
+        return ResponseEntity.ok(res);
     }
 }

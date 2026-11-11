@@ -20,6 +20,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -330,14 +331,30 @@ public class ContributionService {
 
     @Transactional
     public void deleteContribution(Long contributionId) {
+        deleteContributionWithDetails(contributionId);
+    }
+
+    @Transactional
+    public Map<String, Object> deleteContributionWithDetails(Long contributionId) {
         ContributionRequest cr = contributionRequestRepository.findById(contributionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contribution request not found: " + contributionId));
         Resource res = cr.getUploadedResource();
+        String studentName = cr.getUser() != null ? cr.getUser().getName() : "Unknown Student";
+        String studentEmail = cr.getUser() != null ? cr.getUser().getEmail() : "";
+        String title = res != null ? res.getTitle() : "Material";
+        String courseCode = (res != null && res.getCourse() != null) ? res.getCourse().getCode() : "N/A";
         contributionRequestRepository.delete(cr);
         if (res != null && res.getStatus() != ResourceStatus.APPROVED) {
             resourceRepository.delete(res);
         }
         liveSyncService.broadcast("contribution", "deleted", contributionId);
+        return Map.of(
+                "id", contributionId,
+                "studentName", studentName,
+                "studentEmail", studentEmail,
+                "title", title,
+                "courseCode", courseCode
+        );
     }
 
     public LinkVerificationResponse verifyPublicLink(String rawUrl) {

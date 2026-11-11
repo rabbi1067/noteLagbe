@@ -33,24 +33,29 @@ public class ActivityLogService {
         this.liveSyncService = liveSyncService;
     }
 
+    private static String clip(String val, int maxLen) {
+        if (val == null) return null;
+        return val.length() <= maxLen ? val : val.substring(0, maxLen - 3) + "...";
+    }
+
     /**
      * Log an action with detailed metadata, client IP, and device info.
      */
     @Transactional
     public ActivityLog logActivity(String action, String actionType, String details, String userEmail, String userName, String userRole, String ipAddress, String deviceInfo, String status) {
         try {
-            String safeIp = (ipAddress != null && !ipAddress.isBlank()) ? ipAddress : "127.0.0.1";
-            String safeDevice = (deviceInfo != null && !deviceInfo.isBlank()) ? deviceInfo : "Web Client";
+            String safeIp = clip((ipAddress != null && !ipAddress.isBlank()) ? ipAddress : "127.0.0.1", 58);
+            String safeDevice = clip((deviceInfo != null && !deviceInfo.isBlank()) ? deviceInfo : "Web Client", 145);
             ActivityLog entry = new ActivityLog(
-                    action,
-                    actionType,
-                    details,
-                    userEmail,
-                    userName,
-                    userRole,
+                    clip(action != null ? action : "UNKNOWN", 100),
+                    clip(actionType != null ? actionType : "SYSTEM", 50),
+                    clip(details != null ? details : "", 1950),
+                    clip(userEmail, 145),
+                    clip(userName, 145),
+                    clip(userRole, 50),
                     safeIp,
                     safeDevice,
-                    status != null ? status : "SUCCESS"
+                    clip(status != null ? status : "SUCCESS", 30)
             );
             entry = activityLogRepository.save(entry);
             liveSyncService.broadcast("activity_log", "created", entry.getId());

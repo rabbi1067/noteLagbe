@@ -495,7 +495,11 @@ export const api = {
       if (params?.actionType && params.actionType !== "ALL") q.set("actionType", params.actionType);
       return request<any>(`/admin/activity-logs?${q.toString()}`);
     },
-    clearActivityLogs: () => request<any>("/admin/activity-logs", { method: "DELETE" }),
+    clearActivityLogs: (password: string) =>
+      request<any>("/admin/activity-logs/clear", {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      }),
 
     // Reviews Moderation
     getReviews: (status?: string) => request<any[]>(status ? `/admin/reviews?status=${status}` : "/admin/reviews"),

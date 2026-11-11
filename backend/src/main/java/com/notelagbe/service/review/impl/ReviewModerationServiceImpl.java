@@ -113,11 +113,18 @@ public class ReviewModerationServiceImpl implements ReviewModerationService {
     @Transactional
     @CacheEvict(value = {"course_reviews", "teacher_reviews"}, allEntries = true)
     public void deleteReview(Long id) {
-        if (!reviewRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Review not found with id: " + id);
-        }
-        reviewRepository.deleteById(id);
+        deleteReviewWithDetails(id);
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = {"course_reviews", "teacher_reviews"}, allEntries = true)
+    public ReviewResponseDto deleteReviewWithDetails(Long id) {
+        Review review = findReviewOrThrow(id);
+        ReviewResponseDto dto = reviewMapper.toDto(review);
+        reviewRepository.delete(review);
         liveSyncService.broadcast("review", "deleted", id);
+        return dto;
     }
 
     @Override

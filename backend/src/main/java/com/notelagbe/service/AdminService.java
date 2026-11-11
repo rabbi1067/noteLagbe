@@ -20,6 +20,7 @@ import com.notelagbe.exception.ResourceNotFoundException;
 import com.notelagbe.repository.*;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -474,6 +475,23 @@ public class AdminService {
         }).toList();
     }
 
+    private Map<String, Object> buildRevokeResponse(User student, Course course, Teacher teacher, UnlockSource source, String message) {
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("success", true);
+        res.put("message", message);
+        res.put("studentId", student != null ? student.getId() : null);
+        res.put("studentName", student != null ? student.getName() : null);
+        res.put("studentEmail", student != null ? student.getEmail() : null);
+        res.put("courseId", course != null ? course.getId() : null);
+        res.put("courseCode", course != null ? course.getCode() : null);
+        res.put("courseTitle", course != null ? course.getTitle() : null);
+        res.put("teacherId", teacher != null ? teacher.getId() : null);
+        res.put("teacherName", teacher != null ? teacher.getName() : null);
+        res.put("teacherInitial", teacher != null ? teacher.getInitial() : null);
+        res.put("source", source != null ? source.name() : null);
+        return res;
+    }
+
     @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "teachers", "teacher_details", "admin_analytics", "admin_stats"}, allEntries = true)
     @Transactional
     public Map<String, Object> revokeStudentUnlockedCourse(Long studentId, Long courseId, Long unlockId, Long teacherId, User currentUser) {
@@ -487,29 +505,66 @@ public class AdminService {
             if (uc.getUser() == null || !uc.getUser().getId().equals(studentId)) {
                 throw new ApiException("Unlock record does not belong to the specified student.");
             }
+            User student = uc.getUser();
+            Course course = uc.getCourse();
+            Teacher teacher = uc.getTeacher();
+            UnlockSource source = uc.getSource();
             unlockedCourseRepository.delete(uc);
             liveSyncService.broadcast("course_unlock", "revoked", studentId);
-            return Map.of("success", true, "message", "Access revoked successfully.");
+            return buildRevokeResponse(student, course, teacher, source, "Access revoked successfully.");
         }
 
         if (teacherId != null) {
             Optional<UnlockedCourse> ucOpt = unlockedCourseRepository.findByUserIdAndCourseIdAndTeacherId(studentId, courseId, teacherId);
             if (ucOpt.isPresent()) {
-                unlockedCourseRepository.delete(ucOpt.get());
+                UnlockedCourse uc = ucOpt.get();
+                User student = uc.getUser();
+                Course course = uc.getCourse();
+                Teacher teacher = uc.getTeacher();
+                UnlockSource source = uc.getSource();
+                unlockedCourseRepository.delete(uc);
                 liveSyncService.broadcast("course_unlock", "revoked", studentId);
-                return Map.of("success", true, "message", "Gifted faculty access revoked successfully.");
+                return buildRevokeResponse(student, course, teacher, source, "Gifted faculty access revoked successfully.");
             }
             throw new ResourceNotFoundException("Faculty gift record was not found for this student.");
         }
 
         List<UnlockedCourse> matches = unlockedCourseRepository.findAllByUserIdAndCourseId(studentId, courseId);
         if (!matches.isEmpty()) {
+            UnlockedCourse first = matches.get(0);
+            User student = first.getUser();
+            Course course = first.getCourse();
+            Teacher teacher = matches.size() == 1 ? first.getTeacher() : null;
+            UnlockSource source = first.getSource();
             unlockedCourseRepository.deleteAll(matches);
             liveSyncService.broadcast("course_unlock", "revoked", studentId);
-            return Map.of("success", true, "message", "Course access revoked successfully.");
+            return buildRevokeResponse(student, course, teacher, source, "Course access revoked successfully.");
         } else {
             throw new ResourceNotFoundException("Course was not unlocked for this student.");
         }
+    }
+
+    @Transactional(readOnly = true)
+    public User verifySuperAdminPassword(User currentUser, String rawPassword) {
+        if (currentUser == null || currentUser.getId() == null) {
+            throw new ApiException("Authentication required.", HttpStatus.UNAUTHORIZED);
+        }
+        User superAdmin = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Super Admin account not found: " + currentUser.getId()));
+
+        if (superAdmin.getRole() != Role.ROLE_SUPER_ADMIN) {
+            throw new ApiException("Access Denied: Only Super Administrators can clear activity logs.", HttpStatus.FORBIDDEN);
+        }
+        if (rawPassword == null || rawPassword.isBlank()) {
+            throw new ApiException("Super Admin password is required to confirm clearing logs.", HttpStatus.BAD_REQUEST);
+        }
+        if (superAdmin.getPassword() == null || superAdmin.getPassword().isBlank()) {
+            throw new ApiException("No local password is configured on this Super Admin account. Please set a password in Admin Profile Settings first.", HttpStatus.BAD_REQUEST);
+        }
+        if (!passwordEncoder.matches(rawPassword, superAdmin.getPassword())) {
+            throw new ApiException("Incorrect Super Admin password! Logs were not cleared.", HttpStatus.UNAUTHORIZED);
+        }
+        return superAdmin;
     }
 
     public Map<String, Object> getAdminProfile(User currentUser) {
