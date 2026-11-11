@@ -163,7 +163,22 @@ export async function POST(request: NextRequest) {
   const username = typeof body.username === "string" ? body.username.trim() : "";
   const rawPassword = typeof body.password === "string" ? body.password.trim() : "";
   const senderEmail = typeof body.senderEmail === "string" ? body.senderEmail.trim() : username;
-  const senderName = typeof body.senderName === "string" ? body.senderName.trim() : "NoteLagbe • Southeast University";
+  const normalizeSenderDisplayName = (value: string): string => {
+    const cleaned = value
+      .replaceAll("\u00e2\u20ac\u00a2", "\u2022")
+      .replaceAll("\u00e2\u0080\u00a2", "\u2022")
+      .replaceAll("\u00e2\u20ac\u201d", "\u2014")
+      .replaceAll("\u00e2\u0080\u0094", "\u2014")
+      .replaceAll("\u00e2\u20ac\u201c", "\u2013")
+      .replaceAll("\u00e2\u0080\u0093", "\u2013")
+      .trim();
+    return cleaned || "NoteLagbe \u2022 Southeast University";
+  };
+  const rawSenderName =
+    typeof body.senderName === "string" && body.senderName.trim()
+      ? body.senderName.trim()
+      : "NoteLagbe \u2022 Southeast University";
+  const senderName = normalizeSenderDisplayName(rawSenderName);
   const smtpHost = typeof body.smtpHost === "string" && body.smtpHost.trim() ? body.smtpHost.trim() : "smtp.gmail.com";
   const smtpPort = typeof body.smtpPort === "number" && Number.isInteger(body.smtpPort) ? body.smtpPort : 587;
 

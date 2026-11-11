@@ -390,4 +390,57 @@ class EmailDeliveryConfigurationTest {
         assertEquals("https://note-lagbe-sandy.vercel.app/api/mail-relay", emailService.lastUrl);
         assertTrue(emailService.lastPayload.get("html").toString().contains("112233"));
     }
+
+    @Test
+    void senderDisplayNameRepairsPropertiesAndStoredMojibake() throws Exception {
+        java.util.Properties props = new java.util.Properties();
+        try (java.io.InputStream in = getClass().getClassLoader().getResourceAsStream("application.properties")) {
+            assertNotNull(in, "application.properties must exist on test classpath");
+            props.load(in);
+        }
+        String rawFromNameProperty = props.getProperty("email.from-name");
+        assertNotNull(rawFromNameProperty);
+        assertTrue(rawFromNameProperty.contains("NoteLagbe \u2022 Southeast University"),
+                "application.properties must decode bullet cleanly under Java ISO-8859-1 Properties loader");
+        assertFalse(rawFromNameProperty.contains("\u00e2"));
+
+        assertEquals("NoteLagbe \u2022 Southeast University",
+                EmailService.sanitizeSenderDisplayName("NoteLagbe \u00e2\u20ac\u00a2 Southeast University"));
+        assertEquals("NoteLagbe \u2022 Southeast University",
+                EmailService.sanitizeSenderDisplayName("NoteLagbe \u00e2\u0080\u00a2 Southeast University"));
+
+        Map<String, Object> saved = emailService.saveEmailConfig(
+                "VERCEL_RELAY",
+                "fazlerabbicse65@gmail.com",
+                "NoteLagbe \u00e2\u20ac\u00a2 Southeast University",
+                "smtp.gmail.com",
+                587,
+                "",
+                "abcd efgh ijkl mnop",
+                false
+        );
+        assertTrue(saved.containsValue("NoteLagbe \u2022 Southeast University"));
+        assertFalse(saved.toString().contains("\u00e2"));
+
+        // Simulate a legacy mojibake value persisted directly in system_settings before this fix
+        com.notelagbe.entity.SystemSetting senderNameSetting = inMemorySettings.values().stream()
+                .filter(s -> s.getSettingKey().contains("SENDER_NAME"))
+                .findFirst()
+                .orElseThrow();
+        senderNameSetting.setSettingValue("NoteLagbe \u00e2\u0080\u00a2 Southeast University");
+
+        Map<String, Object> refreshed = emailService.getSettingsSummary();
+        assertTrue(refreshed.containsValue("NoteLagbe \u2022 Southeast University"));
+        assertFalse(refreshed.toString().contains("\u00e2"));
+
+        User student = new User();
+        student.setName("Fazle Rabbi");
+        student.setEmail("2023200000686@seu.edu.bd");
+        emailService.nextStatus = 200;
+        emailService.nextBody = "{\"ok\":true}";
+        emailService.onPost = () -> {};
+
+        emailService.sendPasswordResetCodeEmail(student, "445566", 10);
+        assertEquals("NoteLagbe \u2022 Southeast University", emailService.lastPayload.get("senderName"));
+    }
 }

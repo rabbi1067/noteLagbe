@@ -78,8 +78,8 @@ public class EmailService {
     @Value("${email.from:}")
     private String envFromEmail = "";
 
-    @Value("${email.from-name:NoteLagbe • Southeast University}")
-    private String envFromName = "NoteLagbe • Southeast University";
+    @Value("${email.from-name:NoteLagbe \u2022 Southeast University}")
+    private String envFromName = "NoteLagbe \u2022 Southeast University";
 
     @Value("${email.brevo.api-key:}")
     private String envBrevoApiKey = "";
@@ -255,6 +255,23 @@ public class EmailService {
         return trimmed;
     }
 
+    /**
+     * Repairs UTF-8 punctuation corrupted by ISO-8859-1 or Windows-1252 decoding
+     * (for example, {@code \u2022} read as {@code â€¢} or {@code \u00e2\u0080\u00a2}).
+     */
+    static String sanitizeSenderDisplayName(String name) {
+        if (!hasText(name)) {
+            return "NoteLagbe \u2022 Southeast University";
+        }
+        return name.trim()
+                .replace("\u00e2\u20ac\u00a2", "\u2022")
+                .replace("\u00e2\u0080\u00a2", "\u2022")
+                .replace("\u00e2\u20ac\u201d", "\u2014")
+                .replace("\u00e2\u0080\u0094", "\u2014")
+                .replace("\u00e2\u20ac\u201c", "\u2013")
+                .replace("\u00e2\u0080\u0093", "\u2013");
+    }
+
     private EffectiveEmailConfig resolveConfig() {
         Optional<String> dbProvider = getDbSetting(SETTING_KEY_PROVIDER);
         Optional<String> dbSender = getDbSetting(SETTING_KEY_SENDER_EMAIL);
@@ -283,9 +300,9 @@ public class EmailService {
         String senderEmail = dbSender.orElseGet(() ->
                 hasText(envFromEmail) ? envFromEmail.trim() : (hasText(envMailUsername) ? envMailUsername.trim() : "")
         );
-        String senderName = dbSenderName.orElseGet(() ->
-                hasText(envFromName) ? envFromName.trim() : "NoteLagbe • Southeast University"
-        );
+        String senderName = sanitizeSenderDisplayName(dbSenderName.orElseGet(() ->
+                hasText(envFromName) ? envFromName.trim() : "NoteLagbe \u2022 Southeast University"
+        ));
         String smtpHost = dbHost.orElseGet(() -> hasText(envMailHost) ? envMailHost.trim() : "smtp.gmail.com");
         String webhookUrl = dbWebhookUrl.orElseGet(() -> hasText(envAppsScriptUrl) ? envAppsScriptUrl.trim() : "");
 
@@ -453,7 +470,7 @@ public class EmailService {
         if (cleanEmail.isEmpty() || !cleanEmail.contains("@") || cleanEmail.length() > 200) {
             throw new ApiException("Please enter a valid sender email address.");
         }
-        String cleanName = hasText(senderName) ? senderName.trim() : "NoteLagbe • Southeast University";
+        String cleanName = sanitizeSenderDisplayName(senderName);
         if (cleanName.length() > 120) {
             throw new ApiException("Sender display name cannot exceed 120 characters.");
         }
