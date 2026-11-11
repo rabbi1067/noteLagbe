@@ -4,13 +4,18 @@ import com.notelagbe.dto.ResourceCreateRequest;
 import com.notelagbe.entity.*;
 import com.notelagbe.exception.ResourceNotFoundException;
 import com.notelagbe.repository.*;
+import com.notelagbe.security.FileUploadSecurityValidator;
+import com.notelagbe.security.UrlSecurityValidator;
 import org.springframework.web.multipart.MultipartFile;
 import com.notelagbe.exception.ApiException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.Duration;
 import java.util.UUID;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
@@ -19,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.ContentDisposition;
@@ -110,7 +116,9 @@ public class ResourceService {
         masked.setTitle(r.getTitle());
         masked.setType(r.getType());
         masked.setFileUrl(null); // Locked!
-        masked.setPreviewUrl(r.getPreviewUrl());
+        boolean previewIsSameAsFile = r.getPreviewUrl() != null && r.getFileUrl() != null
+                && r.getPreviewUrl().trim().equals(r.getFileUrl().trim());
+        masked.setPreviewUrl(previewIsSameAsFile ? null : r.getPreviewUrl());
         masked.setSemesterName(r.getSemesterName());
         masked.setAcademicYear(r.getAcademicYear());
         masked.setCourse(r.getCourse());
@@ -339,9 +347,40 @@ public class ResourceService {
         return subscriptionService.isCourseUnlocked(user, course);
     }
 
+    private boolean isStaff(User user) {
+        if (user == null || user.getRole() == null) {
+            return false;
+        }
+        return user.getRole() == Role.ROLE_ADMIN
+                || user.getRole() == Role.ROLE_SUPER_ADMIN
+                || user.getRole() == Role.ROLE_MANAGER;
+    }
+
+    private boolean isUploader(User user, Resource resource) {
+        return user != null
+                && user.getId() != null
+                && resource != null
+                && resource.getUploader() != null
+                && user.getId().equals(resource.getUploader().getId());
+    }
+
     public Resource getResourceById(Long id) {
         return resourceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found with ID: " + id));
+    }
+
+    public Resource getResourceByIdForUser(Long id, User user) {
+        Resource r = getResourceById(id);
+        boolean staff = isStaff(user);
+        boolean uploader = isUploader(user, r);
+
+        if (r.getStatus() != ResourceStatus.APPROVED && !staff && !uploader) {
+            throw new ApiException("This material is pending approval and cannot be accessed yet.", HttpStatus.FORBIDDEN);
+        }
+        if (!staff && !uploader && !subscriptionService.isResourceUnlocked(user, r)) {
+            return maskLockedResource(r);
+        }
+        return r;
     }
 
     public void incrementDownloadCount(Long resourceId) {
@@ -351,18 +390,37 @@ public class ResourceService {
         });
     }
 
+    public void incrementDownloadCount(Long resourceId, User user) {
+        Resource r = getResourceById(resourceId);
+        boolean staff = isStaff(user);
+        boolean uploader = isUploader(user, r);
+        if (r.getStatus() != ResourceStatus.APPROVED && !staff && !uploader) {
+            throw new ApiException("This material is pending approval and cannot be accessed yet.", HttpStatus.FORBIDDEN);
+        }
+        if (!staff && !uploader && !subscriptionService.isResourceUnlocked(user, r)) {
+            throw new ApiException(
+                    "Course access is locked. Please subscribe or contribute a material to unlock downloads.",
+                    user == null ? HttpStatus.UNAUTHORIZED : HttpStatus.FORBIDDEN
+            );
+        }
+        r.setDownloadsCount(r.getDownloadsCount() + 1);
+        resourceRepository.save(r);
+    }
+
     public ResponseEntity<byte[]> streamResourceFile(Long id, boolean download, User user) {
         Resource r = getResourceById(id);
+        boolean staff = isStaff(user);
+        boolean uploader = isUploader(user, r);
 
-        // If resource is not approved, only admin or uploader can view
-        if (r.getStatus() != ResourceStatus.APPROVED) {
-            boolean isAdmin = user != null && user.getRole() != null &&
-                    (user.getRole() == Role.ROLE_ADMIN || user.getRole() == Role.ROLE_SUPER_ADMIN || user.getRole() == Role.ROLE_MANAGER ||
-                     user.getRole().name().contains("ADMIN") || user.getRole().name().contains("MANAGER"));
-            boolean isUploader = user != null && r.getUploader() != null && user.getId().equals(r.getUploader().getId());
-            if (!isAdmin && !isUploader) {
-                throw new ApiException("This material is pending approval and cannot be accessed yet.");
-            }
+        if (r.getStatus() != ResourceStatus.APPROVED && !staff && !uploader) {
+            throw new ApiException("This material is pending approval and cannot be accessed yet.", HttpStatus.FORBIDDEN);
+        }
+
+        if (r.getStatus() == ResourceStatus.APPROVED && !staff && !uploader && !subscriptionService.isResourceUnlocked(user, r)) {
+            throw new ApiException(
+                    "Course access is locked. Please subscribe or contribute a material to view or download this resource.",
+                    user == null ? HttpStatus.UNAUTHORIZED : HttpStatus.FORBIDDEN
+            );
         }
 
         String targetUrl = r.getFileUrl() != null && !r.getFileUrl().isBlank()
@@ -445,20 +503,24 @@ public class ResourceService {
             throw new IllegalArgumentException("Target URL is blank");
         }
 
-        // If local relative path
+        // If local relative path (strictly confined under uploads/)
         if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
-            String clean = targetUrl.startsWith("/") ? targetUrl.substring(1) : targetUrl;
-            Path p = Paths.get(clean);
-            if (Files.exists(p)) {
-                return Files.readAllBytes(p);
+            Path uploadsBase = Paths.get("uploads").toAbsolutePath().normalize();
+            Path directPath = UrlSecurityValidator.resolveSafeLocalPath(uploadsBase, targetUrl, "/uploads/", "uploads/");
+            if (Files.exists(directPath) && Files.isRegularFile(directPath)) {
+                return Files.readAllBytes(directPath);
             }
-            Path uploadsPath = Paths.get("uploads").resolve(p.getFileName());
-            if (Files.exists(uploadsPath)) {
-                return Files.readAllBytes(uploadsPath);
-            }
-            Path materialsPath = Paths.get("uploads", "materials").resolve(p.getFileName());
-            if (Files.exists(materialsPath)) {
-                return Files.readAllBytes(materialsPath);
+            Path materialsBase = uploadsBase.resolve("materials").normalize();
+            String safeFileName = Paths.get(targetUrl).getFileName() != null ? Paths.get(targetUrl).getFileName().toString() : "";
+            if (!safeFileName.isBlank() && !safeFileName.contains("..")) {
+                Path fallbackUploads = uploadsBase.resolve(safeFileName).normalize();
+                if (fallbackUploads.startsWith(uploadsBase) && Files.exists(fallbackUploads) && Files.isRegularFile(fallbackUploads)) {
+                    return Files.readAllBytes(fallbackUploads);
+                }
+                Path fallbackMaterials = materialsBase.resolve(safeFileName).normalize();
+                if (fallbackMaterials.startsWith(materialsBase) && Files.exists(fallbackMaterials) && Files.isRegularFile(fallbackMaterials)) {
+                    return Files.readAllBytes(fallbackMaterials);
+                }
             }
             throw new FileNotFoundException("Local file not found on disk: " + targetUrl);
         }
@@ -514,46 +576,42 @@ public class ResourceService {
             }
         }
 
-        // HTTP Client with redirects enabled
-        java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
-                .followRedirects(java.net.http.HttpClient.Redirect.ALWAYS)
-                .connectTimeout(java.time.Duration.ofSeconds(15))
-                .build();
-
         int lastStatusCode = 0;
         String lastErrorMsg = "";
+        int maxBytes = (int) FileUploadSecurityValidator.MAX_MATERIAL_BYTES;
+        Map<String, String> headers = Map.of("User-Agent", "NoteLagbe-DocumentService/1.0");
 
         for (String url : candidates) {
             if (url == null || url.isBlank()) continue;
             try {
-                java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
-                        .uri(java.net.URI.create(url))
-                        .timeout(java.time.Duration.ofSeconds(20))
-                        .header("User-Agent", "NoteLagbe-DocumentService/1.0")
-                        .GET()
-                        .build();
-
-                java.net.http.HttpResponse<byte[]> res = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+                HttpResponse<InputStream> res = UrlSecurityValidator.fetchValidatedStream(
+                        url, headers, 3, Duration.ofSeconds(20));
                 lastStatusCode = res.statusCode();
 
-                if (res.statusCode() >= 200 && res.statusCode() < 300 && res.body() != null && res.body().length > 0) {
+                if (res.statusCode() >= 200 && res.statusCode() < 300) {
                     String contentType = res.headers().firstValue("Content-Type").orElse("").toLowerCase(java.util.Locale.ROOT);
                     if (contentType.startsWith("text/html")) {
+                        res.body().close();
                         lastErrorMsg = "Received HTML viewer page instead of binary file";
                         log.debug("Skipping HTML response ({}) from candidate URL: {}", contentType, url);
                         continue;
                     }
+                    byte[] bodyBytes = UrlSecurityValidator.readBoundedBytes(res.body(), maxBytes);
+                    if (bodyBytes.length == 0) {
+                        continue;
+                    }
                     // Guard against HTML virus-scan/viewer pages served without explicit text/html Content-Type
-                    String head = new String(res.body(), 0, Math.min(res.body().length, 64), java.nio.charset.StandardCharsets.UTF_8)
+                    String head = new String(bodyBytes, 0, Math.min(bodyBytes.length, 64), StandardCharsets.UTF_8)
                             .trim().toLowerCase(java.util.Locale.ROOT);
                     if (head.startsWith("<!doctype html") || head.startsWith("<html")) {
                         lastErrorMsg = "Received HTML document instead of binary file";
                         log.debug("Skipping HTML payload from candidate URL: {}", url);
                         continue;
                     }
-                    log.info("Successfully fetched {} bytes for material from candidate URL: {}", res.body().length, url);
-                    return res.body();
+                    log.info("Successfully fetched {} bytes for material from candidate URL: {}", bodyBytes.length, url);
+                    return bodyBytes;
                 } else {
+                    res.body().close();
                     log.debug("Candidate URL returned HTTP {}: {}", res.statusCode(), url);
                 }
             } catch (Exception e) {
@@ -584,20 +642,23 @@ public class ResourceService {
                 baseImgUrl = baseImgUrl + ".jpg";
             }
 
+            UrlSecurityValidator.validatePublicHttpUrl(baseImgUrl);
+
             for (int pg = 1; pg <= maxPages; pg++) {
                 String pgUrl = baseImgUrl.replace("/upload/", "/upload/pg_" + pg + "/");
                 try {
-                    java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
-                            .uri(java.net.URI.create(pgUrl))
-                            .timeout(java.time.Duration.ofSeconds(15))
-                            .header("User-Agent", "NoteLagbe-DocumentService/1.0")
-                            .GET()
-                            .build();
-                    java.net.http.HttpResponse<byte[]> res = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
-                    if (res.statusCode() >= 200 && res.statusCode() < 300 && res.body() != null && res.body().length > 0) {
-                        collectedPages.add(res.body());
-                        log.info("Fetched page {} ({} bytes) from Cloudinary: {}", pg, res.body().length, pgUrl);
+                    HttpResponse<InputStream> res = UrlSecurityValidator.fetchValidatedStream(
+                            pgUrl, headers, 3, Duration.ofSeconds(15));
+                    if (res.statusCode() >= 200 && res.statusCode() < 300) {
+                        byte[] pageBytes = UrlSecurityValidator.readBoundedBytes(res.body(), maxBytes);
+                        if (pageBytes.length > 0) {
+                            collectedPages.add(pageBytes);
+                            log.info("Fetched page {} ({} bytes) from Cloudinary: {}", pg, pageBytes.length, pgUrl);
+                        } else {
+                            break;
+                        }
                     } else {
+                        res.body().close();
                         // End of document pages reached (Cloudinary returns 400 when page index exceeds total document pages)
                         break;
                     }
@@ -721,25 +782,9 @@ public class ResourceService {
     }
 
     public Map<String, Object> uploadMaterialFile(MultipartFile file) throws IOException {
-        if (file == null || file.isEmpty()) {
-            throw new ApiException("No file was selected for upload.");
-        }
-        if (file.getSize() > 50 * 1024 * 1024) {
-            throw new ApiException("File exceeds the maximum allowable size limit of 50 MB.");
-        }
-
+        String extDot = FileUploadSecurityValidator.validateMaterial(file, FileUploadSecurityValidator.MAX_MATERIAL_BYTES);
+        String ext = extDot.startsWith(".") ? extDot.substring(1) : extDot;
         String originalFilename = file.getOriginalFilename();
-        String ext = "pdf";
-        if (originalFilename != null && originalFilename.contains(".")) {
-            ext = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
-        }
-
-        List<String> allowedExtensions = List.of(
-                "pdf", "png", "jpg", "jpeg", "webp", "doc", "docx", "ppt", "pptx", "zip"
-        );
-        if (!allowedExtensions.contains(ext)) {
-            throw new ApiException("Unsupported file format (." + ext + "). Please upload a PDF, Image (PNG/JPG/WEBP), Office Document, or ZIP archive.");
-        }
 
         String fileUrl;
         if (cloudinaryService.isConfigured()) {
@@ -762,8 +807,11 @@ public class ResourceService {
                 }
             }
 
-            String uniqueFileName = "material_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8) + "_" + safeBaseName + "." + ext;
-            Path targetPath = uploadDir.resolve(uniqueFileName);
+            String uniqueFileName = "material_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8) + "_" + safeBaseName + extDot;
+            Path targetPath = uploadDir.resolve(uniqueFileName).normalize();
+            if (!targetPath.startsWith(uploadDir)) {
+                throw new ApiException("Invalid material target path.", HttpStatus.BAD_REQUEST);
+            }
             Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
             fileUrl = "/uploads/materials/" + uniqueFileName;
         }

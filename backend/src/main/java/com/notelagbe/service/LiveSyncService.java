@@ -1,5 +1,6 @@
 package com.notelagbe.service;
 
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -11,6 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Service
 public class LiveSyncService {
@@ -20,12 +23,28 @@ public class LiveSyncService {
     // Thread-safe collection of active SSE client subscriptions
     private final CopyOnWriteArrayList<SseEmitter> emitters = new CopyOnWriteArrayList<>();
 
+    // Offload SSE fan-out so stalled client sockets never delay HTTP auth or write transactions
+    private final ExecutorService broadcastExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "livesync-broadcaster");
+        t.setDaemon(true);
+        return t;
+    });
+
+    @PreDestroy
+    public void shutdown() {
+        broadcastExecutor.shutdownNow();
+    }
+
+    protected SseEmitter createEmitter() {
+        return new SseEmitter(600_000L); // 10 minutes
+    }
+
     /**
      * Subscribe a client to real-time sync events.
      * Sets a 10-minute timeout; browser EventSource automatically reconnects on timeout or close.
      */
     public SseEmitter subscribe() {
-        SseEmitter emitter = new SseEmitter(600_000L); // 10 minutes
+        SseEmitter emitter = createEmitter();
 
         emitter.onCompletion(() -> emitters.remove(emitter));
         emitter.onTimeout(() -> {
@@ -60,7 +79,7 @@ public class LiveSyncService {
      * @param data payload or identifier
      */
     public void broadcast(String entity, String action, Object data) {
-        if (emitters.isEmpty()) {
+        if (emitters.isEmpty() || broadcastExecutor.isShutdown()) {
             return;
         }
 
@@ -71,24 +90,29 @@ public class LiveSyncService {
                 "timestamp", System.currentTimeMillis()
         );
 
-        List<SseEmitter> deadEmitters = new ArrayList<>();
-
-        for (SseEmitter emitter : emitters) {
-            try {
-                emitter.send(SseEmitter.event()
-                        .name("sync")
-                        .data(payload));
-            } catch (Exception e) {
-                deadEmitters.add(emitter);
+        broadcastExecutor.execute(() -> {
+            if (emitters.isEmpty()) {
+                return;
             }
-        }
+            List<SseEmitter> deadEmitters = new ArrayList<>();
 
-        if (!deadEmitters.isEmpty()) {
-            emitters.removeAll(deadEmitters);
-        }
+            for (SseEmitter emitter : emitters) {
+                try {
+                    emitter.send(SseEmitter.event()
+                            .name("sync")
+                            .data(payload));
+                } catch (Exception e) {
+                    deadEmitters.add(emitter);
+                }
+            }
 
-        log.info("[LiveSync] Broadcasted change: entity={}, action={}, activeClients={}",
-                entity, action, emitters.size());
+            if (!deadEmitters.isEmpty()) {
+                emitters.removeAll(deadEmitters);
+            }
+
+            log.info("[LiveSync] Broadcasted change: entity={}, action={}, activeClients={}",
+                    entity, action, emitters.size());
+        });
     }
 
     public int getActiveClientsCount() {

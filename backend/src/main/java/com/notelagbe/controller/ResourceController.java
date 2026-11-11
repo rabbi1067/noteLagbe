@@ -58,31 +58,28 @@ public class ResourceController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Resource> getResource(@PathVariable Long id) {
-        return ResponseEntity.ok(resourceService.getResourceById(id));
+    public ResponseEntity<Resource> getResource(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User user = userDetails != null ? userDetails.getUser() : null;
+        return ResponseEntity.ok(resourceService.getResourceByIdForUser(id, user));
     }
 
     @GetMapping("/{id}/file")
     public ResponseEntity<byte[]> getResourceFile(
             @PathVariable Long id,
             @RequestParam(required = false, defaultValue = "false") boolean download,
-            @RequestParam(required = false) String token,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         User user = userDetails != null ? userDetails.getUser() : null;
-        if (user == null && StringUtils.hasText(token)) {
-            try {
-                if (jwtTokenProvider.validateToken(token)) {
-                    String email = jwtTokenProvider.getUsernameFromToken(token);
-                    user = userRepository.findByEmail(email).orElse(null);
-                }
-            } catch (Exception ignored) {}
-        }
         return resourceService.streamResourceFile(id, download, user);
     }
 
     @PostMapping("/{id}/download")
-    public ResponseEntity<Map<String, Object>> downloadResource(@PathVariable Long id) {
-        resourceService.incrementDownloadCount(id);
+    public ResponseEntity<Map<String, Object>> downloadResource(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User user = userDetails != null ? userDetails.getUser() : null;
+        resourceService.incrementDownloadCount(id, user);
         return ResponseEntity.ok(Map.of("success", true));
     }
 }

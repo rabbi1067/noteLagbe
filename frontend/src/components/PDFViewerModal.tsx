@@ -180,7 +180,10 @@ export default function PDFViewerModal({
 
   // Reset controls whenever a new resource is opened
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
       setZoom(100);
       setRotation(0);
       setActivePdfPage(1);
@@ -192,38 +195,53 @@ export default function PDFViewerModal({
       setActiveImageBytes(null);
       setImageIsLandscape(false);
       setImageCssFallback(false);
-    }
+    });
+    return () => {
+      active = false;
+    };
   }, [isOpen, resource?.id]);
 
   // Fetch document securely via Authorization header and render from local Blob URL
   useEffect(() => {
     if (!isOpen || !resource || !isUnlocked || (!resource.id && !resource.fileUrl)) {
-      replaceBlobUrl(null);
-      setRawPdfBytes(null);
-      setActivePdfBytes(null);
-      setPdfPageCount(0);
-      setRawImageBlob(null);
-      setActiveImageBytes(null);
-      setImageIsLandscape(false);
-      setImageCssFallback(false);
-      setDocError(null);
-      setDocLoading(false);
-      return;
+      let active = true;
+      queueMicrotask(() => {
+        if (!active) return;
+        replaceBlobUrl(null);
+        setRawPdfBytes(null);
+        setActivePdfBytes(null);
+        setPdfPageCount(0);
+        setRawImageBlob(null);
+        setActiveImageBytes(null);
+        setImageIsLandscape(false);
+        setImageCssFallback(false);
+        setDocError(null);
+        setDocLoading(false);
+      });
+      return () => {
+        active = false;
+      };
     }
 
     if (!resource.id && drivePreviewUrl) {
-      replaceBlobUrl(null);
-      setRawPdfBytes(null);
-      setActivePdfBytes(null);
-      setPdfPageCount(0);
-      setRawImageBlob(null);
-      setActiveImageBytes(null);
-      setImageIsLandscape(false);
-      setImageCssFallback(false);
-      setDetectedKind("drive-embed");
-      setDocError(null);
-      setDocLoading(false);
-      return;
+      let active = true;
+      queueMicrotask(() => {
+        if (!active) return;
+        replaceBlobUrl(null);
+        setRawPdfBytes(null);
+        setActivePdfBytes(null);
+        setPdfPageCount(0);
+        setRawImageBlob(null);
+        setActiveImageBytes(null);
+        setImageIsLandscape(false);
+        setImageCssFallback(false);
+        setDetectedKind("drive-embed");
+        setDocError(null);
+        setDocLoading(false);
+      });
+      return () => {
+        active = false;
+      };
     }
 
     let cancelled = false;
@@ -514,7 +532,7 @@ export default function PDFViewerModal({
         setSavingFixedFile(false);
       }
     },
-    [canDownloadAndOpen, resource?.id, onFileUpdated]
+    [canDownloadAndOpen, resource, onFileUpdated]
   );
 
   const handleSaveFixedPdfToServer = useCallback(async () => {
@@ -535,7 +553,7 @@ export default function PDFViewerModal({
       setAutoAlignedPagesList([]);
       setPdfChangedFromRaw(false);
     }
-  }, [canDownloadAndOpen, resource?.id, resource?.title, courseCode, activePdfBytes, persistFixedFileToResource]);
+  }, [canDownloadAndOpen, resource, courseCode, activePdfBytes, persistFixedFileToResource]);
 
   const handleSaveFixedImageToServer = useCallback(
     async (convertToPortraitPdf: boolean) => {
@@ -591,8 +609,7 @@ export default function PDFViewerModal({
     },
     [
       canDownloadAndOpen,
-      resource?.id,
-      resource?.title,
+      resource,
       courseCode,
       rawImageBlob,
       rotation,
@@ -603,15 +620,17 @@ export default function PDFViewerModal({
   );
 
   const rotateShortcutRef = useRef<() => void>(() => {});
-  rotateShortcutRef.current = () => {
-    if (detectedKind === "pdf" && rawPdfBytes && pdfPageCount > 0) {
-      void handleRotateActivePdfPage(90);
-    } else if (detectedKind === "image" && rawImageBlob) {
-      void applyImageRotation(rotation + 90);
-    } else {
-      setRotation((prev) => (prev + 90) % 360);
-    }
-  };
+  useEffect(() => {
+    rotateShortcutRef.current = () => {
+      if (detectedKind === "pdf" && rawPdfBytes && pdfPageCount > 0) {
+        void handleRotateActivePdfPage(90);
+      } else if (detectedKind === "image" && rawImageBlob) {
+        void applyImageRotation(rotation + 90);
+      } else {
+        setRotation((prev) => (prev + 90) % 360);
+      }
+    };
+  });
 
   // Keyboard accessibility & hotkeys for reading
   useEffect(() => {

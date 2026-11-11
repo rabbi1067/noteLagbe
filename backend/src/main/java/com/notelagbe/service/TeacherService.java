@@ -12,6 +12,7 @@ import com.notelagbe.repository.ReviewRepository;
 import com.notelagbe.repository.TeacherCourseRepository;
 import com.notelagbe.repository.TeacherRepository;
 import com.notelagbe.repository.UnlockedCourseRepository;
+import com.notelagbe.security.FileUploadSecurityValidator;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -204,16 +205,7 @@ public class TeacherService {
     }
 
     public String uploadFacultyPhoto(MultipartFile file) throws IOException {
-        if (file == null || file.isEmpty()) {
-            throw new ApiException("No image file provided for upload.");
-        }
-        String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith("image/")) {
-            throw new ApiException("Invalid file format. Only image files (JPEG, PNG, WEBP, GIF) are allowed.");
-        }
-        if (file.getSize() > 5 * 1024 * 1024) {
-            throw new ApiException("Image file exceeds the 5 MB maximum allowed size.");
-        }
+        String extDot = FileUploadSecurityValidator.validateImage(file, 5L * 1024 * 1024);
 
         if (cloudinaryService.isConfigured()) {
             return cloudinaryService.uploadFile(file, "notelagbe/faculty", true);
@@ -224,14 +216,11 @@ public class TeacherService {
             Files.createDirectories(uploadDir);
         }
 
-        String originalFilename = file.getOriginalFilename();
-        String ext = "png";
-        if (originalFilename != null && originalFilename.contains(".")) {
-            ext = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
+        String fileName = "faculty_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8) + extDot;
+        Path targetPath = uploadDir.resolve(fileName).normalize();
+        if (!targetPath.startsWith(uploadDir)) {
+            throw new ApiException("Invalid target filename.");
         }
-
-        String fileName = "faculty_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8) + "." + ext;
-        Path targetPath = uploadDir.resolve(fileName);
         Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
 
         return "/uploads/faculty/" + fileName;

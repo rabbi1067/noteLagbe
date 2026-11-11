@@ -23,6 +23,104 @@ export interface ChatMessageDto {
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
+const RAW_PUBLIC_BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL?.trim() || "";
+const NORMALIZED_PUBLIC_BACKEND_API_URL =
+  RAW_PUBLIC_BACKEND_URL && /^https?:\/\//i.test(RAW_PUBLIC_BACKEND_URL)
+    ? `${RAW_PUBLIC_BACKEND_URL.replace(/\/api\/?$/, "").replace(/\/+$/, "")}/api`
+    : "";
+
+/**
+ * Resolves a direct Spring Boot `/api` origin when configured via static NEXT_PUBLIC_BACKEND_URL.
+ * Used as cold-start fallback when the Vercel `/api` proxy returns 502/503/504 or times out,
+ * and by EventSource to avoid pinning serverless lambdas.
+ */
+export function resolveDirectBackendApiUrl(): string | null {
+  if (API_BASE_URL.startsWith("http://") || API_BASE_URL.startsWith("https://")) {
+    return API_BASE_URL.replace(/\/+$/, "");
+  }
+  if (!NORMALIZED_PUBLIC_BACKEND_API_URL) {
+    return null;
+  }
+  if (typeof window !== "undefined") {
+    const isLocalPage =
+      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const pointsLocal =
+      NORMALIZED_PUBLIC_BACKEND_API_URL.includes("localhost") ||
+      NORMALIZED_PUBLIC_BACKEND_API_URL.includes("127.0.0.1");
+    if (isLocalPage && !pointsLocal) {
+      return null;
+    }
+  }
+  return NORMALIZED_PUBLIC_BACKEND_API_URL;
+}
+
+const SAFE_COLD_START_RETRY_ENDPOINTS = new Set([
+  "/auth/login",
+  "/auth/register",
+  "/auth/google",
+  "/auth/forgot-password",
+  "/auth/verify-reset-code",
+  "/auth/reset-password",
+]);
+
+const WARMUP_COOLDOWN_MS = 45_000;
+let lastWarmupAt = 0;
+let inFlightWarmup: Promise<boolean> | null = null;
+
+/**
+ * Pre-warms the backend with a non-blocking `/ping` call so Render Free Tier cold starts
+ * begin before the user submits login or registration forms.
+ */
+export function warmupBackend(force = false): Promise<boolean> {
+  if (typeof window === "undefined") {
+    return Promise.resolve(false);
+  }
+  if (!force && Date.now() - lastWarmupAt < WARMUP_COOLDOWN_MS) {
+    return Promise.resolve(true);
+  }
+  if (inFlightWarmup) {
+    return inFlightWarmup;
+  }
+
+  const directBase = resolveDirectBackendApiUrl();
+  const primaryBase = API_BASE_URL.replace(/\/+$/, "");
+  const pingUrl = `${directBase || primaryBase}/ping`;
+
+  inFlightWarmup = (async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12_000);
+    try {
+      const res = await fetch(pingUrl, {
+        method: "GET",
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      if (res.ok) {
+        lastWarmupAt = Date.now();
+        return true;
+      }
+      if (directBase && pingUrl !== `${primaryBase}/ping`) {
+        const proxyRes = await fetch(`${primaryBase}/ping`, {
+          method: "GET",
+          cache: "no-store",
+        });
+        if (proxyRes.ok) {
+          lastWarmupAt = Date.now();
+          return true;
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timer);
+      inFlightWarmup = null;
+    }
+  })();
+
+  return inFlightWarmup;
+}
+
 export function isTokenExpired(token: string): boolean {
   try {
     const parts = token.split(".");
@@ -87,22 +185,139 @@ if (typeof window !== "undefined") {
   window.addEventListener("notelagbe:account-blocked", () => clearClientApiCache());
 }
 
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number
+): Promise<Response> {
+  const controller = new AbortController();
+  const callerSignal = init.signal;
+  let abortedByCaller = false;
+
+  const onCallerAbort = () => {
+    abortedByCaller = true;
+    controller.abort(callerSignal?.reason);
+  };
+
+  if (callerSignal) {
+    if (callerSignal.aborted) {
+      onCallerAbort();
+    } else {
+      callerSignal.addEventListener("abort", onCallerAbort, { once: true });
+    }
+  }
+
+  const timer = setTimeout(() => {
+    if (!abortedByCaller) {
+      controller.abort(new DOMException("Request timed out", "TimeoutError"));
+    }
+  }, timeoutMs);
+
+  try {
+    return await fetch(url, {
+      cache: "no-store",
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+    if (callerSignal) {
+      callerSignal.removeEventListener("abort", onCallerAbort);
+    }
+  }
+}
+
 async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
+  const method = (options.method || "GET").toUpperCase();
+  const endpointPath = endpoint.split("?")[0];
+  const isFormData = options.body instanceof FormData;
+  const isAuthEndpoint = endpointPath.startsWith("/auth/");
+  const canRetryOnColdStart =
+    !isFormData &&
+    (method === "GET" || method === "HEAD" || SAFE_COLD_START_RETRY_ENDPOINTS.has(endpointPath));
+
   const headers: Record<string, string> = {
-    ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-    ...(options.headers as Record<string, string> || {}),
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
+    ...((options.headers as Record<string, string>) || {}),
   };
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    cache: "no-store",
+  const primaryBase = API_BASE_URL.replace(/\/+$/, "");
+  const directBase = resolveDirectBackendApiUrl();
+  const firstTimeoutMs = isFormData ? 45_000 : isAuthEndpoint ? 20_000 : 16_000;
+  const retryTimeoutMs = isAuthEndpoint ? 30_000 : 24_000;
+  const requestInit: RequestInit = {
     ...options,
     headers,
-  });
+  };
+
+  const emitWakingNotice = (attempt: number) => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("notelagbe:backend-waking", {
+          detail: { endpoint: endpointPath, attempt },
+        })
+      );
+    }
+  };
+
+  let response: Response | null = null;
+  let lastNetworkErr: unknown = null;
+
+  try {
+    response = await fetchWithTimeout(`${primaryBase}${endpoint}`, requestInit, firstTimeoutMs);
+    if (
+      canRetryOnColdStart &&
+      (response.status === 502 || response.status === 503 || response.status === 504)
+    ) {
+      emitWakingNotice(2);
+      await new Promise((r) => setTimeout(r, 600));
+      const fallbackBase = directBase && directBase !== primaryBase ? directBase : primaryBase;
+      response = await fetchWithTimeout(`${fallbackBase}${endpoint}`, requestInit, retryTimeoutMs);
+    }
+  } catch (err: unknown) {
+    lastNetworkErr = err;
+    if (options.signal?.aborted) {
+      throw err;
+    }
+    if (canRetryOnColdStart) {
+      emitWakingNotice(2);
+      try {
+        await new Promise((r) => setTimeout(r, 600));
+        const fallbackBase = directBase && directBase !== primaryBase ? directBase : primaryBase;
+        response = await fetchWithTimeout(`${fallbackBase}${endpoint}`, requestInit, retryTimeoutMs);
+      } catch (retryErr: unknown) {
+        lastNetworkErr = retryErr;
+        response = null;
+      }
+    }
+  }
+
+  if (!response) {
+    const errName = lastNetworkErr instanceof Error || lastNetworkErr instanceof DOMException
+      ? lastNetworkErr.name
+      : "";
+    const errMessage = lastNetworkErr instanceof Error || lastNetworkErr instanceof DOMException
+      ? lastNetworkErr.message
+      : "";
+    const isTimeout =
+      errName === "TimeoutError" ||
+      errName === "AbortError" ||
+      /timed out|timeout|abort/i.test(errMessage);
+    throw new Error(
+      isBanglaLocale()
+        ? isTimeout
+          ? "সার্ভার চালু হতে সময় নিচ্ছে বা সাড়া দিচ্ছে না। কয়েক সেকেন্ড অপেক্ষা করে আবার চেষ্টা করুন।"
+          : "সার্ভারের সাথে সংযোগ স্থাপন করা যায়নি। ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।"
+        : isTimeout
+          ? "Server is waking up from idle sleep or taking too long to respond. Please wait a few seconds and try again."
+          : "Unable to reach the server right now. Please check your connection and try again."
+    );
+  }
 
   if (!response.ok) {
     let errorMessage = "An error occurred";
@@ -265,6 +480,45 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return executeFetch<T>(endpoint, options);
 }
 
+async function downloadAuthorizedBlob(
+  endpoint: string,
+  fallbackFilename: string,
+  defaultError: string
+): Promise<void> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}${endpoint}`,
+    { headers },
+    45_000
+  );
+  if (!response.ok) {
+    let errorMsg = defaultError;
+    try {
+      const errData = await response.json();
+      errorMsg = errData.message || errorMsg;
+    } catch {}
+    throw new Error(errorMsg);
+  }
+  const disposition = response.headers.get("content-disposition") || "";
+  const match = /filename\*?=(?:UTF-8''|")?([^";\n]+)/i.exec(disposition);
+  const resolvedName = match?.[1]
+    ? decodeURIComponent(match[1].replace(/"/g, "").trim())
+    : fallbackFilename;
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = resolvedName;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
 export const api = {
   // Auth API
   auth: {
@@ -325,33 +579,12 @@ export const api = {
     getByCode: (code: string) => request<any>(`/courses/${code}`),
     unlock: (code: string) => request<any>(`/courses/${code}/unlock`, { method: "POST" }),
     getCheatSheet: (code: string) => request<any>(`/courses/${code}/cheatsheet`),
-    downloadZip: async (code: string) => {
-      const token = getToken();
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-      const response = await fetch(`${API_BASE_URL}/courses/${code}/download-zip`, {
-        headers,
-      });
-      if (!response.ok) {
-        let errorMsg = "Failed to download offline study pack";
-        try {
-          const errData = await response.json();
-          errorMsg = errData.message || errorMsg;
-        } catch {}
-        throw new Error(errorMsg);
-      }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${code.toUpperCase()}_Offline_Study_Pack.zip`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    },
+    downloadZip: (code: string) =>
+      downloadAuthorizedBlob(
+        `/courses/${code}/download-zip`,
+        `${code.toUpperCase()}_Offline_Study_Pack.zip`,
+        "Failed to download offline study pack"
+      ),
   },
 
   // Teachers API
@@ -383,6 +616,12 @@ export const api = {
     getByCourse: (code: string) => request<any[]>(`/resources/course/${code}`),
     getByTeacher: (teacherId: number) => request<any[]>(`/resources/teacher/${teacherId}`),
     getById: (id: number) => request<any>(`/resources/${id}`),
+    downloadFile: (id: number, fallbackFilename = `material_${id}.pdf`) =>
+      downloadAuthorizedBlob(
+        `/resources/${id}/file?download=true`,
+        fallbackFilename,
+        "Failed to download study material"
+      ),
     trackDownload: (id: number) => request<any>(`/resources/${id}/download`, { method: "POST" }),
     checkAvailability: (courseCode: string, teacherId?: number) => {
       const sp = new URLSearchParams();

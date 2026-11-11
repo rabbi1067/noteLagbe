@@ -20,4 +20,4 @@ COPY --from=build /workspace/target/notelagbe-backend-1.0.0.jar app.jar
 ENV PORT=10000
 EXPOSE 10000
 
-ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-XX:+UseSerialGC", "-XX:+ExitOnOutOfMemoryError", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]

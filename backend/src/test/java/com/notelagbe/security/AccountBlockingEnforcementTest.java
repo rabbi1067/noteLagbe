@@ -4,6 +4,7 @@ import com.notelagbe.dto.AuthRequest;
 import com.notelagbe.dto.GoogleLoginRequest;
 import com.notelagbe.entity.Role;
 import com.notelagbe.entity.User;
+import com.notelagbe.exception.ApiException;
 import com.notelagbe.repository.CourseRepository;
 import com.notelagbe.repository.SubscriptionRepository;
 import com.notelagbe.repository.UnlockedCourseRepository;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -27,6 +29,7 @@ import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -105,11 +108,47 @@ class AccountBlockingEnforcementTest {
         User blocked = makeBlockedStudent();
         when(userRepository.findByEmail("blocked@seu.edu.bd")).thenReturn(Optional.of(blocked));
 
+        AuthService verifiedGoogleAuthService = new AuthService(
+                userRepository,
+                courseRepository,
+                subscriptionRepository,
+                unlockedCourseRepository,
+                passwordEncoder,
+                authenticationManager,
+                tokenProvider,
+                subscriptionService,
+                liveSyncService,
+                cloudinaryService,
+                emailService
+        ) {
+            @Override
+            protected Map<String, Object> verifyGoogleIdToken(String idToken) {
+                return Map.of(
+                        "email", "blocked@seu.edu.bd",
+                        "email_verified", "true",
+                        "name", "Blocked Student"
+                );
+            }
+        };
+
+        GoogleLoginRequest req = new GoogleLoginRequest();
+        req.setEmail("blocked@seu.edu.bd");
+        req.setName("Blocked Student");
+        req.setIdToken("verified.google.id.token");
+
+        assertThrows(DisabledException.class, () -> verifiedGoogleAuthService.loginWithGoogle(req));
+        verify(tokenProvider, never()).generateTokenFromUser(any());
+    }
+
+    @Test
+    void googleSsoRejectsMissingIdTokenBeforeUserLookup() {
         GoogleLoginRequest req = new GoogleLoginRequest();
         req.setEmail("blocked@seu.edu.bd");
         req.setName("Blocked Student");
 
-        assertThrows(DisabledException.class, () -> authService.loginWithGoogle(req));
+        ApiException ex = assertThrows(ApiException.class, () -> authService.loginWithGoogle(req));
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatus());
+        verify(userRepository, never()).findByEmail(any());
         verify(tokenProvider, never()).generateTokenFromUser(any());
     }
 

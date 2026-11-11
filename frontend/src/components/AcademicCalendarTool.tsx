@@ -308,7 +308,7 @@ const translateDescription = (desc: string, lang: "en" | "bn"): string => {
 // Translate Semester Tab Name
 const translateSemesterName = (semName: string, lang: "en" | "bn"): string => {
   if (lang === "en" || !semName) return semName;
-  let translated = semName
+  const translated = semName
     .replace(/Spring/gi, "স্প্রিং")
     .replace(/Summer/gi, "সামার")
     .replace(/Fall/gi, "ফল");
@@ -370,9 +370,10 @@ export default function AcademicCalendarTool() {
 
       if (data.success) {
         setSemesters(data.semesters || []);
-        // Restrict strictly to 4 valid years (2026, 2025, 2024, 2023)
+        // Restrict strictly to valid recent years (current year + 1 down to 2023)
         if (data.availableYears && data.availableYears.length > 0) {
-          const valid = data.availableYears.filter((y: string) => Number(y) <= 2026 && Number(y) >= 2023);
+          const maxYear = new Date().getFullYear() + 1;
+          const valid = data.availableYears.filter((y: string) => Number(y) <= maxYear && Number(y) >= 2023);
           setAvailableYears(valid.slice(0, 4));
         }
         setDataSource(data.source || "seu.edu.bd");
@@ -406,7 +407,13 @@ export default function AcademicCalendarTool() {
   };
 
   useEffect(() => {
-    loadCalendar(selectedYear);
+    let active = true;
+    queueMicrotask(() => {
+      if (active) void loadCalendar(selectedYear);
+    });
+    return () => {
+      active = false;
+    };
   }, [selectedYear]);
 
   // Filter items based on search and category

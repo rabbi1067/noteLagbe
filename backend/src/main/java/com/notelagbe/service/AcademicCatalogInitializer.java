@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.InputStream;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -61,6 +62,9 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
     @Value("${app.admin.initial-password:}")
     private String initialAdminPassword;
 
+    @Value("${app.admin.owner-email:}")
+    private String ownerAdminEmail;
+
     public AcademicCatalogInitializer(CourseRepository courseRepository,
                                       TeacherRepository teacherRepository,
                                       TeacherCourseRepository teacherCourseRepository,
@@ -82,23 +86,47 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
     }
 
     @Override
-    @Transactional
     public void run(String... args) {
         log.info(">>> Checking Southeast University Academic Catalog in database...");
-        seedCoursesIfEmpty();
-        seedTeachersIfEmpty();
-        purgeDemoTeacherCourseOfferings();
-        syncCoursesFromMaterials();
-        ensureAllTeachersHaveInitials();
-        ensureSuperAdminUser();
-        
-        if (cacheManager != null) {
-            for (String cacheName : cacheManager.getCacheNames()) {
-                var c = cacheManager.getCache(cacheName);
-                if (c != null) c.clear();
-            }
+        long existingCourses = courseRepository.count();
+        long existingTeachers = teacherRepository.count();
+
+        if (existingCourses == 0) {
+            seedCoursesIfEmpty();
         }
-        log.info(">>> Southeast University Academic Catalog verified in database.");
+        if (existingTeachers == 0) {
+            seedTeachersIfEmpty();
+        }
+
+        // Always sync the Super Admin record synchronously before accepting traffic.
+        ensureSuperAdminUser();
+
+        if (existingCourses > 0 && existingTeachers > 0) {
+            // Defer catalog hygiene off the cold-start critical path so Render boots and passes health checks quickly.
+            log.info(">>> Southeast University Academic Catalog verified ({} courses, {} teachers). Running consistency check asynchronously.",
+                    existingCourses, existingTeachers);
+            CompletableFuture.runAsync(this::runCatalogConsistencyMaintenanceSafe);
+        } else {
+            runCatalogConsistencyMaintenanceSafe();
+            log.info(">>> Southeast University Academic Catalog verified in database.");
+        }
+    }
+
+    private void runCatalogConsistencyMaintenanceSafe() {
+        try {
+            purgeNonCseDummyCourses();
+            reconcileTeacherCourseMappings();
+            ensureAllTeachersHaveInitials();
+
+            if (cacheManager != null) {
+                for (String cacheName : cacheManager.getCacheNames()) {
+                    var c = cacheManager.getCache(cacheName);
+                    if (c != null) c.clear();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Catalog consistency maintenance skipped/failed: {}", e.getMessage());
+        }
     }
 
     private void ensureSuperAdminUser() {
@@ -112,10 +140,22 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
         Optional<User> existingAdmin = userRepository.findByEmail(adminEmail);
         if (existingAdmin.isPresent()) {
             User admin = existingAdmin.get();
-            admin.setRole(Role.ROLE_SUPER_ADMIN);
-            admin.setPassword(passwordEncoder.encode(adminPass));
-            admin.setEnabled(true);
-            userRepository.save(admin);
+            boolean changed = false;
+            if (admin.getRole() != Role.ROLE_SUPER_ADMIN) {
+                admin.setRole(Role.ROLE_SUPER_ADMIN);
+                changed = true;
+            }
+            if (!admin.isEnabled()) {
+                admin.setEnabled(true);
+                changed = true;
+            }
+            if (admin.getPassword() == null || admin.getPassword().isBlank()) {
+                admin.setPassword(passwordEncoder.encode(adminPass));
+                changed = true;
+            }
+            if (changed) {
+                userRepository.save(admin);
+            }
             log.info(">>> Super Admin account synchronized for: {}", adminEmail);
         } else {
             User superAdmin = new User();
@@ -130,31 +170,17 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
             log.info(">>> Initial Super Admin provisioned securely for email: {}", adminEmail);
         }
 
-        userRepository.findByEmail("fazlerabbicse65@gmail.com").ifPresent(u -> {
-            if (u.getRole() != Role.ROLE_SUPER_ADMIN) {
-                u.setRole(Role.ROLE_SUPER_ADMIN);
-                userRepository.save(u);
-            }
-        });
+        if (ownerAdminEmail != null && !ownerAdminEmail.isBlank()) {
+            userRepository.findByEmail(ownerAdminEmail.trim().toLowerCase()).ifPresent(u -> {
+                if (u.getRole() != Role.ROLE_SUPER_ADMIN) {
+                    u.setRole(Role.ROLE_SUPER_ADMIN);
+                    userRepository.save(u);
+                }
+            });
+        }
     }
 
     private void seedCoursesIfEmpty() {
-        // Enforce authentic CSE curriculum: Purge any non-CSE dummy courses (e.g. mock BBA, EEE, LAW, PHAR, ENG courses).
-        // CSE non-major courses (such as ENG101, EEE181, ACT141, etc.) have department = "CSE" and are strictly kept.
-        List<Course> nonCseCourses = courseRepository.findAll().stream()
-                .filter(c -> c.getDepartment() != null && !c.getDepartment().trim().equalsIgnoreCase("CSE"))
-                .toList();
-        if (!nonCseCourses.isEmpty()) {
-            for (Course nc : nonCseCourses) {
-                var mappings = teacherCourseRepository.findByCourseId(nc.getId());
-                if (mappings != null && !mappings.isEmpty()) {
-                    teacherCourseRepository.deleteAll(mappings);
-                }
-                courseRepository.delete(nc);
-            }
-            log.info("Purged {} mock non-CSE courses from database. Only authentic CSE courses are retained.", nonCseCourses.size());
-        }
-
         if (courseRepository.count() > 0) {
             log.info("Courses table already populated ({} courses found). Skipping course init.", courseRepository.count());
             return;
@@ -332,45 +358,89 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
         }
     }
 
-    private void purgeDemoTeacherCourseOfferings() {
+    private void purgeNonCseDummyCourses() {
+        // Enforce authentic CSE curriculum: Purge any non-CSE dummy courses (e.g. mock BBA, EEE, LAW, PHAR, ENG courses).
+        // CSE non-major courses (such as ENG101, EEE181, ACT141, etc.) have department = "CSE" and are strictly kept.
+        List<Course> nonCseCourses = courseRepository.findAll().stream()
+                .filter(c -> c.getDepartment() != null && !c.getDepartment().trim().equalsIgnoreCase("CSE"))
+                .toList();
+        if (!nonCseCourses.isEmpty()) {
+            for (Course nc : nonCseCourses) {
+                try {
+                    var mappings = teacherCourseRepository.findByCourseId(nc.getId());
+                    if (mappings != null && !mappings.isEmpty()) {
+                        teacherCourseRepository.deleteAll(mappings);
+                    }
+                    courseRepository.delete(nc);
+                } catch (Exception ex) {
+                    log.warn("Skipping cleanup of non-CSE course {} because related academic records exist: {}", nc.getCode(), ex.getMessage());
+                }
+            }
+            log.info("Purged {} mock non-CSE courses from database. Only authentic CSE courses are retained.", nonCseCourses.size());
+        }
+    }
+
+    /**
+     * Reconciles teacher-course mappings in memory using bulk loads so cold boots over cloud SQL
+     * do not issue hundreds of sequential round-trip queries.
+     */
+    private void reconcileTeacherCourseMappings() {
         log.info(">>> Checking and purging demo/fake teacher course offerings...");
-        List<TeacherCourse> all = teacherCourseRepository.findAll();
+        List<Resource> allResources = resourceRepository.findAll();
+        List<TeacherCourse> allMappings = teacherCourseRepository.findAll();
+
+        Set<String> approvedCourseTeacherKeys = new HashSet<>();
+        for (Resource r : allResources) {
+            if (r.getStatus() == ResourceStatus.APPROVED
+                    && r.getCourse() != null && r.getCourse().getCode() != null
+                    && r.getTeacher() != null && r.getTeacher().getId() != null) {
+                approvedCourseTeacherKeys.add(
+                        r.getCourse().getCode().toUpperCase(Locale.ROOT) + ":" + r.getTeacher().getId()
+                );
+            }
+        }
+
         List<TeacherCourse> toPurge = new ArrayList<>();
-        for (TeacherCourse tc : all) {
-            if (tc.getCourse() == null || tc.getTeacher() == null) {
+        Map<String, TeacherCourse> activeMappingsByIds = new HashMap<>();
+        for (TeacherCourse tc : allMappings) {
+            if (tc.getCourse() == null || tc.getTeacher() == null || tc.getCourse().getCode() == null) {
                 toPurge.add(tc);
                 continue;
             }
-            boolean hasApprovedResource = resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
-                    tc.getCourse().getCode(), tc.getTeacher().getId(), ResourceStatus.APPROVED);
-            if (!hasApprovedResource) {
+            String approvedKey = tc.getCourse().getCode().toUpperCase(Locale.ROOT) + ":" + tc.getTeacher().getId();
+            if (!approvedCourseTeacherKeys.contains(approvedKey)) {
                 toPurge.add(tc);
+            } else {
+                String idKey = tc.getCourse().getId() + ":" + tc.getTeacher().getId();
+                activeMappingsByIds.putIfAbsent(idKey, tc);
             }
         }
+
         if (!toPurge.isEmpty()) {
             teacherCourseRepository.deleteAll(toPurge);
             log.info(">>> Successfully purged {} demo teacher course mappings from database.", toPurge.size());
         }
-    }
 
-    private void syncCoursesFromMaterials() {
-        List<Resource> approved = resourceRepository.findAll();
+        List<TeacherCourse> toSave = new ArrayList<>();
         int added = 0;
-        for (Resource r : approved) {
-            if (r.getTeacher() != null && r.getCourse() != null) {
-                List<TeacherCourse> tcList = teacherCourseRepository.findAllByCourseIdAndTeacherId(r.getCourse().getId(), r.getTeacher().getId());
-                if (tcList.isEmpty()) {
+        for (Resource r : allResources) {
+            if (r.getTeacher() != null && r.getCourse() != null
+                    && r.getTeacher().getId() != null && r.getCourse().getId() != null) {
+                String idKey = r.getCourse().getId() + ":" + r.getTeacher().getId();
+                TeacherCourse existing = activeMappingsByIds.get(idKey);
+                if (existing == null) {
                     TeacherCourse tc = new TeacherCourse(r.getTeacher(), r.getCourse(), "General", "ADMIN_ASSIGNED");
-                    teacherCourseRepository.save(tc);
+                    activeMappingsByIds.put(idKey, tc);
+                    toSave.add(tc);
                     added++;
-                } else {
-                    TeacherCourse tc = tcList.get(0);
-                    if (!"ADMIN_ASSIGNED".equalsIgnoreCase(tc.getScheduleInfo())) {
-                        tc.setScheduleInfo("ADMIN_ASSIGNED");
-                        teacherCourseRepository.save(tc);
-                    }
+                } else if (!"ADMIN_ASSIGNED".equalsIgnoreCase(existing.getScheduleInfo())) {
+                    existing.setScheduleInfo("ADMIN_ASSIGNED");
+                    toSave.add(existing);
                 }
             }
+        }
+        if (!toSave.isEmpty()) {
+            teacherCourseRepository.saveAll(toSave);
         }
         if (added > 0) {
             log.info(">>> Auto-registered {} teacher-course mappings from existing academic materials.", added);
@@ -379,14 +449,18 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
 
     private void ensureAllTeachersHaveInitials() {
         List<Teacher> teachers = teacherRepository.findAll();
+        List<Teacher> updatedTeachers = new ArrayList<>();
         for (Teacher t : teachers) {
             if (t.getInitial() == null || t.getInitial().trim().isEmpty() || t.getInitial().equalsIgnoreCase("N/A")) {
                 String genInit = generateFallbackInitials(t.getName());
                 if (genInit != null) {
                     t.setInitial(genInit);
-                    teacherRepository.save(t);
+                    updatedTeachers.add(t);
                 }
             }
+        }
+        if (!updatedTeachers.isEmpty()) {
+            teacherRepository.saveAll(updatedTeachers);
         }
     }
 

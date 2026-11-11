@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { API_BASE_URL } from "./api";
+import { API_BASE_URL, resolveDirectBackendApiUrl } from "./api";
 
 export interface SyncPayload {
   entity: string; // e.g. "course", "teacher", "resource", "matrix", "department", "review"
@@ -93,13 +93,15 @@ export function notifyDataChanged(entity: string, action: string, data?: any) {
 // Persistent SSE connection singleton
 let eventSource: EventSource | null = null;
 let reconnectTimer: any = null;
+let reconnectAttempt = 0;
 
 function initServerEvents() {
   if (typeof window === "undefined" || eventSource) return;
 
   try {
-    let sseUrl = `${API_BASE_URL}/sync/events`;
-    if (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+    const directBase = resolveDirectBackendApiUrl();
+    let sseUrl = `${directBase || API_BASE_URL.replace(/\/+$/, "")}/sync/events`;
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
       // Direct connection to local backend for zero-latency, unbuffered SSE events on localhost
       sseUrl = "http://localhost:8888/api/sync/events";
     }
@@ -125,6 +127,7 @@ function initServerEvents() {
     eventSource.onmessage = handleMessage;
 
     eventSource.onopen = () => {
+      reconnectAttempt = 0;
       // Dispatches connection revalidation
       dispatchToSubscribers({
         entity: "all",
@@ -138,11 +141,14 @@ function initServerEvents() {
         eventSource.close();
         eventSource = null;
       }
-      // Reconnect after 4 seconds
+      // Exponential backoff reconnect to avoid hammering a cold-starting backend
+      const delays = [4000, 8000, 15000, 30000, 60000];
+      const delay = delays[Math.min(reconnectAttempt, delays.length - 1)];
+      reconnectAttempt += 1;
       clearTimeout(reconnectTimer);
       reconnectTimer = setTimeout(() => {
         initServerEvents();
-      }, 4000);
+      }, delay);
     };
   } catch {
     // Ignore SSE setup failures in unsupported environments
@@ -167,7 +173,10 @@ export function subscribeToSync(callback: SyncCallback): () => void {
  */
 export function useDataSync(onSync: (payload?: SyncPayload) => void, filterEntity?: string) {
   const callbackRef = useRef(onSync);
-  callbackRef.current = onSync;
+
+  useEffect(() => {
+    callbackRef.current = onSync;
+  }, [onSync]);
 
   useEffect(() => {
     const handleSync = (payload: SyncPayload) => {

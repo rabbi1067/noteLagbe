@@ -176,8 +176,21 @@ public class CourseService {
             return true; // Already unlocked full course
         }
 
-        Subscription sub = subscriptionService.getValidActiveSubscription(user.getId())
+        Subscription validSub = subscriptionService.getValidActiveSubscription(user.getId())
                 .orElseThrow(() -> new ApiException("No active subscription plan found or your plan validity has ended. Please purchase or renew a plan to unlock courses!"));
+
+        // Acquire row-level write lock on the active subscription so concurrent unlocks cannot exceed quota
+        Subscription sub = subscriptionRepository.findByIdForUpdate(validSub.getId())
+                .orElseThrow(() -> new ApiException("Active subscription record is no longer available."));
+
+        if (!sub.isActive() || sub.isExpired()) {
+            throw new ApiException("Your subscription plan is no longer active. Please renew to unlock courses!");
+        }
+
+        // Re-check inside locked critical section for idempotency
+        if (unlockedCourseRepository.existsByUserIdAndCourseIdAndTeacherIsNull(user.getId(), course.getId())) {
+            return true;
+        }
 
         if (sub.isUnlimited()) {
             UnlockedCourse uc = new UnlockedCourse(user, course, UnlockSource.YEAR_UNLIMITED, sub.getEndDate());
@@ -780,7 +793,7 @@ HOW TO USE THIS OFFLINE STUDY PACK:
 2. Filter notes by instructor (e.g. MSH, AMS, SMA), search by exam topics, and
    track your revision progress with built-in checkboxes.
 3. Every material also has an offline HTML viewer and downloadable PDF in its folder.
-4. If you have any new notes to contribute, visit https://notelagbe.com to earn rewards!
+4. If you have any new notes to contribute, visit https://note-lagbe-sandy.vercel.app to earn rewards!
 
 Good luck with your exams!
 NoteLagbe - By Southeast University Students, For Southeast University Students

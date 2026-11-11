@@ -1,5 +1,7 @@
 package com.notelagbe.service;
 
+import org.springframework.cache.annotation.CacheEvict;
+
 import com.notelagbe.dto.WaiverSubmitRequest;
 import com.notelagbe.entity.PaymentStatus;
 import com.notelagbe.entity.PlanType;
@@ -77,6 +79,7 @@ public class WaiverService {
         return waiverRequestRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
+    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "admin_analytics", "admin_stats"}, allEntries = true)
     @Transactional
     public WaiverRequest approveWaiver(Long waiverId, int grantedCoursesCount, String notes) {
         WaiverRequest wr = waiverRequestRepository.findById(waiverId)
@@ -89,7 +92,7 @@ public class WaiverService {
         int quota = grantedCoursesCount > 0 ? grantedCoursesCount : 6;
         wr.setStatus(PaymentStatus.APPROVED);
         wr.setGrantedCoursesCount(quota);
-        wr.setAdminNotes(notes != null ? notes : "Approved for ৳99 package (6 course unlocks quota).");
+        wr.setAdminNotes(notes != null ? notes : "Approved for ৳99 package (" + quota + " course unlocks quota).");
         wr.setReviewedAt(LocalDateTime.now());
         waiverRequestRepository.save(wr);
 
@@ -100,7 +103,7 @@ public class WaiverService {
                     subscriptionRepository.save(sub);
                 });
 
-        // Create ৳99 Package (1-Semester Plan, 3 Months, 6 Courses Quota)
+        // Create ৳99 Package (1-Semester Plan, 3 Months, granted quota)
         Subscription waiverSub = new Subscription();
         waiverSub.setUser(wr.getUser());
         waiverSub.setPlanType(PlanType.SEMESTER_1);
@@ -117,7 +120,7 @@ public class WaiverService {
             notificationService.createNotification(
                     wr.getUser(),
                     "Financial Aid / Waiver Approved! 🎉",
-                    "Your financial aid / waiver application has been approved by Admin! The ৳99 package (1-Semester Plan) is active on your profile with 6 course unlocks quota for 3 months.",
+                    "Your financial aid / waiver application has been approved by Admin! The ৳99 package (1-Semester Plan) is active on your profile with " + quota + " course unlocks quota for 3 months.",
                     "WAIVER_APPROVED",
                     "/courses"
             );
@@ -140,10 +143,15 @@ public class WaiverService {
         return wr;
     }
 
+    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "admin_analytics", "admin_stats"}, allEntries = true)
     @Transactional
     public WaiverRequest rejectWaiver(Long waiverId, String notes) {
         WaiverRequest wr = waiverRequestRepository.findById(waiverId)
                 .orElseThrow(() -> new ResourceNotFoundException("Waiver request not found: " + waiverId));
+
+        if (wr.getStatus() == PaymentStatus.APPROVED) {
+            throw new ApiException("An already approved waiver cannot be rejected directly.");
+        }
 
         wr.setStatus(PaymentStatus.REJECTED);
         wr.setAdminNotes(notes);

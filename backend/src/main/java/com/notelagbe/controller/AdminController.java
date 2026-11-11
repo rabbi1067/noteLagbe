@@ -52,6 +52,9 @@ public class AdminController {
     private final CacheManager cacheManager;
     private final HttpServletRequest httpRequest;
 
+    @org.springframework.beans.factory.annotation.Value("${app.admin.initial-email:}")
+    private String initialAdminEmail;
+
     public AdminController(AdminService adminService,
                            PaymentService paymentService,
                            ContributionService contributionService,
@@ -266,6 +269,7 @@ public class AdminController {
         }
         Course created = courseService.createCourse(course, initialTeacherId);
         logAdminAction("COURSE_CREATE", "ACADEMIC", "Admin created curriculum course: " + created.getCode() + " - " + created.getTitle());
+        evictAnalyticsCache();
         return ResponseEntity.ok(Map.of("success", true, "message", "Course created successfully", "course", created));
     }
 
@@ -275,6 +279,7 @@ public class AdminController {
             @PathVariable Long teacherId) {
         courseService.assignTeacherToCourse(code, teacherId);
         logAdminAction("FACULTY_ASSIGN", "ACADEMIC", "Assigned faculty ID #" + teacherId + " to course " + code);
+        evictAnalyticsCache();
         return ResponseEntity.ok(Map.of("success", true, "message", "Teacher assigned to course successfully"));
     }
 
@@ -284,6 +289,7 @@ public class AdminController {
             @PathVariable Long teacherId) {
         courseService.removeTeacherFromCourse(code, teacherId);
         logAdminAction("FACULTY_UNASSIGN", "ACADEMIC", "Removed faculty ID #" + teacherId + " from course " + code);
+        evictAnalyticsCache();
         return ResponseEntity.ok(Map.of("success", true, "message", "Teacher removed from course successfully"));
     }
 
@@ -293,13 +299,16 @@ public class AdminController {
             @RequestBody Map<String, Object> payload) {
         Course updated = courseService.updateCourse(code, payload);
         logAdminAction("COURSE_UPDATE", "ACADEMIC", "Admin updated curriculum course details for: " + code);
+        evictAnalyticsCache();
         return ResponseEntity.ok(Map.of("success", true, "message", "Course updated successfully", "course", updated));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @DeleteMapping("/courses/{code}")
     public ResponseEntity<Map<String, Object>> deleteCourse(@PathVariable String code) {
         courseService.deleteCourse(code);
         logAdminAction("COURSE_DELETE", "ACADEMIC", "Admin deleted curriculum course: " + code);
+        evictAnalyticsCache();
         return ResponseEntity.ok(Map.of("success", true, "message", "Course deleted successfully"));
     }
 
@@ -310,6 +319,7 @@ public class AdminController {
     public ResponseEntity<Map<String, Object>> createTeacher(@RequestBody Teacher teacher) {
         Teacher saved = teacherService.createTeacher(teacher);
         logAdminAction("FACULTY_CREATE", "ACADEMIC", "Admin created faculty profile: " + saved.getName() + (saved.getInitial() != null ? " (" + saved.getInitial() + ")" : ""));
+        evictAnalyticsCache();
         return ResponseEntity.ok(Map.of("success", true, "message", "Faculty profile created successfully", "teacher", saved));
     }
 
@@ -330,13 +340,16 @@ public class AdminController {
             @RequestBody Map<String, Object> payload) {
         Teacher updated = teacherService.updateTeacher(id, payload);
         logAdminAction("FACULTY_UPDATE", "ACADEMIC", "Admin updated faculty profile ID #" + id + " (" + updated.getName() + ")");
+        evictAnalyticsCache();
         return ResponseEntity.ok(Map.of("success", true, "message", "Faculty profile updated successfully", "teacher", updated));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @DeleteMapping("/teachers/{id}")
     public ResponseEntity<Map<String, Object>> deleteTeacher(@PathVariable Long id) {
         teacherService.deleteTeacher(id);
         logAdminAction("FACULTY_DELETE", "ACADEMIC", "Admin deleted faculty profile ID #" + id);
+        evictAnalyticsCache();
         return ResponseEntity.ok(Map.of("success", true, "message", "Faculty member removed successfully"));
     }
 
@@ -396,6 +409,7 @@ public class AdminController {
         return ResponseEntity.ok(updated);
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @DeleteMapping("/resources/{id}")
     public ResponseEntity<Map<String, Object>> deleteResource(
             @PathVariable Long id,
@@ -409,13 +423,14 @@ public class AdminController {
     }
 
     // ==========================================
-    // Staff & Team Management (Super Admin only)
+    // Staff & Team Management (Super Admin & Admin only)
     // ==========================================
     @GetMapping("/staff")
     public ResponseEntity<List<StaffResponseDto>> getAllStaff() {
         return ResponseEntity.ok(adminService.getAllStaff());
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PostMapping("/staff")
     public ResponseEntity<StaffResponseDto> createStaff(
             @Valid @RequestBody StaffCreateRequest request,
@@ -424,9 +439,11 @@ public class AdminController {
         StaffResponseDto staff = adminService.createStaff(request, actor);
         logAdminAction(actor, "STAFF_CREATE", "STAFF",
                 formatActorPrefix(actor) + " created account: " + request.getEmail() + " as " + request.getRole());
+        evictAnalyticsCache();
         return ResponseEntity.ok(staff);
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PutMapping("/staff/{id}")
     public ResponseEntity<StaffResponseDto> updateStaff(
             @PathVariable Long id,
@@ -436,9 +453,11 @@ public class AdminController {
         StaffResponseDto updated = adminService.updateStaff(id, payload, actor);
         logAdminAction(actor, "STAFF_UPDATE", "STAFF",
                 formatActorPrefix(actor) + " updated user account #" + id + " (" + updated.getEmail() + " • Role: " + updated.getRole() + ")");
+        evictAnalyticsCache();
         return ResponseEntity.ok(updated);
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PutMapping("/staff/{id}/toggle-status")
     public ResponseEntity<Map<String, Object>> toggleStaffStatus(
             @PathVariable Long id,
@@ -447,9 +466,11 @@ public class AdminController {
         Map<String, Object> res = adminService.toggleStaffBlock(id, actor);
         logAdminAction(actor, "STAFF_STATUS_TOGGLE", "STAFF",
                 formatActorPrefix(actor) + " toggled active status (enabled=" + res.get("enabled") + ") for account ID #" + id);
+        evictAnalyticsCache();
         return ResponseEntity.ok(res);
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @DeleteMapping("/staff/{id}")
     public ResponseEntity<Map<String, Object>> deleteStaff(
             @PathVariable Long id,
@@ -458,6 +479,7 @@ public class AdminController {
         adminService.deleteStaff(id, actor);
         logAdminAction(actor, "STAFF_DELETE", "STAFF",
                 formatActorPrefix(actor) + " deleted user account ID #" + id);
+        evictAnalyticsCache();
         return ResponseEntity.ok(Map.of("success", true, "message", "Staff account removed successfully"));
     }
 
@@ -668,6 +690,7 @@ public class AdminController {
         return ResponseEntity.ok(waiverService.getWaivers(status));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PostMapping("/waivers/{id}/approve")
     public ResponseEntity<WaiverRequest> approveWaiver(
             @PathVariable Long id,
@@ -693,6 +716,7 @@ public class AdminController {
         return ResponseEntity.ok(w);
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PostMapping("/waivers/{id}/reject")
     public ResponseEntity<WaiverRequest> rejectWaiver(
             @PathVariable Long id,
@@ -811,7 +835,10 @@ public class AdminController {
         User actor = resolveActor(userDetails);
         String recipient = body != null && body.containsKey("recipientEmail") && !body.get("recipientEmail").isBlank()
                 ? body.get("recipientEmail")
-                : (actor != null && actor.getEmail() != null ? actor.getEmail() : "admin@seu.edu.bd");
+                : (actor != null && actor.getEmail() != null ? actor.getEmail() : initialAdminEmail);
+        if (recipient == null || recipient.isBlank()) {
+            throw new ApiException("Recipient email address is required to send a test email.");
+        }
         Map<String, Object> result = emailService.sendTestEmail(recipient);
         logAdminAction(actor, "TEST_EMAIL", "SYSTEM",
                 formatActorPrefix(actor) + " triggered test email to " + recipient + ": success=" + result.get("success"));
@@ -894,6 +921,7 @@ public class AdminController {
         return ResponseEntity.ok(noticeService.getAllNotices());
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PostMapping("/notices")
     public ResponseEntity<Notice> createNotice(
             @Valid @RequestBody NoticeRequest request,
@@ -905,6 +933,7 @@ public class AdminController {
         return ResponseEntity.ok(n);
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PutMapping("/notices/{id}")
     public ResponseEntity<Notice> updateNotice(
             @PathVariable Long id,
@@ -917,6 +946,7 @@ public class AdminController {
         return ResponseEntity.ok(updated);
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @DeleteMapping("/notices/{id}")
     public ResponseEntity<Map<String, Object>> deleteNotice(
             @PathVariable Long id,
@@ -928,6 +958,7 @@ public class AdminController {
         return ResponseEntity.ok(Map.of("success", true, "message", "Notice deleted successfully"));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PutMapping("/notices/{id}/toggle-status")
     public ResponseEntity<Map<String, Object>> toggleNoticeStatus(
             @PathVariable Long id,

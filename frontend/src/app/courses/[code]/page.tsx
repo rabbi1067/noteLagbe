@@ -2272,16 +2272,30 @@ function MaterialCard({
                 <span>{language === "bn" ? "প্রজেক্ট লিংক" : "Open Project"}</span>
               </a>
             ) : resource.type === "DOC_NOTE" || resource.fileUrl?.match(/\.(doc|docx|odt|txt|rtf)$/i) ? (
-              <a
-                href={`/api/resources/${resource.id}/file?download=true`}
-                target="_blank"
-                rel="noopener noreferrer"
-                download
-                className="py-1.5 px-3 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white transition-all flex items-center gap-1.5 shadow-sm"
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const extMatch = resource.fileUrl?.match(/\.(doc|docx|odt|txt|rtf)(?:\?|$)/i);
+                    const ext = extMatch ? extMatch[1].toLowerCase() : "docx";
+                    const safeBase = (resource.title || "document").replace(/[^a-z0-9._-]+/gi, "_");
+                    await api.resources.downloadFile(
+                      resource.id,
+                      resource.fileName || `${safeBase}.${ext}`
+                    );
+                    void api.resources.trackDownload(resource.id).catch(() => {});
+                  } catch (err: any) {
+                    toast.error(
+                      err?.message ||
+                        (language === "bn" ? "ডক ফাইল ডাউনলোড ব্যর্থ হয়েছে" : "Failed to download document")
+                    );
+                  }
+                }}
+                className="py-1.5 px-3 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>{language === "bn" ? "ডক ফাইল" : "Download Doc"}</span>
-              </a>
+              </button>
             ) : (
               <button
                 onClick={() => onOpenViewer(resource)}

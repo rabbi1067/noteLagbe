@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import catalogCourses from "@/data/courses_catalog.json";
+import { resolveBackendBaseUrl } from "@/lib/backendUrl";
 
 export const dynamic = "force-dynamic";
 
 let cachedCoursesResponse: { data: any[]; timestamp: number } | null = null;
-const CACHE_TTL_MS = 45 * 1000; // 45 seconds server memory cache
+const CACHE_TTL_MS = 30 * 1000; // 30 seconds server memory cache
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -20,35 +21,23 @@ export async function GET(request: NextRequest) {
   if (isDefaultQuery && cachedCoursesResponse && (Date.now() - cachedCoursesResponse.timestamp < CACHE_TTL_MS)) {
     return NextResponse.json(cachedCoursesResponse.data, {
       headers: {
-        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=86400",
+        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
         "X-Data-Source": "edge-memory",
       },
     });
   }
 
   // 2. Try to fetch fresh live data from Spring Boot backend with fast 2.5s resilient timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 2500);
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
-
-    const backendUrl =
-      (process.env.BACKEND_INTERNAL_URL && process.env.BACKEND_INTERNAL_URL.startsWith("http"))
-        ? process.env.BACKEND_INTERNAL_URL
-        : (process.env.NEXT_PUBLIC_BACKEND_URL && process.env.NEXT_PUBLIC_BACKEND_URL.startsWith("http"))
-        ? process.env.NEXT_PUBLIC_BACKEND_URL
-        : (process.env.BACKEND_URL && process.env.BACKEND_URL.startsWith("http"))
-        ? process.env.BACKEND_URL
-        : (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.startsWith("http"))
-        ? process.env.NEXT_PUBLIC_API_URL
-        : (process.env.NODE_ENV === "development" ? "http://localhost:8888" : "https://notelagbe-backend.onrender.com");
-
+    const backendUrl = resolveBackendBaseUrl();
     const queryString = searchParams.toString();
     const res = await fetch(`${backendUrl}/api/courses${queryString ? `?${queryString}` : ""}`, {
       signal: controller.signal,
       headers: { Accept: "application/json" },
-      next: { revalidate: 60 },
+      cache: "no-store",
     });
-    clearTimeout(timeoutId);
 
     if (res.ok) {
       const data = await res.json();
@@ -58,7 +47,7 @@ export async function GET(request: NextRequest) {
         }
         return NextResponse.json(data, {
           headers: {
-            "Cache-Control": "public, s-maxage=60, stale-while-revalidate=86400",
+            "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
             "X-Data-Source": "backend-live",
           },
         });
@@ -66,10 +55,12 @@ export async function GET(request: NextRequest) {
     }
   } catch {
     // Backend cold or offline -> fallback immediately to bundled official catalog
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   // 3. Instant Zero-Latency Fallback using pre-bundled authentic 85 CSE curriculum courses
-  let filtered = (catalogCourses as any[]).filter((c) => {
+  const filtered = (catalogCourses as any[]).filter((c) => {
     if (department && department !== "ALL") {
       const cDept = (c.department || "CSE").trim().toUpperCase();
       if (cDept !== department) return false;
@@ -101,13 +92,9 @@ export async function GET(request: NextRequest) {
     return true;
   });
 
-  if (isDefaultQuery && !cachedCoursesResponse) {
-    cachedCoursesResponse = { data: filtered, timestamp: Date.now() };
-  }
-
   return NextResponse.json(filtered, {
     headers: {
-      "Cache-Control": "public, s-maxage=60, stale-while-revalidate=86400",
+      "Cache-Control": "no-store",
       "X-Data-Source": "catalog-bundled",
     },
   });

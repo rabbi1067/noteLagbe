@@ -11,6 +11,7 @@ import com.notelagbe.exception.ResourceNotFoundException;
 import com.notelagbe.repository.ChatMessageRepository;
 import com.notelagbe.repository.SystemSettingRepository;
 import com.notelagbe.repository.UserRepository;
+import com.notelagbe.security.FileUploadSecurityValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -44,6 +45,13 @@ public class ChatService {
     private final LiveSyncService liveSyncService;
     private final InputSanitizationService inputSanitizationService;
     private final SystemSettingRepository systemSettingRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private CloudinaryService cloudinaryService;
+
+    public void setCloudinaryService(CloudinaryService cloudinaryService) {
+        this.cloudinaryService = cloudinaryService;
+    }
 
     public ChatService(ChatMessageRepository chatMessageRepository,
                        UserRepository userRepository,
@@ -164,30 +172,25 @@ public class ChatService {
             throw new ApiException("Your chat privileges have been suspended by an administrator.");
         }
 
-        if (audioFile == null || audioFile.isEmpty()) {
-            throw new ApiException("No audio file provided.");
+        String extDot = FileUploadSecurityValidator.validateAudio(audioFile, FileUploadSecurityValidator.MAX_AUDIO_BYTES);
+
+        String voiceUrl;
+        if (cloudinaryService != null && cloudinaryService.isConfigured()) {
+            voiceUrl = cloudinaryService.uploadFile(audioFile, "notelagbe/voice", false);
+        } else {
+            Path uploadDir = Paths.get("uploads", "voice").toAbsolutePath().normalize();
+            if (!Files.exists(uploadDir)) {
+                Files.createDirectories(uploadDir);
+            }
+
+            String fileName = "voice_" + sender.getId() + "_" + System.currentTimeMillis() + extDot;
+            Path targetPath = uploadDir.resolve(fileName).normalize();
+            if (!targetPath.startsWith(uploadDir)) {
+                throw new ApiException("Invalid audio upload destination.");
+            }
+            Files.copy(audioFile.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+            voiceUrl = "/uploads/voice/" + fileName;
         }
-
-        if (audioFile.getSize() > 15 * 1024 * 1024) {
-            throw new ApiException("Audio recording exceeds 15 MB limit.");
-        }
-
-        Path uploadDir = Paths.get("uploads", "voice").toAbsolutePath().normalize();
-        if (!Files.exists(uploadDir)) {
-            Files.createDirectories(uploadDir);
-        }
-
-        String orig = audioFile.getOriginalFilename();
-        String ext = "webm";
-        if (orig != null && orig.contains(".")) {
-            ext = orig.substring(orig.lastIndexOf('.') + 1).toLowerCase();
-        }
-
-        String fileName = "voice_" + sender.getId() + "_" + System.currentTimeMillis() + "." + ext;
-        Path targetPath = uploadDir.resolve(fileName);
-        Files.copy(audioFile.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
-
-        String voiceUrl = "/uploads/voice/" + fileName;
 
         ChatMessage msg = new ChatMessage();
         msg.setSender(sender);
@@ -202,8 +205,8 @@ public class ChatService {
 
         if (replyToId != null) {
             msg.setReplyToId(replyToId);
-            msg.setReplyToSender(replyToSender);
-            msg.setReplyToText(replyToText);
+            msg.setReplyToSender(replyToSender != null ? inputSanitizationService.sanitizePlainText(replyToSender) : null);
+            msg.setReplyToText(replyToText != null ? inputSanitizationService.sanitizePlainText(replyToText) : null);
         }
 
         ChatMessage saved = chatMessageRepository.save(msg);
@@ -223,30 +226,25 @@ public class ChatService {
             throw new ApiException("Your chat privileges have been suspended by an administrator.");
         }
 
-        if (imageFile == null || imageFile.isEmpty()) {
-            throw new ApiException("No image file provided.");
+        String extDot = FileUploadSecurityValidator.validateImage(imageFile, 15L * 1024 * 1024);
+
+        String imageUrl;
+        if (cloudinaryService != null && cloudinaryService.isConfigured()) {
+            imageUrl = cloudinaryService.uploadFile(imageFile, "notelagbe/chat_images", true);
+        } else {
+            Path uploadDir = Paths.get("uploads", "chat_images").toAbsolutePath().normalize();
+            if (!Files.exists(uploadDir)) {
+                Files.createDirectories(uploadDir);
+            }
+
+            String fileName = "chat_img_" + sender.getId() + "_" + System.currentTimeMillis() + extDot;
+            Path targetPath = uploadDir.resolve(fileName).normalize();
+            if (!targetPath.startsWith(uploadDir)) {
+                throw new ApiException("Invalid image upload destination.");
+            }
+            Files.copy(imageFile.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+            imageUrl = "/uploads/chat_images/" + fileName;
         }
-
-        if (imageFile.getSize() > 15 * 1024 * 1024) {
-            throw new ApiException("Image exceeds 15 MB limit.");
-        }
-
-        Path uploadDir = Paths.get("uploads", "chat_images").toAbsolutePath().normalize();
-        if (!Files.exists(uploadDir)) {
-            Files.createDirectories(uploadDir);
-        }
-
-        String orig = imageFile.getOriginalFilename();
-        String ext = "jpg";
-        if (orig != null && orig.contains(".")) {
-            ext = orig.substring(orig.lastIndexOf('.') + 1).toLowerCase();
-        }
-
-        String fileName = "chat_img_" + sender.getId() + "_" + System.currentTimeMillis() + "." + ext;
-        Path targetPath = uploadDir.resolve(fileName);
-        Files.copy(imageFile.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
-
-        String imageUrl = "/uploads/chat_images/" + fileName;
 
         ChatMessage msg = new ChatMessage();
         msg.setSender(sender);
@@ -256,13 +254,14 @@ public class ChatService {
         msg.setSenderRole(sender.getRole() != null ? sender.getRole() : Role.ROLE_STUDENT);
         msg.setMessageType("IMAGE");
         msg.setImageUrl(imageUrl);
-        msg.setText(caption != null && !caption.trim().isEmpty() ? profanityFilterService.filterProfanity(caption.trim()) : null);
+        String cleanCaption = caption != null ? inputSanitizationService.sanitizePlainText(caption) : "";
+        msg.setText(!cleanCaption.isEmpty() ? profanityFilterService.filterProfanity(cleanCaption) : null);
         msg.setCreatedAt(LocalDateTime.now());
 
         if (replyToId != null) {
             msg.setReplyToId(replyToId);
-            msg.setReplyToSender(replyToSender);
-            msg.setReplyToText(replyToText);
+            msg.setReplyToSender(replyToSender != null ? inputSanitizationService.sanitizePlainText(replyToSender) : null);
+            msg.setReplyToText(replyToText != null ? inputSanitizationService.sanitizePlainText(replyToText) : null);
         }
 
         ChatMessage saved = chatMessageRepository.save(msg);

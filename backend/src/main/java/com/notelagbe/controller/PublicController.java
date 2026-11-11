@@ -1,6 +1,7 @@
 package com.notelagbe.controller;
 
 import com.notelagbe.entity.PlanType;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -11,16 +12,22 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 @RestController
 @RequestMapping("/api")
 public class PublicController {
 
-    // Persistent in-memory atomic counters for live visitor & view tracking
-    private static final AtomicLong totalViews = new AtomicLong(2480L);
-    private static final AtomicInteger activeLearnersOnline = new AtomicInteger(42);
+    private static final long ACTIVE_WINDOW_MS = 5 * 60 * 1000L;
+    private static final AtomicLong totalViews = new AtomicLong(0L);
+    private static final ConcurrentHashMap<String, Long> activeVisitorSessions = new ConcurrentHashMap<>();
+
+    private int pruneAndCountActive() {
+        long cutoff = System.currentTimeMillis() - ACTIVE_WINDOW_MS;
+        activeVisitorSessions.entrySet().removeIf(entry -> entry.getValue() < cutoff);
+        return activeVisitorSessions.size();
+    }
 
     @GetMapping("/ping")
     public ResponseEntity<Map<String, Object>> ping() {
@@ -37,17 +44,28 @@ public class PublicController {
     public ResponseEntity<Map<String, Object>> getPublicPlatformStats() {
         return ResponseEntity.ok(Map.of(
                 "totalViews", totalViews.get(),
-                "activeNow", activeLearnersOnline.get(),
+                "activeNow", pruneAndCountActive(),
                 "status", "OK"
         ));
     }
 
     @PostMapping("/stats/visit")
-    public ResponseEntity<Map<String, Object>> recordVisit() {
+    public ResponseEntity<Map<String, Object>> recordVisit(HttpServletRequest request) {
         long updatedViews = totalViews.incrementAndGet();
+        String clientKey = request != null ? request.getRemoteAddr() : "anonymous";
+        if (request != null) {
+            String xff = request.getHeader("X-Forwarded-For");
+            if (xff != null && !xff.isBlank()) {
+                clientKey = xff.split(",")[0].trim();
+            }
+        }
+        if (activeVisitorSessions.size() > 10_000) {
+            pruneAndCountActive();
+        }
+        activeVisitorSessions.put(clientKey, System.currentTimeMillis());
         return ResponseEntity.ok(Map.of(
                 "totalViews", updatedViews,
-                "activeNow", activeLearnersOnline.get(),
+                "activeNow", pruneAndCountActive(),
                 "status", "OK"
         ));
     }

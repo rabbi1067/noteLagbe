@@ -401,9 +401,10 @@ export default function CoursesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {displayedCourses.map((course) => (
-            <div
+            <Link
               key={course.id}
-              className="flex flex-col rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-slate-800/90 p-6 shadow-sm hover:shadow-xl hover:border-blue-500/40 dark:hover:border-blue-500/30 transition-all group"
+              href={`/courses/${encodeURIComponent(course.code)}`}
+              className="flex flex-col rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-slate-800/90 p-6 shadow-sm hover:shadow-xl hover:border-blue-500/40 dark:hover:border-blue-500/30 transition-all group cursor-pointer"
             >
               {/* Card Top: Code & Dept Badge */}
               <div className="flex items-center justify-between mb-3">
@@ -560,15 +561,12 @@ export default function CoursesPage() {
                   )}
                 </div>
 
-                <Link
-                  href={`/courses/${course.code}`}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline group-hover:translate-x-0.5 transition-all"
-                >
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 group-hover:underline group-hover:translate-x-0.5 transition-all">
                   <span>{t("catalog.viewMaterials", "View Materials")}</span>
                   <ChevronRight className="w-3.5 h-3.5" />
-                </Link>
+                </span>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

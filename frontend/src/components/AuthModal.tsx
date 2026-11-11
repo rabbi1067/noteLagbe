@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { notifyDataChanged } from "@/lib/sync";
-import { api } from "@/lib/api";
+import { api, warmupBackend } from "@/lib/api";
 
 export default function AuthModal() {
   const { showAuthModal, setShowAuthModal, login, register } = useAuth();
@@ -55,6 +55,32 @@ export default function AuthModal() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  const [authWaitSeconds, setAuthWaitSeconds] = useState(0);
+  const [wakingBackend, setWakingBackend] = useState(false);
+
+  const isAnyAuthPending = loading || forgotLoading || otpLoading || resetLoading;
+  const visibleWaitSeconds = isAnyAuthPending ? authWaitSeconds : 0;
+
+  useEffect(() => {
+    if (showAuthModal) {
+      void warmupBackend();
+    }
+  }, [showAuthModal]);
+
+  useEffect(() => {
+    if (!isAnyAuthPending) return;
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      setAuthWaitSeconds(Math.max(1, Math.floor((Date.now() - startedAt) / 1000)));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isAnyAuthPending]);
+
+  useEffect(() => {
+    const handleBackendWaking = () => setWakingBackend(true);
+    window.addEventListener("notelagbe:backend-waking", handleBackendWaking);
+    return () => window.removeEventListener("notelagbe:backend-waking", handleBackendWaking);
+  }, []);
 
   useEffect(() => {
     if (!showAuthModal || authMode !== "forgot" || resetStep !== "code") return;
@@ -150,6 +176,8 @@ export default function AuthModal() {
         return;
       }
 
+      setAuthWaitSeconds(0);
+      setWakingBackend(false);
       setLoading(true);
       try {
         await register(cleanName, cleanEmail, cleanPassword, cleanId || undefined, cleanPhone || undefined);
@@ -161,6 +189,8 @@ export default function AuthModal() {
         setLoading(false);
       }
     } else {
+      setAuthWaitSeconds(0);
+      setWakingBackend(false);
       setLoading(true);
       try {
         await login(cleanEmail, cleanPassword);
@@ -184,6 +214,8 @@ export default function AuthModal() {
       return;
     }
 
+    setAuthWaitSeconds(0);
+    setWakingBackend(false);
     setForgotLoading(true);
     try {
       const res = await api.auth.forgotPassword(cleanForgotEmail);
@@ -239,6 +271,8 @@ export default function AuthModal() {
       return;
     }
 
+    setAuthWaitSeconds(0);
+    setWakingBackend(false);
     setOtpLoading(true);
     try {
       const res = await api.auth.verifyResetCode({
@@ -288,6 +322,8 @@ export default function AuthModal() {
       return;
     }
 
+    setAuthWaitSeconds(0);
+    setWakingBackend(false);
     setResetLoading(true);
     try {
       const cleanEmail = forgotEmail.trim().toLowerCase();
@@ -808,16 +844,42 @@ export default function AuthModal() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.99] transition-all shadow-md shadow-blue-500/25 disabled:opacity-50 mt-2 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.99] transition-all shadow-md shadow-blue-500/25 disabled:opacity-70 mt-2 flex items-center justify-center gap-2 cursor-pointer"
             >
               {loading ? (
-                <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                <>
+                  <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  <span>
+                    {wakingBackend || visibleWaitSeconds >= 3
+                      ? language === "bn"
+                        ? `সার্ভার চালু হচ্ছে... (${visibleWaitSeconds}s)`
+                        : `Waking server... (${visibleWaitSeconds}s)`
+                      : isRegister
+                        ? language === "bn"
+                          ? "অ্যাকাউন্ট তৈরি হচ্ছে..."
+                          : "Creating account..."
+                        : language === "bn"
+                          ? "সাইন ইন হচ্ছে..."
+                          : "Signing in..."}
+                  </span>
+                </>
               ) : isRegister ? (
                 "Complete Student Registration"
               ) : (
                 "Sign In"
               )}
             </button>
+
+            {loading && (wakingBackend || visibleWaitSeconds >= 4) && (
+              <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-300 flex items-start gap-2">
+                <Clock className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>
+                  {language === "bn"
+                    ? "সার্ভার স্লিপ মোড থেকে চালু হচ্ছে। প্রথমবার লগইনে সাধারণত ২০–৪৫ সেকেন্ড সময় লাগতে পারে; অনুগ্রহ করে অপেক্ষা করুন।"
+                    : "Server is waking up from idle sleep. The first request typically takes 20–45 seconds; please hold on."}
+                </span>
+              </div>
+            )}
           </form>
         )}
       </div>

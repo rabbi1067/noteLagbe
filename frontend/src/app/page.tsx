@@ -48,8 +48,7 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<"all" | "notes" | "questions">("all");
   const [isLoading, setIsLoading] = useState(true);
   const [syncTick, setSyncTick] = useState(0);
-  const [activeVisitorCount, setActiveVisitorCount] = useState<number>(2519);
-  const [isVisitorIncrementing, setIsVisitorIncrementing] = useState<boolean>(false);
+  const [activeVisitorCount, setActiveVisitorCount] = useState<number>(0);
 
   // Instant cache load on client mount without causing SSR hydration mismatch
   useEffect(() => {
@@ -98,33 +97,13 @@ export default function HomePage() {
         // Fallback to local storage if offline
         try {
           const cached = localStorage.getItem("notelagbe_cached_views");
-          const nextCount = cached ? parseInt(cached, 10) + 1 : 2482;
-          if (mounted) setActiveVisitorCount(nextCount);
-          localStorage.setItem("notelagbe_cached_views", String(nextCount));
+          const nextCount = cached ? parseInt(cached, 10) : 0;
+          if (mounted) setActiveVisitorCount(Number.isFinite(nextCount) ? nextCount : 0);
         } catch {}
       });
 
-    // 2. Realistic live activity ticker (occasional +1 as active students browse)
-    const interval = setInterval(() => {
-      if (!mounted) return;
-      if (Math.random() > 0.35) {
-        setIsVisitorIncrementing(true);
-        setActiveVisitorCount((prev) => {
-          const next = prev + 1;
-          try {
-            localStorage.setItem("notelagbe_cached_views", String(next));
-          } catch {}
-          return next;
-        });
-        setTimeout(() => {
-          if (mounted) setIsVisitorIncrementing(false);
-        }, 800);
-      }
-    }, 16000);
-
     return () => {
       mounted = false;
-      clearInterval(interval);
     };
   }, []);
 
@@ -175,11 +154,23 @@ export default function HomePage() {
   }, [activeDepartment]);
 
   useEffect(() => {
-    loadAllData();
+    let active = true;
+    queueMicrotask(() => {
+      if (active) void loadAllData();
+    });
+    return () => {
+      active = false;
+    };
   }, [loadAllData]);
 
   useEffect(() => {
-    loadCourses();
+    let active = true;
+    queueMicrotask(() => {
+      if (active) void loadCourses();
+    });
+    return () => {
+      active = false;
+    };
   }, [loadCourses]);
 
   // Enterprise Real-Time Sync: Instantly re-fetches when admin modifies any data
@@ -538,8 +529,8 @@ export default function HomePage() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                 </span>
-                <p suppressHydrationWarning className={`text-2xl font-black text-purple-600 dark:text-purple-400 font-mono tracking-tight transition-all duration-300 ${isVisitorIncrementing ? "scale-110 text-emerald-500 dark:text-emerald-400" : ""}`}>
-                  {activeVisitorCount.toLocaleString()}+
+                <p suppressHydrationWarning className="text-2xl font-black text-purple-600 dark:text-purple-400 font-mono tracking-tight transition-all duration-300">
+                  {activeVisitorCount.toLocaleString()}
                 </p>
               </div>
               <p className="text-xs font-semibold text-slate-500 mt-0.5">
@@ -671,9 +662,10 @@ export default function HomePage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCourses.map((course) => (
-              <div
+              <Link
                 key={course.id}
-                className="flex flex-col rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-slate-800/90 p-6 shadow-sm hover:shadow-xl hover:border-blue-500/40 dark:hover:border-blue-500/30 transition-all group"
+                href={`/courses/${encodeURIComponent(course.code)}`}
+                className="flex flex-col rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-slate-800/90 p-6 shadow-sm hover:shadow-xl hover:border-blue-500/40 dark:hover:border-blue-500/30 transition-all group cursor-pointer"
               >
                 {/* Card Top: Code & Dept Badge */}
                 <div className="flex items-center justify-between mb-3">
@@ -792,15 +784,12 @@ export default function HomePage() {
                     )}
                   </div>
 
-                  <Link
-                    href={`/courses/${course.code}`}
-                    className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline group-hover:translate-x-0.5 transition-all"
-                  >
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 group-hover:underline group-hover:translate-x-0.5 transition-all">
                     <span>{language === "bn" ? "কোর্স দেখুন" : "Explore Course"}</span>
                     <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
+                  </span>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

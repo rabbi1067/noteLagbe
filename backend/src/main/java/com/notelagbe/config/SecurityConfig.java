@@ -46,32 +46,35 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/uploads/**",
                     "/api/auth/**",
-                    "/api/departments/**",
-                    "/api/teachers/**",
-                    "/api/courses/**",
                     "/api/resources/public/**",
                     "/api/resources/check-availability",
                     "/api/reviews/public/**",
                     "/api/plans",
                     "/api/ping",
-                    "/api/demo/**",
                     "/api/sync/**",
                     "/api/stats/**",
                     "/api/notices/**",
-                    "/api/contributions/verify-link",
                     "/api/contributions/leaderboard",
                     "/h2-console/**",
                     "/error"
                 ).permitAll()
 
-                // GET requests for resources, reviews, and community chat are public
-                .requestMatchers(HttpMethod.GET, "/api/resources/**", "/api/reviews/**", "/api/chat/**").permitAll()
+                // Public read-only academic catalog and community feeds
+                .requestMatchers(HttpMethod.GET,
+                    "/api/departments/**",
+                    "/api/teachers/**",
+                    "/api/courses/**",
+                    "/api/resources/**",
+                    "/api/reviews/**",
+                    "/api/chat/**"
+                ).permitAll()
 
-                // Admin & Staff Endpoints
+                // Admin & Staff Sync and Management Endpoints
+                .requestMatchers(HttpMethod.POST, "/api/departments/sync", "/api/teachers/sync-cse").hasAnyRole("ADMIN", "SUPER_ADMIN", "MANAGER")
                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN", "MANAGER")
 
                 // Authenticated Endpoints for Students & Admins
-                .requestMatchers("/api/student/**", "/api/reviews/**", "/api/contributions/**", "/api/payments/**", "/api/waivers/**", "/api/notifications/**", "/api/chat/**").authenticated()
+                .requestMatchers("/api/courses/**", "/api/student/**", "/api/reviews/**", "/api/contributions/**", "/api/payments/**", "/api/waivers/**", "/api/notifications/**", "/api/chat/**").authenticated()
 
                 .anyRequest().authenticated()
             );

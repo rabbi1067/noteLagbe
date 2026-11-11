@@ -533,6 +533,31 @@ export default function AdminDashboardPage() {
   const [savingChatRetention, setSavingChatRetention] = useState(false);
   const [purgingChatMessages, setPurgingChatMessages] = useState(false);
 
+  // Pure render clock snapshot & live queue synchronization refs
+  const [renderNowMs, setRenderNowMs] = useState<number>(0);
+  useEffect(() => {
+    let active = true;
+    const syncClock = () => {
+      if (active) setRenderNowMs(Date.now());
+    };
+    queueMicrotask(syncClock);
+    const interval = setInterval(syncClock, 60000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const isLoadingAdminRef = useRef(false);
+  const pendingFullReloadRef = useRef(false);
+  const isRefreshingQueuesRef = useRef(false);
+  const pendingQueueRefreshOptsRef = useRef<{ includeResources: boolean; includeSubscribers: boolean } | null>(null);
+  const queueSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSelfQueueMutationAtRef = useRef(0);
+  const markSelfQueueMutation = useCallback(() => {
+    lastSelfQueueMutationAtRef.current = Date.now();
+  }, []);
+
   // Department Management & Directory States
   const [departmentSearch, setDepartmentSearch] = useState("");
   const [showDeptManageModal, setShowDeptManageModal] = useState(false);
@@ -545,18 +570,25 @@ export default function AdminDashboardPage() {
   const [customDeptNames, setCustomDeptNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("notelagbe_admin_custom_dept_names");
-      if (saved) {
-        const parsed: Record<string, string> = JSON.parse(saved);
-        const migrated: Record<string, string> = {};
-        Object.entries(parsed).forEach(([key, val]) => {
-          const normalized = normalizeDeptCode(key);
-          migrated[normalized] = val;
-        });
-        setCustomDeptNames(migrated);
-      }
-    } catch {}
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      try {
+        const saved = localStorage.getItem("notelagbe_admin_custom_dept_names");
+        if (saved) {
+          const parsed: Record<string, string> = JSON.parse(saved);
+          const migrated: Record<string, string> = {};
+          Object.entries(parsed).forEach(([key, val]) => {
+            const normalized = normalizeDeptCode(key);
+            migrated[normalized] = val;
+          });
+          setCustomDeptNames(migrated);
+        }
+      } catch {}
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -575,21 +607,28 @@ export default function AdminDashboardPage() {
   const [customDepartments, setCustomDepartments] = useState<string[]>([]);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("notelagbe_admin_custom_departments");
-      if (saved) {
-        const list: string[] = JSON.parse(saved);
-        const migrated = Array.from(
-          new Set(
-            list
-              .map((d) => normalizeDeptCode(d))
-              .filter((d) => d && d !== "CE" && d !== "CIVIL")
-          )
-        );
-        setCustomDepartments(migrated);
-        localStorage.setItem("notelagbe_admin_custom_departments", JSON.stringify(migrated));
-      }
-    } catch {}
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      try {
+        const saved = localStorage.getItem("notelagbe_admin_custom_departments");
+        if (saved) {
+          const list: string[] = JSON.parse(saved);
+          const migrated = Array.from(
+            new Set(
+              list
+                .map((d) => normalizeDeptCode(d))
+                .filter((d) => d && d !== "CE" && d !== "CIVIL")
+            )
+          );
+          setCustomDepartments(migrated);
+          localStorage.setItem("notelagbe_admin_custom_departments", JSON.stringify(migrated));
+        }
+      } catch {}
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -734,7 +773,7 @@ export default function AdminDashboardPage() {
             : [updated.uploadedResource, ...prev]
         );
       }
-      lastSelfQueueMutationAtRef.current = Date.now();
+      markSelfQueueMutation();
       notifyDataChanged("contribution", "approved", targetId);
       notifyDataChanged("subscription", "unlocked", targetId);
       notifyDataChanged("resource", "approved", resourceId);
@@ -1000,173 +1039,6 @@ export default function AdminDashboardPage() {
   const isAdmin = user?.role === "ROLE_ADMIN" || user?.role === "ROLE_SUPER_ADMIN" || user?.role === "ROLE_MANAGER";
   const isSuperAdmin = user?.role === "ROLE_SUPER_ADMIN";
 
-  useEffect(() => {
-    if (isAdmin && activeTab === "activityLogs") {
-      loadActivityLogs(activityLogPage, activityLogSearch, activityLogCategory);
-    }
-  }, [isAdmin, activeTab, activityLogPage, activityLogCategory, loadActivityLogs]);
-
-  // Real-time automatic polling (4 seconds) when viewing Security & Activity Logs tab
-  useEffect(() => {
-    if (!isAdmin || activeTab !== "activityLogs") return;
-    const interval = setInterval(() => {
-      loadActivityLogs(activityLogPage, activityLogSearch, activityLogCategory);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [isAdmin, activeTab, activityLogPage, activityLogSearch, activityLogCategory, loadActivityLogs]);
-
-
-  // Data Loading
-  useEffect(() => {
-    if (isAdmin) {
-      loadAllAdminData(true);
-    }
-  }, [isAdmin]);
-
-  // Restrict payments tab strictly to Super Admin
-  useEffect(() => {
-    if (!isSuperAdmin && activeTab === "payments") {
-      setActiveTab("overview");
-    }
-  }, [isSuperAdmin, activeTab]);
-
-  const isLoadingAdminRef = useRef(false);
-  const pendingFullReloadRef = useRef(false);
-  const isRefreshingQueuesRef = useRef(false);
-  const pendingQueueRefreshOptsRef = useRef<{ includeResources: boolean; includeSubscribers: boolean } | null>(null);
-  const queueSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSelfQueueMutationAtRef = useRef(0);
-
-  const QUEUE_SYNC_ENTITIES = useMemo(
-    () => new Set(["review", "payment", "waiver", "contribution", "subscription"]),
-    []
-  );
-
-  const refreshVerificationQueues = useCallback(
-    async (opts?: { includeResources?: boolean; includeSubscribers?: boolean }) => {
-      const includeResources = Boolean(opts?.includeResources);
-      const includeSubscribers = Boolean(opts?.includeSubscribers) && isSuperAdmin;
-
-      if (isRefreshingQueuesRef.current) {
-        const prev = pendingQueueRefreshOptsRef.current;
-        pendingQueueRefreshOptsRef.current = {
-          includeResources: Boolean(prev?.includeResources || includeResources),
-          includeSubscribers: Boolean(prev?.includeSubscribers || includeSubscribers),
-        };
-        return;
-      }
-
-      isRefreshingQueuesRef.current = true;
-      try {
-        const [pData, cData, wData, revData, resData, subData] = await Promise.all([
-          isSuperAdmin ? api.admin.getPayments().catch(() => null) : Promise.resolve(null),
-          api.admin.getContributions().catch(() => null),
-          api.admin.getWaivers().catch(() => null),
-          api.admin.getReviews().catch(() => null),
-          includeResources ? api.admin.getResources().catch(() => null) : Promise.resolve(null),
-          includeSubscribers ? api.admin.getSubscriptions(true).catch(() => null) : Promise.resolve(null),
-        ]);
-
-        if (Array.isArray(pData)) setPayments(pData);
-        if (Array.isArray(cData)) setContributions(cData);
-        if (Array.isArray(wData)) setWaivers(wData);
-        if (Array.isArray(revData)) setAdminReviews(revData);
-        if (Array.isArray(resData)) setResources(resData);
-        if (Array.isArray(subData)) setActiveSubscribers(subData);
-      } finally {
-        isRefreshingQueuesRef.current = false;
-        const queued = pendingQueueRefreshOptsRef.current;
-        pendingQueueRefreshOptsRef.current = null;
-        if (queued) {
-          void refreshVerificationQueues(queued);
-        }
-      }
-    },
-    [isSuperAdmin]
-  );
-
-  useEffect(() => {
-    return () => {
-      if (queueSyncTimerRef.current) {
-        clearTimeout(queueSyncTimerRef.current);
-      }
-    };
-  }, []);
-
-  // Enterprise Live Sync: Coalesced refresh so backend SSE bursts never trigger redundant 18-request storms
-  useDataSync((payload) => {
-    if (!isAdmin || !payload) return;
-    if (payload.action === "admin_broadcast" || payload.action === "connected") return;
-
-    const entity = payload.entity || "all";
-    const isQueueEvent = QUEUE_SYNC_ENTITIES.has(entity);
-
-    // Ignore SSE echoes triggered by our own local moderation action (state is already updated instantly)
-    if (isQueueEvent && Date.now() - lastSelfQueueMutationAtRef.current < 1500) {
-      return;
-    }
-
-    if (activeTab === "activityLogs" || entity === "activity_log") {
-      loadActivityLogs(activityLogPage, activityLogSearch, activityLogCategory);
-    }
-
-    if (isQueueEvent || entity === "focus") {
-      const needResources = entity === "contribution" || entity === "focus";
-      const needSubscribers = isSuperAdmin && (entity === "payment" || entity === "waiver" || entity === "subscription" || entity === "focus");
-      if (queueSyncTimerRef.current) clearTimeout(queueSyncTimerRef.current);
-      queueSyncTimerRef.current = setTimeout(() => {
-        void refreshVerificationQueues({
-          includeResources: needResources,
-          includeSubscribers: needSubscribers,
-        });
-      }, 300);
-      return;
-    }
-
-    if (queueSyncTimerRef.current) clearTimeout(queueSyncTimerRef.current);
-    queueSyncTimerRef.current = setTimeout(() => {
-      void loadAllAdminData(false);
-    }, 350);
-  });
-
-  // Reset pagination on filter changes (defined before any returns)
-  useEffect(() => {
-    setResourcePage(1);
-  }, [resourceSearch, resourceTypeFilter, departmentFilter]);
-
-  useEffect(() => {
-    setCoursePage(1);
-  }, [courseSearch, courseDeptFilter]);
-
-  useEffect(() => {
-    setTeacherPage(1);
-  }, [teacherSearch, teacherDeptFilter]);
-
-  useEffect(() => {
-    setReviewPage(1);
-  }, [reviewStatusFilter]);
-
-  useEffect(() => {
-    setNoticePage(1);
-  }, [noticeSearch, noticeTypeFilter]);
-
-
-  useEffect(() => {
-    setStaffPage(1);
-  }, [userSearch, userRoleCategory, userSpecificRole, userStatusFilter]);
-
-  useEffect(() => {
-    setPaymentPage(1);
-  }, [paymentStatusFilter, paymentSearch]);
-
-  useEffect(() => {
-    setContributionPage(1);
-  }, [contributionStatusFilter, contributionSearch]);
-
-  useEffect(() => {
-    setWaiverPage(1);
-  }, [waiverStatusFilter, waiverSearch]);
-
   const loadAllAdminData = async (isInitial = false) => {
     if (!isInitial && isLoadingAdminRef.current) {
       pendingFullReloadRef.current = true;
@@ -1294,6 +1166,236 @@ export default function AdminDashboardPage() {
       }
     }
   };
+
+  useEffect(() => {
+    if (!isAdmin || activeTab !== "activityLogs") return;
+    let active = true;
+    queueMicrotask(() => {
+      if (active) {
+        void loadActivityLogs(activityLogPage, activityLogSearch, activityLogCategory);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [isAdmin, activeTab, activityLogPage, activityLogSearch, activityLogCategory, loadActivityLogs]);
+
+  // Real-time automatic polling (4 seconds) when viewing Security & Activity Logs tab
+  useEffect(() => {
+    if (!isAdmin || activeTab !== "activityLogs") return;
+    const interval = setInterval(() => {
+      loadActivityLogs(activityLogPage, activityLogSearch, activityLogCategory);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isAdmin, activeTab, activityLogPage, activityLogSearch, activityLogCategory, loadActivityLogs]);
+
+
+  // Data Loading
+  useEffect(() => {
+    if (!isAdmin) return;
+    let active = true;
+    queueMicrotask(() => {
+      if (active) void loadAllAdminData(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [isAdmin]);
+
+  // Restrict payments tab strictly to Super Admin
+  useEffect(() => {
+    if (isSuperAdmin || activeTab !== "payments") return;
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setActiveTab("overview");
+    });
+    return () => {
+      active = false;
+    };
+  }, [isSuperAdmin, activeTab]);
+
+  const QUEUE_SYNC_ENTITIES = useMemo(
+    () => new Set(["review", "payment", "waiver", "contribution", "subscription"]),
+    []
+  );
+
+  const refreshVerificationQueues = useCallback(
+    async (opts?: { includeResources?: boolean; includeSubscribers?: boolean }) => {
+      const includeResources = Boolean(opts?.includeResources);
+      const includeSubscribers = Boolean(opts?.includeSubscribers) && isSuperAdmin;
+
+      if (isRefreshingQueuesRef.current) {
+        const prev = pendingQueueRefreshOptsRef.current;
+        pendingQueueRefreshOptsRef.current = {
+          includeResources: Boolean(prev?.includeResources || includeResources),
+          includeSubscribers: Boolean(prev?.includeSubscribers || includeSubscribers),
+        };
+        return;
+      }
+
+      isRefreshingQueuesRef.current = true;
+      try {
+        const [pData, cData, wData, revData, resData, subData] = await Promise.all([
+          isSuperAdmin ? api.admin.getPayments().catch(() => null) : Promise.resolve(null),
+          api.admin.getContributions().catch(() => null),
+          api.admin.getWaivers().catch(() => null),
+          api.admin.getReviews().catch(() => null),
+          includeResources ? api.admin.getResources().catch(() => null) : Promise.resolve(null),
+          includeSubscribers ? api.admin.getSubscriptions(true).catch(() => null) : Promise.resolve(null),
+        ]);
+
+        if (Array.isArray(pData)) setPayments(pData);
+        if (Array.isArray(cData)) setContributions(cData);
+        if (Array.isArray(wData)) setWaivers(wData);
+        if (Array.isArray(revData)) setAdminReviews(revData);
+        if (Array.isArray(resData)) setResources(resData);
+        if (Array.isArray(subData)) setActiveSubscribers(subData);
+      } finally {
+        isRefreshingQueuesRef.current = false;
+        const queued = pendingQueueRefreshOptsRef.current;
+        pendingQueueRefreshOptsRef.current = null;
+        if (queued) {
+          void refreshVerificationQueues(queued);
+        }
+      }
+    },
+    [isSuperAdmin]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (queueSyncTimerRef.current) {
+        clearTimeout(queueSyncTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Enterprise Live Sync: Coalesced refresh so backend SSE bursts never trigger redundant 18-request storms
+  useDataSync((payload) => {
+    if (!isAdmin || !payload) return;
+    if (payload.action === "admin_broadcast" || payload.action === "connected") return;
+
+    const entity = payload.entity || "all";
+    const isQueueEvent = QUEUE_SYNC_ENTITIES.has(entity);
+
+    // Ignore SSE echoes triggered by our own local moderation action (state is already updated instantly)
+    if (isQueueEvent && Date.now() - lastSelfQueueMutationAtRef.current < 1500) {
+      return;
+    }
+
+    if (activeTab === "activityLogs" || entity === "activity_log") {
+      loadActivityLogs(activityLogPage, activityLogSearch, activityLogCategory);
+    }
+
+    if (isQueueEvent || entity === "focus") {
+      const needResources = entity === "contribution" || entity === "focus";
+      const needSubscribers = isSuperAdmin && (entity === "payment" || entity === "waiver" || entity === "subscription" || entity === "focus");
+      if (queueSyncTimerRef.current) clearTimeout(queueSyncTimerRef.current);
+      queueSyncTimerRef.current = setTimeout(() => {
+        void refreshVerificationQueues({
+          includeResources: needResources,
+          includeSubscribers: needSubscribers,
+        });
+      }, 300);
+      return;
+    }
+
+    if (queueSyncTimerRef.current) clearTimeout(queueSyncTimerRef.current);
+    queueSyncTimerRef.current = setTimeout(() => {
+      void loadAllAdminData(false);
+    }, 350);
+  });
+
+  // Reset pagination on filter changes (defined before any returns)
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setResourcePage(1);
+    });
+    return () => {
+      active = false;
+    };
+  }, [resourceSearch, resourceTypeFilter, departmentFilter]);
+
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setCoursePage(1);
+    });
+    return () => {
+      active = false;
+    };
+  }, [courseSearch, courseDeptFilter]);
+
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setTeacherPage(1);
+    });
+    return () => {
+      active = false;
+    };
+  }, [teacherSearch, teacherDeptFilter]);
+
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setReviewPage(1);
+    });
+    return () => {
+      active = false;
+    };
+  }, [reviewStatusFilter]);
+
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setNoticePage(1);
+    });
+    return () => {
+      active = false;
+    };
+  }, [noticeSearch, noticeTypeFilter]);
+
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setStaffPage(1);
+    });
+    return () => {
+      active = false;
+    };
+  }, [userSearch, userRoleCategory, userSpecificRole, userStatusFilter]);
+
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setPaymentPage(1);
+    });
+    return () => {
+      active = false;
+    };
+  }, [paymentStatusFilter, paymentSearch]);
+
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setContributionPage(1);
+    });
+    return () => {
+      active = false;
+    };
+  }, [contributionStatusFilter, contributionSearch]);
+
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setWaiverPage(1);
+    });
+    return () => {
+      active = false;
+    };
+  }, [waiverStatusFilter, waiverSearch]);
 
   // ---------------- Resource CRUD ----------------
   const filteredModalCourses = useMemo(() => {
@@ -1934,8 +2036,9 @@ export default function AdminDashboardPage() {
       toast.error("You cannot delete your own administrative account!");
       return;
     }
-    if (staff.email === "admin@seu.edu.bd") {
-      toast.error("Root Super Admin account cannot be removed!");
+    const superAdminCount = staffList.filter((u) => u.role === "ROLE_SUPER_ADMIN").length;
+    if (staff.role === "ROLE_SUPER_ADMIN" && superAdminCount <= 1) {
+      toast.error("The last Super Admin account cannot be removed!");
       return;
     }
     if (!isSuperAdmin && staff.role !== "ROLE_STUDENT") {
@@ -2017,8 +2120,11 @@ export default function AdminDashboardPage() {
       toast.error("You cannot block your own administrative account!");
       return;
     }
-    if (staff.email === "admin@seu.edu.bd") {
-      toast.error("Root Super Admin account cannot be blocked!");
+    const activeSuperAdminCount = staffList.filter(
+      (u) => u.role === "ROLE_SUPER_ADMIN" && u.enabled !== false
+    ).length;
+    if (staff.role === "ROLE_SUPER_ADMIN" && staff.enabled !== false && activeSuperAdminCount <= 1) {
+      toast.error("The last active Super Admin account cannot be blocked!");
       return;
     }
     if (!isSuperAdmin && staff.role !== "ROLE_STUDENT") {
@@ -2355,7 +2461,7 @@ export default function AdminDashboardPage() {
     try {
       const updated = await api.admin.approvePayment(id);
       applyStatusUpdate(setPayments, id, updated, "APPROVED");
-      lastSelfQueueMutationAtRef.current = Date.now();
+      markSelfQueueMutation();
       notifyDataChanged("payment", "approved", id);
       confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
       toast.success("Payment approved! 6 courses unlocked for student.");
@@ -2380,7 +2486,7 @@ export default function AdminDashboardPage() {
         try {
           const updated = await api.admin.rejectPayment(id);
           applyStatusUpdate(setPayments, id, updated, "REJECTED");
-          lastSelfQueueMutationAtRef.current = Date.now();
+          markSelfQueueMutation();
           notifyDataChanged("payment", "rejected", id);
           toast.success("Payment rejected");
           showDeleteSuccess("Payment Request Rejected", "The subscription payment transaction has been declined.", `Payment #${id}`);
@@ -2409,7 +2515,7 @@ export default function AdminDashboardPage() {
             : [updated.uploadedResource, ...prev]
         );
       }
-      lastSelfQueueMutationAtRef.current = Date.now();
+      markSelfQueueMutation();
       notifyDataChanged("contribution", "approved", id);
       notifyDataChanged("subscription", "unlocked", id);
       notifyDataChanged("resource", "approved", id);
@@ -2436,7 +2542,7 @@ export default function AdminDashboardPage() {
         try {
           const updated = await api.admin.rejectContribution(id);
           applyStatusUpdate(setContributions, id, updated, "REJECTED");
-          lastSelfQueueMutationAtRef.current = Date.now();
+          markSelfQueueMutation();
           notifyDataChanged("contribution", "rejected", id);
           notifyDataChanged("resource", "rejected", id);
           toast.success("Contribution rejected");
@@ -2459,7 +2565,7 @@ export default function AdminDashboardPage() {
     try {
       const updated = await api.admin.approveWaiver(id, 6, "Approved ৳99 package with 6 course unlock quota by Administrator");
       applyStatusUpdate(setWaivers, id, updated, "APPROVED");
-      lastSelfQueueMutationAtRef.current = Date.now();
+      markSelfQueueMutation();
       notifyDataChanged("waiver", "approved", id);
       confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
       toast.success("Financial waiver approved! Student granted 1-Semester 6 Course Unlocks.");
@@ -2484,7 +2590,7 @@ export default function AdminDashboardPage() {
         try {
           const updated = await api.admin.rejectWaiver(id, "Declined based on quota availability.");
           applyStatusUpdate(setWaivers, id, updated, "REJECTED");
-          lastSelfQueueMutationAtRef.current = Date.now();
+          markSelfQueueMutation();
           notifyDataChanged("waiver", "rejected", id);
           toast.success("Waiver application declined");
           showDeleteSuccess("Waiver Declined", "The financial waiver application has been declined.", `Waiver #${id}`);
@@ -2506,7 +2612,7 @@ export default function AdminDashboardPage() {
     try {
       const updated = await api.admin.approveReview(id);
       applyStatusUpdate(setAdminReviews, id, updated, "APPROVED");
-      lastSelfQueueMutationAtRef.current = Date.now();
+      markSelfQueueMutation();
       notifyDataChanged("review", "approved", id);
       toast.success("Review approved and published to public faculty profile!");
       void refreshVerificationQueues();
@@ -2524,7 +2630,7 @@ export default function AdminDashboardPage() {
     try {
       const updated = await api.admin.rejectReview(id);
       applyStatusUpdate(setAdminReviews, id, updated, "REJECTED");
-      lastSelfQueueMutationAtRef.current = Date.now();
+      markSelfQueueMutation();
       notifyDataChanged("review", "rejected", id);
       toast.success("Review rejected / unpublished from public view.");
       void refreshVerificationQueues();
@@ -2548,7 +2654,7 @@ export default function AdminDashboardPage() {
         try {
           await api.admin.deleteReview(id);
           setAdminReviews((prev) => prev.filter((r) => r.id !== id));
-          lastSelfQueueMutationAtRef.current = Date.now();
+          markSelfQueueMutation();
           notifyDataChanged("review", "deleted", id);
           toast.success("Review deleted permanently");
           showDeleteSuccess("Review Deleted Successfully!", "The faculty review has been permanently erased.", `Review #${id}`);
@@ -2916,7 +3022,12 @@ export default function AdminDashboardPage() {
     }
     setTestingEmail(true);
     try {
-      const recipient = adminProfile?.email || user?.email || "admin@seu.edu.bd";
+      const recipient = adminProfile?.email || user?.email || "";
+      if (!recipient) {
+        toast.error("Administrative email address is not available.");
+        setTestingEmail(false);
+        return;
+      }
       const res = await api.admin.sendTestEmail(recipient);
       if (res.success) {
         toast.success(res.message || "Test email dispatched successfully!");
@@ -2929,38 +3040,6 @@ export default function AdminDashboardPage() {
       setTestingEmail(false);
     }
   };
-
-  // ---------------- Route Guard ----------------
-  if (!isAuthenticated || !isAdmin) {
-    return (
-      <div className="max-w-md mx-auto py-32 px-4 text-center space-y-5">
-        <div className="w-16 h-16 rounded-3xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 mx-auto flex items-center justify-center shadow-lg">
-          <Lock className="w-8 h-8" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white">Admin Access Restricted</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-            This console is strictly restricted to Southeast University faculty and system administrators.
-            Public student accounts cannot access administrative controls.
-          </p>
-        </div>
-        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Link
-            href="/"
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:opacity-90"
-          >
-            Back to Home
-          </Link>
-          <Link
-            href="/courses"
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
-          >
-            Browse Courses
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   // ---------------- Filter Computations ----------------
   const filteredResources = resources.filter((r) => {
@@ -3343,19 +3422,47 @@ export default function AdminDashboardPage() {
 
   // Clamp pagination whenever queue items are approved/rejected/deleted
   useEffect(() => {
-    if (paymentPage > totalPaymentPages) setPaymentPage(totalPaymentPages);
+    if (paymentPage <= totalPaymentPages) return;
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setPaymentPage(totalPaymentPages);
+    });
+    return () => {
+      active = false;
+    };
   }, [paymentPage, totalPaymentPages]);
 
   useEffect(() => {
-    if (contributionPage > totalContributionPages) setContributionPage(totalContributionPages);
+    if (contributionPage <= totalContributionPages) return;
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setContributionPage(totalContributionPages);
+    });
+    return () => {
+      active = false;
+    };
   }, [contributionPage, totalContributionPages]);
 
   useEffect(() => {
-    if (waiverPage > totalWaiverPages) setWaiverPage(totalWaiverPages);
+    if (waiverPage <= totalWaiverPages) return;
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setWaiverPage(totalWaiverPages);
+    });
+    return () => {
+      active = false;
+    };
   }, [waiverPage, totalWaiverPages]);
 
   useEffect(() => {
-    if (reviewPage > totalReviewPages) setReviewPage(totalReviewPages);
+    if (reviewPage <= totalReviewPages) return;
+    let active = true;
+    queueMicrotask(() => {
+      if (active) setReviewPage(totalReviewPages);
+    });
+    return () => {
+      active = false;
+    };
   }, [reviewPage, totalReviewPages]);
 
   // Total strictly-PENDING items requiring immediate administrative action
@@ -3364,6 +3471,38 @@ export default function AdminDashboardPage() {
     pendingContributionsCount +
     pendingWaiversCount +
     pendingReviewsCount;
+
+  // ---------------- Route Guard (placed strictly after all React hooks) ----------------
+  if (!isAuthenticated || !isAdmin) {
+    return (
+      <div className="max-w-md mx-auto py-32 px-4 text-center space-y-5">
+        <div className="w-16 h-16 rounded-3xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 mx-auto flex items-center justify-center shadow-lg">
+          <Lock className="w-8 h-8" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white">Admin Access Restricted</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            This console is strictly restricted to Southeast University faculty and system administrators.
+            Public student accounts cannot access administrative controls.
+          </p>
+        </div>
+        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <Link
+            href="/"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:opacity-90"
+          >
+            Back to Home
+          </Link>
+          <Link
+            href="/courses"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
+          >
+            Browse Courses
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen max-h-screen overflow-hidden bg-slate-100 dark:bg-[#0a0f1d] text-slate-900 dark:text-slate-100 flex flex-col antialiased transition-colors duration-200">
@@ -3609,7 +3748,7 @@ export default function AdminDashboardPage() {
                       {user?.name || "Administrator"}
                     </p>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                      {user?.email || "admin@seu.edu.bd"}
+                      {user?.email || "—"}
                     </p>
                     <div className="flex items-center gap-1.5 mt-1">
                       <span className="font-mono text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
@@ -6159,8 +6298,8 @@ export default function AdminDashboardPage() {
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {paginatedSubscribers.map((sub: any) => {
-                        const daysLeft = sub.endDate
-                          ? Math.max(0, Math.ceil((new Date(sub.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+                        const daysLeft = sub.endDate && renderNowMs > 0
+                          ? Math.max(0, Math.ceil((new Date(sub.endDate).getTime() - renderNowMs) / (1000 * 60 * 60 * 24)))
                           : 0;
                         const isExpiringSoon = daysLeft <= 7;
 
@@ -7395,7 +7534,13 @@ export default function AdminDashboardPage() {
                         const isStudent = s.role === "ROLE_STUDENT";
                         const canManage = isSuperAdmin || isStudent;
                         const isSelf = user?.id === s.id;
-                        const isRoot = s.email === "admin@seu.edu.bd";
+                        const superAdminCount = staffList.filter((u) => u.role === "ROLE_SUPER_ADMIN").length;
+                        const activeSuperAdminCount = staffList.filter(
+                          (u) => u.role === "ROLE_SUPER_ADMIN" && u.enabled !== false
+                        ).length;
+                        const isRoot =
+                          s.role === "ROLE_SUPER_ADMIN" &&
+                          (superAdminCount <= 1 || (s.enabled !== false && activeSuperAdminCount <= 1));
 
                         return (
                           <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
@@ -7714,7 +7859,7 @@ export default function AdminDashboardPage() {
                             <Lock className="w-2.5 h-2.5" /> Fixed
                           </span>
                         </div>
-                        <span className="font-mono text-xs text-slate-700 dark:text-slate-300 font-medium truncate block">{adminProfile?.email || user?.email || "admin@seu.edu.bd"}</span>
+                        <span className="font-mono text-xs text-slate-700 dark:text-slate-300 font-medium truncate block">{adminProfile?.email || user?.email || "—"}</span>
                       </div>
 
                       <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800/80">
@@ -7782,7 +7927,7 @@ export default function AdminDashboardPage() {
                           type="email"
                           disabled
                           readOnly
-                          value={adminProfile?.email || user?.email || "admin@seu.edu.bd"}
+                          value={adminProfile?.email || user?.email || ""}
                           className="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 font-mono cursor-not-allowed select-none text-xs"
                         />
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
@@ -8563,11 +8708,11 @@ export default function AdminDashboardPage() {
                           >
                             {/* Status */}
                             <td className="py-3.5 px-4 whitespace-nowrap">
-                              {notice.expiresAt && new Date(notice.expiresAt).getTime() < Date.now() ? (
+                              {notice.expiresAt && renderNowMs > 0 && new Date(notice.expiresAt).getTime() < renderNowMs ? (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30">
                                   AUTO-PAUSED (EXPIRED)
                                 </span>
-                              ) : notice.active && notice.startsAt && new Date(notice.startsAt).getTime() > Date.now() ? (
+                              ) : notice.active && notice.startsAt && renderNowMs > 0 && new Date(notice.startsAt).getTime() > renderNowMs ? (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
                                   SCHEDULED
                                 </span>
@@ -8644,8 +8789,8 @@ export default function AdminDashboardPage() {
                                   </p>
                                 )}
                                 {notice.expiresAt ? (
-                                  <p className={`text-[11px] font-bold font-mono ${new Date(notice.expiresAt).getTime() < Date.now() ? "text-rose-500" : "text-emerald-500 dark:text-emerald-400"}`}>
-                                    {new Date(notice.expiresAt).getTime() < Date.now() ? "Auto-Paused: " : "Until: "}
+                                  <p className={`text-[11px] font-bold font-mono ${renderNowMs > 0 && new Date(notice.expiresAt).getTime() < renderNowMs ? "text-rose-500" : "text-emerald-500 dark:text-emerald-400"}`}>
+                                    {renderNowMs > 0 && new Date(notice.expiresAt).getTime() < renderNowMs ? "Auto-Paused: " : "Until: "}
                                     {new Date(notice.expiresAt).toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                                   </p>
                                 ) : (

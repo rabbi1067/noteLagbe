@@ -1,5 +1,7 @@
 package com.notelagbe.service;
 
+import java.util.Optional;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.notelagbe.dto.PaymentSubmitRequest;
@@ -133,15 +135,20 @@ public class PaymentService {
                 );
                 int unlockedCount = 0;
                 for (Map<String, Object> item : items) {
+                    if (!sub.isUnlimited() && unlockedCount >= sub.getMaxCoursesAllowed()) {
+                        break;
+                    }
                     String code = (String) item.get("courseCode");
                     if (code == null) code = (String) item.get("code");
-                    if (code != null) {
-                        courseRepository.findByCodeIgnoreCase(code.trim()).ifPresent(course -> {
+                    if (code != null && !code.trim().isEmpty()) {
+                        Optional<Course> courseOpt = courseRepository.findByCodeIgnoreCase(code.trim());
+                        if (courseOpt.isPresent()) {
+                            Course course = courseOpt.get();
                             if (!unlockedCourseRepository.existsByUserIdAndCourseIdAndTeacherIsNull(pr.getUser().getId(), course.getId())) {
                                 unlockedCourseRepository.save(new UnlockedCourse(pr.getUser(), course, UnlockSource.PURCHASED_QUOTA, sub.getEndDate()));
+                                unlockedCount++;
                             }
-                        });
-                        unlockedCount++;
+                        }
                     }
                 }
                 sub.setUsedCoursesCount(unlockedCount);
@@ -185,10 +192,15 @@ public class PaymentService {
         return pr;
     }
 
+    @CacheEvict(value = {"courses", "course_details", "admin_analytics", "admin_stats"}, allEntries = true)
     @Transactional
     public PaymentRequest rejectPayment(Long paymentId, String adminNotes) {
         PaymentRequest pr = paymentRequestRepository.findById(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment request not found: " + paymentId));
+
+        if (pr.getStatus() == PaymentStatus.APPROVED) {
+            throw new ApiException("An already approved payment cannot be rejected directly.");
+        }
 
         pr.setStatus(PaymentStatus.REJECTED);
         pr.setAdminNotes(adminNotes);

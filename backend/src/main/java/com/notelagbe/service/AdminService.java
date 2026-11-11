@@ -217,14 +217,39 @@ public class AdminService {
 
         // Email is immutable once registered (Security/Identity constraint)
 
+        final Long targetUserId = u.getId();
+
         if (payload.containsKey("studentId")) {
             String sId = payload.get("studentId") != null ? payload.get("studentId").toString().trim() : "";
-            u.setStudentId(sId.isEmpty() ? null : sId);
+            if (sId.isEmpty()) {
+                u.setStudentId(null);
+            } else {
+                userRepository.findByStudentId(sId).ifPresent(existing -> {
+                    if (!existing.getId().equals(targetUserId)) {
+                        throw new ApiException("Student ID '" + sId + "' is already assigned to another account.");
+                    }
+                });
+                u.setStudentId(sId);
+            }
         }
 
         if (payload.containsKey("phone")) {
-            String phone = payload.get("phone") != null ? payload.get("phone").toString().trim() : null;
-            u.setPhone((phone != null && !phone.isEmpty()) ? phone : null);
+            String rawPhone = payload.get("phone") != null ? payload.get("phone").toString().trim() : "";
+            if (rawPhone.isEmpty()) {
+                u.setPhone(null);
+            } else {
+                String cleanPhone = rawPhone.replaceAll("[^0-9+]", "");
+                String baseDigits = cleanPhone.replaceAll("[^0-9]", "");
+                if (baseDigits.startsWith("880") && baseDigits.length() >= 13) {
+                    baseDigits = "0" + baseDigits.substring(3);
+                }
+                List<User> phoneMatches = userRepository.findMatchingPhoneUsers(cleanPhone, baseDigits, "+88" + baseDigits);
+                boolean conflict = phoneMatches.stream().anyMatch(existing -> !existing.getId().equals(targetUserId));
+                if (conflict) {
+                    throw new ApiException("This phone number is already registered to another account.");
+                }
+                u.setPhone(cleanPhone);
+            }
         }
 
         if (payload.containsKey("address")) {
@@ -242,6 +267,13 @@ public class AdminService {
                 }
                 if (currentUser.getId().equals(u.getId()) && newRole != u.getRole()) {
                     throw new ApiException("You cannot modify your own administrative role!");
+                }
+                if (u.getRole() == Role.ROLE_SUPER_ADMIN && newRole != Role.ROLE_SUPER_ADMIN && u.isEnabled()) {
+                    long activeSuperAdmins = userRepository.findByRoleIn(List.of(Role.ROLE_SUPER_ADMIN))
+                            .stream().filter(User::isEnabled).count();
+                    if (activeSuperAdmins <= 1) {
+                        throw new ApiException("Cannot demote the last active Super Admin account.");
+                    }
                 }
                 u.setRole(newRole);
             } catch (IllegalArgumentException e) {
@@ -262,7 +294,7 @@ public class AdminService {
         }
         User u = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User account not found: " + id));
-        if (u.getEmail().equalsIgnoreCase("admin@seu.edu.bd")) {
+        if (u.getRole() == Role.ROLE_SUPER_ADMIN) {
             throw new ApiException("Root Super Admin account cannot be blocked!");
         }
 
@@ -295,7 +327,7 @@ public class AdminService {
         }
         User u = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User account not found: " + id));
-        if (u.getEmail().equalsIgnoreCase("admin@seu.edu.bd")) {
+        if (u.getRole() == Role.ROLE_SUPER_ADMIN) {
             throw new ApiException("Root Super Admin account cannot be removed!");
         }
 

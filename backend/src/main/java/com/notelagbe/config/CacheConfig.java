@@ -29,6 +29,9 @@ public class CacheConfig {
     public static final String CACHE_TEACHER_RESOURCES = "teacher_resources";
     public static final String CACHE_COURSE_REVIEWS = "course_reviews";
     public static final String CACHE_TEACHER_REVIEWS = "teacher_reviews";
+    public static final String CACHE_RECENT_REVIEWS = "recent_reviews";
+
+    private CacheManager activeCacheManager;
 
     @Bean
     public CacheManager cacheManager() {
@@ -45,8 +48,10 @@ public class CacheConfig {
                 CACHE_COURSE_RESOURCES,
                 CACHE_TEACHER_RESOURCES,
                 CACHE_COURSE_REVIEWS,
-                CACHE_TEACHER_REVIEWS
+                CACHE_TEACHER_REVIEWS,
+                CACHE_RECENT_REVIEWS
         ));
+        this.activeCacheManager = manager;
         log.info("[NoteLagbe Architecture] Enterprise In-Memory Cache Manager initialized for: {}", manager.getCacheNames());
         return manager;
     }
@@ -56,6 +61,16 @@ public class CacheConfig {
      */
     @Scheduled(fixedRate = 1800000)
     public void evictAllCachesAtIntervals() {
-        log.debug("[NoteLagbe Cache] Performing scheduled routine cache refresh...");
+        CacheManager manager = this.activeCacheManager;
+        if (manager == null) {
+            return;
+        }
+        for (String cacheName : manager.getCacheNames()) {
+            var cache = manager.getCache(cacheName);
+            if (cache != null) {
+                cache.clear();
+            }
+        }
+        log.debug("[NoteLagbe Cache] Cleared all {} caches on scheduled refresh interval.", manager.getCacheNames().size());
     }
 }

@@ -82,35 +82,49 @@ export default function MultiPageUploader({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const addMoreInputRef = useRef<HTMLInputElement | null>(null);
   const uploadSeqRef = useRef(0);
-  const rotationDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pendingRotationSync, setPendingRotationSync] = useState<{
+    files: File[];
+    rotations: RotationDegrees[];
+  } | null>(null);
 
   // Sync initial values if parent updates them (e.g. edit mode in modal or form reset)
   useEffect(() => {
-    if (initialUrl && (!uploadedResult || uploadedResult.url !== initialUrl)) {
-      setUploadedResult({
-        url: initialUrl,
-        fileName: initialFileName,
-        fileSize: initialFileSize,
-      });
-      setPageFiles([]);
-      setPageRotations([]);
-      setPageIsLandscapeRaw([]);
-      setAutoAlignedCount(0);
-      if (localMergedBlobUrl) {
-        URL.revokeObjectURL(localMergedBlobUrl);
-        setLocalMergedBlobUrl(null);
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      if (initialUrl) {
+        setUploadedResult((prev) =>
+          prev && prev.url === initialUrl
+            ? prev
+            : {
+                url: initialUrl,
+                fileName: initialFileName,
+                fileSize: initialFileSize,
+              }
+        );
+        setPageFiles([]);
+        setPageRotations([]);
+        setPageIsLandscapeRaw([]);
+        setAutoAlignedCount(0);
+        setLocalMergedBlobUrl((prevBlob) => {
+          if (prevBlob) URL.revokeObjectURL(prevBlob);
+          return null;
+        });
+      } else {
+        setUploadedResult(null);
+        setPageFiles([]);
+        setPageRotations([]);
+        setPageIsLandscapeRaw([]);
+        setAutoAlignedCount(0);
+        setLocalMergedBlobUrl((prevBlob) => {
+          if (prevBlob) URL.revokeObjectURL(prevBlob);
+          return null;
+        });
       }
-    } else if (!initialUrl) {
-      setUploadedResult(null);
-      setPageFiles([]);
-      setPageRotations([]);
-      setPageIsLandscapeRaw([]);
-      setAutoAlignedCount(0);
-      if (localMergedBlobUrl) {
-        URL.revokeObjectURL(localMergedBlobUrl);
-        setLocalMergedBlobUrl(null);
-      }
-    }
+    });
+    return () => {
+      active = false;
+    };
   }, [initialUrl, initialFileName, initialFileSize]);
 
   // Create preview URLs for images
@@ -134,14 +148,6 @@ export default function MultiPageUploader({
       }
     };
   }, [previews, localMergedBlobUrl]);
-
-  useEffect(() => {
-    return () => {
-      if (rotationDebounceRef.current) {
-        clearTimeout(rotationDebounceRef.current);
-      }
-    };
-  }, []);
 
   // Theme styling helpers
   const isEmerald = accentColor === "emerald";
@@ -294,10 +300,7 @@ export default function MultiPageUploader({
   // Inspect raw orientations + compute auto-alignment + trigger merge/upload
   const resolveOrientationsAndUpload = useCallback(
     async (nextFiles: File[], preserveRotations?: Record<number, number>) => {
-      if (rotationDebounceRef.current) {
-        clearTimeout(rotationDebounceRef.current);
-        rotationDebounceRef.current = null;
-      }
+      setPendingRotationSync(null);
 
       const rawFlags = await Promise.all(
         nextFiles.map(async (f) => {
@@ -353,13 +356,19 @@ export default function MultiPageUploader({
     resolveOrientationsAndUpload(combined, preserveMap);
   };
 
+  useEffect(() => {
+    if (!pendingRotationSync) return;
+    const timer = setTimeout(() => {
+      setPendingRotationSync(null);
+      processAndUploadFiles(pendingRotationSync.files, pendingRotationSync.rotations);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [pendingRotationSync, processAndUploadFiles]);
+
   // Reorder: Move file left / earlier
-  const handleMoveLeft = (index: number) => {
+  const handleMoveLeft = useCallback((index: number) => {
     if (index <= 0) return;
-    if (rotationDebounceRef.current) {
-      clearTimeout(rotationDebounceRef.current);
-      rotationDebounceRef.current = null;
-    }
+    setPendingRotationSync(null);
     const nextFiles = [...pageFiles];
     [nextFiles[index - 1], nextFiles[index]] = [nextFiles[index], nextFiles[index - 1]];
 
@@ -373,15 +382,12 @@ export default function MultiPageUploader({
     setPageRotations(nextRots);
     setPageIsLandscapeRaw(nextFlags);
     processAndUploadFiles(nextFiles, nextRots);
-  };
+  }, [pageFiles, pageRotations, pageIsLandscapeRaw, processAndUploadFiles]);
 
   // Reorder: Move file right / later
-  const handleMoveRight = (index: number) => {
+  const handleMoveRight = useCallback((index: number) => {
     if (index >= pageFiles.length - 1) return;
-    if (rotationDebounceRef.current) {
-      clearTimeout(rotationDebounceRef.current);
-      rotationDebounceRef.current = null;
-    }
+    setPendingRotationSync(null);
     const nextFiles = [...pageFiles];
     [nextFiles[index + 1], nextFiles[index]] = [nextFiles[index], nextFiles[index + 1]];
 
@@ -395,33 +401,22 @@ export default function MultiPageUploader({
     setPageRotations(nextRots);
     setPageIsLandscapeRaw(nextFlags);
     processAndUploadFiles(nextFiles, nextRots);
-  };
+  }, [pageFiles, pageRotations, pageIsLandscapeRaw, processAndUploadFiles]);
 
   // Rotate a specific page by delta degrees (-90 or +90) and debounce PDF rebuild
-  const handleRotatePage = (index: number, deltaDeg: number) => {
+  const handleRotatePage = useCallback((index: number, deltaDeg: number) => {
     const nextRots = pageFiles.map((_, i) =>
       i === index
         ? normalizeRotationDegrees((pageRotations[i] ?? 0) + deltaDeg)
         : pageRotations[i] ?? 0
     );
     setPageRotations(nextRots);
-
-    if (rotationDebounceRef.current) {
-      clearTimeout(rotationDebounceRef.current);
-    }
-    const snapshotFiles = [...pageFiles];
-    rotationDebounceRef.current = setTimeout(() => {
-      rotationDebounceRef.current = null;
-      processAndUploadFiles(snapshotFiles, nextRots);
-    }, 600);
-  };
+    setPendingRotationSync({ files: [...pageFiles], rotations: nextRots });
+  }, [pageFiles, pageRotations]);
 
   // One-click Align All Sideways Images to Portrait A4
-  const handleAlignAllPortrait = () => {
-    if (rotationDebounceRef.current) {
-      clearTimeout(rotationDebounceRef.current);
-      rotationDebounceRef.current = null;
-    }
+  const handleAlignAllPortrait = useCallback(() => {
+    setPendingRotationSync(null);
     const nextRots: RotationDegrees[] = pageFiles.map((f, idx) => {
       if (!isImageFileObject(f)) return pageRotations[idx] ?? 0;
       const isRawLand = pageIsLandscapeRaw[idx] ?? false;
@@ -431,14 +426,11 @@ export default function MultiPageUploader({
     });
     setPageRotations(nextRots);
     processAndUploadFiles(pageFiles, nextRots);
-  };
+  }, [pageFiles, pageRotations, pageIsLandscapeRaw, processAndUploadFiles]);
 
   // Remove a specific page
-  const handleRemovePage = (index: number) => {
-    if (rotationDebounceRef.current) {
-      clearTimeout(rotationDebounceRef.current);
-      rotationDebounceRef.current = null;
-    }
+  const handleRemovePage = useCallback((index: number) => {
+    setPendingRotationSync(null);
     const nextFiles = pageFiles.filter((_, i) => i !== index);
     const nextRots = pageRotations.filter((_, i) => i !== index);
     const nextFlags = pageIsLandscapeRaw.filter((_, i) => i !== index);
@@ -452,14 +444,11 @@ export default function MultiPageUploader({
       setAutoAlignedCount(0);
       if (onClear) onClear();
     }
-  };
+  }, [pageFiles, pageRotations, pageIsLandscapeRaw, processAndUploadFiles, onClear]);
 
   // Full clear
   const handleFullClear = () => {
-    if (rotationDebounceRef.current) {
-      clearTimeout(rotationDebounceRef.current);
-      rotationDebounceRef.current = null;
-    }
+    setPendingRotationSync(null);
     uploadSeqRef.current++;
     setPageFiles([]);
     setPageRotations([]);
@@ -474,6 +463,18 @@ export default function MultiPageUploader({
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (addMoreInputRef.current) addMoreInputRef.current.value = "";
   };
+
+  const remainingLandscapeCount = useMemo(
+    () =>
+      pageFiles.reduce((acc, f, idx) => {
+        if (!isImageFileObject(f)) return acc;
+        const isRawLand = pageIsLandscapeRaw[idx] ?? false;
+        const rot = pageRotations[idx] ?? 0;
+        const isEffLand = rot === 90 || rot === 270 ? !isRawLand : isRawLand;
+        return isEffLand ? acc + 1 : acc;
+      }, 0),
+    [pageFiles, pageIsLandscapeRaw, pageRotations]
+  );
 
   return (
     <div className="space-y-3">
@@ -588,16 +589,7 @@ export default function MultiPageUploader({
       )}
 
       {/* Case 2: Multi-Page Gallery & Reordering Grid (When 1 or more pages are in state) */}
-      {pageFiles.length > 0 && (() => {
-        const remainingLandscapeCount = pageFiles.reduce((acc, f, idx) => {
-          if (!isImageFileObject(f)) return acc;
-          const isRawLand = pageIsLandscapeRaw[idx] ?? false;
-          const rot = pageRotations[idx] ?? 0;
-          const isEffLand = rot === 90 || rot === 270 ? !isRawLand : isRawLand;
-          return isEffLand ? acc + 1 : acc;
-        }, 0);
-
-        return (
+      {pageFiles.length > 0 && (
         <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3.5">
           {/* Gallery Header */}
           <div className="flex items-center justify-between flex-wrap gap-2 pb-2.5 border-b border-slate-200 dark:border-slate-800">
@@ -800,8 +792,7 @@ export default function MultiPageUploader({
             </button>
           </div>
         </div>
-        );
-      })()}
+      )}
 
       {/* Case 3: Processing & Uploading Status Bar */}
       {isProcessing && (

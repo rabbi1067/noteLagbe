@@ -54,7 +54,7 @@ public class ReviewModerationServiceImpl implements ReviewModerationService {
 
     @Override
     @Transactional
-    @CacheEvict(value = {"course_reviews", "teacher_reviews"}, allEntries = true)
+    @CacheEvict(value = {"course_reviews", "teacher_reviews", "recent_reviews"}, allEntries = true)
     public ReviewResponseDto approveReview(Long id) {
         Review review = findReviewOrThrow(id);
         review.setStatus(ReviewStatus.APPROVED);
@@ -67,7 +67,7 @@ public class ReviewModerationServiceImpl implements ReviewModerationService {
 
     @Override
     @Transactional
-    @CacheEvict(value = {"course_reviews", "teacher_reviews"}, allEntries = true)
+    @CacheEvict(value = {"course_reviews", "teacher_reviews", "recent_reviews"}, allEntries = true)
     public ReviewResponseDto rejectReview(Long id) {
         Review review = findReviewOrThrow(id);
         review.setStatus(ReviewStatus.REJECTED);
@@ -111,14 +111,14 @@ public class ReviewModerationServiceImpl implements ReviewModerationService {
 
     @Override
     @Transactional
-    @CacheEvict(value = {"course_reviews", "teacher_reviews"}, allEntries = true)
+    @CacheEvict(value = {"course_reviews", "teacher_reviews", "recent_reviews"}, allEntries = true)
     public void deleteReview(Long id) {
         deleteReviewWithDetails(id);
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = {"course_reviews", "teacher_reviews"}, allEntries = true)
+    @CacheEvict(value = {"course_reviews", "teacher_reviews", "recent_reviews"}, allEntries = true)
     public ReviewResponseDto deleteReviewWithDetails(Long id) {
         Review review = findReviewOrThrow(id);
         ReviewResponseDto dto = reviewMapper.toDto(review);

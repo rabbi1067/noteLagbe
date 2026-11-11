@@ -9,6 +9,7 @@ public class AuthResponse {
     private String role;
     private String studentId;
     private String avatarUrl;
+    private UserProfileResponse profile;
 
     public AuthResponse() {}
 
@@ -45,4 +46,7 @@ public class AuthResponse {
 
     public String getAvatarUrl() { return avatarUrl; }
     public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+
+    public UserProfileResponse getProfile() { return profile; }
+    public void setProfile(UserProfileResponse profile) { this.profile = profile; }
 }

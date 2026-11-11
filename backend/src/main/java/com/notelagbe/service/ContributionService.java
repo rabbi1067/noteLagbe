@@ -7,16 +7,18 @@ import com.notelagbe.entity.*;
 import com.notelagbe.exception.ApiException;
 import com.notelagbe.exception.ResourceNotFoundException;
 import com.notelagbe.repository.*;
+import com.notelagbe.security.UrlSecurityValidator;
 import org.springframework.cache.annotation.CacheEvict;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.InputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -361,14 +363,11 @@ public class ContributionService {
         if (rawUrl == null || rawUrl.trim().isEmpty()) {
             return LinkVerificationResponse.invalidUrl("URL cannot be empty");
         }
-        String url = rawUrl.trim();
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            return LinkVerificationResponse.invalidUrl("URL must start with http:// or https://");
-        }
+        URI validatedUri = UrlSecurityValidator.validatePublicHttpUrl(rawUrl);
+        String url = validatedUri.toString();
 
         try {
-            URI uri = URI.create(url);
-            String host = uri.getHost() != null ? uri.getHost().toLowerCase() : "";
+            String host = validatedUri.getHost() != null ? validatedUri.getHost().toLowerCase() : "";
 
             boolean isGdrive = host.contains("drive.google.com") || host.contains("docs.google.com");
             String fileId = null;
@@ -388,86 +387,63 @@ public class ContributionService {
                 }
 
                 // Probe Google Drive
-                String checkTarget = fileId != null 
+                String checkTarget = fileId != null
                         ? "https://drive.google.com/file/d/" + fileId + "/view"
                         : url;
-
-                HttpClient client = HttpClient.newBuilder()
-                        .followRedirects(HttpClient.Redirect.NEVER)
-                        .connectTimeout(Duration.ofSeconds(4))
-                        .build();
+                URI targetUri = UrlSecurityValidator.validatePublicHttpUrl(checkTarget);
 
                 HttpRequest req = HttpRequest.newBuilder()
-                        .uri(URI.create(checkTarget))
+                        .uri(targetUri)
                         .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                         .timeout(Duration.ofSeconds(5))
                         .GET()
                         .build();
 
-                HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
-                int status = resp.statusCode();
-                Optional<String> location = resp.headers().firstValue("Location");
+                HttpResponse<InputStream> resp = UrlSecurityValidator.getSharedHttpClient()
+                        .send(req, HttpResponse.BodyHandlers.ofInputStream());
+                try (InputStream bodyStream = resp.body()) {
+                    int status = resp.statusCode();
+                    Optional<String> location = resp.headers().firstValue("Location");
 
-                // Check redirection to Google Signin / Accounts
-                if (location.isPresent()) {
-                    String loc = location.get();
-                    if (loc.contains("accounts.google.com") || loc.contains("ServiceLogin") || loc.contains("signin")) {
-                        return LinkVerificationResponse.restrictedGoogleDrive(fileId, "Google Drive link is restricted (Private). Please set General Access to 'Anyone with the link' (Viewer).");
+                    // Check redirection to Google Signin / Accounts
+                    if (location.isPresent()) {
+                        String loc = location.get();
+                        if (loc.contains("accounts.google.com") || loc.contains("ServiceLogin") || loc.contains("signin")) {
+                            return LinkVerificationResponse.restrictedGoogleDrive(fileId, "Google Drive link is restricted (Private). Please set General Access to 'Anyone with the link' (Viewer).");
+                        }
                     }
-                }
 
-                if (status == 401 || status == 403) {
-                    return LinkVerificationResponse.restrictedGoogleDrive(fileId, "Access denied (401/403). Google Drive file is private or restricted.");
-                }
-
-                if (status == 200) {
-                    String body = resp.body();
-                    if (body != null && (body.contains("You need access") || body.contains("Request access") || body.contains("You need permission"))) {
-                        return LinkVerificationResponse.restrictedGoogleDrive(fileId, "Sign-in required to view this file. Please change General Access to 'Anyone with the link'.");
+                    if (status == 401 || status == 403) {
+                        return LinkVerificationResponse.restrictedGoogleDrive(fileId, "Access denied (401/403). Google Drive file is private or restricted.");
                     }
-                    String previewUrl = fileId != null ? "https://drive.google.com/file/d/" + fileId + "/preview" : url;
-                    return LinkVerificationResponse.publicLink(true, fileId, "Google Drive link is public and accessible! ✓", previewUrl);
-                }
 
-                if (status >= 300 && status < 400 && location.isPresent()) {
-                    String previewUrl = fileId != null ? "https://drive.google.com/file/d/" + fileId + "/preview" : url;
-                    return LinkVerificationResponse.publicLink(true, fileId, "Google Drive link is accessible! ✓", previewUrl);
-                }
+                    if (status == 200) {
+                        byte[] bodyBytes = UrlSecurityValidator.readBoundedBytes(bodyStream, 256 * 1024);
+                        String body = new String(bodyBytes, StandardCharsets.UTF_8);
+                        if (body.contains("You need access") || body.contains("Request access") || body.contains("You need permission")) {
+                            return LinkVerificationResponse.restrictedGoogleDrive(fileId, "Sign-in required to view this file. Please change General Access to 'Anyone with the link'.");
+                        }
+                        String previewUrl = fileId != null ? "https://drive.google.com/file/d/" + fileId + "/preview" : url;
+                        return LinkVerificationResponse.publicLink(true, fileId, "Google Drive link is public and accessible! ✓", previewUrl);
+                    }
 
-                return LinkVerificationResponse.restrictedGoogleDrive(fileId, "Could not verify public access (Status " + status + "). Please verify link permissions.");
+                    if (status >= 300 && status < 400 && location.isPresent()) {
+                        String previewUrl = fileId != null ? "https://drive.google.com/file/d/" + fileId + "/preview" : url;
+                        return LinkVerificationResponse.publicLink(true, fileId, "Google Drive link is accessible! ✓", previewUrl);
+                    }
+
+                    return LinkVerificationResponse.restrictedGoogleDrive(fileId, "Could not verify public access (Status " + status + "). Please verify link permissions.");
+                }
             } else {
-                // Non-Google link: quick head/get check
-                HttpClient client = HttpClient.newBuilder()
-                        .followRedirects(HttpClient.Redirect.NORMAL)
-                        .connectTimeout(Duration.ofSeconds(4))
-                        .build();
-
-                HttpRequest req = HttpRequest.newBuilder()
-                        .uri(URI.create(url))
-                        .header("User-Agent", "Mozilla/5.0")
-                        .timeout(Duration.ofSeconds(5))
-                        .method("HEAD", HttpRequest.BodyPublishers.noBody())
-                        .build();
-
-                try {
-                    HttpResponse<Void> resp = client.send(req, HttpResponse.BodyHandlers.discarding());
-                    if (resp.statusCode() < 400) {
-                        return LinkVerificationResponse.publicLink(false, null, "File link is reachable and public! ✓", url);
-                    }
-                } catch (Exception ignored) {
-                    HttpRequest getReq = HttpRequest.newBuilder()
-                            .uri(URI.create(url))
-                            .header("User-Agent", "Mozilla/5.0")
-                            .timeout(Duration.ofSeconds(5))
-                            .GET()
-                            .build();
-                    HttpResponse<Void> getResp = client.send(getReq, HttpResponse.BodyHandlers.discarding());
-                    if (getResp.statusCode() < 400) {
-                        return LinkVerificationResponse.publicLink(false, null, "File link is reachable and public! ✓", url);
-                    }
+                // Non-Google link: SSRF-safe bounded HEAD/GET reachability check
+                int statusCode = UrlSecurityValidator.checkPublicUrlReachability(url, "Mozilla/5.0", Duration.ofSeconds(5));
+                if (statusCode < 400) {
+                    return LinkVerificationResponse.publicLink(false, null, "File link is reachable and public! ✓", url);
                 }
                 return LinkVerificationResponse.publicLink(false, null, "Link registered.", url);
             }
+        } catch (ApiException ex) {
+            throw ex;
         } catch (Exception e) {
             return LinkVerificationResponse.unreachable("Could not verify link: " + e.getMessage());
         }

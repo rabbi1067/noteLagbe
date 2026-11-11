@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -36,48 +37,27 @@ public class AuthController {
         this.emailService = emailService;
     }
 
+    private void logAuthAsync(String action, String details, String email, String name, String role, HttpServletRequest request, String status) {
+        if (activityLogService == null) {
+            return;
+        }
+        String clientIp = ActivityLogService.getClientIp(request);
+        String deviceInfo = ActivityLogService.getDeviceInfo(request);
+        CompletableFuture.runAsync(() -> {
+            try {
+                activityLogService.logActivity(action, "AUTH", details, email, name, role, clientIp, deviceInfo, status);
+            } catch (Exception ignored) {}
+        });
+    }
+
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest request, HttpServletRequest httpRequest) {
         try {
             AuthResponse res = authService.login(request);
-            try {
-                if (res != null && res.getEmail() != null) {
-                    activityLogService.logAuth(
-                            "USER_LOGIN",
-                            "User authenticated successfully via password: " + res.getEmail(),
-                            res.getEmail(),
-                            res.getName(),
-                            res.getRole(),
-                            httpRequest,
-                            "SUCCESS"
-                    );
-                }
-            } catch (Exception ignored) {}
-            return ResponseEntity.ok(res);
-        } catch (DisabledException ex) {
-            try {
-                activityLogService.logAuth(
-                        "USER_LOGIN_BLOCKED",
-                        "Blocked account attempted password login: " + request.getEmail(),
-                        request.getEmail(),
-                        null,
-                        "BLOCKED",
-                        httpRequest,
-                        "FAILED"
-                );
-            } catch (Exception ignored) {}
-            throw ex;
-        }
-    }
-
-    @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
-        AuthResponse res = authService.register(request);
-        try {
             if (res != null && res.getEmail() != null) {
-                activityLogService.logAuth(
-                        "USER_REGISTER",
-                        "New student account registered: " + res.getEmail() + (request.getStudentId() != null ? " (ID: " + request.getStudentId() + ")" : ""),
+                logAuthAsync(
+                        "USER_LOGIN",
+                        "User authenticated successfully via password: " + res.getEmail(),
                         res.getEmail(),
                         res.getName(),
                         res.getRole(),
@@ -85,7 +65,35 @@ public class AuthController {
                         "SUCCESS"
                 );
             }
-        } catch (Exception ignored) {}
+            return ResponseEntity.ok(res);
+        } catch (DisabledException ex) {
+            logAuthAsync(
+                    "USER_LOGIN_BLOCKED",
+                    "Blocked account attempted password login: " + request.getEmail(),
+                    request.getEmail(),
+                    null,
+                    "BLOCKED",
+                    httpRequest,
+                    "FAILED"
+            );
+            throw ex;
+        }
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
+        AuthResponse res = authService.register(request);
+        if (res != null && res.getEmail() != null) {
+            logAuthAsync(
+                    "USER_REGISTER",
+                    "New student account registered: " + res.getEmail() + (request.getStudentId() != null ? " (ID: " + request.getStudentId() + ")" : ""),
+                    res.getEmail(),
+                    res.getName(),
+                    res.getRole(),
+                    httpRequest,
+                    "SUCCESS"
+            );
+        }
         return ResponseEntity.ok(res);
     }
 
@@ -93,32 +101,28 @@ public class AuthController {
     public ResponseEntity<AuthResponse> googleLogin(@Valid @RequestBody GoogleLoginRequest request, HttpServletRequest httpRequest) {
         try {
             AuthResponse res = authService.loginWithGoogle(request);
-            try {
-                if (res != null && res.getEmail() != null) {
-                    activityLogService.logAuth(
-                            "USER_LOGIN_GOOGLE",
-                            "User authenticated via Google Single Sign-On: " + res.getEmail(),
-                            res.getEmail(),
-                            res.getName(),
-                            res.getRole(),
-                            httpRequest,
-                            "SUCCESS"
-                    );
-                }
-            } catch (Exception ignored) {}
+            if (res != null && res.getEmail() != null) {
+                logAuthAsync(
+                        "USER_LOGIN_GOOGLE",
+                        "User authenticated via Google Single Sign-On: " + res.getEmail(),
+                        res.getEmail(),
+                        res.getName(),
+                        res.getRole(),
+                        httpRequest,
+                        "SUCCESS"
+                );
+            }
             return ResponseEntity.ok(res);
         } catch (DisabledException ex) {
-            try {
-                activityLogService.logAuth(
-                        "USER_LOGIN_BLOCKED",
-                        "Blocked account attempted Google SSO login: " + request.getEmail(),
-                        request.getEmail(),
-                        request.getName(),
-                        "BLOCKED",
-                        httpRequest,
-                        "FAILED"
-                );
-            } catch (Exception ignored) {}
+            logAuthAsync(
+                    "USER_LOGIN_BLOCKED",
+                    "Blocked account attempted Google SSO login: " + request.getEmail(),
+                    request.getEmail(),
+                    request.getName(),
+                    "BLOCKED",
+                    httpRequest,
+                    "FAILED"
+            );
             throw ex;
         }
     }

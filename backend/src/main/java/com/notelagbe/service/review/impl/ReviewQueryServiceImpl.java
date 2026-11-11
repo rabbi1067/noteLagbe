@@ -10,6 +10,7 @@ import com.notelagbe.repository.ReviewRepository;
 import com.notelagbe.service.review.ReviewMapper;
 import com.notelagbe.service.review.ReviewQueryService;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,8 +56,10 @@ public class ReviewQueryServiceImpl implements ReviewQueryService {
     }
 
     @Override
+    @Cacheable(value = "recent_reviews", unless = "#result == null")
     public List<ReviewResponseDto> getRecentApprovedReviews() {
-        List<Review> reviews = reviewRepository.findByStatusOrderByCreatedAtDesc(ReviewStatus.APPROVED);
+        List<Review> reviews = reviewRepository.findByStatusOrderByCreatedAtDesc(
+                ReviewStatus.APPROVED, PageRequest.of(0, 30));
         return reviewMapper.toDtoList(reviews);
     }
 }

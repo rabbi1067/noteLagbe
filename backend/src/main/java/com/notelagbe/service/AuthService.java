@@ -1,5 +1,7 @@
 package com.notelagbe.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.notelagbe.dto.AuthRequest;
 import com.notelagbe.dto.AuthResponse;
 import com.notelagbe.dto.GoogleLoginRequest;
@@ -12,7 +14,10 @@ import com.notelagbe.repository.CourseRepository;
 import com.notelagbe.repository.SubscriptionRepository;
 import com.notelagbe.repository.UnlockedCourseRepository;
 import com.notelagbe.repository.UserRepository;
+import com.notelagbe.security.CustomUserDetails;
+import com.notelagbe.security.FileUploadSecurityValidator;
 import com.notelagbe.security.JwtTokenProvider;
+import com.notelagbe.security.UrlSecurityValidator;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -24,6 +29,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -57,6 +66,7 @@ public class AuthService {
     private final EmailService emailService;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
     private static final int OTP_EXPIRY_MINUTES = 10;
     private static final int RESET_TOKEN_EXPIRY_MINUTES = 10;
     private static final int OTP_RESEND_COOLDOWN_SECONDS = 45;
@@ -64,6 +74,13 @@ public class AuthService {
 
     @org.springframework.beans.factory.annotation.Value("${app.admin.initial-email:}")
     private String initialAdminEmail;
+
+    @org.springframework.beans.factory.annotation.Value("${app.google.client-id:}")
+    private String googleClientId;
+
+    void setGoogleClientId(String googleClientId) {
+        this.googleClientId = googleClientId;
+    }
 
     public AuthService(UserRepository userRepository,
                        CourseRepository courseRepository,
@@ -108,19 +125,23 @@ public class AuthService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String token = tokenProvider.generateToken(authentication);
 
-        User user = userRepository.findByEmail(cleanEmail)
-                .orElseThrow(() -> new ApiException("User not found"));
+        User user = (authentication != null && authentication.getPrincipal() instanceof CustomUserDetails cud && cud.getUser() != null)
+                ? cud.getUser()
+                : userRepository.findByEmail(cleanEmail)
+                        .orElseThrow(() -> new ApiException("User not found"));
         assertUserNotBlocked(user);
 
-        return new AuthResponse(
+        AuthResponse response = new AuthResponse(
                 token,
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
-                user.getRole().name(),
+                user.getRole() != null ? user.getRole().name() : Role.ROLE_STUDENT.name(),
                 user.getStudentId(),
                 user.getAvatarUrl()
         );
+        response.setProfile(getCurrentUserProfile(user));
+        return response;
     }
 
     @Transactional
@@ -134,24 +155,7 @@ public class AuthService {
         user.setName(request.getName().trim());
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        // Phone duplicate check
-        String rawPhone = request.getPhone() != null ? request.getPhone().trim() : null;
-        String cleanPhone = null;
-        if (rawPhone != null && !rawPhone.isEmpty()) {
-            cleanPhone = rawPhone.replaceAll("[^0-9+]", "");
-            String baseDigits = cleanPhone.replaceAll("[^0-9]", "");
-            if (baseDigits.startsWith("880") && baseDigits.length() >= 13) {
-                baseDigits = "0" + baseDigits.substring(3);
-            }
-            String p1 = cleanPhone;
-            String p2 = baseDigits;
-            String p3 = "+88" + baseDigits;
-
-            List<User> existingWithPhone = userRepository.findMatchingPhoneUsers(p1, p2, p3);
-            if (!existingWithPhone.isEmpty()) {
-                throw new ApiException("This phone number is already registered to another account! Please use a different phone number or log in.");
-            }
-        }
+        String cleanPhone = normalizeAndValidateUniquePhone(request.getPhone(), null);
 
         // Student ID duplicate check
         String sId = request.getStudentId() != null ? request.getStudentId().trim() : null;
@@ -176,67 +180,161 @@ public class AuthService {
 
         String token = tokenProvider.generateTokenFromUser(user);
 
-        return new AuthResponse(
+        AuthResponse response = new AuthResponse(
                 token,
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
-                user.getRole().name(),
+                user.getRole() != null ? user.getRole().name() : Role.ROLE_STUDENT.name(),
                 user.getStudentId(),
                 user.getAvatarUrl()
         );
+        response.setProfile(getCurrentUserProfile(user));
+        return response;
+    }
+
+    private String normalizeAndValidateUniquePhone(String rawPhone, Long excludeUserId) {
+        if (rawPhone == null || rawPhone.trim().isEmpty()) {
+            return null;
+        }
+        String cleanPhone = rawPhone.trim().replaceAll("[^0-9+]", "");
+        if (cleanPhone.isEmpty()) {
+            return null;
+        }
+        String baseDigits = cleanPhone.replaceAll("[^0-9]", "");
+        if (baseDigits.startsWith("880") && baseDigits.length() >= 13) {
+            baseDigits = "0" + baseDigits.substring(3);
+        }
+        List<User> existingWithPhone = userRepository.findMatchingPhoneUsers(cleanPhone, baseDigits, "+88" + baseDigits);
+        boolean conflict = existingWithPhone.stream()
+                .anyMatch(existing -> excludeUserId == null || !existing.getId().equals(excludeUserId));
+        if (conflict) {
+            throw new ApiException("This phone number is already registered to another account! Please use a different phone number or log in.");
+        }
+        return cleanPhone;
     }
 
     @Transactional
     public AuthResponse loginWithGoogle(GoogleLoginRequest request) {
-        String email = request.getEmail().toLowerCase().trim();
-        Optional<User> existingUser = userRepository.findByEmail(email);
+        Map<String, Object> tokenClaims = verifyGoogleIdToken(request.getIdToken());
+        String verifiedEmail = String.valueOf(tokenClaims.get("email")).toLowerCase().trim();
+        if (request.getEmail() != null && !request.getEmail().isBlank()
+                && !verifiedEmail.equalsIgnoreCase(request.getEmail().trim())) {
+            throw new ApiException("Google token email mismatch.", org.springframework.http.HttpStatus.UNAUTHORIZED);
+        }
 
+        String verifiedName = tokenClaims.get("name") != null
+                ? String.valueOf(tokenClaims.get("name")).trim()
+                : (request.getName() != null && !request.getName().isBlank() ? request.getName().trim() : "SEU Student");
+        String verifiedPicture = tokenClaims.get("picture") != null
+                ? String.valueOf(tokenClaims.get("picture")).trim()
+                : null;
+
+        Optional<User> existingUser = userRepository.findByEmail(verifiedEmail);
         User user;
         if (existingUser.isPresent()) {
             user = existingUser.get();
             assertUserNotBlocked(user);
-            if (request.getAvatarUrl() != null && user.getAvatarUrl() == null) {
-                user.setAvatarUrl(request.getAvatarUrl());
+            if (verifiedPicture != null && (user.getAvatarUrl() == null || user.getAvatarUrl().isBlank())) {
+                user.setAvatarUrl(verifiedPicture);
                 userRepository.save(user);
             }
         } else {
             user = new User();
-            user.setName(request.getName() != null ? request.getName() : "SEU Student");
-            user.setEmail(email);
+            user.setName(verifiedName.isEmpty() ? "SEU Student" : verifiedName);
+            user.setEmail(verifiedEmail);
             user.setRole(Role.ROLE_STUDENT);
             user.setAuthProvider(AuthProvider.GOOGLE);
-            user.setAvatarUrl(request.getAvatarUrl());
+            user.setAvatarUrl(verifiedPicture);
             user.setEnabled(true);
             user = userRepository.save(user);
         }
 
         String token = tokenProvider.generateTokenFromUser(user);
 
-        return new AuthResponse(
+        AuthResponse response = new AuthResponse(
                 token,
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
-                user.getRole().name(),
+                user.getRole() != null ? user.getRole().name() : Role.ROLE_STUDENT.name(),
                 user.getStudentId(),
                 user.getAvatarUrl()
         );
+        response.setProfile(getCurrentUserProfile(user));
+        return response;
+    }
+
+    protected Map<String, Object> verifyGoogleIdToken(String idToken) {
+        if (idToken == null || idToken.trim().isEmpty()) {
+            throw new ApiException("Google ID token is required.", org.springframework.http.HttpStatus.UNAUTHORIZED);
+        }
+        try {
+            String encoded = URLEncoder.encode(idToken.trim(), StandardCharsets.UTF_8);
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create("https://oauth2.googleapis.com/tokeninfo?id_token=" + encoded))
+                    .timeout(Duration.ofSeconds(8))
+                    .GET()
+                    .build();
+            HttpResponse<String> response = UrlSecurityValidator.getSharedHttpClient()
+                    .send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() != 200 || response.body() == null || response.body().isBlank()) {
+                throw new ApiException("Invalid or expired Google sign-in token.", org.springframework.http.HttpStatus.UNAUTHORIZED);
+            }
+            Map<String, Object> claims = JSON_MAPPER.readValue(response.body(), new TypeReference<>() {});
+            Object emailObj = claims.get("email");
+            Object emailVerifiedObj = claims.get("email_verified");
+            if (emailObj == null || String.valueOf(emailObj).isBlank()
+                    || !"true".equalsIgnoreCase(String.valueOf(emailVerifiedObj))) {
+                throw new ApiException("Google account email is not verified.", org.springframework.http.HttpStatus.UNAUTHORIZED);
+            }
+            Object issObj = claims.get("iss");
+            if (issObj != null) {
+                String iss = String.valueOf(issObj);
+                if (!"https://accounts.google.com".equals(iss) && !"accounts.google.com".equals(iss)) {
+                    throw new ApiException("Untrusted Google token issuer.", org.springframework.http.HttpStatus.UNAUTHORIZED);
+                }
+            }
+            Object expObj = claims.get("exp");
+            if (expObj != null) {
+                long expEpoch = Long.parseLong(String.valueOf(expObj));
+                if (expEpoch * 1000L < System.currentTimeMillis()) {
+                    throw new ApiException("Google sign-in token has expired.", org.springframework.http.HttpStatus.UNAUTHORIZED);
+                }
+            }
+            if (googleClientId != null && !googleClientId.isBlank()) {
+                Object audObj = claims.get("aud");
+                if (audObj == null || !googleClientId.trim().equals(String.valueOf(audObj))) {
+                    throw new ApiException("Google token audience mismatch.", org.springframework.http.HttpStatus.UNAUTHORIZED);
+                }
+            }
+            return claims;
+        } catch (ApiException ex) {
+            throw ex;
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new ApiException("Google token verification interrupted.", org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE);
+        } catch (Exception ex) {
+            throw new ApiException("Failed to verify Google ID token.", org.springframework.http.HttpStatus.UNAUTHORIZED);
+        }
     }
 
     public UserProfileResponse getCurrentUserProfile(User user) {
+        Role safeRole = user.getRole() != null ? user.getRole() : Role.ROLE_STUDENT;
         UserProfileResponse response = new UserProfileResponse();
         response.setId(user.getId());
         response.setName(user.getName());
         response.setEmail(user.getEmail());
         response.setStudentId(user.getStudentId());
-        response.setRole(user.getRole().name());
+        response.setRole(safeRole.name());
         response.setAvatarUrl(user.getAvatarUrl());
         response.setChatBlocked(user.isChatBlocked());
         response.setPhone(user.getPhone() != null ? user.getPhone() : "");
         response.setAddress(user.getAddress() != null ? user.getAddress() : "");
 
-        Optional<Subscription> subOpt = subscriptionService.getValidActiveSubscription(user.getId());
+        Optional<Subscription> subOpt = subscriptionService != null && user.getId() != null
+                ? subscriptionService.getValidActiveSubscription(user.getId())
+                : Optional.empty();
         if (subOpt.isPresent()) {
             Subscription sub = subOpt.get();
             response.setHasActiveSubscription(true);
@@ -256,7 +354,9 @@ public class AuthService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        List<UnlockedCourse> userUnlocks = unlockedCourseRepository.findByUserId(user.getId());
+        List<UnlockedCourse> userUnlocks = unlockedCourseRepository != null && user.getId() != null
+                ? unlockedCourseRepository.findByUserId(user.getId())
+                : List.of();
         List<UserProfileResponse.UnlockedCourseDetail> details = new ArrayList<>();
         List<String> validUnlockedCodes = new ArrayList<>();
 
@@ -312,10 +412,10 @@ public class AuthService {
             }
         }
 
-        if (user.getRole() == Role.ROLE_ADMIN || user.getRole() == Role.ROLE_SUPER_ADMIN || user.getRole() == Role.ROLE_MANAGER
+        if (safeRole == Role.ROLE_ADMIN || safeRole == Role.ROLE_SUPER_ADMIN || safeRole == Role.ROLE_MANAGER
                 || (subOpt.isPresent() && subOpt.get().isUnlimited())) {
-            response.setUnlockedCourseCodes(courseRepository.findAll().stream().map(Course::getCode).toList());
-            response.setActiveAccessSource(user.getRole() == Role.ROLE_STUDENT ? "UNLIMITED_ACCESS" : "STAFF_UNRESTRICTED");
+            response.setUnlockedCourseCodes(courseRepository != null ? courseRepository.findAll().stream().map(Course::getCode).toList() : List.of());
+            response.setActiveAccessSource(safeRole == Role.ROLE_STUDENT ? "UNLIMITED_ACCESS" : "STAFF_UNRESTRICTED");
         } else {
             response.setUnlockedCourseCodes(validUnlockedCodes);
         }
@@ -340,7 +440,7 @@ public class AuthService {
         }
 
         if (phone != null) {
-            u.setPhone(phone.trim().isEmpty() ? null : phone.trim());
+            u.setPhone(normalizeAndValidateUniquePhone(phone, u.getId()));
         }
 
         if (address != null) {
@@ -352,13 +452,16 @@ public class AuthService {
             if (trimmed.isEmpty() || trimmed.equalsIgnoreCase("null") || trimmed.equalsIgnoreCase("remove")) {
                 if (u.getAvatarUrl() != null && u.getAvatarUrl().startsWith("/uploads/avatars/")) {
                     try {
-                        String oldFileName = u.getAvatarUrl().replace("/uploads/avatars/", "");
-                        Path oldFilePath = Paths.get("uploads", "avatars").resolve(oldFileName).toAbsolutePath().normalize();
+                        Path oldFilePath = UrlSecurityValidator.resolveSafeLocalPath(
+                                Paths.get("uploads", "avatars"), u.getAvatarUrl(), "/uploads/avatars/");
                         Files.deleteIfExists(oldFilePath);
                     } catch (Exception ignored) {}
                 }
                 u.setAvatarUrl(null);
             } else {
+                if (!trimmed.startsWith("/uploads/avatars/")) {
+                    UrlSecurityValidator.validatePublicHttpUrl(trimmed);
+                }
                 u.setAvatarUrl(trimmed);
             }
         }
@@ -370,18 +473,7 @@ public class AuthService {
 
     @Transactional
     public UserProfileResponse uploadAvatar(User currentUser, MultipartFile file) throws IOException {
-        if (file == null || file.isEmpty()) {
-            throw new ApiException("No image file provided for upload.");
-        }
-
-        String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith("image/")) {
-            throw new ApiException("Invalid file format. Only image files (JPEG, PNG, WEBP, GIF) are allowed.");
-        }
-
-        if (file.getSize() > 5 * 1024 * 1024) {
-            throw new ApiException("Image file exceeds the 5 MB maximum allowed size.");
-        }
+        String extDot = FileUploadSecurityValidator.validateImage(file, 5L * 1024 * 1024);
 
         User u = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + currentUser.getId()));
@@ -391,17 +483,11 @@ public class AuthService {
             Files.createDirectories(uploadDir);
         }
 
-        String originalFilename = file.getOriginalFilename();
-        String ext = "png";
-        if (originalFilename != null && originalFilename.contains(".")) {
-            ext = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
-        }
-
         // If user already had a previously uploaded avatar, delete the previous physical file to avoid orphan storage
         if (u.getAvatarUrl() != null && u.getAvatarUrl().startsWith("/uploads/avatars/")) {
             try {
-                String oldFileName = u.getAvatarUrl().replace("/uploads/avatars/", "");
-                Path oldFilePath = uploadDir.resolve(oldFileName).toAbsolutePath().normalize();
+                Path oldFilePath = UrlSecurityValidator.resolveSafeLocalPath(
+                        uploadDir, u.getAvatarUrl(), "/uploads/avatars/");
                 Files.deleteIfExists(oldFilePath);
             } catch (Exception ignored) {}
         }
@@ -410,8 +496,8 @@ public class AuthService {
         if (cloudinaryService.isConfigured()) {
             fileUrl = cloudinaryService.uploadFile(file, "notelagbe/avatars", true);
         } else {
-            String fileName = "user_" + u.getId() + "_" + System.currentTimeMillis() + "." + ext;
-            Path targetPath = uploadDir.resolve(fileName);
+            String fileName = "user_" + u.getId() + "_" + System.currentTimeMillis() + extDot;
+            Path targetPath = uploadDir.resolve(fileName).normalize();
             Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
             fileUrl = "/uploads/avatars/" + fileName;
         }
@@ -448,6 +534,9 @@ public class AuthService {
         User u = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + currentUser.getId()));
 
+        if (u.getPassword() == null || u.getPassword().isBlank()) {
+            throw new ApiException("This account has no local password configured. Please use Forgot Password to set one.");
+        }
         if (currentPassword == null || currentPassword.isEmpty()) {
             throw new ApiException("Current password is required.");
         }

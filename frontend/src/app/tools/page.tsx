@@ -4095,7 +4095,7 @@ export default function StudentToolsPage() {
                 </div>
 
                 <div className="bg-slate-950 text-slate-100 p-4 border-x border-slate-800 space-y-1 text-[11px] leading-relaxed my-auto rounded-b-lg">
-                  <p className="text-blue-400">// Academic Submission Manifest</p>
+                  <p className="text-blue-400">{"// Academic Submission Manifest"}</p>
                   <p className="text-purple-400">const <span className="text-yellow-300">submissionRecord</span> = &#123;</p>
                   <p className="pl-4"><span className="text-sky-300">"university"</span>: <span className="text-emerald-300">"Southeast University"</span>,</p>
                   <p className="pl-4"><span className="text-sky-300">"documentType"</span>: <span className="text-emerald-300">"{coverType || "LAB REPORT"}"</span>,</p>

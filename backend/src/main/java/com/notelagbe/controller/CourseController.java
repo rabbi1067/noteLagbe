@@ -81,37 +81,47 @@ public class CourseController {
     @GetMapping("/{code}/download-zip")
     public void downloadOfflineStudyPack(
             @PathVariable String code,
-            @RequestParam(required = false) String token,
             @AuthenticationPrincipal CustomUserDetails userDetails,
             HttpServletResponse response) throws IOException {
         com.notelagbe.entity.User user = userDetails != null ? userDetails.getUser() : null;
         if (user == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
-            response.getOutputStream().write("{\"success\":false,\"message\":\"Login required to download offline study pack\"}".getBytes(StandardCharsets.UTF_8));
+            response.getOutputStream().write(jsonError("Login required to download offline study pack").getBytes(StandardCharsets.UTF_8));
             return;
         }
 
         try {
             courseService.verifyCourseUnlockedForDownload(code, user);
             response.setContentType("application/zip");
-            response.setHeader("Content-Disposition", "attachment; filename=\"" + code.toUpperCase() + "_Offline_Study_Pack.zip\"");
+            String safeFileCode = code.replaceAll("[^a-zA-Z0-9_-]", "").toUpperCase();
+            if (safeFileCode.isEmpty()) safeFileCode = "COURSE";
+            response.setHeader("Content-Disposition", "attachment; filename=\"" + safeFileCode + "_Offline_Study_Pack.zip\"");
             courseService.generateOfflineStudyPackZip(code, user, response.getOutputStream());
             try {
-                activityLogService.logActivity("OFFLINE_PACK_DOWNLOAD", "CONTENT", "Student downloaded offline study pack for: " + code.toUpperCase(), user, httpRequest);
+                activityLogService.logActivity("OFFLINE_PACK_DOWNLOAD", "CONTENT", "Student downloaded offline study pack for: " + safeFileCode, user, httpRequest);
             } catch (Exception ignored) {}
         } catch (com.notelagbe.exception.ApiException e) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.setContentType("application/json");
-            response.getOutputStream().write(("{\"success\":false,\"message\":\"" + e.getMessage() + "\"}").getBytes(StandardCharsets.UTF_8));
+            response.getOutputStream().write(jsonError(e.getMessage()).getBytes(StandardCharsets.UTF_8));
         } catch (com.notelagbe.exception.ResourceNotFoundException e) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             response.setContentType("application/json");
-            response.getOutputStream().write(("{\"success\":false,\"message\":\"" + e.getMessage() + "\"}").getBytes(StandardCharsets.UTF_8));
+            response.getOutputStream().write(jsonError(e.getMessage()).getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             response.setContentType("application/json");
-            response.getOutputStream().write(("{\"success\":false,\"message\":\"Failed to generate offline ZIP: " + e.getMessage() + "\"}").getBytes(StandardCharsets.UTF_8));
+            response.getOutputStream().write(jsonError("Failed to generate offline study pack. Please try again later.").getBytes(StandardCharsets.UTF_8));
         }
+    }
+
+    private String jsonError(String message) {
+        String clean = message == null ? "Unexpected error" : message
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\r", "")
+                .replace("\n", " ");
+        return "{\"success\":false,\"message\":\"" + clean + "\"}";
     }
 }

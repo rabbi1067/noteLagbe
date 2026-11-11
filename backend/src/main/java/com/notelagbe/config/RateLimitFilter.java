@@ -135,14 +135,21 @@ public class RateLimitFilter implements Filter {
             }
         }
 
-        // 2. Localhost GET exemption to keep Next.js HMR & SSR blazing fast in development
-        boolean isLocal = "127.0.0.1".equals(clientIp) || "0:0:0:0:0:0:0:1".equals(clientIp) || "localhost".equalsIgnoreCase(clientIp);
+        // 2. Direct loopback GET exemption to keep local Next.js HMR & SSR fast in development
+        // Uses actual socket remoteAddr (never spoofable X-Forwarded-For)
+        String remoteAddr = request.getRemoteAddr();
+        boolean isLocal = "127.0.0.1".equals(remoteAddr)
+                || "0:0:0:0:0:0:0:1".equals(remoteAddr)
+                || "::1".equals(remoteAddr);
         if (isLocal && !isMutation) {
             filterChain.doFilter(servletRequest, servletResponse);
             return;
         }
 
         // 3. Multi-tier Token Bucket Enforcement
+        if (buckets.size() > 25_000) {
+            cleanupIdleBuckets();
+        }
         String tierKey = getTierKey(path);
         String bucketKey = clientIp + ":" + tierKey;
 
@@ -192,15 +199,41 @@ public class RateLimitFilter implements Filter {
     }
 
     private String getClientIP(HttpServletRequest request) {
+        String cfIp = sanitizeIpCandidate(request.getHeader("CF-Connecting-IP"));
+        if (cfIp != null) {
+            return cfIp;
+        }
         String xfHeader = request.getHeader("X-Forwarded-For");
         if (xfHeader != null && !xfHeader.isEmpty()) {
-            return xfHeader.split(",")[0].trim();
+            String[] parts = xfHeader.split(",");
+            for (String part : parts) {
+                String candidate = sanitizeIpCandidate(part);
+                if (candidate != null && !isLoopbackLiteral(candidate)) {
+                    return candidate;
+                }
+            }
         }
-        String cfIp = request.getHeader("CF-Connecting-IP");
-        if (cfIp != null && !cfIp.isEmpty()) {
-            return cfIp.trim();
+        String remote = sanitizeIpCandidate(request.getRemoteAddr());
+        return remote != null ? remote : "unknown";
+    }
+
+    private String sanitizeIpCandidate(String raw) {
+        if (raw == null) return null;
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty() || trimmed.length() > 45) return null;
+        for (int i = 0; i < trimmed.length(); i++) {
+            char ch = trimmed.charAt(i);
+            boolean allowed = (ch >= '0' && ch <= '9')
+                    || (ch >= 'a' && ch <= 'f')
+                    || (ch >= 'A' && ch <= 'F')
+                    || ch == '.' || ch == ':';
+            if (!allowed) return null;
         }
-        return request.getRemoteAddr();
+        return trimmed;
+    }
+
+    private boolean isLoopbackLiteral(String ip) {
+        return "127.0.0.1".equals(ip) || "0:0:0:0:0:0:0:1".equals(ip) || "::1".equals(ip);
     }
 
     /**

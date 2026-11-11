@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { api, getToken, setToken, removeToken } from "@/lib/api";
+import { api, getToken, setToken, removeToken, warmupBackend } from "@/lib/api";
 import { subscribeToSync, SyncPayload } from "@/lib/sync";
 import { toast } from "sonner";
 import AccountBlockedModal, { AccountBlockedNotice } from "@/components/AccountBlockedModal";
@@ -158,6 +158,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [clearLocalSession, forceBlockedLogout, router]);
+
+  useEffect(() => {
+    void warmupBackend();
+  }, []);
 
   useEffect(() => {
     const storedToken = getToken();
@@ -360,12 +364,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return subscribeToSync(handleSync);
   }, [clearLocalSession, forceBlockedLogout, refreshProfile, router]);
 
+  const applySessionFromAuthResponse = useCallback(
+    (res: {
+      id: number;
+      name: string;
+      email: string;
+      studentId?: string;
+      role: UserProfile["role"];
+      avatarUrl?: string;
+      profile?: UserProfile;
+    }) => {
+      const nextProfile: UserProfile = res.profile
+        ? res.profile
+        : {
+            id: res.id,
+            name: res.name,
+            email: res.email,
+            studentId: res.studentId,
+            role: res.role,
+            avatarUrl: res.avatarUrl,
+            hasActiveSubscription: false,
+            planName: "Free Preview / Expired",
+            maxCoursesAllowed: 0,
+            usedCoursesCount: 0,
+            remainingCoursesCount: 0,
+            unlimited: false,
+            unlockedCourseCodes: [],
+          };
+      setUser(nextProfile);
+      userRef.current = nextProfile;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("notelagbe_user", JSON.stringify(nextProfile));
+      }
+      if (!res.profile) {
+        // Hydrate full subscription details asynchronously if backend omitted embedded profile
+        void refreshProfile();
+      }
+    },
+    [refreshProfile]
+  );
+
   const login = async (email: string, pass: string) => {
     try {
       const res = await api.auth.login({ email, password: pass });
       setToken(res.token);
       setTokenState(res.token);
-      await refreshProfile();
+      applySessionFromAuthResponse(res);
       setShowAuthModal(false);
       setBlockedNotice(null);
       toast.success(`Welcome back, ${res.name}!`);
@@ -393,7 +437,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await api.auth.register({ name, email, password: pass, studentId, phone });
     setToken(res.token);
     setTokenState(res.token);
-    await refreshProfile();
+    applySessionFromAuthResponse(res);
     setShowAuthModal(false);
     toast.success("Student account created successfully! Welcome to NoteLagbe.");
     router.push("/dashboard");
