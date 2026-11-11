@@ -618,6 +618,45 @@ export const api = {
       request<{ success: boolean; message: string }>(`/admin/chat/users/${userId}/block`, { method: "POST" }),
     unblockUserFromChat: (userId: number) =>
       request<{ success: boolean; message: string }>(`/admin/chat/users/${userId}/unblock`, { method: "POST" }),
+    getChatRetention: () =>
+      request<{
+        retentionDays: number;
+        defaultRetentionDays: number;
+        minRetentionDays: number;
+        maxRetentionDays: number;
+        allowedOptions: number[];
+        totalActiveMessages: number;
+        softDeletedMessages: number;
+        messagesDueForPurge: number;
+        oldestMessageAt: string | null;
+      }>("/admin/chat/retention"),
+    updateChatRetention: (retentionDays: number) =>
+      request<{
+        retentionDays: number;
+        defaultRetentionDays: number;
+        minRetentionDays: number;
+        maxRetentionDays: number;
+        allowedOptions: number[];
+        totalActiveMessages: number;
+        softDeletedMessages: number;
+        messagesDueForPurge: number;
+        oldestMessageAt: string | null;
+      }>("/admin/chat/retention", {
+        method: "PUT",
+        body: JSON.stringify({ retentionDays }),
+      }),
+    purgeOldChatMessages: (olderThanDays?: number) =>
+      request<{
+        success: boolean;
+        purgedCount: number;
+        filesDeleted: number;
+        olderThanDays: number;
+        cutoff: string;
+        message: string;
+      }>("/admin/chat/purge", {
+        method: "POST",
+        body: JSON.stringify(olderThanDays !== undefined ? { olderThanDays } : {}),
+      }),
   },
 
   // Community Live Chat API

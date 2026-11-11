@@ -966,4 +966,55 @@ public class AdminController {
                 formatActorPrefix(actor) + " unblocked user ID #" + userId + " in community live chat");
         return ResponseEntity.ok(res);
     }
+
+    @GetMapping("/chat/retention")
+    public ResponseEntity<Map<String, Object>> getChatRetentionStatus() {
+        return ResponseEntity.ok(chatService.getRetentionStatus());
+    }
+
+    @PutMapping("/chat/retention")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<Map<String, Object>> updateChatRetention(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        Object rawDays = body != null ? body.get("retentionDays") : null;
+        if (rawDays == null) {
+            throw new ApiException("retentionDays is required.");
+        }
+        int days;
+        try {
+            days = Integer.parseInt(rawDays.toString().trim());
+        } catch (NumberFormatException ex) {
+            throw new ApiException("retentionDays must be a valid integer.");
+        }
+
+        User actor = resolveActor(userDetails);
+        Map<String, Object> updated = chatService.updateRetentionDays(days);
+        logAdminAction(actor, "CHAT_RETENTION_UPDATE", "SYSTEM",
+                formatActorPrefix(actor) + " updated live chat rolling retention window to " + days + " days");
+        return ResponseEntity.ok(updated);
+    }
+
+    @PostMapping("/chat/purge")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<Map<String, Object>> purgeExpiredChatMessagesNow(
+            @RequestBody(required = false) Map<String, Object> body,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        Integer olderThanDays = null;
+        if (body != null && body.get("olderThanDays") != null) {
+            try {
+                olderThanDays = Integer.parseInt(body.get("olderThanDays").toString().trim());
+            } catch (NumberFormatException ex) {
+                throw new ApiException("olderThanDays must be a valid integer.");
+            }
+        }
+        User actor = resolveActor(userDetails);
+        Map<String, Object> result = chatService.purgeMessagesOlderThanDays(olderThanDays);
+        int daysUsed = ((Number) result.get("olderThanDays")).intValue();
+        int purgedCount = ((Number) result.get("purgedCount")).intValue();
+        logAdminAction(actor, "CHAT_PURGE", "SYSTEM",
+                formatActorPrefix(actor) + " executed manual live chat FIFO purge (>" + daysUsed
+                        + " days): permanently deleted " + purgedCount + " expired message(s)");
+        return ResponseEntity.ok(result);
+    }
 }

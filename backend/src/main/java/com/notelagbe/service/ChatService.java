@@ -4,10 +4,12 @@ import com.notelagbe.dto.ChatMessageDto;
 import com.notelagbe.dto.ChatMessageRequest;
 import com.notelagbe.entity.ChatMessage;
 import com.notelagbe.entity.Role;
+import com.notelagbe.entity.SystemSetting;
 import com.notelagbe.entity.User;
 import com.notelagbe.exception.ApiException;
 import com.notelagbe.exception.ResourceNotFoundException;
 import com.notelagbe.repository.ChatMessageRepository;
+import com.notelagbe.repository.SystemSettingRepository;
 import com.notelagbe.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,22 +32,31 @@ public class ChatService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatService.class);
 
+    public static final String SETTING_KEY_CHAT_RETENTION_DAYS = "CHAT_RETENTION_DAYS";
+    public static final int DEFAULT_RETENTION_DAYS = 30;
+    public static final int MIN_RETENTION_DAYS = 7;
+    public static final int MAX_RETENTION_DAYS = 365;
+    public static final List<Integer> ALLOWED_RETENTION_PRESETS = List.of(7, 15, 30, 60, 90);
+
     private final ChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
     private final ProfanityFilterService profanityFilterService;
     private final LiveSyncService liveSyncService;
     private final InputSanitizationService inputSanitizationService;
+    private final SystemSettingRepository systemSettingRepository;
 
     public ChatService(ChatMessageRepository chatMessageRepository,
                        UserRepository userRepository,
                        ProfanityFilterService profanityFilterService,
                        LiveSyncService liveSyncService,
-                       InputSanitizationService inputSanitizationService) {
+                       InputSanitizationService inputSanitizationService,
+                       SystemSettingRepository systemSettingRepository) {
         this.chatMessageRepository = chatMessageRepository;
         this.userRepository = userRepository;
         this.profanityFilterService = profanityFilterService;
         this.liveSyncService = liveSyncService;
         this.inputSanitizationService = inputSanitizationService;
+        this.systemSettingRepository = systemSettingRepository;
     }
 
     // High-performance thread-safe memory cache to eliminate database load on repeated polls
@@ -72,7 +83,10 @@ public class ChatService {
         if (list == null || (now - cachedMessagesTimestamp) > CACHE_TTL_MS) {
             synchronized (cacheLock) {
                 if (cachedMessages == null || (now - cachedMessagesTimestamp) > CACHE_TTL_MS) {
-                    cachedMessages = chatMessageRepository.findTop150ByDeletedFalseOrderByCreatedAtAsc();
+                    List<ChatMessage> latestDesc = chatMessageRepository.findTop150ByDeletedFalseOrderByCreatedAtDesc();
+                    List<ChatMessage> chronological = new ArrayList<>(latestDesc);
+                    Collections.reverse(chronological);
+                    cachedMessages = chronological;
                     cachedMessagesTimestamp = System.currentTimeMillis();
                 }
                 list = cachedMessages;
@@ -367,5 +381,134 @@ public class ChatService {
 
     public int getActiveUsersCount() {
         return liveSyncService.getActiveClientsCount();
+    }
+
+    public int getRetentionDays() {
+        return systemSettingRepository.findBySettingKey(SETTING_KEY_CHAT_RETENTION_DAYS)
+                .map(SystemSetting::getSettingValue)
+                .map(val -> {
+                    try {
+                        int parsed = Integer.parseInt(val.trim());
+                        if (parsed >= MIN_RETENTION_DAYS && parsed <= MAX_RETENTION_DAYS) {
+                            return parsed;
+                        }
+                    } catch (NumberFormatException ignored) {
+                    }
+                    return DEFAULT_RETENTION_DAYS;
+                })
+                .orElse(DEFAULT_RETENTION_DAYS);
+    }
+
+    @Transactional
+    public Map<String, Object> updateRetentionDays(int days) {
+        if (days < MIN_RETENTION_DAYS || days > MAX_RETENTION_DAYS) {
+            throw new ApiException("Chat retention window must be between " + MIN_RETENTION_DAYS + " and " + MAX_RETENTION_DAYS + " days.");
+        }
+        SystemSetting setting = systemSettingRepository.findBySettingKey(SETTING_KEY_CHAT_RETENTION_DAYS)
+                .orElse(new SystemSetting(SETTING_KEY_CHAT_RETENTION_DAYS, String.valueOf(days)));
+        setting.setSettingValue(String.valueOf(days));
+        systemSettingRepository.save(setting);
+        liveSyncService.broadcast("chat", "retention_updated", days);
+        log.info("[Chat Retention] Super Admin updated rolling chat retention policy to {} days.", days);
+        return getRetentionStatus();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getRetentionStatus() {
+        int retentionDays = getRetentionDays();
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(retentionDays);
+        long totalActiveMessages = chatMessageRepository.countActiveMessages();
+        long softDeletedMessages = chatMessageRepository.countSoftDeletedMessages();
+        long messagesDueForPurge = chatMessageRepository.countPurgeableMessages(cutoff);
+        String oldestMessageAt = chatMessageRepository.findTop1ByDeletedFalseOrderByCreatedAtAsc()
+                .map(m -> m.getCreatedAt() != null ? m.getCreatedAt().toString() : null)
+                .orElse(null);
+
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("retentionDays", retentionDays);
+        status.put("defaultRetentionDays", DEFAULT_RETENTION_DAYS);
+        status.put("minRetentionDays", MIN_RETENTION_DAYS);
+        status.put("maxRetentionDays", MAX_RETENTION_DAYS);
+        status.put("allowedOptions", ALLOWED_RETENTION_PRESETS);
+        status.put("totalActiveMessages", totalActiveMessages);
+        status.put("softDeletedMessages", softDeletedMessages);
+        status.put("messagesDueForPurge", messagesDueForPurge);
+        status.put("oldestMessageAt", oldestMessageAt);
+        return status;
+    }
+
+    @Transactional
+    public Map<String, Object> purgeMessagesOlderThanDays(Integer olderThanDays) {
+        int targetDays = (olderThanDays != null) ? olderThanDays : getRetentionDays();
+        if (targetDays < MIN_RETENTION_DAYS || targetDays > MAX_RETENTION_DAYS) {
+            throw new ApiException("Purge retention window must be between " + MIN_RETENTION_DAYS + " and " + MAX_RETENTION_DAYS + " days.");
+        }
+
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(targetDays);
+        List<ChatMessage> expired = chatMessageRepository.findPurgeableMessages(cutoff);
+        int filesDeleted = 0;
+
+        if (!expired.isEmpty()) {
+            for (ChatMessage msg : expired) {
+                filesDeleted += deleteLocalChatMediaIfPresent(msg);
+                if (msg.getLikedUserIds() != null) {
+                    msg.getLikedUserIds().clear();
+                }
+            }
+            chatMessageRepository.deleteAll(expired);
+            invalidateCache();
+            liveSyncService.broadcast("chat", "messages_purged", expired.size());
+            log.info("[Chat Auto-Purge] Permanently removed {} chat messages older than {} days ({} local media files deleted).",
+                    expired.size(), targetDays, filesDeleted);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", true);
+        result.put("purgedCount", expired.size());
+        result.put("filesDeleted", filesDeleted);
+        result.put("olderThanDays", targetDays);
+        result.put("cutoff", cutoff.toString());
+        result.put("message", expired.isEmpty()
+                ? "No chat messages exceeded the " + targetDays + "-day retention window."
+                : "Permanently purged " + expired.size() + " expired chat message(s) older than " + targetDays + " days.");
+        return result;
+    }
+
+    /**
+     * Rolling FIFO Chat Retention Engine: Runs daily at 2:00 AM server time.
+     * Permanently deletes expired messages day-by-day (default > 30 days) without wiping recent conversations.
+     */
+    @Scheduled(cron = "0 0 2 * * ?")
+    @Transactional
+    public void purgeExpiredChatMessages() {
+        try {
+            int retentionDays = getRetentionDays();
+            purgeMessagesOlderThanDays(retentionDays);
+        } catch (Exception ex) {
+            log.error("[Chat Auto-Purge] Scheduled retention sweep failed: {}", ex.getMessage(), ex);
+        }
+    }
+
+    private int deleteLocalChatMediaIfPresent(ChatMessage msg) {
+        int removed = 0;
+        Path uploadsRoot = Paths.get("uploads").toAbsolutePath().normalize();
+        for (String url : Arrays.asList(msg.getVoiceUrl(), msg.getImageUrl())) {
+            if (url == null || url.isBlank() || !url.startsWith("/uploads/")) {
+                continue;
+            }
+            String relative = url.substring("/uploads/".length()).replace('\\', '/');
+            if (relative.isBlank() || relative.contains("..")) {
+                continue;
+            }
+            try {
+                Path target = uploadsRoot.resolve(relative).normalize();
+                if (target.startsWith(uploadsRoot) && Files.deleteIfExists(target)) {
+                    removed++;
+                }
+            } catch (Exception ex) {
+                log.warn("[Chat Retention] Could not delete expired chat media {}: {}", url, ex.getMessage());
+            }
+        }
+        return removed;
     }
 }

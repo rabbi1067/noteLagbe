@@ -505,6 +505,18 @@ export default function AdminDashboardPage() {
   const [adminPreviewImage, setAdminPreviewImage] = useState<string | null>(null);
   const [playingVoiceId, setPlayingVoiceId] = useState<number | null>(null);
   const adminAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [chatRetention, setChatRetention] = useState<{
+    retentionDays: number;
+    defaultRetentionDays: number;
+    allowedOptions: number[];
+    totalActiveMessages: number;
+    softDeletedMessages: number;
+    messagesDueForPurge: number;
+    oldestMessageAt: string | null;
+  } | null>(null);
+  const [selectedChatRetentionDays, setSelectedChatRetentionDays] = useState<number>(30);
+  const [savingChatRetention, setSavingChatRetention] = useState(false);
+  const [purgingChatMessages, setPurgingChatMessages] = useState(false);
 
   // Department Management & Directory States
   const [departmentSearch, setDepartmentSearch] = useState("");
@@ -1041,7 +1053,7 @@ export default function AdminDashboardPage() {
       setLoading(true);
     }
     try {
-      const [sData, rData, pData, staffData, cData, wData, cList, tList, settingsData, revData, profileData, noticeData, chatMsgs, pinnedChat, chatActiveData] = await Promise.all([
+      const [sData, rData, pData, staffData, cData, wData, cList, tList, settingsData, revData, profileData, noticeData, chatMsgs, pinnedChat, chatActiveData, chatRetentionData] = await Promise.all([
         api.admin.getStats().catch(() => null),
         api.admin.getResources().catch(() => []),
         isSuperAdmin ? api.admin.getPayments().catch(() => []) : Promise.resolve([]),
@@ -1063,6 +1075,7 @@ export default function AdminDashboardPage() {
         api.chat.getMessages().catch(() => []),
         api.chat.getPinned().catch(() => null),
         api.chat.getActiveCount().catch(() => ({ activeCount: 0 })),
+        api.admin.getChatRetention().catch(() => null),
       ]);
       setStats(sData);
       setResources(rData || []);
@@ -1087,6 +1100,10 @@ export default function AdminDashboardPage() {
       setChatMessages(chatMsgs || []);
       setPinnedChatMessage(pinnedChat || null);
       setActiveChatUsersCount(chatActiveData?.activeCount ?? 0);
+      if (chatRetentionData) {
+        setChatRetention(chatRetentionData);
+        setSelectedChatRetentionDays(chatRetentionData.retentionDays ?? 30);
+      }
       if (settingsData && typeof settingsData.emailNotificationsEnabled === "boolean") {
         setEmailNotificationsEnabled(settingsData.emailNotificationsEnabled);
         if (typeof settingsData.smtpConfigured === "boolean") {
@@ -8093,6 +8110,200 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                 </div>
               </div>
 
+              {/* Rolling FIFO Retention & Storage Governance Banner */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-50 via-white to-blue-50/40 dark:from-[#0c1322] dark:via-[#0e172a] dark:to-indigo-950/20 border border-slate-200 dark:border-slate-800/90 shadow-sm backdrop-blur-xl">
+                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5">
+                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500/15 to-indigo-500/15 border border-blue-500/20 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">
+                      <Clock className="w-5 h-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                          {language === "bn"
+                            ? "রোলিং চ্যাট রিটেনশন ও অটো-পার্জ ইঞ্জিন"
+                            : "Rolling FIFO Chat Retention & Auto-Purge"}
+                        </h4>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-500/15 text-blue-600 dark:text-blue-300 border border-blue-500/20">
+                          {language === "bn"
+                            ? `${chatRetention?.retentionDays ?? 30} দিন সক্রিয়`
+                            : `${chatRetention?.retentionDays ?? 30}-Day Active Window`}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          {language === "bn" ? "দৈনিক রাত ২:০০ টায় অটো-ক্লিন" : "Daily Auto-Purge @ 2:00 AM"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl">
+                        {language === "bn"
+                          ? `ডিফল্ট ৩০ দিনের রোলিং উইন্ডো অনুযায়ী মেয়াদোত্তীর্ণ পুরোনো দিনের মেসেজ ও মিডিয়া প্রতিদিন স্বয়ংক্রিয়ভাবে স্থায়ী ডিলিট হয়; সাম্প্রতিক ${chatRetention?.retentionDays ?? 30} দিনের চ্যাট অক্ষত থাকে।`
+                          : `Keeps the most recent ${chatRetention?.retentionDays ?? 30} days intact and permanently prunes expired day(s) & media attachments daily via FIFO rolling cleanup instead of wiping active conversations.`}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                        <span>
+                          {language === "bn" ? "মোট সক্রিয় মেসেজ:" : "Stored Active:"}{" "}
+                          <strong className="text-slate-800 dark:text-slate-200">
+                            {chatRetention?.totalActiveMessages ?? chatMessages.length}
+                          </strong>
+                        </span>
+                        <span className="text-slate-300 dark:text-slate-700">•</span>
+                        <span>
+                          {language === "bn" ? "মেয়াদোত্তীর্ণ পার্জ কিউ:" : "Expired Queue:"}{" "}
+                          <strong
+                            className={
+                              (chatRetention?.messagesDueForPurge ?? 0) > 0
+                                ? "text-amber-600 dark:text-amber-400"
+                                : "text-slate-800 dark:text-slate-200"
+                            }
+                          >
+                            {chatRetention?.messagesDueForPurge ?? 0}
+                          </strong>
+                        </span>
+                        {chatRetention?.oldestMessageAt && (
+                          <>
+                            <span className="text-slate-300 dark:text-slate-700">•</span>
+                            <span>
+                              {language === "bn" ? "সবচেয়ে পুরোনো মেসেজ:" : "Oldest Active:"}{" "}
+                              <strong className="text-slate-800 dark:text-slate-200">
+                                {new Date(chatRetention.oldestMessageAt).toLocaleDateString()}
+                              </strong>
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {isSuperAdmin ? (
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700/80 rounded-xl px-2.5 py-1.5">
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                          {language === "bn" ? "সীমা:" : "Window:"}
+                        </span>
+                        <select
+                          aria-label={language === "bn" ? "চ্যাট রিটেনশন সময়সীমা" : "Chat Retention Window"}
+                          value={selectedChatRetentionDays}
+                          onChange={(e) => setSelectedChatRetentionDays(Number(e.target.value))}
+                          className="bg-transparent text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                        >
+                          {(chatRetention?.allowedOptions || [7, 15, 30, 60, 90]).map((daysOption) => (
+                            <option key={daysOption} value={daysOption} className="bg-white dark:bg-slate-900">
+                              {daysOption === 30
+                                ? language === "bn"
+                                  ? "৩০ দিন (ডিফল্ট)"
+                                  : "30 Days (Default)"
+                                : language === "bn"
+                                ? `${daysOption} দিন`
+                                : `${daysOption} Days`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={
+                          savingChatRetention ||
+                          selectedChatRetentionDays === (chatRetention?.retentionDays ?? 30)
+                        }
+                        onClick={async () => {
+                          setSavingChatRetention(true);
+                          try {
+                            const updated = await api.admin.updateChatRetention(selectedChatRetentionDays);
+                            setChatRetention(updated);
+                            setSelectedChatRetentionDays(updated.retentionDays);
+                            toast.success(
+                              language === "bn"
+                                ? `চ্যাট রিটেনশন নীতি ${updated.retentionDays} দিনে আপডেট হয়েছে।`
+                                : `Chat retention updated to ${updated.retentionDays}-day rolling window.`
+                            );
+                          } catch (err: any) {
+                            toast.error(err?.message || "Failed to update chat retention policy.");
+                          } finally {
+                            setSavingChatRetention(false);
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500 disabled:opacity-45 disabled:cursor-not-allowed shadow-sm transition-all"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>
+                          {savingChatRetention
+                            ? language === "bn"
+                              ? "সংরক্ষণ হচ্ছে..."
+                              : "Saving..."
+                            : language === "bn"
+                            ? "নীতি সংরক্ষণ"
+                            : "Save Policy"}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={purgingChatMessages}
+                        onClick={() => {
+                          const targetDays = chatRetention?.retentionDays ?? selectedChatRetentionDays ?? 30;
+                          openDeleteConfirm({
+                            title:
+                              language === "bn"
+                                ? "মেয়াদোত্তীর্ণ চ্যাট স্থায়ীভাবে ডিলিট"
+                                : "Purge Expired Chat Messages",
+                            itemType: "Live Chat Archive",
+                            itemName:
+                              language === "bn"
+                                ? `${targetDays} দিনের আগের সব মেসেজ ও মিডিয়া`
+                                : `Messages older than ${targetDays} days`,
+                            warningText:
+                              language === "bn"
+                                ? `এতে শুধুমাত্র ${targetDays} দিনের চেয়ে পুরোনো মেসেজ এবং সংযুক্ত ছবি/ভয়েস ফাইল স্থায়ীভাবে মুছে যাবে। সাম্প্রতিক ${targetDays} দিনের চ্যাট অক্ষত থাকবে।`
+                                : `Only unpinned messages older than ${targetDays} days (and their local media uploads) will be permanently deleted. The most recent ${targetDays} days remain intact.`,
+                            confirmButtonText:
+                              language === "bn" ? "এখনই পার্জ করুন" : "Purge Expired Now",
+                            onConfirm: async () => {
+                              setPurgingChatMessages(true);
+                              try {
+                                const res = await api.admin.purgeOldChatMessages(targetDays);
+                                const [msgs, pinned, retentionData] = await Promise.all([
+                                  api.chat.getMessages().catch(() => []),
+                                  api.chat.getPinned().catch(() => null),
+                                  api.admin.getChatRetention().catch(() => null),
+                                ]);
+                                setChatMessages(msgs || []);
+                                setPinnedChatMessage(pinned || null);
+                                if (retentionData) setChatRetention(retentionData);
+                                showDeleteSuccess(
+                                  language === "bn" ? "চ্যাট পার্জ সম্পন্ন" : "Chat Retention Purge Complete",
+                                  res.message || `Purged ${res.purgedCount} expired message(s).`,
+                                  `${res.purgedCount} message(s)`
+                                );
+                              } catch (err: any) {
+                                toast.error(err?.message || "Failed to purge expired chat messages.");
+                                throw err;
+                              } finally {
+                                setPurgingChatMessages(false);
+                              }
+                            },
+                          });
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25 hover:bg-rose-500/20 disabled:opacity-50 transition-all"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>
+                          {language === "bn"
+                            ? `পুরোনো পার্জ (>${chatRetention?.retentionDays ?? 30}d)`
+                            : `Purge Expired (>${chatRetention?.retentionDays ?? 30}d)`}
+                        </span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-[11px] font-medium text-slate-600 dark:text-slate-400 shrink-0">
+                      <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />
+                      <span>
+                        {language === "bn" ? "সুপার অ্যাডমিন দ্বারা নিয়ন্ত্রিত" : "Policy Managed by Super Admin"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Search, Filter & Actions Bar */}
               <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#0c1322] border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
                 <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
@@ -8116,14 +8327,19 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                     <button
                       onClick={async () => {
                         try {
-                          const [msgs, pinned, activeData] = await Promise.all([
+                          const [msgs, pinned, activeData, retentionData] = await Promise.all([
                             api.chat.getMessages(),
                             api.chat.getPinned().catch(() => null),
                             api.chat.getActiveCount().catch(() => ({ activeCount: 0 })),
+                            api.admin.getChatRetention().catch(() => null),
                           ]);
                           setChatMessages(msgs || []);
                           setPinnedChatMessage(pinned || null);
                           setActiveChatUsersCount(activeData?.activeCount ?? 0);
+                          if (retentionData) {
+                            setChatRetention(retentionData);
+                            setSelectedChatRetentionDays(retentionData.retentionDays ?? 30);
+                          }
                           toast.success("Chat stream and active metrics refreshed.");
                         } catch {
                           toast.error("Failed to refresh chat.");
