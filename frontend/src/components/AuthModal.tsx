@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { 
@@ -35,6 +36,7 @@ export default function AuthModal() {
 function AuthModalContent() {
   const { setShowAuthModal, login, register } = useAuth();
   const { language } = useLanguage();
+  const router = useRouter();
   
   // Modes: "signin" | "register" | "forgot"
   const [authMode, setAuthMode] = useState<"signin" | "register" | "forgot">("signin");
@@ -69,7 +71,9 @@ function AuthModalContent() {
 
   useEffect(() => {
     void warmupBackend();
-  }, []);
+    router.prefetch("/admin");
+    router.prefetch("/dashboard");
+  }, [router]);
 
   useEffect(() => {
     if (!isAnyAuthPending) return;

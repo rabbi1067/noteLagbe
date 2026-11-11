@@ -497,7 +497,7 @@ public class CourseService {
         liveSyncService.broadcast("teacher_course", "updated", teacherId);
     }
 
-    @CacheEvict(value = {"courses", "course_details"}, allEntries = true)
+    @CacheEvict(value = {"courses", "course_details", "course_codes"}, allEntries = true)
     @Transactional
     public Course createCourse(Course course, Long initialTeacherId) {
         if (course.getCode() == null || course.getCode().trim().isEmpty()) {
@@ -523,7 +523,7 @@ public class CourseService {
         return saved;
     }
 
-    @CacheEvict(value = {"courses", "course_details"}, allEntries = true)
+    @CacheEvict(value = {"courses", "course_details", "course_codes"}, allEntries = true)
     @Transactional
     public Course updateCourse(String code, Map<String, Object> payload) {
         Course course = courseRepository.findByCodeIgnoreCase(code.trim())
@@ -557,7 +557,7 @@ public class CourseService {
         return updated;
     }
 
-    @CacheEvict(value = {"courses", "course_details"}, allEntries = true)
+    @CacheEvict(value = {"courses", "course_details", "course_codes"}, allEntries = true)
     @Transactional
     public void deleteCourse(String code) {
         Course course = courseRepository.findByCodeIgnoreCase(code.trim())

@@ -23,7 +23,9 @@ export interface ChatMessageDto {
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
-const RAW_PUBLIC_BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL?.trim() || "";
+const RAW_PUBLIC_BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL?.trim() ||
+  (process.env.NODE_ENV !== "development" ? "https://notelagbe-backend.onrender.com" : "");
 const NORMALIZED_PUBLIC_BACKEND_API_URL =
   RAW_PUBLIC_BACKEND_URL && /^https?:\/\//i.test(RAW_PUBLIC_BACKEND_URL)
     ? `${RAW_PUBLIC_BACKEND_URL.replace(/\/api\/?$/, "").replace(/\/+$/, "")}/api`
@@ -42,12 +44,18 @@ export function resolveDirectBackendApiUrl(): string | null {
     return null;
   }
   if (typeof window !== "undefined") {
-    const isLocalPage =
-      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const hostname = window.location.hostname;
+    const isLocalPage = hostname === "localhost" || hostname === "127.0.0.1";
     const pointsLocal =
       NORMALIZED_PUBLIC_BACKEND_API_URL.includes("localhost") ||
       NORMALIZED_PUBLIC_BACKEND_API_URL.includes("127.0.0.1");
     if (isLocalPage && !pointsLocal) {
+      return null;
+    }
+    const explicitPublicBackend = Boolean(process.env.NEXT_PUBLIC_BACKEND_URL?.trim());
+    const isTrustedCorsHost =
+      hostname.endsWith(".vercel.app") || hostname.endsWith(".onrender.com");
+    if (!explicitPublicBackend && !isTrustedCorsHost) {
       return null;
     }
   }
@@ -248,6 +256,15 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
 
   const primaryBase = API_BASE_URL.replace(/\/+$/, "");
   const directBase = resolveDirectBackendApiUrl();
+  // On deployed origins using "/api" rewrites, target the direct CORS backend origin first
+  // so login/admin requests bypass serverless proxy hops and reuse the warmed connection.
+  const useDirectFirst = Boolean(directBase && primaryBase === "/api");
+  const requestPrimaryBase = useDirectFirst ? directBase! : primaryBase;
+  const requestFallbackBase = useDirectFirst
+    ? primaryBase
+    : directBase && directBase !== primaryBase
+      ? directBase
+      : primaryBase;
   const firstTimeoutMs = isFormData ? 45_000 : isAuthEndpoint ? 20_000 : 16_000;
   const retryTimeoutMs = isAuthEndpoint ? 30_000 : 24_000;
   const requestInit: RequestInit = {
@@ -269,15 +286,16 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
   let lastNetworkErr: unknown = null;
 
   try {
-    response = await fetchWithTimeout(`${primaryBase}${endpoint}`, requestInit, firstTimeoutMs);
+    response = await fetchWithTimeout(`${requestPrimaryBase}${endpoint}`, requestInit, firstTimeoutMs);
     if (
       canRetryOnColdStart &&
       (response.status === 502 || response.status === 503 || response.status === 504)
     ) {
       emitWakingNotice(2);
-      await new Promise((r) => setTimeout(r, 600));
-      const fallbackBase = directBase && directBase !== primaryBase ? directBase : primaryBase;
-      response = await fetchWithTimeout(`${fallbackBase}${endpoint}`, requestInit, retryTimeoutMs);
+      if (requestFallbackBase === requestPrimaryBase) {
+        await new Promise((r) => setTimeout(r, 600));
+      }
+      response = await fetchWithTimeout(`${requestFallbackBase}${endpoint}`, requestInit, retryTimeoutMs);
     }
   } catch (err: unknown) {
     lastNetworkErr = err;
@@ -287,9 +305,10 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
     if (canRetryOnColdStart) {
       emitWakingNotice(2);
       try {
-        await new Promise((r) => setTimeout(r, 600));
-        const fallbackBase = directBase && directBase !== primaryBase ? directBase : primaryBase;
-        response = await fetchWithTimeout(`${fallbackBase}${endpoint}`, requestInit, retryTimeoutMs);
+        if (requestFallbackBase === requestPrimaryBase) {
+          await new Promise((r) => setTimeout(r, 600));
+        }
+        response = await fetchWithTimeout(`${requestFallbackBase}${endpoint}`, requestInit, retryTimeoutMs);
       } catch (retryErr: unknown) {
         lastNetworkErr = retryErr;
         response = null;

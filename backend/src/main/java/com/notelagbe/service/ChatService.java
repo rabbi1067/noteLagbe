@@ -49,6 +49,9 @@ public class ChatService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private CloudinaryService cloudinaryService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.notelagbe.security.UserDetailsServiceImpl userDetailsServiceImpl;
+
     public void setCloudinaryService(CloudinaryService cloudinaryService) {
         this.cloudinaryService = cloudinaryService;
     }
@@ -345,6 +348,9 @@ public class ChatService {
 
         u.setChatBlocked(blocked);
         userRepository.save(u);
+        if (userDetailsServiceImpl != null) {
+            userDetailsServiceImpl.evictUserCache(u.getEmail());
+        }
 
         liveSyncService.broadcast("user", blocked ? "chat_blocked" : "chat_unblocked", userId);
         return Map.of(

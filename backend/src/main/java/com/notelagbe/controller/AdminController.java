@@ -55,6 +55,9 @@ public class AdminController {
     @org.springframework.beans.factory.annotation.Value("${app.admin.initial-email:}")
     private String initialAdminEmail;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.notelagbe.security.UserDetailsServiceImpl userDetailsServiceImpl;
+
     public AdminController(AdminService adminService,
                            PaymentService paymentService,
                            ContributionService contributionService,
@@ -181,6 +184,9 @@ public class AdminController {
                 var c = cacheManager.getCache(name);
                 if (c != null) c.clear();
             }
+        }
+        if (userDetailsServiceImpl != null) {
+            userDetailsServiceImpl.evictAllUserCache();
         }
         return ResponseEntity.ok(Map.of("message", "All application caches cleared successfully."));
     }

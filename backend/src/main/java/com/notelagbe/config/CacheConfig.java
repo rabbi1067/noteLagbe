@@ -18,6 +18,7 @@ public class CacheConfig {
     private static final Logger log = LoggerFactory.getLogger(CacheConfig.class);
 
     public static final String CACHE_COURSES = "courses";
+    public static final String CACHE_COURSE_CODES = "course_codes";
     public static final String CACHE_COURSE_DETAILS = "course_details";
     public static final String CACHE_TEACHERS = "teachers";
     public static final String CACHE_TEACHER_DETAILS = "teacher_details";
@@ -38,6 +39,7 @@ public class CacheConfig {
         ConcurrentMapCacheManager manager = new ConcurrentMapCacheManager();
         manager.setCacheNames(Arrays.asList(
                 CACHE_COURSES,
+                CACHE_COURSE_CODES,
                 CACHE_COURSE_DETAILS,
                 CACHE_TEACHERS,
                 CACHE_TEACHER_DETAILS,

@@ -1048,115 +1048,133 @@ export default function AdminDashboardPage() {
     if (isInitial) {
       setLoading(true);
     }
+    const defaultSettings = {
+      emailNotificationsEnabled: true,
+      smtpConfigured: false,
+      provider: "SMTP",
+      smtpSender: "Not Configured",
+      senderEmail: "",
+      senderName: "NoteLagbe • Southeast University",
+      smtpHost: "smtp.gmail.com:587 (TLS)",
+      rawSmtpHost: "smtp.gmail.com",
+      smtpPort: 587,
+      webhookUrl: "",
+      hasSecret: false,
+      secretPreview: "",
+      credentialSource: "NOT_CONFIGURED",
+      statusMessage: "Default",
+    };
+
     try {
-      const [sData, rData, pData, staffData, cData, wData, cList, tList, settingsData, revData, profileData, noticeData, chatMsgs, pinnedChat, chatActiveData, chatRetentionData] = await Promise.all([
-        api.admin.getStats().catch(() => null),
-        api.admin.getResources().catch(() => []),
-        isSuperAdmin ? api.admin.getPayments().catch(() => []) : Promise.resolve([]),
-        api.admin.getStaff().catch(() => []),
-        api.admin.getContributions().catch(() => []),
-        api.admin.getWaivers().catch(() => []),
-        api.courses.getAll().catch(() => []),
-        api.teachers.getAll().catch(() => []),
-        api.admin.getSettings().catch(() => ({
-          emailNotificationsEnabled: true,
-          smtpConfigured: false,
-          provider: "SMTP",
-          smtpSender: "Not Configured",
-          senderEmail: "",
-          senderName: "NoteLagbe • Southeast University",
-          smtpHost: "smtp.gmail.com:587 (TLS)",
-          rawSmtpHost: "smtp.gmail.com",
-          smtpPort: 587,
-          webhookUrl: "",
-          hasSecret: false,
-          secretPreview: "",
-          credentialSource: "NOT_CONFIGURED",
-          statusMessage: "Default",
-        })),
-        api.admin.getReviews().catch(() => []),
-        api.admin.getProfile().catch(() => null),
-        api.admin.getNotices().catch(() => []),
-        api.chat.getMessages().catch(() => []),
-        api.chat.getPinned().catch(() => null),
-        api.chat.getActiveCount().catch(() => ({ activeCount: 0 })),
-        api.admin.getChatRetention().catch(() => null),
-      ]);
-      setStats(sData);
-      setResources(rData || []);
-      setPayments(pData || []);
-      const visibleStaffList = Array.isArray(staffData)
-        ? isSuperAdmin
-          ? staffData
-          : staffData.filter((u: any) => u.role === "ROLE_STUDENT")
-        : [];
-      setStaffList(visibleStaffList);
-      setContributions(cData || []);
-      setWaivers(wData || []);
-      if (isSuperAdmin) {
-        api.admin.getSubscriptions(true).then((subs) => {
-          setActiveSubscribers(subs || []);
-        }).catch(() => {});
-      }
-      // Pre-fetch activity logs stats
-      api.admin.getActivityLogs({ page: 1, size: 15 }).then((logData) => {
-        if (logData) setActivityLogsData(logData);
-      }).catch(() => {});
-      const sortedCourses = sortCoursesNaturally(cList || []);
-      setCourses(sortedCourses);
-      setTeachers(tList || []);
-      setAdminReviews(revData || []);
-      setNotices(noticeData || []);
-      setChatMessages(chatMsgs || []);
-      setPinnedChatMessage(pinnedChat || null);
-      setActiveChatUsersCount(chatActiveData?.activeCount ?? 0);
-      if (chatRetentionData) {
-        setChatRetention(chatRetentionData);
-        setSelectedChatRetentionDays(chatRetentionData.retentionDays ?? 30);
-      }
-      if (settingsData && typeof settingsData.emailNotificationsEnabled === "boolean") {
-        setEmailNotificationsEnabled(settingsData.emailNotificationsEnabled);
-        if (typeof settingsData.smtpConfigured === "boolean") {
-          setSmtpConfigured(settingsData.smtpConfigured);
+      // Launch all requests in parallel, but hydrate fast core overview/profile/settings state
+      // immediately once Tier 1 finishes so entering /admin never stalls on secondary lists.
+      const tier1Promises = Promise.all([
+        api.admin.getStats().catch(() => null).then((sData) => {
+          setStats(sData);
+          return sData;
+        }),
+        api.admin.getProfile().catch(() => null).then((profileData) => {
+          if (profileData) {
+            setAdminProfile(profileData);
+            setAdminName(profileData.name || "");
+            setAdminEmail(profileData.email || "");
+            setAdminPhone(profileData.phone || "");
+            setAdminAddress(profileData.address || "");
+            setAdminAvatarUrl(profileData.avatarUrl || "");
+          } else if (user) {
+            setAdminProfile({
+              name: user.name,
+              email: user.email,
+              phone: user.phone || "",
+              address: user.address || "",
+              role: user.role,
+              avatarUrl: user.avatarUrl || "",
+              enabled: true,
+            });
+            setAdminName(user.name || "");
+            setAdminEmail(user.email || "");
+            setAdminPhone(user.phone || "");
+            setAdminAddress(user.address || "");
+            setAdminAvatarUrl(user.avatarUrl || "");
+          }
+          return profileData;
+        }),
+        api.admin.getNotices().catch(() => []).then((noticeData) => {
+          setNotices(noticeData || []);
+          return noticeData;
+        }),
+        api.admin.getSettings().catch(() => defaultSettings).then((settingsData) => {
+          if (settingsData && typeof settingsData.emailNotificationsEnabled === "boolean") {
+            setEmailNotificationsEnabled(settingsData.emailNotificationsEnabled);
+            if (typeof settingsData.smtpConfigured === "boolean") {
+              setSmtpConfigured(settingsData.smtpConfigured);
+            }
+            if (settingsData.smtpSender) setSmtpSender(settingsData.smtpSender);
+            if (settingsData.smtpHost) setSmtpHost(settingsData.smtpHost);
+            if (settingsData.provider) setEmailProvider(settingsData.provider);
+            if (settingsData.senderEmail !== undefined) setEmailSenderInput(settingsData.senderEmail || "");
+            if (settingsData.senderName) setEmailSenderNameInput(settingsData.senderName);
+            if (settingsData.rawSmtpHost) setEmailHostInput(settingsData.rawSmtpHost);
+            if (settingsData.smtpPort) setEmailPortInput(settingsData.smtpPort);
+            if (settingsData.webhookUrl !== undefined) setEmailWebhookUrlInput(settingsData.webhookUrl || "");
+            if (typeof settingsData.hasSecret === "boolean") setEmailHasSecret(settingsData.hasSecret);
+            if (settingsData.secretPreview !== undefined) setEmailSecretPreview(settingsData.secretPreview || "");
+            if (settingsData.credentialSource) setEmailCredentialSource(settingsData.credentialSource);
+          }
+          return settingsData;
+        }),
+      ]).finally(() => {
+        if (isInitial) {
+          setLoading(false);
         }
-        if (settingsData.smtpSender) setSmtpSender(settingsData.smtpSender);
-        if (settingsData.smtpHost) setSmtpHost(settingsData.smtpHost);
-        if (settingsData.provider) setEmailProvider(settingsData.provider);
-        if (settingsData.senderEmail !== undefined) setEmailSenderInput(settingsData.senderEmail || "");
-        if (settingsData.senderName) setEmailSenderNameInput(settingsData.senderName);
-        if (settingsData.rawSmtpHost) setEmailHostInput(settingsData.rawSmtpHost);
-        if (settingsData.smtpPort) setEmailPortInput(settingsData.smtpPort);
-        if (settingsData.webhookUrl !== undefined) setEmailWebhookUrlInput(settingsData.webhookUrl || "");
-        if (typeof settingsData.hasSecret === "boolean") setEmailHasSecret(settingsData.hasSecret);
-        if (settingsData.secretPreview !== undefined) setEmailSecretPreview(settingsData.secretPreview || "");
-        if (settingsData.credentialSource) setEmailCredentialSource(settingsData.credentialSource);
-      }
-      if (cList && cList.length > 0 && !resCourseCode) {
-        setResCourseCode(cList[0].code);
-      }
-      if (profileData) {
-        setAdminProfile(profileData);
-        setAdminName(profileData.name || "");
-        setAdminEmail(profileData.email || "");
-        setAdminPhone(profileData.phone || "");
-        setAdminAddress(profileData.address || "");
-        setAdminAvatarUrl(profileData.avatarUrl || "");
-      } else if (user) {
-        setAdminProfile({
-          name: user.name,
-          email: user.email,
-          phone: user.phone || "",
-          address: user.address || "",
-          role: user.role,
-          avatarUrl: user.avatarUrl || "",
-          enabled: true,
-        });
-        setAdminName(user.name || "");
-        setAdminEmail(user.email || "");
-        setAdminPhone(user.phone || "");
-        setAdminAddress(user.address || "");
-        setAdminAvatarUrl(user.avatarUrl || "");
-      }
+      });
+
+      const tier2Promises = Promise.all([
+        api.admin.getResources().catch(() => []).then((rData) => setResources(rData || [])),
+        (isSuperAdmin ? api.admin.getPayments().catch(() => []) : Promise.resolve([])).then((pData) =>
+          setPayments(pData || [])
+        ),
+        api.admin.getStaff().catch(() => []).then((staffData) => {
+          const visibleStaffList = Array.isArray(staffData)
+            ? isSuperAdmin
+              ? staffData
+              : staffData.filter((u: any) => u.role === "ROLE_STUDENT")
+            : [];
+          setStaffList(visibleStaffList);
+        }),
+        api.admin.getContributions().catch(() => []).then((cData) => setContributions(cData || [])),
+        api.admin.getWaivers().catch(() => []).then((wData) => setWaivers(wData || [])),
+        api.courses.getAll().catch(() => []).then((cList) => {
+          const sortedCourses = sortCoursesNaturally(cList || []);
+          setCourses(sortedCourses);
+          if (cList && cList.length > 0) {
+            setResCourseCode((prev) => prev || cList[0].code);
+          }
+        }),
+        api.teachers.getAll().catch(() => []).then((tList) => setTeachers(tList || [])),
+        api.admin.getReviews().catch(() => []).then((revData) => setAdminReviews(revData || [])),
+        api.chat.getMessages().catch(() => []).then((chatMsgs) => setChatMessages(chatMsgs || [])),
+        api.chat.getPinned().catch(() => null).then((pinnedChat) => setPinnedChatMessage(pinnedChat || null)),
+        api.chat.getActiveCount().catch(() => ({ activeCount: 0 })).then((chatActiveData) =>
+          setActiveChatUsersCount(chatActiveData?.activeCount ?? 0)
+        ),
+        api.admin.getChatRetention().catch(() => null).then((chatRetentionData) => {
+          if (chatRetentionData) {
+            setChatRetention(chatRetentionData);
+            setSelectedChatRetentionDays(chatRetentionData.retentionDays ?? 30);
+          }
+        }),
+        isSuperAdmin
+          ? api.admin.getSubscriptions(true).then((subs) => {
+              setActiveSubscribers(subs || []);
+            }).catch(() => {})
+          : Promise.resolve(),
+        api.admin.getActivityLogs({ page: 1, size: 15 }).then((logData) => {
+          if (logData) setActivityLogsData(logData);
+        }).catch(() => {}),
+      ]);
+
+      await Promise.all([tier1Promises, tier2Promises]);
       if (!isInitial) {
         notifyDataChanged("all", "admin_broadcast");
       }

@@ -49,6 +49,33 @@ public class AdminService {
     private final NotificationService notificationService;
     private final EmailService emailService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.notelagbe.security.UserDetailsServiceImpl userDetailsServiceImpl;
+
+    private static final List<ResourceType> NOTE_RESOURCE_TYPES = List.of(
+            ResourceType.NOTE,
+            ResourceType.LAB_HAND_NOTE,
+            ResourceType.LAB_REPORT,
+            ResourceType.OTHERS,
+            ResourceType.SYLLABUS
+    );
+
+    private static final List<ResourceType> QUESTION_RESOURCE_TYPES = List.of(
+            ResourceType.QUESTION_COURSE_IN,
+            ResourceType.MID_QUESTION,
+            ResourceType.FINAL_QUESTION,
+            ResourceType.QUIZ_CT,
+            ResourceType.LAB_QUIZ,
+            ResourceType.LAB_FINAL,
+            ResourceType.LAB_MANUAL
+    );
+
+    private void evictCachedUser(String email) {
+        if (userDetailsServiceImpl != null && email != null) {
+            userDetailsServiceImpl.evictUserCache(email);
+        }
+    }
+
     public AdminService(UserRepository userRepository,
                         TeacherRepository teacherRepository,
                         CourseRepository courseRepository,
@@ -87,50 +114,23 @@ public class AdminService {
         AdminDashboardStats stats = new AdminDashboardStats();
 
         stats.setTotalUsers(userRepository.count());
-        stats.setTotalStudents(userRepository.findAll().stream()
-                .filter(u -> u.getRole() == Role.ROLE_STUDENT)
-                .count());
+        stats.setTotalStudents(userRepository.countByRole(Role.ROLE_STUDENT));
         stats.setTotalTeachers(teacherRepository.count());
         stats.setTotalCourses(courseRepository.count());
         stats.setTotalResources(resourceRepository.count());
 
-        stats.setTotalApprovedNotes(resourceRepository.findAll().stream()
-                .filter(r -> r.getStatus() == ResourceStatus.APPROVED && (
-                        r.getType() == ResourceType.NOTE ||
-                        r.getType() == ResourceType.LAB_HAND_NOTE ||
-                        r.getType() == ResourceType.LAB_REPORT ||
-                        r.getType() == ResourceType.OTHERS ||
-                        r.getType() == ResourceType.SYLLABUS
-                ))
-                .count());
+        stats.setTotalApprovedNotes(resourceRepository.countByStatusAndTypeIn(ResourceStatus.APPROVED, NOTE_RESOURCE_TYPES));
+        stats.setTotalApprovedQuestions(resourceRepository.countByStatusAndTypeIn(ResourceStatus.APPROVED, QUESTION_RESOURCE_TYPES));
 
-        stats.setTotalApprovedQuestions(resourceRepository.findAll().stream()
-                .filter(r -> r.getStatus() == ResourceStatus.APPROVED && (
-                        r.getType() == ResourceType.QUESTION_COURSE_IN ||
-                        r.getType() == ResourceType.MID_QUESTION ||
-                        r.getType() == ResourceType.FINAL_QUESTION ||
-                        r.getType() == ResourceType.QUIZ_CT ||
-                        r.getType() == ResourceType.LAB_QUIZ ||
-                        r.getType() == ResourceType.LAB_FINAL ||
-                        r.getType() == ResourceType.LAB_MANUAL
-                ))
-                .count());
-
-        stats.setPendingPayments(paymentRequestRepository.findByStatusOrderByCreatedAtDesc(PaymentStatus.PENDING).size());
-        stats.setPendingContributions(contributionRequestRepository.findByStatusOrderByCreatedAtDesc(ResourceStatus.PENDING).size());
-        stats.setPendingWaivers(waiverRequestRepository.findByStatusOrderByCreatedAtDesc(PaymentStatus.PENDING).size());
+        stats.setPendingPayments(paymentRequestRepository.countByStatus(PaymentStatus.PENDING));
+        stats.setPendingContributions(contributionRequestRepository.countByStatus(ResourceStatus.PENDING));
+        stats.setPendingWaivers(waiverRequestRepository.countByStatus(PaymentStatus.PENDING));
         stats.setPendingReviews(reviewRepository.countByStatus(ReviewStatus.PENDING));
 
-        List<PaymentRequest> approvedPayments = paymentRequestRepository.findByStatusOrderByCreatedAtDesc(PaymentStatus.APPROVED);
-        double revenue = approvedPayments.stream().mapToDouble(PaymentRequest::getAmount).sum();
-        stats.setTotalRevenue(revenue);
+        Double revenue = paymentRequestRepository.sumAmountByStatus(PaymentStatus.APPROVED);
+        stats.setTotalRevenue(revenue != null ? revenue : 0.0);
 
-        long activeSubscribers = subscriptionRepository.findAll().stream()
-                .filter(s -> s.isActive() && !s.isExpired())
-                .map(s -> s.getUser().getId())
-                .distinct()
-                .count();
-        stats.setActivePremiumUsers(activeSubscribers);
+        stats.setActivePremiumUsers(subscriptionRepository.countActiveSubscribers(LocalDateTime.now()));
 
         return stats;
     }
@@ -195,6 +195,7 @@ public class AdminService {
         u.setAuthProvider(AuthProvider.LOCAL);
         u.setEnabled(true);
         u = userRepository.save(u);
+        evictCachedUser(u.getEmail());
         liveSyncService.broadcast("user", "created", u.getId());
         liveSyncService.broadcast("staff", "created", u.getId());
 
@@ -285,6 +286,7 @@ public class AdminService {
         }
 
         u = userRepository.save(u);
+        evictCachedUser(u.getEmail());
         liveSyncService.broadcast("user", "updated", u.getId());
         liveSyncService.broadcast("staff", "updated", u.getId());
         return new StaffResponseDto(u.getId(), u.getName(), u.getEmail(), u.getStudentId(), u.getRole().name(), u.getCreatedAt(), u.isEnabled(), u.getPhone(), u.getAddress());
@@ -308,6 +310,7 @@ public class AdminService {
 
         u.setEnabled(!u.isEnabled());
         userRepository.save(u);
+        evictCachedUser(u.getEmail());
         liveSyncService.broadcast("user", u.isEnabled() ? "unblocked" : "blocked", u.getId());
         liveSyncService.broadcast("staff", "updated", u.getId());
 
@@ -371,7 +374,9 @@ public class AdminService {
             resourceRepository.save(r);
         }
 
+        String deletedEmail = u.getEmail();
         userRepository.delete(u);
+        evictCachedUser(deletedEmail);
         liveSyncService.broadcast("user", "deleted", userId);
         liveSyncService.broadcast("staff", "deleted", userId);
     }
@@ -654,6 +659,7 @@ public class AdminService {
 
         // Email cannot be modified - registration email is fixed
         u = userRepository.save(u);
+        evictCachedUser(u.getEmail());
         Map<String, Object> map = new java.util.HashMap<>();
         map.put("success", true);
         map.put("message", "Admin profile updated successfully");
@@ -684,6 +690,7 @@ public class AdminService {
 
         u.setPassword(passwordEncoder.encode(newPassword.trim()));
         userRepository.save(u);
+        evictCachedUser(u.getEmail());
 
         return Map.of(
                 "success", true,

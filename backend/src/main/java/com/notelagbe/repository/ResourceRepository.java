@@ -4,9 +4,11 @@ import com.notelagbe.entity.Resource;
 import com.notelagbe.entity.ResourceStatus;
 import com.notelagbe.entity.ResourceType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Collection;
 import java.util.List;
 
 public interface ResourceRepository extends JpaRepository<Resource, Long> {
+    long countByStatusAndTypeIn(ResourceStatus status, Collection<ResourceType> types);
     List<Resource> findByCourseIdAndStatus(Long courseId, ResourceStatus status);
     List<Resource> findByCourseId(Long courseId);
     List<Resource> findByTeacherId(Long teacherId);

@@ -78,6 +78,12 @@ public class AuthService {
     @org.springframework.beans.factory.annotation.Value("${app.google.client-id:}")
     private String googleClientId;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.notelagbe.security.UserDetailsServiceImpl userDetailsServiceImpl;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.cache.CacheManager cacheManager;
+
     void setGoogleClientId(String googleClientId) {
         this.googleClientId = googleClientId;
     }
@@ -114,9 +120,46 @@ public class AuthService {
         }
     }
 
+    private Optional<User> findUserForLogin(String cleanEmail) {
+        if (userDetailsServiceImpl != null) {
+            return userDetailsServiceImpl.findUserCachedOrLoad(cleanEmail);
+        }
+        return userRepository.findByEmail(cleanEmail);
+    }
+
+    private void evictCachedUser(String email) {
+        if (userDetailsServiceImpl != null && email != null) {
+            userDetailsServiceImpl.evictUserCache(email);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> getCachedCourseCodes() {
+        if (courseRepository == null) {
+            return List.of();
+        }
+        org.springframework.cache.Cache cache = cacheManager != null
+                ? cacheManager.getCache(com.notelagbe.config.CacheConfig.CACHE_COURSE_CODES)
+                : null;
+        if (cache != null) {
+            List<String> cached = cache.get("all", List.class);
+            if (cached != null && !cached.isEmpty()) {
+                return cached;
+            }
+        }
+        List<String> codes = courseRepository.findAllCourseCodes();
+        if (codes == null || codes.isEmpty()) {
+            codes = courseRepository.findAll().stream().map(Course::getCode).toList();
+        }
+        if (cache != null && codes != null && !codes.isEmpty()) {
+            cache.put("all", codes);
+        }
+        return codes != null ? codes : List.of();
+    }
+
     public AuthResponse login(AuthRequest request) {
         String cleanEmail = request.getEmail().toLowerCase().trim();
-        userRepository.findByEmail(cleanEmail).ifPresent(this::assertUserNotBlocked);
+        findUserForLogin(cleanEmail).ifPresent(this::assertUserNotBlocked);
 
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(cleanEmail, request.getPassword())
@@ -175,6 +218,7 @@ public class AuthService {
         user.setAuthProvider(AuthProvider.LOCAL);
 
         user = userRepository.save(user);
+        evictCachedUser(user.getEmail());
         liveSyncService.broadcast("user", "created", user.getId());
         liveSyncService.broadcast("staff", "created", user.getId());
 
@@ -238,6 +282,7 @@ public class AuthService {
             if (verifiedPicture != null && (user.getAvatarUrl() == null || user.getAvatarUrl().isBlank())) {
                 user.setAvatarUrl(verifiedPicture);
                 userRepository.save(user);
+                evictCachedUser(user.getEmail());
             }
         } else {
             user = new User();
@@ -248,6 +293,7 @@ public class AuthService {
             user.setAvatarUrl(verifiedPicture);
             user.setEnabled(true);
             user = userRepository.save(user);
+            evictCachedUser(user.getEmail());
         }
 
         String token = tokenProvider.generateTokenFromUser(user);
@@ -332,6 +378,20 @@ public class AuthService {
         response.setPhone(user.getPhone() != null ? user.getPhone() : "");
         response.setAddress(user.getAddress() != null ? user.getAddress() : "");
 
+        boolean isStaff = safeRole == Role.ROLE_ADMIN || safeRole == Role.ROLE_SUPER_ADMIN || safeRole == Role.ROLE_MANAGER;
+        if (isStaff) {
+            response.setHasActiveSubscription(false);
+            response.setPlanName("Administrative Access");
+            response.setMaxCoursesAllowed(0);
+            response.setUsedCoursesCount(0);
+            response.setRemainingCoursesCount(0);
+            response.setUnlimited(false);
+            response.setActiveAccessSource("STAFF_UNRESTRICTED");
+            response.setUnlockedCourseCodes(List.of());
+            response.setUnlockedCourseDetails(List.of());
+            return response;
+        }
+
         Optional<Subscription> subOpt = subscriptionService != null && user.getId() != null
                 ? subscriptionService.getValidActiveSubscription(user.getId())
                 : Optional.empty();
@@ -414,7 +474,7 @@ public class AuthService {
 
         if (safeRole == Role.ROLE_ADMIN || safeRole == Role.ROLE_SUPER_ADMIN || safeRole == Role.ROLE_MANAGER
                 || (subOpt.isPresent() && subOpt.get().isUnlimited())) {
-            response.setUnlockedCourseCodes(courseRepository != null ? courseRepository.findAll().stream().map(Course::getCode).toList() : List.of());
+            response.setUnlockedCourseCodes(getCachedCourseCodes());
             response.setActiveAccessSource(safeRole == Role.ROLE_STUDENT ? "UNLIMITED_ACCESS" : "STAFF_UNRESTRICTED");
         } else {
             response.setUnlockedCourseCodes(validUnlockedCodes);
@@ -468,6 +528,7 @@ public class AuthService {
 
         // Email cannot be modified - registration email is permanent
         u = userRepository.save(u);
+        evictCachedUser(u.getEmail());
         return getCurrentUserProfile(u);
     }
 
@@ -503,6 +564,7 @@ public class AuthService {
         }
         u.setAvatarUrl(fileUrl);
         u = userRepository.save(u);
+        evictCachedUser(u.getEmail());
 
         return getCurrentUserProfile(u);
     }
@@ -525,6 +587,7 @@ public class AuthService {
 
         u.setAvatarUrl(null);
         u = userRepository.save(u);
+        evictCachedUser(u.getEmail());
 
         return getCurrentUserProfile(u);
     }
@@ -549,6 +612,7 @@ public class AuthService {
 
         u.setPassword(passwordEncoder.encode(newPassword.trim()));
         userRepository.save(u);
+        evictCachedUser(u.getEmail());
 
         return Map.of(
                 "success", true,
@@ -737,6 +801,7 @@ public class AuthService {
         user.setResetTokenExpiry(null);
         clearResetOtp(user);
         userRepository.save(user);
+        evictCachedUser(user.getEmail());
 
         liveSyncService.broadcast("user", "password_reset", user.getId());
 

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface WaiverRequestRepository extends JpaRepository<WaiverRequest, Long> {
+    long countByStatus(PaymentStatus status);
     List<WaiverRequest> findAllByOrderByCreatedAtDesc();
     List<WaiverRequest> findByStatusOrderByCreatedAtDesc(PaymentStatus status);
     List<WaiverRequest> findByUserIdOrderByCreatedAtDesc(Long userId);
