@@ -2,17 +2,20 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import LiveRemainingCountdown from "@/components/LiveRemainingCountdown";
 import { useDataSync } from "@/lib/sync";
-import { Search, BookOpen, ArrowRight, Filter, Layers, Sparkles, ChevronRight, ChevronLeft, CheckCircle2, Flame, TrendingUp, ArrowUpDown } from "lucide-react";
+import FacultyAvatar from "@/components/FacultyAvatar";
+import { Search, BookOpen, ArrowRight, Filter, Layers, Sparkles, ChevronRight, ChevronLeft, CheckCircle2, Flame, TrendingUp, ArrowUpDown, FlaskConical, FileText, FileQuestion, Users, RotateCcw } from "lucide-react";
 import { CourseGridSkeleton } from "@/components/skeletons/CardSkeletons";
 import { useSeuDepartments } from "@/lib/seuDepartments";
 import coursesCatalogData from "@/data/courses_catalog.json";
 
 export default function CoursesPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const { language, t } = useLanguage();
   const { departments: officialSeuDepts } = useSeuDepartments();
@@ -23,6 +26,7 @@ export default function CoursesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("ALL");
+  const [courseFormat, setCourseFormat] = useState<"all" | "theory" | "lab">("all");
   const [filterType, setFilterType] = useState<"all" | "has_notes" | "has_questions">("all");
   const [sortBy, setSortBy] = useState<"default" | "popular" | "notes" | "questions">("default");
   const [loading, setLoading] = useState<boolean>(false);
@@ -97,6 +101,10 @@ export default function CoursesPage() {
       if (selectedSemester !== null && c.semester !== selectedSemester) return false;
       if (selectedGroup && (c.electiveGroup || "").toUpperCase() !== selectedGroup.toUpperCase()) return false;
 
+      const isLab = Boolean(c.lab ?? c.isLab);
+      if (courseFormat === "theory" && isLab) return false;
+      if (courseFormat === "lab" && !isLab) return false;
+
       if (filterType === "has_notes" && !c.hasNotes) return false;
       if (filterType === "has_questions" && !c.hasQuestions) return false;
       if (searchQuery.trim()) {
@@ -127,7 +135,7 @@ export default function CoursesPage() {
     }
 
     return list;
-  }, [courses, filterType, searchQuery, sortBy, selectedDepartment, selectedSemester, selectedGroup]);
+  }, [courses, courseFormat, filterType, searchQuery, sortBy, selectedDepartment, selectedSemester, selectedGroup]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -258,45 +266,79 @@ export default function CoursesPage() {
           </div>
         </div>
 
-        {/* Resource Availability & Sort Order (Balanced Clean Row) */}
-        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+        {/* Resource Availability, Course Format & Sort Order (Balanced Clean Row) */}
+        <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 pt-3 border-t border-slate-100 dark:border-slate-800">
           
-          {/* Material / Resource Availability Filter */}
-          <div className="space-y-2">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              {language === "bn" ? "ম্যাটেরিয়াল ফিল্টার:" : "Resource Availability:"}
-            </p>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                onClick={() => setFilterType("all")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  filterType === "all"
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-                }`}
-              >
-                {t("catalog.filterAll", "All Courses")}
-              </button>
-              <button
-                onClick={() => setFilterType("has_notes")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  filterType === "has_notes"
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-                }`}
-              >
-                {t("catalog.filterNotes", "Has Hand Notes")}
-              </button>
-              <button
-                onClick={() => setFilterType("has_questions")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  filterType === "has_questions"
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-                }`}
-              >
-                {t("catalog.filterQuestions", "Has Exam Questions")}
-              </button>
+          {/* Material Availability & Course Format Filters */}
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4 flex-wrap">
+            <div className="space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                {language === "bn" ? "কোর্সের ধরন:" : "Course Format:"}
+              </p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { id: "all" as const, label: language === "bn" ? "সব ধরন" : "All Formats", icon: null },
+                  { id: "theory" as const, label: language === "bn" ? "থিওরি" : "Theory", icon: BookOpen },
+                  { id: "lab" as const, label: language === "bn" ? "প্র্যাকটিক্যাল ল্যাব" : "Lab Courses", icon: FlaskConical },
+                ].map((fmt) => {
+                  const Icon = fmt.icon;
+                  const active = courseFormat === fmt.id;
+                  return (
+                    <button
+                      key={fmt.id}
+                      onClick={() => setCourseFormat(fmt.id)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        active
+                          ? fmt.id === "lab"
+                            ? "bg-amber-600 text-white shadow-sm"
+                            : "bg-blue-600 text-white shadow-sm"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                      }`}
+                    >
+                      {Icon && <Icon className="w-3.5 h-3.5" />}
+                      <span>{fmt.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                {language === "bn" ? "ম্যাটেরিয়াল ফিল্টার:" : "Resource Availability:"}
+              </p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  onClick={() => setFilterType("all")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    filterType === "all"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  }`}
+                >
+                  {t("catalog.filterAll", "All Courses")}
+                </button>
+                <button
+                  onClick={() => setFilterType("has_notes")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    filterType === "has_notes"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  }`}
+                >
+                  {t("catalog.filterNotes", "Has Hand Notes")}
+                </button>
+                <button
+                  onClick={() => setFilterType("has_questions")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    filterType === "has_questions"
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  }`}
+                >
+                  {t("catalog.filterQuestions", "Has Exam Questions")}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -359,7 +401,7 @@ export default function CoursesPage() {
       {/* Courses List */}
       {loading && courses.length === 0 ? (
         <CourseGridSkeleton count={6} />
-      ) : selectedDepartment !== "ALL" && displayedCourses.length === 0 && !searchQuery.trim() && !selectedSemester && filterType === "all" ? (
+      ) : selectedDepartment !== "ALL" && displayedCourses.length === 0 && !searchQuery.trim() && !selectedSemester && filterType === "all" && courseFormat === "all" ? (
         <div className="p-12 sm:p-16 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center space-y-4 shadow-sm">
           <div className="w-16 h-16 rounded-3xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center shadow-inner">
             <Sparkles className="w-8 h-8" />
@@ -393,90 +435,154 @@ export default function CoursesPage() {
           </div>
         </div>
       ) : displayedCourses.length === 0 ? (
-        <div className="py-20 text-center p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-          <BookOpen className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-          <h3 className="font-bold text-base text-slate-800 dark:text-slate-200">No courses found matching your filter criteria</h3>
-          <p className="text-xs text-slate-500 mt-1">Try resetting the department or search query.</p>
+        <div className="py-16 text-center p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+          <BookOpen className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
+          <h3 className="font-bold text-base text-slate-800 dark:text-slate-200">
+            {language === "bn" ? "ফিল্টার অনুযায়ী কোনো কোর্স পাওয়া যায়নি" : "No courses found matching your filter criteria"}
+          </h3>
+          <p className="text-xs text-slate-500">
+            {language === "bn" ? "সার্চ বা ফিল্টার রিসেট করে আবার চেষ্টা করুন।" : "Try resetting the department, semester, format, or search query."}
+          </p>
+          <button
+            onClick={() => {
+              setSelectedDepartment("ALL");
+              setSelectedSemester(null);
+              setSelectedGroup(null);
+              setCourseFormat("all");
+              setFilterType("all");
+              setSearchQuery("");
+            }}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-sm"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>{language === "bn" ? "সব ফিল্টার রিসেট করুন" : "Reset All Filters"}</span>
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {displayedCourses.map((course) => (
-            <div
-              key={course.id}
-              className="flex flex-col rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-slate-800/90 p-6 shadow-sm hover:shadow-xl hover:border-blue-500/40 dark:hover:border-blue-500/30 transition-all group"
-            >
-              {/* Card Top: Code & Dept Badge */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-base text-blue-600 dark:text-blue-400 group-hover:text-blue-500 transition-colors">
-                    {course.code}
-                  </span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                    {course.department || "CSE"}
-                  </span>
+          {displayedCourses.map((course) => {
+            const isLab = Boolean(course.lab ?? course.isLab);
+            const validTeachers = course.teachers || [];
+            const hasMaterials = (course.notesCount || 0) > 0 || (course.questionsCount || 0) > 0;
+            const unlockedDetailMatch = (course.unlocked || (user?.unlockedCourseDetails || []).some((d: any) => !d.isExpired && d.courseCode?.toLowerCase() === course.code?.toLowerCase()));
+
+            return (
+              <div
+                key={course.id}
+                role="link"
+                tabIndex={0}
+                onClick={() => router.push(`/courses/${course.code}`)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    router.push(`/courses/${course.code}`);
+                  }
+                }}
+                className="flex flex-col rounded-3xl bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-slate-800/90 p-6 shadow-sm hover:shadow-xl hover:-translate-y-0.5 hover:border-blue-500/40 dark:hover:border-blue-500/40 transition-all duration-300 group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              >
+                {/* Card Top: Emblem Icon + Code & Status Badges */}
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border transition-transform duration-300 group-hover:scale-105 ${
+                        isLab
+                          ? "bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/60"
+                          : "bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border-blue-200/80 dark:border-blue-800/60"
+                      }`}
+                    >
+                      {isLab ? <FlaskConical className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono font-black text-base text-blue-600 dark:text-blue-400 group-hover:text-blue-500 transition-colors">
+                          {course.code}
+                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          {course.department || "CSE"}
+                        </span>
+                      </div>
+                      <span
+                        className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                          isLab
+                            ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/70 dark:border-amber-900/70"
+                            : "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/70 dark:border-emerald-900/70"
+                        }`}
+                      >
+                        {isLab ? (language === "bn" ? "প্র্যাকটিক্যাল ল্যাব" : "Lab Course") : (language === "bn" ? "থিওরি কোর্স" : "Theory Course")}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    {Boolean(course.trending && course.unlockCount && course.unlockCount > 0) && (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 flex items-center gap-0.5 shadow-xs">
+                        <TrendingUp className="w-2.5 h-2.5" />
+                        <span>HOT</span>
+                      </span>
+                    )}
+                    {Boolean(course.unlockCount && course.unlockCount > 0) ? (
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border border-orange-200/70 dark:border-orange-800/40 flex items-center gap-1 shadow-xs">
+                        <Flame className="w-2.5 h-2.5 text-orange-500 fill-orange-500" />
+                        <span>{course.unlockCount} {language === "bn" ? "আনলক" : "Unlocks"}</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700/80">
+                        {course.semester && course.semester > 0 ? `Sem ${course.semester}` : (language === "bn" ? "ঐচ্ছিক" : "Elective")}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                  {Boolean(course.trending && course.unlockCount && course.unlockCount > 0) && (
-                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 flex items-center gap-0.5 shadow-xs">
-                      <TrendingUp className="w-2.5 h-2.5" />
-                      <span>HOT</span>
-                    </span>
-                  )}
-                  {Boolean(course.unlockCount && course.unlockCount > 0) && (
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border border-orange-200/70 dark:border-orange-800/40 flex items-center gap-1 shadow-xs">
-                      <Flame className="w-2.5 h-2.5 text-orange-500 fill-orange-500" />
-                      <span>{course.unlockCount} {language === "bn" ? "আনলক" : "Unlocks"}</span>
-                    </span>
-                  )}
-                  {course.isLab && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
-                      {language === "bn" ? "ল্যাব" : "Lab"}
+
+                {/* Title & Structured Metadata Pills */}
+                <h3 className="font-bold text-base text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2 min-h-[2.75rem] mb-2.5">
+                  {course.title}
+                </h3>
+
+                <div className="flex flex-wrap items-center gap-1.5 mb-4">
+                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-lg bg-slate-50 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700/70">
+                    {course.semester && course.semester > 0 ? `${t("course.semester", "Semester")} ${course.semester}` : (language === "bn" ? "ঐচ্ছিক" : "Elective")}
+                  </span>
+                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-lg bg-slate-50 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 border border-slate-200/70 dark:border-slate-700/70">
+                    {course.credits} {t("course.credits", "Credits")}
+                  </span>
+                  {course.prerequisite && course.prerequisite !== "Nil" && (
+                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/40 truncate max-w-[140px]">
+                      {language === "bn" ? "পূর্বশর্ত:" : "Pre:"} {course.prerequisite}
                     </span>
                   )}
                 </div>
-              </div>
 
-              {/* Title & Metadata */}
-              <h3 className="font-bold text-base text-slate-900 dark:text-white line-clamp-1 mb-2">
-                {course.title}
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 flex items-center gap-2 font-medium">
-                <span>{course.semester && course.semester > 0 ? `${t("course.semester", "Semester")} ${course.semester}` : (language === "bn" ? "ঐচ্ছিক" : "Elective")}</span>
-                <span>•</span>
-                <span>{course.credits} {t("course.credits", "Credits")}</span>
-                {course.prerequisite && course.prerequisite !== "Nil" && (
-                  <>
-                    <span>•</span>
-                    <span className="truncate">{language === "bn" ? "পূর্বশর্ত:" : "Pre:"} {course.prerequisite}</span>
-                  </>
-                )}
-              </p>
-
-              {/* Teaching Faculty & Material Availability Breakdown */}
-              <div className="flex-1 space-y-2 mb-5">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  {language === "bn" ? "দায়িত্বপ্রাপ্ত শিক্ষক ও ম্যাটেরিয়াল:" : "Assigned Faculty & Material Status:"}
-                </p>
-
-                {(() => {
-                  const validTeachers = course.teachers || [];
-                  return validTeachers.length > 0 ? (
+                {/* Assigned Faculty Shortcuts or Compact Archive Overview */}
+                <div className="flex-1 mb-5">
+                  {validTeachers.length > 0 ? (
                     <div className="space-y-1.5">
-                      {validTeachers.slice(0, 3).map((teacher: any) => (
-                        <div
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {language === "bn" ? "শিক্ষক অনুযায়ী ম্যাটেরিয়াল দেখুন:" : "Filter by Course Instructor:"}
+                      </p>
+                      {validTeachers.slice(0, 2).map((teacher: any) => (
+                        <button
                           key={teacher.id}
-                          className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/courses/${course.code}?faculty=${teacher.id}`);
+                          }}
+                          className="w-full flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-blue-50/80 dark:hover:bg-blue-950/40 border border-slate-100 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 text-xs transition-all text-left"
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0">
-                              {teacher.initial ? teacher.initial.substring(0, 2) : teacher.name.charAt(0)}
-                            </span>
+                            <FacultyAvatar
+                              image={teacher.image}
+                              name={teacher.name}
+                              initial={teacher.initial}
+                              designation={teacher.designation}
+                              size="sm"
+                            />
                             <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
                               {teacher.name} {teacher.initial ? `[${teacher.initial}]` : ""}
                             </span>
                           </div>
 
-                          {/* Availability Pill */}
                           <div className="shrink-0 pl-2">
                             {teacher.hasNotes && teacher.hasQuestions ? (
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
@@ -491,85 +597,107 @@ export default function CoursesPage() {
                                 {language === "bn" ? "প্রশ্ন" : "Exam Papers"}
                               </span>
                             ) : (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                                {language === "bn" ? "অ্যাসাইনকৃত শিক্ষক" : "Assigned Faculty"}
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                {language === "bn" ? "শিক্ষক" : "Faculty"}
                               </span>
                             )}
                           </div>
-                        </div>
+                        </button>
                       ))}
-                      {validTeachers.length > 3 && (
-                        <p className="text-[10px] text-slate-400 text-right pr-1">
-                          +{validTeachers.length - 3} {language === "bn" ? "জন শিক্ষক" : "more faculty members"}
+                      {validTeachers.length > 2 && (
+                        <p className="text-[10px] font-semibold text-slate-400 text-right pr-1">
+                          +{validTeachers.length - 2} {language === "bn" ? "জন আরও শিক্ষক" : "more faculty members"}
                         </p>
                       )}
                     </div>
                   ) : (
-                    <p className="text-xs text-slate-400 italic py-1">
-                      {language === "bn" ? "কোর্স রেজিস্ট্রেশন অনুযায়ী শিক্ষক নির্ধারিত হবে" : "Faculty assigned on course registration"}
-                    </p>
-                  );
-                })()}
-              </div>
-
-              {/* Card Footer: Action */}
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between mt-auto">
-                <div className="flex items-center gap-2 text-xs flex-wrap">
-                  {(course.unlocked || (user?.unlockedCourseDetails || []).some((d: any) => !d.isExpired && d.courseCode?.toLowerCase() === course.code?.toLowerCase())) && (() => {
-                    const details = (user?.unlockedCourseDetails || []).filter((d: any) => !d.isExpired && d.courseCode?.toLowerCase() === course.code?.toLowerCase());
-                    const fullDetail = details.find((d: any) => !d.teacherId);
-                    const giftDetails = details.filter((d: any) => d.teacherId != null);
-                    if (course.unlocked || fullDetail) {
-                      const detail = fullDetail || details[0];
-                      return (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          <span>
-                            {language === "bn" ? "আনলকড" : "Unlocked"}
-                            {detail && detail.remainingDays > 0 ? ` (${detail.remainingDays}d)` : ""}
-                          </span>
-                        </span>
-                      );
-                    }
-                    const firstGift = giftDetails[0];
-                    return (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/60 flex items-center gap-1">
-                        <span>
-                          🎁 {firstGift?.teacherInitial || firstGift?.teacherName || (language === "bn" ? "গিফটড ফ্যাকাল্টি" : "Gifted Faculty")}
-                          {giftDetails.length > 1 ? ` +${giftDetails.length - 1}` : ""}
-                          {firstGift && firstGift.remainingDays > 0 ? ` (${firstGift.remainingDays}d)` : ""}
-                        </span>
-                      </span>
-                    );
-                  })()}
-                  {course.notesCount > 0 && (
-                    <span className="font-bold text-blue-600 dark:text-blue-400">
-                      {course.notesCount} {t("course.notesCount", "Notes")}
-                    </span>
-                  )}
-                  {course.notesCount > 0 && course.questionsCount > 0 && <span>•</span>}
-                  {course.questionsCount > 0 && (
-                    <span className="font-bold text-purple-600 dark:text-purple-400">
-                      {course.questionsCount} {language === "bn" ? "বিগত প্রশ্ন" : "Past Exams"}
-                    </span>
-                  )}
-                  {course.notesCount === 0 && course.questionsCount === 0 && (
-                    <span className="text-slate-400 font-medium">
-                      {language === "bn" ? "প্রথম আপলোড করুন" : "Be the first to upload"}
-                    </span>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <div className="p-2.5 rounded-xl bg-slate-50/90 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 flex items-center gap-2">
+                        <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-[10px] text-slate-400 font-semibold leading-none">{language === "bn" ? "হ্যান্ড নোট" : "Hand Notes"}</p>
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mt-0.5 truncate">
+                            {course.notesCount > 0 ? `${course.notesCount} ${language === "bn" ? "টি ফাইল" : "Files"}` : (language === "bn" ? "আপলোড করুন" : "Open Slot")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-slate-50/90 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 flex items-center gap-2">
+                        <FileQuestion className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-[10px] text-slate-400 font-semibold leading-none">{isLab ? (language === "bn" ? "ল্যাব ও কুইজ" : "Labs / Quiz") : (language === "bn" ? "বিগত প্রশ্ন" : "Past Exams")}</p>
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mt-0.5 truncate">
+                            {course.questionsCount > 0 ? `${course.questionsCount} ${language === "bn" ? "টি ফাইল" : "Papers"}` : (language === "bn" ? "প্রথম শেয়ার" : "Open Slot")}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
 
-                <Link
-                  href={`/courses/${course.code}`}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline group-hover:translate-x-0.5 transition-all"
-                >
-                  <span>{t("catalog.viewMaterials", "View Materials")}</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </Link>
+                {/* Card Footer: Unlock Badge, Resource Totals & Clickable CTA */}
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 mt-auto">
+                  <div className="flex items-center gap-1.5 text-xs flex-wrap min-w-0">
+                    {unlockedDetailMatch && (() => {
+                      const details = (user?.unlockedCourseDetails || []).filter((d: any) => !d.isExpired && d.courseCode?.toLowerCase() === course.code?.toLowerCase());
+                      const fullDetail = details.find((d: any) => !d.teacherId);
+                      const giftDetails = details.filter((d: any) => d.teacherId != null);
+                      if (course.unlocked || fullDetail) {
+                        const detail = fullDetail || details[0];
+                        return (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>
+                              {language === "bn" ? "আনলকড" : "Unlocked"}
+                              {detail && detail.remainingDays > 0 ? ` (${detail.remainingDays}d)` : ""}
+                            </span>
+                          </span>
+                        );
+                      }
+                      const firstGift = giftDetails[0];
+                      return (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/60 flex items-center gap-1">
+                          <span>
+                            🎁 {firstGift?.teacherInitial || firstGift?.teacherName || (language === "bn" ? "গিফটড ফ্যাকাল্টি" : "Gifted Faculty")}
+                            {giftDetails.length > 1 ? ` +${giftDetails.length - 1}` : ""}
+                            {firstGift && firstGift.remainingDays > 0 ? ` (${firstGift.remainingDays}d)` : ""}
+                          </span>
+                        </span>
+                      );
+                    })()}
+                    {hasMaterials ? (
+                      <>
+                        {course.notesCount > 0 && (
+                          <span className="font-bold text-blue-600 dark:text-blue-400">
+                            {course.notesCount} {t("course.notesCount", "Notes")}
+                          </span>
+                        )}
+                        {course.notesCount > 0 && course.questionsCount > 0 && <span className="text-slate-300 dark:text-slate-600">•</span>}
+                        {course.questionsCount > 0 && (
+                          <span className="font-bold text-purple-600 dark:text-purple-400">
+                            {course.questionsCount} {language === "bn" ? "বিগত প্রশ্ন" : "Past Exams"}
+                          </span>
+                        )}
+                      </>
+                    ) : !unlockedDetailMatch ? (
+                      <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+                        <span>{language === "bn" ? "ওপেন আর্কাইভ" : "Open Archive"}</span>
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <Link
+                    href={`/courses/${course.code}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-50/90 dark:bg-blue-950/50 text-xs font-bold text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0"
+                  >
+                    <span>{t("catalog.viewMaterials", "View Materials")}</span>
+                    <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

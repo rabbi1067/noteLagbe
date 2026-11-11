@@ -29,6 +29,10 @@ import {
   GraduationCap,
   Layers,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  FolderOpen,
+  ArrowLeft,
   ExternalLink,
   Upload,
   Info,
@@ -108,6 +112,20 @@ export default function CourseDetailPage() {
   const [selectedFacultyId, setSelectedFacultyId] = useState<number | "ALL">("ALL");
   const [activeTab, setActiveTab] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+
+  // Pre-select instructor filter when navigating from /courses?faculty=<id>
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const facultyParam = params.get("faculty");
+    if (facultyParam) {
+      const parsedId = Number(facultyParam);
+      if (!Number.isNaN(parsedId) && parsedId > 0) {
+        setSelectedFacultyId(parsedId);
+      }
+    }
+  }, []);
 
   // Modals state
   const [selectedResource, setSelectedResource] = useState<any>(null);
@@ -609,14 +627,217 @@ export default function CourseDetailPage() {
     ? courseFacultyList.find((t: any) => t.id === selectedFacultyId)
     : null;
 
+  const totalNotesCount = isLabCourse
+    ? labHandNotes.length + labDocNotes.length + labManuals.length
+    : handNotes.length + docNotes.length;
+  const totalExamsCount = isLabCourse
+    ? labQuizzes.length + labFinals.length + projectLinks.length
+    : midtermExams.length + finalExams.length + quizCTs.length;
+
+  const materialCategories = isLabCourse
+    ? [
+        {
+          id: "LAB_HAND_NOTE",
+          tabId: "LAB_HAND_NOTE",
+          title: language === "bn" ? "হ্যান্ড নোট" : "Hand Notes",
+          tagLabel: language === "bn" ? "হ্যান্ড নোট" : "Hand Note",
+          tagColor: "teal" as const,
+          subtitle: language === "bn" ? "ব্যবহারিক ক্লাস লেকচার ও প্র্যাকটিক্যাল কোড শিট" : "Practical Class Lectures & Code Cheatsheets",
+          emptyText: language === "bn" ? "এখনও কোনো হ্যান্ড নোট আপলোড করা হয়নি।" : "No lab hand notes uploaded yet.",
+          icon: BookMarked,
+          iconWrapClass: "text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 border-teal-200/70 dark:border-teal-800/50",
+          badgeClass: "bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-400",
+          items: labHandNotes,
+        },
+        {
+          id: "LAB_QUIZ",
+          tabId: "LAB_QUIZ",
+          title: language === "bn" ? "ল্যাব কুইজ" : "Lab Quizzes",
+          tagLabel: language === "bn" ? "ল্যাব কুইজ" : "Lab Quiz",
+          tagColor: "purple" as const,
+          subtitle: language === "bn" ? "ব্যবহারিক কোডিং কুইজ ও কমান্ড টেস্ট" : "Practical Coding & Command Quizzes",
+          emptyText: language === "bn" ? "এখনও কোনো ল্যাব কুইজ আপলোড করা হয়নি।" : "No lab quizzes uploaded yet.",
+          icon: HelpCircle,
+          iconWrapClass: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 border-purple-200/70 dark:border-purple-800/50",
+          badgeClass: "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400",
+          items: labQuizzes,
+        },
+        {
+          id: "LAB_FINAL",
+          tabId: "LAB_FINAL",
+          title: language === "bn" ? "ল্যাব ফাইনাল" : "Lab Final",
+          tagLabel: language === "bn" ? "ল্যাব ফাইনাল" : "Lab Final",
+          tagColor: "rose" as const,
+          subtitle: language === "bn" ? "ল্যাব ফাইনাল প্রবলেম সেট ও ভাইভা প্রশ্নব্যাংক" : "Lab Final Problem Sets & Viva Question Bank",
+          emptyText: language === "bn" ? "এখনও কোনো ল্যাব ফাইনাল শিট আপলোড করা হয়নি।" : "No lab final examination sheets uploaded yet.",
+          icon: Award,
+          iconWrapClass: "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 border-rose-200/70 dark:border-rose-800/50",
+          badgeClass: "bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400",
+          items: labFinals,
+        },
+        {
+          id: "PROJECT_LINK",
+          tabId: "PROJECT_LINK",
+          title: language === "bn" ? "প্রজেক্ট লিংক" : "Project Links",
+          tagLabel: language === "bn" ? "প্রজেক্ট লিংক" : "Project Link",
+          tagColor: "emerald" as const,
+          subtitle: language === "bn" ? "লাইভ ওয়েব ডেমো ও গিটহাব সোর্স কোড রিপোজিটরি" : "Live Web Demos & GitHub Source Codes",
+          emptyText: language === "bn" ? "এখনও কোনো প্রজেক্ট লিংক বা কোড যুক্ত করা হয়নি।" : "No project links or source codes added yet.",
+          icon: ExternalLink,
+          iconWrapClass: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200/70 dark:border-emerald-800/50",
+          badgeClass: "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400",
+          items: projectLinks,
+        },
+        {
+          id: "DOC_NOTE",
+          tabId: "DOC_NOTE",
+          title: language === "bn" ? "ডক ফাইল নোট" : "Doc File Notes",
+          tagLabel: language === "bn" ? "ডক ফাইল নোট" : "Doc File Note",
+          tagColor: "cyan" as const,
+          subtitle: language === "bn" ? "ওয়ার্ড ফাইল (.docx) ও ল্যাব রিপোর্ট টেমপ্লেট" : "Word (.docx) Documentation & Report Templates",
+          emptyText: language === "bn" ? "এখনও কোনো ডক ফাইল নোট আপলোড করা হয়নি।" : "No doc file notes uploaded yet.",
+          icon: FileText,
+          iconWrapClass: "text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/60 border-cyan-200/70 dark:border-cyan-800/50",
+          badgeClass: "bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-400",
+          items: labDocNotes,
+        },
+        ...(labManuals.length > 0
+          ? [
+              {
+                id: "LAB_MANUAL",
+                tabId: "LAB_MANUAL",
+                title: language === "bn" ? "ল্যাব ম্যানুয়াল" : "Lab Manuals & Practical Experiments",
+                tagLabel: language === "bn" ? "ল্যাব ম্যানুয়াল" : "Lab Manual",
+                tagColor: "amber" as const,
+                subtitle: language === "bn" ? "ল্যাব এক্সপেরিমেন্ট ও ম্যানুয়াল শিট" : "Laboratory Manuals & Experiment Guides",
+                emptyText: language === "bn" ? "এখনও কোনো ল্যাব ম্যানুয়াল আপলোড করা হয়নি।" : "No lab manuals uploaded yet.",
+                icon: FlaskConical,
+                iconWrapClass: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border-amber-200/70 dark:border-amber-800/50",
+                badgeClass: "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400",
+                items: labManuals,
+              },
+            ]
+          : []),
+      ]
+    : [
+        {
+          id: "NOTES",
+          tabId: "NOTES",
+          title: language === "bn" ? "হ্যান্ড নোট" : "Hand Notes",
+          tagLabel: language === "bn" ? "হ্যান্ড নোট" : "Hand Notes",
+          tagColor: "emerald" as const,
+          subtitle: language === "bn" ? "লেকচার হ্যান্ড নোট ও ক্লাস স্লাইড" : "Lecture Hand Notes & Class Slides",
+          emptyText: language === "bn" ? "এখনও কোনো হ্যান্ড নোট আপলোড করা হয়নি।" : "No hand notes uploaded yet for this selection.",
+          icon: BookMarked,
+          iconWrapClass: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200/70 dark:border-emerald-800/50",
+          badgeClass: "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400",
+          items: handNotes,
+        },
+        {
+          id: "MIDTERM",
+          tabId: "MIDTERM",
+          title: language === "bn" ? "মিডটার্ম" : "Midterm Examination Papers",
+          tagLabel: language === "bn" ? "মিডটার্ম" : "Midterm",
+          tagColor: "blue" as const,
+          subtitle: language === "bn" ? "বিগত সেমিস্টারের মিডটার্ম প্রশ্ন আর্কাইভ" : "Multi-Semester Midterm Archive",
+          emptyText: language === "bn" ? "এখনও কোনো মিডটার্ম প্রশ্ন আপলোড করা হয়নি।" : "No midterm examination papers uploaded yet for this selection.",
+          icon: FileText,
+          iconWrapClass: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 border-blue-200/70 dark:border-blue-800/50",
+          badgeClass: "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400",
+          items: midtermExams,
+        },
+        {
+          id: "FINAL",
+          tabId: "FINAL",
+          title: language === "bn" ? "ফাইনাল" : "Final Examination Papers",
+          tagLabel: language === "bn" ? "ফাইনাল" : "Final",
+          tagColor: "indigo" as const,
+          subtitle: language === "bn" ? "বিগত সেমিস্টারের ফাইনাল পরীক্ষা প্রশ্ন আর্কাইভ" : "Multi-Semester Final Exam Archive",
+          emptyText: language === "bn" ? "এখনও কোনো ফাইনাল পরীক্ষা প্রশ্ন আপলোড করা হয়নি।" : "No final examination papers uploaded yet for this selection.",
+          icon: GraduationCap,
+          iconWrapClass: "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 border-indigo-200/70 dark:border-indigo-800/50",
+          badgeClass: "bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400",
+          items: finalExams,
+        },
+        {
+          id: "QUIZ",
+          tabId: "QUIZ",
+          title: language === "bn" ? "কুইজ ও ক্লাস টেস্ট (CT)" : "Quiz & Class Test (CT) Papers",
+          tagLabel: language === "bn" ? "কুইজ / সিটি" : "Quiz / CT",
+          tagColor: "purple" as const,
+          subtitle: language === "bn" ? "সেমিস্টার কুইজ ও ক্লাস টেস্ট সলিউশন" : "Semester Quizzes, Spot Tests & Questions",
+          emptyText: language === "bn" ? "এখনও কোনো কুইজ বা ক্লাস টেস্ট প্রশ্ন আপলোড করা হয়নি।" : "No quiz or class test papers uploaded yet.",
+          icon: HelpCircle,
+          iconWrapClass: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 border-purple-200/70 dark:border-purple-800/50",
+          badgeClass: "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400",
+          items: quizCTs,
+        },
+        {
+          id: "DOC_NOTE",
+          tabId: "DOC_NOTE",
+          title: language === "bn" ? "ডক ফাইল নোট" : "Doc File Notes",
+          tagLabel: language === "bn" ? "ডক ফাইল নোট" : "Doc File Note",
+          tagColor: "cyan" as const,
+          subtitle: language === "bn" ? "ওয়ার্ড ফাইল (.docx), লেকচার ড্রাফট ও এডিটেবল নোটস" : "Editable Word (.docx) Lecture Guides, Summaries & Outlines",
+          emptyText: language === "bn" ? "এখনও কোনো ডক ফাইল নোট আপলোড করা হয়নি।" : "No doc file notes uploaded yet.",
+          icon: FileText,
+          iconWrapClass: "text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/60 border-cyan-200/70 dark:border-cyan-800/50",
+          badgeClass: "bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-400",
+          items: docNotes,
+        },
+      ];
+
+  const visibleCategories = materialCategories.filter((cat) => activeTab === "ALL" || activeTab === cat.tabId);
+  const isCategoryExpanded = (catId: string, itemCount: number) => {
+    if (activeTab !== "ALL") return true;
+    if (searchQuery.trim().length > 0 && itemCount > 0) return true;
+    if (collapsedCategories[catId] !== undefined) return !collapsedCategories[catId];
+    return itemCount > 0;
+  };
+  const toggleCategory = (catId: string, currentlyExpanded: boolean) => {
+    setCollapsedCategories((prev) => ({ ...prev, [catId]: currentlyExpanded }));
+  };
+  const anyExpanded = visibleCategories.some((c) => isCategoryExpanded(c.id, c.items.length));
+  const toggleAllCategories = () => {
+    const nextCollapsed: Record<string, boolean> = {};
+    visibleCategories.forEach((c) => {
+      nextCollapsed[c.id] = anyExpanded;
+    });
+    setCollapsedCategories(nextCollapsed);
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      
-      {/* 1. COURSE HERO HEADER */}
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {/* Top Breadcrumb Back Link (Matches Faculty Directory UX) */}
+      <div className="flex items-center justify-between gap-4">
+        <Link
+          href="/courses"
+          className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>{language === "bn" ? "কোর্স ক্যাটালগে ফিরে যান" : "Back to Course Catalog"}</span>
+        </Link>
+        <div className="text-[11px] font-bold text-slate-400 hidden sm:flex items-center gap-1.5">
+          <span>{language === "bn" ? "কোর্স" : "Courses"}</span>
+          <ChevronRight className="w-3 h-3" />
+          <span className="text-blue-600 dark:text-blue-400 font-mono">{course.code}</span>
+        </div>
+      </div>
+
+      {/* 1. COMPACT COURSE HERO HEADER */}
       <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-3 max-w-3xl">
+        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+          <div className="space-y-3 max-w-3xl flex-1">
             <div className="flex flex-wrap items-center gap-2">
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                  isLabCourse
+                    ? "bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/60"
+                    : "bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border-blue-200/80 dark:border-blue-800/60"
+                }`}
+              >
+                {isLabCourse ? <FlaskConical className="w-4 h-4" /> : <BookOpen className="w-4 h-4" />}
+              </div>
               <span className="font-mono text-xs sm:text-sm font-extrabold px-3 py-1 rounded-xl bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
                 {course.code}
               </span>
@@ -639,7 +860,6 @@ export default function CourseDetailPage() {
                 </span>
               )}
 
-              {/* Real Database Unlock Counter Badges (Only shown when real users have unlocked) */}
               {Boolean(course.unlockCount && course.unlockCount > 0) && (
                 <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-400 border border-orange-200/70 dark:border-orange-800/50 flex items-center gap-1.5 shadow-sm">
                   <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500 animate-pulse" />
@@ -659,7 +879,7 @@ export default function CourseDetailPage() {
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              {course.description || (language === "bn" 
+              {course.description || (language === "bn"
                 ? "সাউথইস্ট ইউনিভার্সিটির অফিশিয়াল একাডেমিক কারিকুলাম ও কোর্স আর্কাইভ। লেকচার হ্যান্ড নোট, বিগত সেমিস্টারের মিডটার্ম ও ফাইনাল প্রশ্ন এবং ল্যাব শিট।"
                 : "Official academic course archive for Southeast University. Access lecture hand notes, previous semester midterm & final examination question papers, and lab manuals.")}
             </p>
@@ -707,18 +927,16 @@ export default function CourseDetailPage() {
             )}
           </div>
 
-          {/* Action CTAs */}
-          <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
-            {/* AI Revision CheatSheet Button */}
+          {/* Right Action CTAs */}
+          <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0 lg:w-64">
             <button
               onClick={() => setCheatSheetOpen(true)}
-              className="py-3 px-5 rounded-2xl text-xs font-bold text-slate-800 dark:text-white bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all flex items-center justify-center gap-2 shadow-sm"
+              className="py-2.5 px-4 rounded-2xl text-xs font-bold text-slate-800 dark:text-white bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all flex items-center justify-center gap-2 shadow-sm"
             >
               <Sparkles className="w-4 h-4 text-amber-500" />
               <span>{t("course.aiCheatSheet", "AI Exam Cheat Sheet")}</span>
             </button>
 
-            {/* Unlock Status CTA */}
             {isCourseUnlocked ? (
               <div className="py-2.5 px-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-400 text-xs font-bold flex flex-col items-center justify-center gap-0.5">
                 <div className="flex items-center gap-1.5">
@@ -762,7 +980,7 @@ export default function CourseDetailPage() {
                 <button
                   onClick={handleUnlockCourse}
                   disabled={unlocking}
-                  className="w-full py-3 px-5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/25 transition-all flex flex-col items-center justify-center gap-0.5"
+                  className="w-full py-2.5 px-4 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/25 transition-all flex flex-col items-center justify-center gap-0.5"
                 >
                   <div className="flex items-center gap-2">
                     <Unlock className="w-4 h-4" />
@@ -773,12 +991,11 @@ export default function CourseDetailPage() {
               </div>
             )}
 
-            {/* Offline Study Mode (ZIP) CTA */}
             {hasAnyCourseAccess ? (
               <button
                 onClick={handleDownloadOfflineZip}
                 disabled={downloadingZip}
-                className="w-full py-3 px-4 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-700 hover:to-teal-700 shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-70 group border border-emerald-500/30"
+                className="w-full py-2.5 px-4 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-700 hover:to-teal-700 shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-70 group border border-emerald-500/30"
               >
                 {downloadingZip ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
@@ -786,7 +1003,7 @@ export default function CourseDetailPage() {
                   <Download className="w-4 h-4 text-emerald-100 group-hover:scale-110 transition-transform shrink-0" />
                 )}
                 <div className="flex flex-col text-left">
-                  <span className="leading-tight font-black text-[13px]">
+                  <span className="leading-tight font-black text-xs">
                     {downloadingZip
                       ? (language === "bn" ? "প্যাকেজ প্রস্তুত হচ্ছে..." : "Packaging ZIP...")
                       : (language === "bn" ? "অফলাইন স্টাডি প্যাক (ZIP)" : "Offline Study Pack (ZIP)")}
@@ -808,11 +1025,11 @@ export default function CourseDetailPage() {
                     handleUnlockCourse();
                   }
                 }}
-                className="w-full p-3 rounded-2xl bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 transition-all flex items-center justify-between gap-2 text-left cursor-pointer group shadow-sm"
+                className="w-full p-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 transition-all flex items-center justify-between gap-2 text-left cursor-pointer group shadow-sm"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 group-hover:text-blue-500 transition-colors">
-                    <Download className="w-4 h-4" />
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 group-hover:text-blue-500 transition-colors">
+                    <Download className="w-3.5 h-3.5" />
                   </div>
                   <div className="flex flex-col">
                     <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
@@ -829,34 +1046,22 @@ export default function CourseDetailPage() {
               </button>
             )}
 
-            {/* Real Social Proof Card - Only when real unlocks exist */}
             {Boolean(course.unlockCount && course.unlockCount > 0) && (
-              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-blue-500/10 border border-amber-200/70 dark:border-amber-900/40 space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="text-[11px] font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1">
-                    <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                    <span>{course.unlockCount} {language === "bn" ? "জন SEU শিক্ষার্থী যুক্ত" : "SEU Students Enrolled"}</span>
-                  </div>
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-blue-500/10 border border-amber-200/70 dark:border-amber-900/40 space-y-1">
+                <div className="text-[11px] font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1">
+                  <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                  <span>{course.unlockCount} {language === "bn" ? "জন SEU শিক্ষার্থী যুক্ত" : "SEU Students Enrolled"}</span>
                 </div>
-                <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-tight">
-                  {isCourseUnlocked
-                    ? (language === "bn"
-                        ? "অভিনন্দন! আপনি এই কোর্সের পূর্ণাঙ্গ রিসোর্স আর্काइভের সফল আনলককারী।"
-                        : "You are actively utilizing this course archive alongside your batchmates.")
-                    : (language === "bn"
-                        ? "মিডটার্ম ও ফাইনাল পরীক্ষার সেরা প্রস্তুতির জন্য ব্যাচমেটদের সর্বাধিক পছন্দের কোর্স।"
-                        : "Trusted by batchmates preparing for Midterm & Final examinations.")}
-                </p>
                 <div className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                  <span>{language === "bn" ? "সকল শিক্ষকের হ্যান্ডনোট ও বিগত প্রশ্ন অন্তর্ভুক্ত" : "Includes all faculty notes & exam papers"}</span>
+                  <ShieldCheck className="w-3 h-3 shrink-0" />
+                  <span>{language === "bn" ? "সকল শিক্ষকের হ্যান্ডনোট ও প্রশ্ন" : "Verified faculty notes & papers"}</span>
                 </div>
               </div>
             )}
 
             <Link
               href="/contribute"
-              className="py-2 px-4 rounded-xl text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:text-blue-600 text-center transition-colors"
+              className="py-1.5 px-3 rounded-xl text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:text-blue-600 text-center transition-colors"
             >
               {t("course.contribute", "+ Contribute Material for this Course")}
             </Link>
@@ -864,956 +1069,551 @@ export default function CourseDetailPage() {
         </div>
       </div>
 
-      {/* 2. FACULTY SELECTION (WHO TEACHES THIS COURSE) */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-              <User className="w-4 h-4 text-blue-600" />
-              <span>{t("course.facultyHeader", "Course Faculty & Instructors")}</span>
+      {/* 2. FACULTY DIRECTORY STYLE 2-COLUMN WORKSPACE */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* LEFT STICKY SIDEBAR: Quick Stats + Instructor Filter + Reviews & Decision Guide */}
+        <div className="lg:col-span-5 lg:sticky lg:top-24 space-y-6">
+          
+          {/* Card A: Archive Overview (Matches Faculty Academic Overview) */}
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <Layers className="w-4 h-4 text-blue-600" />
+              <span>{language === "bn" ? "কোর্স আর্কাইভ ওভারভিউ" : "Course Archive Overview"}</span>
             </h2>
-            <p className="text-xs text-slate-500">
-              {t("course.facultySubtitle", "Select an instructor below to view their specific lecture hand notes, midterm & final questions, and lab tasks.")}
-            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-3 text-center">
+              <div className="p-3 rounded-2xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50">
+                <p className="text-2xl font-black text-blue-600 dark:text-blue-400">{totalNotesCount}</p>
+                <p className="text-[11px] font-bold text-slate-500 mt-0.5">{t("course.notesCount", "Notes")}</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900/50">
+                <p className="text-2xl font-black text-purple-600 dark:text-purple-400">{totalExamsCount}</p>
+                <p className="text-[11px] font-bold text-slate-500 mt-0.5">
+                  {isLabCourse ? (language === "bn" ? "ল্যাব ও প্রজেক্ট" : "Labs & Projects") : (language === "bn" ? "পরীক্ষার প্রশ্ন" : "Exam Papers")}
+                </p>
+              </div>
+              <div className="p-3 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/50">
+                <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{courseFacultyList.length}</p>
+                <p className="text-[11px] font-bold text-slate-500 mt-0.5">{language === "bn" ? "শিক্ষক" : "Instructors"}</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/50">
+                <p className="text-2xl font-black text-amber-500 flex items-center justify-center gap-1">
+                  <span>{avgRating || "—"}</span>
+                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                </p>
+                <p className="text-[11px] font-bold text-slate-500 mt-0.5">
+                  {reviewCount > 0 ? `${reviewCount} ${language === "bn" ? "রিভিউ" : "Reviews"}` : (language === "bn" ? "রেটিং" : "Rating")}
+                </p>
+              </div>
+            </div>
           </div>
-          <span className="text-xs font-bold text-slate-500">
-            {course.teachers?.length || 0} {t("course.facultyAssigned", "Faculty Assigned")}
-          </span>
-        </div>
 
-        {/* Faculty Grid Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* All Faculty Card */}
-          <button
-            onClick={() => setSelectedFacultyId("ALL")}
-            className={`p-4 rounded-2xl text-left border transition-all flex items-center gap-3 ${
-              selectedFacultyId === "ALL"
-                ? "bg-blue-50 dark:bg-blue-950/40 border-blue-500 ring-2 ring-blue-500/20 shadow-sm"
-                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300"
-            }`}
-          >
-            <div className={`w-10 h-10 rounded-xl font-extrabold text-xs flex items-center justify-center shrink-0 ${
-              selectedFacultyId === "ALL"
-                ? "bg-blue-600 text-white"
-                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
-            }`}>
-              ALL
+          {/* Card B: Course Faculty & Instructors Interactive Filter */}
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <Users className="w-4 h-4 text-blue-600" />
+                <span>{t("course.facultyHeader", "Course Instructors")}</span>
+              </h2>
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500">
+                {courseFacultyList.length} {t("course.facultyAssigned", "Assigned")}
+              </span>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-bold text-xs text-slate-900 dark:text-white truncate">
-                {t("course.allFacultyMembers", "All Faculty Members")}
-              </p>
-              <p className="text-[11px] text-slate-500 truncate">
-                {resources.length} {t("course.totalMaterials", "Total Materials")}
-              </p>
-            </div>
-            {selectedFacultyId === "ALL" && (
-              <Check className="w-4 h-4 text-blue-600 shrink-0" />
-            )}
-          </button>
 
-          {/* Individual Faculty Cards with Name + [Initial] */}
-          {courseFacultyList.map((tItem: any) => {
-            const isSelected = selectedFacultyId === tItem.id;
-            const isThisTeacherGifted =
-              !isCourseUnlocked &&
-              (hasUnlockedForTeacher(code, tItem.id) ||
-                Boolean(course?.unlockedTeacherIds?.some((id: number) => Number(id) === Number(tItem.id))));
-            const tRes = resources.filter(r => r.teacher?.id === tItem.id);
-            const notesCount = tRes.filter(r => r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "LAB_REPORT").length;
-            const examsCount = tRes.filter(r => r.type === "MID_QUESTION" || r.type === "FINAL_QUESTION" || r.type === "LAB_QUIZ" || r.type === "LAB_FINAL").length;
-
-            return (
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
               <button
-                key={tItem.id}
-                onClick={() => setSelectedFacultyId(tItem.id)}
-                className={`p-4 rounded-2xl text-left border transition-all flex items-center gap-3 relative ${
-                  isSelected
-                    ? "bg-blue-50 dark:bg-blue-950/40 border-blue-500 ring-2 ring-blue-500/20 shadow-sm"
-                    : isThisTeacherGifted
-                    ? "bg-amber-50/40 dark:bg-amber-950/20 border-amber-400/50 hover:border-amber-400"
-                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300"
+                onClick={() => setSelectedFacultyId("ALL")}
+                className={`w-full p-3 rounded-2xl text-left border transition-all flex items-center gap-3 ${
+                  selectedFacultyId === "ALL"
+                    ? "bg-blue-50 dark:bg-blue-950/40 border-blue-500 ring-2 ring-blue-500/20 shadow-xs"
+                    : "bg-slate-50/70 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 hover:border-blue-300"
                 }`}
               >
-                <FacultyAvatar
-                  image={tItem.image}
-                  name={tItem.name}
-                  initial={tItem.initial}
-                  designation={tItem.designation}
-                  size="sm"
-                />
-                <div className="min-w-0 flex-1">
-                  {/* Name with [Initial] */}
-                  <p className="font-bold text-xs text-slate-900 dark:text-white truncate">
-                    {tItem.name} {tItem.initial ? `[${tItem.initial}]` : ""}
-                  </p>
-                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                    {isThisTeacherGifted && (
-                      <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                        🎁 Unlocked
-                      </span>
-                    )}
-                    {notesCount > 0 && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">
-                        {notesCount} {t("course.notesCount", "Notes")}
-                      </span>
-                    )}
-                    {examsCount > 0 && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400">
-                        {examsCount} {t("course.examsCount", "Exams")}
-                      </span>
-                    )}
-                    {notesCount === 0 && examsCount === 0 && !isThisTeacherGifted && (
-                      <span className="text-[10px] text-slate-400">{t("course.facultyRole", "Faculty")}</span>
-                    )}
-                  </div>
+                <div className={`w-9 h-9 rounded-xl font-extrabold text-[11px] flex items-center justify-center shrink-0 ${
+                  selectedFacultyId === "ALL"
+                    ? "bg-blue-600 text-white"
+                    : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                }`}>
+                  ALL
                 </div>
-                {isSelected && (
-                  <Check className="w-4 h-4 text-blue-600 shrink-0" />
-                )}
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                    {t("course.allFacultyMembers", "All Faculty Members")}
+                  </p>
+                  <p className="text-[11px] text-slate-500 truncate">
+                    {resources.length} {t("course.totalMaterials", "Total Materials")}
+                  </p>
+                </div>
+                {selectedFacultyId === "ALL" && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
               </button>
-            );
-          })}
-        </div>
-      </div>
 
-      {/* 3. MATERIAL EXPLORER HEADER & TABS */}
-      <div className="space-y-6">
-        
-        {/* Navigation & Search Filter Bar */}
-        <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            
-            {/* Category Tabs: Custom for Lab vs Theory */}
-            <div className="flex flex-wrap items-center gap-2">
-              {isLabCourse ? (
-                // Lab Categories: Hand Notes, Lab Quiz, Lab Final, Project Link, Doc File Notes
-                [
-                  { id: "ALL", label: `${language === "bn" ? "সকল মেটেরিয়াল" : "All Materials"} (${facultyFiltered.length})` },
-                  { id: "LAB_HAND_NOTE", label: `${language === "bn" ? "হ্যান্ড নোট" : "Hand Notes"} (${labHandNotes.length})` },
-                  { id: "LAB_QUIZ", label: `${language === "bn" ? "কুইজ" : "Quiz"} (${labQuizzes.length})` },
-                  { id: "LAB_FINAL", label: `${language === "bn" ? "ল্যাব ফাইনাল" : "Lab Final"} (${labFinals.length})` },
-                  { id: "PROJECT_LINK", label: `${language === "bn" ? "প্রজেক্ট লিংক" : "Project Links"} (${projectLinks.length})` },
-                  { id: "DOC_NOTE", label: `${language === "bn" ? "ডক ফাইল নোট" : "Doc File Notes"} (${labDocNotes.length})` },
-                  ...(labManuals.length > 0 ? [{ id: "LAB_MANUAL", label: `${language === "bn" ? "ল্যাব ম্যানুয়াল" : "Lab Manuals"} (${labManuals.length})` }] : []),
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                      activeTab === tab.id
-                        ? "bg-blue-600 text-white shadow-sm"
-                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              {courseFacultyList.map((tItem: any) => {
+                const isSelected = selectedFacultyId === tItem.id;
+                const isThisTeacherGifted =
+                  !isCourseUnlocked &&
+                  (hasUnlockedForTeacher(code, tItem.id) ||
+                    Boolean(course?.unlockedTeacherIds?.some((id: number) => Number(id) === Number(tItem.id))));
+                const tRes = resources.filter(r => r.teacher?.id === tItem.id);
+                const notesCount = tRes.filter(r => r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "LAB_REPORT" || r.type === "DOC_NOTE").length;
+                const examsCount = tRes.filter(r => r.type === "MID_QUESTION" || r.type === "FINAL_QUESTION" || r.type === "LAB_QUIZ" || r.type === "LAB_FINAL" || r.type === "QUIZ_CT").length;
+
+                return (
+                  <div
+                    key={tItem.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelectedFacultyId(tItem.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelectedFacultyId(tItem.id);
+                      }
+                    }}
+                    className={`w-full p-3 rounded-2xl text-left border transition-all flex items-center gap-3 cursor-pointer ${
+                      isSelected
+                        ? "bg-blue-50 dark:bg-blue-950/40 border-blue-500 ring-2 ring-blue-500/20 shadow-xs"
+                        : isThisTeacherGifted
+                        ? "bg-amber-50/40 dark:bg-amber-950/20 border-amber-400/50 hover:border-amber-400"
+                        : "bg-slate-50/70 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 hover:border-blue-300"
                     }`}
                   >
-                    {tab.label}
-                  </button>
-                ))
-              ) : (
-                // Theory Categories: Hand Notes, Midterm, Final, Quiz & CT, Doc File Notes
-                [
-                  { id: "ALL", label: `${language === "bn" ? "সকল মেটেরিয়াল" : "All Materials"} (${facultyFiltered.length})` },
-                  { id: "NOTES", label: `${language === "bn" ? "হ্যান্ড নোট" : "Hand Notes"} (${handNotes.length})` },
-                  { id: "MIDTERM", label: `${language === "bn" ? "মিডটার্ম" : "Midterm"} (${midtermExams.length})` },
-                  { id: "FINAL", label: `${language === "bn" ? "ফাইনাল" : "Final"} (${finalExams.length})` },
-                  { id: "QUIZ", label: `${language === "bn" ? "কুইজ / সিটি" : "Quiz & CT"} (${quizCTs.length})` },
-                  { id: "DOC_NOTE", label: `${language === "bn" ? "ডক ফাইল নোট" : "Doc File Notes"} (${docNotes.length})` },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                      activeTab === tab.id
-                        ? "bg-blue-600 text-white shadow-sm"
-                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))
+                    <FacultyAvatar
+                      image={tItem.image}
+                      name={tItem.name}
+                      initial={tItem.initial}
+                      designation={tItem.designation}
+                      size="sm"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                        {tItem.name} {tItem.initial ? `[${tItem.initial}]` : ""}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        {isThisTeacherGifted && (
+                          <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                            🎁 Unlocked
+                          </span>
+                        )}
+                        {notesCount > 0 && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">
+                            {notesCount} {t("course.notesCount", "Notes")}
+                          </span>
+                        )}
+                        {examsCount > 0 && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400">
+                            {examsCount} {t("course.examsCount", "Exams")}
+                          </span>
+                        )}
+                        {notesCount === 0 && examsCount === 0 && !isThisTeacherGifted && (
+                          <span className="text-[10px] text-slate-400">{t("course.facultyRole", "Faculty")}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Link
+                        href={`/teachers/${tItem.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        title={language === "bn" ? "শিক্ষকের প্রোফাইল দেখুন" : "View Faculty Profile"}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-100/70 dark:hover:bg-blue-900/50 transition-colors"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </Link>
+                      {isSelected && <Check className="w-4 h-4 text-blue-600" />}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {courseFacultyList.length === 0 && (
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-200 dark:border-slate-700 text-[11px] text-slate-500 flex items-center justify-between gap-2">
+                  <span>{language === "bn" ? "ম্যাটেরিয়াল আপলোডের সাথে সাথে শিক্ষকের তালিকা যুক্ত হবে।" : "Faculty chips appear as course materials are curated."}</span>
+                  <Link href="/teachers" className="text-blue-600 dark:text-blue-400 font-bold hover:underline shrink-0">
+                    {language === "bn" ? "ডিরেক্টরি" : "Directory"}
+                  </Link>
+                </div>
               )}
             </div>
+          </div>
 
-            {/* Quick Live Search within this Course */}
-            <div className="relative min-w-[240px]">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          {/* Card C: Compact Student Reviews & Open Credit Sequence Guide */}
+          {(() => {
+            const advice = getEnrollmentAdvice(isLabCourse);
+            return (
+              <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                      <span>{t("reviews.title", "Course Feedback")}</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      {reviewCount > 0
+                        ? `${reviewCount} ${reviewCount === 1 ? "Evaluation" : "Evaluations"} • ${avgRating} ★`
+                        : (language === "bn" ? "ওপেন ক্রেডিট পরামর্শ ও রিভিউ" : "Open credit guide & reviews")}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        setShowAuthModal(true);
+                        return;
+                      }
+                      setShowReviewModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-sm transition-all shrink-0"
+                  >
+                    <MessageSquarePlus className="w-3.5 h-3.5" />
+                    <span>{language === "bn" ? "রিভিউ লিখুন" : "Write Review"}</span>
+                  </button>
+                </div>
+
+                {/* Open Credit Consensus Box */}
+                <div className="p-4 rounded-2xl bg-slate-50/90 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <span>🎯</span>
+                      <span>{advice.verdictTitle}</span>
+                    </span>
+                    {recommendPercent !== null && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300/50 dark:border-emerald-800 flex items-center gap-1">
+                        <ThumbsUp className="w-3 h-3" />
+                        <span>{recommendPercent}% Rec.</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                    {advice.adviceText}
+                  </p>
+                  <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                    <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800">
+                      <span className="text-slate-400 uppercase font-bold block">{language === "bn" ? "কাঠিন্য" : "Difficulty"}</span>
+                      <span className="font-extrabold text-amber-600 dark:text-amber-400 block mt-0.5 truncate">
+                        {reviewCount > 0 && dynamicDifficulty ? dynamicDifficulty : (language === "bn" ? "অমূল্যায়িত" : "Not Rated")}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800">
+                      <span className="text-slate-400 uppercase font-bold block">{language === "bn" ? "চাপ" : "Workload"}</span>
+                      <span className="font-extrabold text-emerald-600 dark:text-emerald-400 block mt-0.5 truncate">
+                        {reviewCount > 0 && dynamicWorkload ? dynamicWorkload.split(" ")[0] : (language === "bn" ? "অমূল্যায়িত" : "Not Rated")}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800">
+                      <span className="text-slate-400 uppercase font-bold block">{language === "bn" ? "সময়" : "Timing"}</span>
+                      <span className="font-extrabold text-purple-600 dark:text-purple-400 block mt-0.5 truncate">
+                        {reviewCount > 0 ? advice.timingLabel.split(" ")[0] : (course?.semester ? `Sem ${course.semester}` : "Flex")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Compact Recent Reviews Feed */}
+                {reviewCount === 0 ? (
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-dashed border-slate-200 dark:border-slate-800 text-center space-y-2">
+                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      {language === "bn" ? "এখনও কোনো শিক্ষার্থী রিভিউ দেয়নি" : "No student feedback yet"}
+                    </p>
+                    <button
+                      onClick={() => {
+                        if (!isAuthenticated) {
+                          setShowAuthModal(true);
+                          return;
+                        }
+                        setShowReviewModal(true);
+                      }}
+                      className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      {language === "bn" ? "+ প্রথম রিভিউ লিখুন" : "+ Be the first to share advice"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {reviews.slice(0, 2).map((rev) => (
+                      <div
+                        key={rev.id}
+                        className="p-4 rounded-2xl bg-[#0d131f] border border-slate-800 text-white space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 text-blue-400">
+                              <User className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-white truncate">
+                                {rev.anonymous
+                                  ? (language === "bn" ? "অজ্ঞাতনামা শিক্ষার্থী" : "Anonymous Student")
+                                  : (rev.authorName || rev.studentName || "Student")}
+                              </p>
+                              <p className="text-[10px] text-slate-400 font-mono">
+                                {formatReviewDate(rev.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <div className="flex items-center text-amber-400">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`w-2.5 h-2.5 ${star <= (rev.rating || 5) ? "fill-amber-400 text-amber-400" : "text-slate-700"}`}
+                                />
+                              ))}
+                            </div>
+                            <Smile className="w-4 h-4 text-emerald-400 shrink-0" />
+                          </div>
+                        </div>
+                        <div className="border-l-2 border-blue-500 pl-3 py-0.5 text-xs text-slate-200 leading-relaxed line-clamp-3">
+                          &quot;{rev.comment}&quot;
+                        </div>
+                      </div>
+                    ))}
+
+                    {reviewCount > 2 && (
+                      <button
+                        onClick={() => setShowAllReviewsModal(true)}
+                        className="w-full py-2 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <span>
+                          {language === "bn" ? `সকল রিভিউ দেখুন (${reviewCount})` : `View All Course Reviews (${reviewCount})`}
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+        </div>
+
+        {/* RIGHT MAIN WORKSPACE: Sticky Material Explorer + Collapsible Category Folders */}
+        <div className="lg:col-span-7 space-y-6">
+
+          {/* Material Explorer Header, Tabs & Live Filter Toolbar */}
+          <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <FolderOpen className="w-4 h-4 text-blue-600" />
+                <h2 className="text-base font-black text-slate-900 dark:text-white">
+                  {language === "bn" ? "কোর্স ম্যাটেরিয়াল এক্সপ্লোরার" : "Course Materials Explorer"}
+                </h2>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800/50">
+                  {facultyFiltered.length}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {activeTab === "ALL" && visibleCategories.length > 1 && (
+                  <button
+                    onClick={toggleAllCategories}
+                    className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                  >
+                    {anyExpanded
+                      ? (language === "bn" ? "সব ফোল্ডার গুটিয়ে নিন" : "Collapse All")
+                      : (language === "bn" ? "সব ফোল্ডার খুলুন" : "Expand All")}
+                  </button>
+                )}
+
+                <button
+                  onClick={hasAnyCourseAccess ? handleDownloadOfflineZip : handleUnlockCourse}
+                  disabled={downloadingZip}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-xs cursor-pointer"
+                  title={language === "bn" ? "অফলাইন স্টাডি প্যাক ডাউনলোড (.ZIP)" : "Download Offline Study Pack (.ZIP)"}
+                >
+                  {downloadingZip ? (
+                    <div className="w-3.5 h-3.5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5 text-emerald-500" />
+                  )}
+                  <span className="hidden sm:inline font-bold">
+                    {language === "bn" ? "অফলাইন ZIP" : "Offline ZIP"}
+                  </span>
+                  {!hasAnyCourseAccess && (
+                    <span className="text-[10px] text-amber-500 font-bold">🔒</span>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Category Tabs: Custom for Lab vs Theory */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(isLabCourse
+                ? [
+                    { id: "ALL", label: `${language === "bn" ? "সকল" : "All"} (${facultyFiltered.length})` },
+                    { id: "LAB_HAND_NOTE", label: `${language === "bn" ? "হ্যান্ড নোট" : "Hand Notes"} (${labHandNotes.length})` },
+                    { id: "LAB_QUIZ", label: `${language === "bn" ? "কুইজ" : "Quiz"} (${labQuizzes.length})` },
+                    { id: "LAB_FINAL", label: `${language === "bn" ? "ল্যাব ফাইনাল" : "Lab Final"} (${labFinals.length})` },
+                    { id: "PROJECT_LINK", label: `${language === "bn" ? "প্রজেক্ট লিংক" : "Projects"} (${projectLinks.length})` },
+                    { id: "DOC_NOTE", label: `${language === "bn" ? "ডক নোট" : "Doc Notes"} (${labDocNotes.length})` },
+                    ...(labManuals.length > 0 ? [{ id: "LAB_MANUAL", label: `${language === "bn" ? "ল্যাব ম্যানুয়াল" : "Manuals"} (${labManuals.length})` }] : []),
+                  ]
+                : [
+                    { id: "ALL", label: `${language === "bn" ? "সকল" : "All"} (${facultyFiltered.length})` },
+                    { id: "NOTES", label: `${language === "bn" ? "হ্যান্ড নোট" : "Hand Notes"} (${handNotes.length})` },
+                    { id: "MIDTERM", label: `${language === "bn" ? "মিডটার্ম" : "Midterm"} (${midtermExams.length})` },
+                    { id: "FINAL", label: `${language === "bn" ? "ফাইনাল" : "Final"} (${finalExams.length})` },
+                    { id: "QUIZ", label: `${language === "bn" ? "কুইজ / সিটি" : "Quiz & CT"} (${quizCTs.length})` },
+                    { id: "DOC_NOTE", label: `${language === "bn" ? "ডক নোট" : "Doc Notes"} (${docNotes.length})` },
+                  ]
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === tab.id
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "bg-slate-50 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Live Search Input */}
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 maxLength={100}
                 placeholder={t("tabs.searchPlaceholder", "Filter by semester, quiz, or topic...")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:outline-none focus:border-blue-500 text-slate-900 dark:text-white"
+                className="w-full pl-10 pr-8 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:outline-none focus:border-blue-500 text-slate-900 dark:text-white"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs hover:text-slate-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs hover:text-slate-600"
                 >
                   ✕
                 </button>
               )}
             </div>
 
-            {/* Quick 1-Click ZIP Download button */}
-            <button
-              onClick={hasAnyCourseAccess ? handleDownloadOfflineZip : handleUnlockCourse}
-              disabled={downloadingZip}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-sm cursor-pointer"
-              title={language === "bn" ? "অফলাইন স্টাডি প্যাক ডাউনলোড (.ZIP)" : "Download Offline Study Pack (.ZIP)"}
-            >
-              {downloadingZip ? (
-                <div className="w-3.5 h-3.5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Download className="w-3.5 h-3.5 text-emerald-500" />
-              )}
-              <span className="hidden sm:inline font-bold">
-                {language === "bn" ? "অফলাইন ZIP" : "Offline ZIP"}
-              </span>
-              {!hasAnyCourseAccess && (
-                <span className="text-[10px] text-amber-500 font-bold">🔒</span>
-              )}
-            </button>
-          </div>
-
-          {/* Active Instructor Feedback Pill */}
-          {selectedFacultyObj && (
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-              <div className="flex items-center gap-2">
-                <span>{t("course.filteringFor", "Filtering materials for:")}</span>
-                <span className="font-bold text-slate-900 dark:text-white bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md text-blue-700 dark:text-blue-300">
-                  {selectedFacultyObj.name} {selectedFacultyObj.initial ? `[${selectedFacultyObj.initial}]` : ""}
-                </span>
-              </div>
-              <button 
-                onClick={() => setSelectedFacultyId("ALL")}
-                className="text-blue-600 text-xs font-bold hover:underline"
-              >
-                {t("course.clearFilter", "Clear Instructor Filter")}
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Notice Info */}
-        <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-800/50 flex items-start gap-3 text-xs">
-          <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <p className="font-extrabold text-blue-950 dark:text-blue-100">
-              {isLabCourse ? (language === "bn" ? "প্র্যাকটিক্যাল ল্যাব কোর্স আর্কাইভ:" : "Practical Lab Course Archive:") : (language === "bn" ? "কোর্স আনলকের পরিধি ও নিয়ম:" : "Course Unlock Scope & Policy:")}
-            </p>
-            <p className="text-blue-900 dark:text-blue-200 leading-relaxed">
-              {isLabCourse ? t("notice.scopeLab") : t("notice.scopeTheory")}
-            </p>
-          </div>
-        </div>
-
-        {/* ========================================================================= */}
-        {/* 4. STRUCTURED STACKS: RENDER LAB OR THEORY SECTIONS                       */}
-        {/* ========================================================================= */}
-        
-        {isLabCourse ? (
-          /* ========================================================= */
-          /* LAB COURSE SECTIONS (NO MIDTERM / NO FINAL THEORY EXAMS)  */
-          /* ========================================================= */
-          <div className="space-y-8">
-            
-            {/* 1. Lab Hand Notes */}
-            {(activeTab === "ALL" || activeTab === "LAB_HAND_NOTE") && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <BookMarked className="w-4 h-4 text-teal-600" />
-                    <span>{language === "bn" ? "হ্যান্ড নোট" : "Hand Notes"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-400">
-                      {labHandNotes.length}
-                    </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
-                    {language === "bn" ? "ব্যবহারিক ক্লাস লেকচার ও প্র্যাকটিক্যাল কোড শিট" : "Practical Class Lectures & Code Cheatsheets"}
+            {/* Active Instructor Feedback Pill */}
+            {selectedFacultyObj && (
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="shrink-0">{t("course.filteringFor", "Filtering materials for:")}</span>
+                  <span className="font-bold bg-blue-50 dark:bg-blue-950/60 px-2.5 py-0.5 rounded-lg text-blue-700 dark:text-blue-300 truncate">
+                    {selectedFacultyObj.name} {selectedFacultyObj.initial ? `[${selectedFacultyObj.initial}]` : ""}
                   </span>
                 </div>
-
-                {labHandNotes.length === 0 ? (
-                  <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
-                    {language === "bn" ? "এখনও কোনো হ্যান্ড নোট আপলোড করা হয়নি।" : "No lab hand notes uploaded yet."}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {labHandNotes.map((res) => (
-                      <MaterialCard
-                        key={res.id}
-                        resource={res}
-                        categoryTag={language === "bn" ? "হ্যান্ড নোট" : "Hand Note"}
-                        tagColor="teal"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
-                        onOpenViewer={handleOpenViewer}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* 2. Lab Quiz */}
-            {(activeTab === "ALL" || activeTab === "LAB_QUIZ") && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <HelpCircle className="w-4 h-4 text-purple-600" />
-                    <span>{language === "bn" ? "ল্যাব কুইজ" : "Lab Quizzes"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400">
-                      {labQuizzes.length}
-                    </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
-                    {language === "bn" ? "ব্যবহারিক কোডিং কুইজ ও কমান্ড টেস্ট" : "Practical Coding & Command Quizzes"}
-                  </span>
-                </div>
-
-                {labQuizzes.length === 0 ? (
-                  <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
-                    {language === "bn" ? "এখনও কোনো ল্যাব কুইজ আপলোড করা হয়নি।" : "No lab quizzes uploaded yet."}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {labQuizzes.map((res) => (
-                      <MaterialCard
-                        key={res.id}
-                        resource={res}
-                        categoryTag={language === "bn" ? "ল্যাব কুইজ" : "Lab Quiz"}
-                        tagColor="purple"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
-                        onOpenViewer={handleOpenViewer}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* 3. Lab Final */}
-            {(activeTab === "ALL" || activeTab === "LAB_FINAL") && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Award className="w-4 h-4 text-rose-600" />
-                    <span>{language === "bn" ? "ল্যাব ফাইনাল" : "Lab Final"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400">
-                      {labFinals.length}
-                    </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
-                    {language === "bn" ? "ল্যাব ফাইনাল প্রবলেম সেট ও ভাইভা প্রশ্নব্যাংক" : "Lab Final Problem Sets & Viva Question Bank"}
-                  </span>
-                </div>
-
-                {labFinals.length === 0 ? (
-                  <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
-                    {language === "bn" ? "এখনও কোনো ল্যাব ফাইনাল শিট আপলোড করা হয়নি।" : "No lab final examination sheets uploaded yet."}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {labFinals.map((res) => (
-                      <MaterialCard
-                        key={res.id}
-                        resource={res}
-                        categoryTag={language === "bn" ? "ল্যাব ফাইনাল" : "Lab Final"}
-                        tagColor="rose"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
-                        onOpenViewer={handleOpenViewer}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* 4. Project Links (Live Demo or GitHub Source Code) */}
-            {(activeTab === "ALL" || activeTab === "PROJECT_LINK") && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <ExternalLink className="w-4 h-4 text-emerald-600" />
-                    <span>{language === "bn" ? "প্রজেক্ট লিংক" : "Project Links"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">
-                      {projectLinks.length}
-                    </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
-                    {language === "bn" ? "লাইভ ওয়েব ডেমো ও গিটহাব সোর্স কোড রিপোজিটরি" : "Live Web Demos & GitHub Source Codes"}
-                  </span>
-                </div>
-
-                {projectLinks.length === 0 ? (
-                  <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
-                    {language === "bn" ? "এখনও কোনো প্রজেক্ট লিংক বা কোড যুক্ত করা হয়নি।" : "No project links or source codes added yet."}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {projectLinks.map((res) => (
-                      <MaterialCard
-                        key={res.id}
-                        resource={res}
-                        categoryTag={language === "bn" ? "প্রজেক্ট লিংক" : "Project Link"}
-                        tagColor="emerald"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
-                        onOpenViewer={handleOpenViewer}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* 5. Doc File Notes */}
-            {(activeTab === "ALL" || activeTab === "DOC_NOTE") && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-cyan-600" />
-                    <span>{language === "bn" ? "ডক ফাইল নোট" : "Doc File Notes"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-400">
-                      {labDocNotes.length}
-                    </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
-                    {language === "bn" ? "ওয়ার্ড ফাইল (.docx) ও ল্যাব রিপোর্ট টেমপ্লেট" : "Word (.docx) Documentation & Report Templates"}
-                  </span>
-                </div>
-
-                {labDocNotes.length === 0 ? (
-                  <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
-                    {language === "bn" ? "এখনও কোনো ডক ফাইল নোট আপলোড করা হয়নি।" : "No doc file notes uploaded yet."}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {labDocNotes.map((res) => (
-                      <MaterialCard
-                        key={res.id}
-                        resource={res}
-                        categoryTag={language === "bn" ? "ডক ফাইল নোট" : "Doc File Note"}
-                        tagColor="cyan"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
-                        onOpenViewer={handleOpenViewer}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* 6. Optional: Lab Manuals (If any exist) */}
-            {labManuals.length > 0 && (activeTab === "ALL" || activeTab === "LAB_MANUAL") && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <FlaskConical className="w-4 h-4 text-amber-600" />
-                    <span>{language === "bn" ? "ল্যাব ম্যানুয়াল" : "Lab Manuals & Practical Experiments"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400">
-                      {labManuals.length}
-                    </span>
-                  </h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {labManuals.map((res) => (
-                    <MaterialCard
-                      key={res.id}
-                      resource={res}
-                      categoryTag={language === "bn" ? "ল্যাব ম্যানুয়াল" : "Lab Manual"}
-                      tagColor="amber"
-                      isCourseUnlocked={isResourceUnlockedForView(res)}
-                      onOpenViewer={handleOpenViewer}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-          </div>
-        ) : (
-          /* ========================================================= */
-          /* THEORY COURSE SECTIONS (5 DEDICATED STACKS)               */
-          /* ========================================================= */
-          <div className="space-y-8">
-            
-            {/* SECTION A: HAND NOTES */}
-            {(activeTab === "ALL" || activeTab === "NOTES") && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <BookMarked className="w-4 h-4 text-emerald-600" />
-                    <span>{language === "bn" ? "হ্যান্ড নোট" : "Hand Notes"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">
-                      {handNotes.length}
-                    </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
-                    {language === "bn" ? "লেকচার হ্যান্ড নোট ও ক্লাস স্লাইড" : "Lecture Hand Notes & Class Slides"}
-                  </span>
-                </div>
-
-                {handNotes.length === 0 ? (
-                  <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
-                    {language === "bn" ? "এখনও কোনো হ্যান্ড নোট আপলোড করা হয়নি।" : "No hand notes uploaded yet for this selection."}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {handNotes.map((res) => (
-                      <MaterialCard
-                        key={res.id}
-                        resource={res}
-                        categoryTag={language === "bn" ? "হ্যান্ড নোট" : "Hand Notes"}
-                        tagColor="emerald"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
-                        onOpenViewer={handleOpenViewer}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* SECTION B: MIDTERM EXAMINATION QUESTIONS */}
-            {(activeTab === "ALL" || activeTab === "MIDTERM") && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-blue-600" />
-                    <span>{language === "bn" ? "মিডটার্ম" : "Midterm Examination Papers"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400">
-                      {midtermExams.length} {language === "bn" ? "টি সেমিস্টার" : "Semesters"}
-                    </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
-                    {language === "bn" ? "বিগত সেমিস্টারের মিডটার্ম প্রশ্ন আর্কাইভ" : "Multi-Semester Midterm Archive"}
-                  </span>
-                </div>
-
-                {midtermExams.length === 0 ? (
-                  <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
-                    {language === "bn" ? "এখনও কোনো মিডটার্ম প্রশ্ন আপলোড করা হয়নি।" : "No midterm examination papers uploaded yet for this selection."}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {midtermExams.map((res) => (
-                      <MaterialCard
-                        key={res.id}
-                        resource={res}
-                        categoryTag={language === "bn" ? "মিডটার্ম" : "Midterm"}
-                        tagColor="blue"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
-                        onOpenViewer={handleOpenViewer}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* SECTION C: FINAL EXAMINATION QUESTIONS */}
-            {(activeTab === "ALL" || activeTab === "FINAL") && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <GraduationCap className="w-4 h-4 text-indigo-600" />
-                    <span>{language === "bn" ? "ফাইনাল" : "Final Examination Papers"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400">
-                      {finalExams.length} {language === "bn" ? "টি সেমিস্টার" : "Semesters"}
-                    </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
-                    {language === "bn" ? "বিগত সেমিস্টারের ফাইনাল পরীক্ষা প্রশ্ন আর্কাইভ" : "Multi-Semester Final Exam Archive"}
-                  </span>
-                </div>
-
-                {finalExams.length === 0 ? (
-                  <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
-                    {language === "bn" ? "এখনও কোনো ফাইনাল পরীক্ষা প্রশ্ন আপলোড করা হয়নি।" : "No final examination papers uploaded yet for this selection."}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {finalExams.map((res) => (
-                      <MaterialCard
-                        key={res.id}
-                        resource={res}
-                        categoryTag={language === "bn" ? "ফাইনাল" : "Final"}
-                        tagColor="indigo"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
-                        onOpenViewer={handleOpenViewer}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* SECTION D: QUIZ / CLASS TEST (CT) */}
-            {(activeTab === "ALL" || activeTab === "QUIZ") && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <HelpCircle className="w-4 h-4 text-purple-600" />
-                    <span>{language === "bn" ? "কুইজ ও ক্লাস টেস্ট (CT)" : "Quiz & Class Test (CT) Papers"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400">
-                      {quizCTs.length}
-                    </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
-                    {language === "bn" ? "সেমিস্টার কুইজ ও ক্লাস টেস্ট সলিউশন" : "Semester Quizzes, Spot Tests & Questions"}
-                  </span>
-                </div>
-
-                {quizCTs.length === 0 ? (
-                  <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
-                    {language === "bn" ? "এখনও কোনো কুইজ বা ক্লাস টেস্ট প্রশ্ন আপলোড করা হয়নি।" : "No quiz or class test papers uploaded yet."}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {quizCTs.map((res) => (
-                      <MaterialCard
-                        key={res.id}
-                        resource={res}
-                        categoryTag={language === "bn" ? "কুইজ / সিটি" : "Quiz / CT"}
-                        tagColor="purple"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
-                        onOpenViewer={handleOpenViewer}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* SECTION E: DOC FILE NOTES */}
-            {(activeTab === "ALL" || activeTab === "DOC_NOTE") && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-cyan-600" />
-                    <span>{language === "bn" ? "ডক ফাইল নোট" : "Doc File Notes"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-400">
-                      {docNotes.length}
-                    </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
-                    {language === "bn" ? "ওয়ার্ড ফাইল (.docx), লেকচার ড্রাফট ও এডিটেবল নোটস" : "Editable Word (.docx) Lecture Guides, Summaries & Outlines"}
-                  </span>
-                </div>
-
-                {docNotes.length === 0 ? (
-                  <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500">
-                    {language === "bn" ? "এখনও কোনো ডক ফাইল নোট আপলোড করা হয়নি।" : "No doc file notes uploaded yet."}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {docNotes.map((res) => (
-                      <MaterialCard
-                        key={res.id}
-                        resource={res}
-                        categoryTag={language === "bn" ? "ডক ফাইল নোট" : "Doc File Note"}
-                        tagColor="cyan"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
-                        onOpenViewer={handleOpenViewer}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-          </div>
-        )}
-
-        {/* Pro Tip Box */}
-        <div className="p-5 rounded-3xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 flex items-start gap-3 text-xs">
-          <Lightbulb className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-extrabold text-amber-900 dark:text-amber-200">
-              {isLabCourse ? t("tip.labTitle", "Lab Exam Preparation Tip") : t("tip.theoryTitle", "Exam Preparation Tip")}
-            </p>
-            <p className="text-amber-800/90 dark:text-amber-300 mt-0.5 leading-relaxed">
-              {isLabCourse ? t("tip.labText") : t("tip.theoryText")}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* 5. STUDENT REVIEWS & COURSE DECISION GUIDE */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl space-y-6">
-        
-        {/* Header with Title and "Write Course Review" Button */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-100 dark:border-slate-800">
-          <div>
-            <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-              <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
-              <span>{t("reviews.title", "Course Feedback")}</span>
-            </h3>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
-              {reviewCount > 0 
-                ? `${reviewCount} ${reviewCount === 1 ? "Course Evaluation" : "Course Evaluations"} • Average ${avgRating} ⭐ ${recommendPercent !== null ? `(${recommendPercent}% Recommended)` : ""}`
-                : (language === "bn" ? "ওপেন ক্রেডিট সিস্টেমে এই কোর্সটি কখন নেওয়া উচিত—জুনিয়রদের পরামর্শ দিন" : "Senior guidance on when to take this course under SEU's open credit curriculum")}
-            </p>
-          </div>
-
-          <button
-            onClick={() => {
-              if (!isAuthenticated) {
-                setShowAuthModal(true);
-                return;
-              }
-              setShowReviewModal(true);
-            }}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/20 hover:scale-105 transition-all shrink-0"
-          >
-            <MessageSquarePlus className="w-4 h-4" />
-            <span>{language === "bn" ? "কোর্স রিভিউ লিখুন" : "Write Course Review"}</span>
-          </button>
-        </div>
-
-        {/* DECISION MATRIX: "When Should You Take This Course? (Open Credit Sequence Guide)" */}
-        {(() => {
-          const advice = getEnrollmentAdvice(isLabCourse);
-          return (
-            <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-slate-50 to-blue-50/40 dark:from-slate-950 dark:to-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xl">🎯</span>
-                  <div>
-                    <h4 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <span>{language === "bn" ? "এই কোর্সটি কখন নেওয়া উচিত? (ওপেন ক্রেডিট সিকোয়েন্সিং গাইড)" : "When Should You Take This Course? (Open Credit Sequence Guide)"}</span>
-                      {reviewCount > 0 && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-500/10 text-blue-500 dark:text-blue-400 border border-blue-500/20">
-                          {language === "bn" ? `সকল (${reviewCount}) রিভিউ হতে হিসাবকৃত` : `Calculated from all ${reviewCount} review${reviewCount > 1 ? 's' : ''}`}
-                        </span>
-                      )}
-                    </h4>
-                    <p className="text-[11px] font-bold text-blue-600 dark:text-blue-400 mt-0.5">
-                      {advice.verdictTitle} {reviewCount > 0 && `• ${timingPercent}% ${language === "bn" ? "ঐক্যমত" : "Consensus"}`}
-                    </p>
-                  </div>
-                </div>
-
-                {recommendPercent !== null && (
-                  <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800 flex items-center gap-1.5 shadow-sm">
-                    <ThumbsUp className="w-3.5 h-3.5" />
-                    <span>{recommendPercent}% {language === "bn" ? "শিক্ষার্থী নেওয়ার পক্ষে" : "Would Recommend"}</span>
-                  </span>
-                )}
-              </div>
-
-              {/* Actionable Open Credit Advice for juniors */}
-              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
-                {advice.adviceText}
-              </p>
-
-              {/* 4-Metric Grid (Difficulty, Workload Demand, Recommended Timing, Course Rating) calculated from all reviews */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-center text-xs">
-                {/* Difficulty */}
-                <div className="p-3 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-sm">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                    {language === "bn" ? "কাঠিন্য" : "Difficulty"}
-                  </span>
-                  {reviewCount > 0 && dynamicDifficulty ? (
-                    <>
-                      <span className="font-extrabold text-amber-600 dark:text-amber-400 block mt-0.5 truncate">
-                        {dynamicDifficulty}
-                      </span>
-                      <span className="text-[10px] text-slate-400 mt-0.5 block">
-                        {diffPercent}% {language === "bn" ? "শিক্ষার্থীর মত" : "consensus"}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="font-bold text-slate-400 dark:text-slate-500 block mt-0.5">
-                        {language === "bn" ? "মূল্যায়ন নেই" : "Not Rated"}
-                      </span>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block">
-                        {language === "bn" ? "কোনো রিভিউ নেই" : "No evaluations yet"}
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                {/* Workload Demand */}
-                <div className="p-3 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-sm">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                    {language === "bn" ? "পড়ার চাপ" : "Workload Demand"}
-                  </span>
-                  {reviewCount > 0 && dynamicWorkload ? (
-                    <>
-                      <span className="font-extrabold text-emerald-600 dark:text-emerald-400 block mt-0.5 truncate">
-                        {dynamicWorkload}
-                      </span>
-                      <span className="text-[10px] text-slate-400 mt-0.5 block">
-                        {workloadPercent}% {language === "bn" ? "শিক্ষার্থীর মত" : "consensus"}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="font-bold text-slate-400 dark:text-slate-500 block mt-0.5">
-                        {language === "bn" ? "মূল্যায়ন নেই" : "Not Rated"}
-                      </span>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block">
-                        {language === "bn" ? "কোনো রিভিউ নেই" : "No evaluations yet"}
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                {/* Recommended Timing */}
-                <div className="p-3 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-sm">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                    {language === "bn" ? "উপযুক্ত সময়" : "Recommended Timing"}
-                  </span>
-                  {reviewCount > 0 ? (
-                    <>
-                      <span className="font-extrabold text-purple-600 dark:text-purple-400 block mt-0.5 truncate">
-                        {advice.timingLabel}
-                      </span>
-                      <span className="text-[10px] text-slate-400 mt-0.5 block">
-                        {timingPercent}% {language === "bn" ? "শিক্ষার্থীর মত" : "consensus"}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="font-bold text-slate-700 dark:text-slate-300 block mt-0.5 truncate">
-                        {course?.semester ? (language === "bn" ? `সেমিস্টার ${course.semester}` : `Semester ${course.semester}`) : "—"}
-                      </span>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block">
-                        {course?.semester ? (language === "bn" ? "সিলেবাস অনুসারে" : "Curriculum Sequence") : (language === "bn" ? "কোনো রিভিউ নেই" : "No evaluations yet")}
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                {/* Course Rating */}
-                <div className="p-3 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-sm">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                    {language === "bn" ? "কোর্স রেটিং" : "Course Rating"}
-                  </span>
-                  {reviewCount > 0 && avgRating ? (
-                    <>
-                      <span className="font-extrabold text-amber-500 block mt-0.5 truncate flex items-center justify-center gap-1">
-                        {avgRating} / 5.0 <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                      </span>
-                      <span className="text-[10px] text-slate-400 mt-0.5 block">
-                        {reviewCount} {language === "bn" ? "টি রিভিউ হতে" : reviewCount > 1 ? "reviews" : "review"}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="font-bold text-slate-400 dark:text-slate-500 block mt-0.5 flex items-center justify-center gap-1">
-                        — / 5.0 <Star className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" />
-                      </span>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 block">
-                        {language === "bn" ? "কোনো রেটিং নেই" : "No ratings yet"}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Existing Reviews Feed */}
-        {reviewCount === 0 ? (
-          <div className="p-8 sm:p-10 rounded-3xl bg-slate-50 dark:bg-slate-950/60 border border-dashed border-slate-200 dark:border-slate-800 text-center space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-500 flex items-center justify-center mx-auto shadow-sm">
-              <Star className="w-6 h-6 fill-amber-500/20" />
-            </div>
-            <div>
-              <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">
-                {language === "bn" ? "এখনও কোনো শিক্ষার্থী রিভিউ দেয়নি" : "No Student Feedback Yet"}
-              </h4>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto leading-relaxed">
-                {language === "bn"
-                  ? "আপনি কি ইতিমধ্যে এই কোর্সটি সম্পন্ন করেছেন? আপনার অভিজ্ঞতা ও পরামর্শ শেয়ার করুন—এটি জুনিয়রদের ওপেন ক্রেডিটে কোর্স নির্বাচন ও সেমিস্টার প্ল্যানিংয়ে সঠিক সিদ্ধান্ত নিতে সাহায্য করবে!"
-                  : "Have you completed this course? Share your advice on credit workload, difficulty, and sequencing to help juniors make the right enrollment choices!"}
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                if (!isAuthenticated) {
-                  setShowAuthModal(true);
-                  return;
-                }
-                setShowReviewModal(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors"
-            >
-              <MessageSquarePlus className="w-3.5 h-3.5" />
-              <span>{language === "bn" ? "প্রথম রিভিউটি লিখুন" : "Be the First to Review This Course"}</span>
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {reviews.slice(0, 2).map((rev) => (
-                <div
-                  key={rev.id}
-                  className="p-5 sm:p-6 rounded-2xl bg-[#0d131f] border border-slate-800 text-white shadow-xl space-y-3.5 flex flex-col justify-between"
+                <button
+                  onClick={() => setSelectedFacultyId("ALL")}
+                  className="text-blue-600 text-xs font-bold hover:underline shrink-0"
                 >
-                  {/* Author Row with circular avatar, Name, Date, green Smiley face + star badge */}
-                  <div className="flex items-center justify-between gap-3">
+                  {t("course.clearFilter", "Clear Filter")}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Scope Notice Bar */}
+          <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-800/50 flex items-start gap-3 text-xs">
+            <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="font-extrabold text-blue-950 dark:text-blue-100">
+                {isLabCourse ? (language === "bn" ? "প্র্যাকটিক্যাল ল্যাব কোর্স আর্কাইভ:" : "Practical Lab Course Archive:") : (language === "bn" ? "কোর্স আনলকের পরিধি ও নিয়ম:" : "Course Unlock Scope & Policy:")}
+              </p>
+              <p className="text-blue-900/90 dark:text-blue-200/90 leading-relaxed">
+                {isLabCourse ? t("notice.scopeLab") : t("notice.scopeTheory")}
+              </p>
+            </div>
+          </div>
+
+          {/* Collapsible Category Folder Accordions (Faculty Directory Pattern) */}
+          <div className="space-y-4">
+            {visibleCategories.map((cat) => {
+              const Icon = cat.icon;
+              const expanded = isCategoryExpanded(cat.id, cat.items.length);
+
+              return (
+                <div
+                  key={cat.id}
+                  className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-all"
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleCategory(cat.id, expanded)}
+                    className="w-full p-4 sm:p-5 flex items-center justify-between gap-4 text-left hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors cursor-pointer"
+                  >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 text-blue-400">
-                        <User className="w-4 h-4" />
+                      <div className={`w-10 h-10 rounded-2xl border flex items-center justify-center shrink-0 ${cat.iconWrapClass}`}>
+                        <Icon className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-xs sm:text-sm font-bold text-white truncate">
-                          {rev.anonymous
-                            ? (language === "bn" ? "অজ্ঞাতনামা শিক্ষার্থী" : "Anonymous Student")
-                            : (rev.authorName || rev.studentName || "Student")}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
+                            {cat.title}
+                          </h3>
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${cat.badgeClass}`}>
+                            {cat.items.length}
+                          </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 font-mono">
-                          {formatReviewDate(rev.createdAt)}
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                          {cat.subtitle}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2.5 shrink-0">
-                      <div className="flex items-center text-amber-400">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star
-                            key={star}
-                            className={`w-3 h-3 ${
-                              star <= (rev.rating || 5)
-                                ? "fill-amber-400 text-amber-400"
-                                : "text-slate-700"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <Smile className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <div className="flex items-center gap-2 shrink-0 text-slate-400">
+                      <span className="hidden sm:inline text-[11px] font-semibold">
+                        {expanded ? (language === "bn" ? "বন্ধ করুন" : "Hide") : (language === "bn" ? "খুলুন" : "Open")}
+                      </span>
+                      {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </div>
-                  </div>
+                  </button>
 
-                  {/* Quoted Feedback with Blue Left Border Accent */}
-                  <div className="border-l-2 border-blue-500 pl-3.5 sm:pl-4 py-0.5 text-xs sm:text-sm text-slate-200 leading-relaxed font-normal flex-1">
-                    &quot;{rev.comment}&quot;
-                  </div>
+                  {expanded && (
+                    <div className="px-4 sm:px-5 pb-5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                      {cat.items.length === 0 ? (
+                        <div className="p-5 rounded-2xl bg-slate-50/80 dark:bg-slate-950/40 border border-dashed border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                          <span className="text-slate-500 dark:text-slate-400">{cat.emptyText}</span>
+                          <Link
+                            href="/contribute"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors shrink-0 self-start sm:self-auto"
+                          >
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>{language === "bn" ? "ম্যাটেরিয়াল শেয়ার করুন" : "Share Material"}</span>
+                          </Link>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                          {cat.items.map((res) => (
+                            <MaterialCard
+                              key={res.id}
+                              resource={res}
+                              categoryTag={cat.tagLabel}
+                              tagColor={cat.tagColor}
+                              isCourseUnlocked={isResourceUnlockedForView(res)}
+                              onOpenViewer={handleOpenViewer}
+                              onFilterInstructor={(tid) => setSelectedFacultyId(tid)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-
-            {/* View All Reviews Button */}
-            {reviewCount > 2 && (
-              <button
-                onClick={() => setShowAllReviewsModal(true)}
-                className="w-full py-2.5 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-              >
-                <span>
-                  {language === "bn"
-                    ? `সকল কোর্স রিভিউ দেখুন (${reviewCount})`
-                    : `View All Course Reviews (${reviewCount})`}
-                </span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            )}
+              );
+            })}
           </div>
-        )}
+
+          {/* Pro Tip Box */}
+          <div className="p-5 rounded-3xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 flex items-start gap-3 text-xs">
+            <Lightbulb className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-extrabold text-amber-900 dark:text-amber-200">
+                {isLabCourse ? t("tip.labTitle", "Lab Exam Preparation Tip") : t("tip.theoryTitle", "Exam Preparation Tip")}
+              </p>
+              <p className="text-amber-800/90 dark:text-amber-300 mt-0.5 leading-relaxed">
+                {isLabCourse ? t("tip.labText") : t("tip.theoryText")}
+              </p>
+            </div>
+          </div>
+
+        </div>
       </div>
 
       {/* 6. WRITE COURSE REVIEW MODAL */}
@@ -2201,12 +2001,14 @@ function MaterialCard({
   tagColor,
   isCourseUnlocked,
   onOpenViewer,
+  onFilterInstructor,
 }: {
   resource: any;
   categoryTag: string;
   tagColor: "emerald" | "blue" | "indigo" | "amber" | "teal" | "cyan" | "purple" | "rose";
   isCourseUnlocked: boolean;
   onOpenViewer: (r: any) => void;
+  onFilterInstructor?: (teacherId: number) => void;
 }) {
   const { language } = useLanguage();
   const colorStyles: Record<string, string> = {
@@ -2221,36 +2023,55 @@ function MaterialCard({
   };
 
   return (
-    <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4">
-      <div className="space-y-3">
+    <div className="rounded-2xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 p-4 shadow-xs hover:shadow-md hover:-translate-y-0.5 hover:border-blue-500/40 dark:hover:border-blue-400/40 transition-all duration-200 flex flex-col justify-between space-y-3 group">
+      <div className="space-y-2.5">
         {/* Badge Header */}
         <div className="flex items-center justify-between gap-2">
           <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${colorStyles[tagColor] || colorStyles.blue}`}>
             {categoryTag}
           </span>
 
-          <span className="text-[10px] font-mono text-slate-600 dark:text-slate-300 font-bold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+          <span className="text-[10px] font-mono text-slate-600 dark:text-slate-300 font-bold bg-white dark:bg-slate-900/70 px-2 py-0.5 rounded border border-slate-200/70 dark:border-slate-700/70">
             {resource.semesterName || "Fall 2026"}
           </span>
         </div>
 
         {/* Title */}
-        <h4 className="font-extrabold text-sm text-slate-900 dark:text-white leading-snug line-clamp-2">
+        <h4 className="font-extrabold text-sm text-slate-900 dark:text-white leading-snug line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
           {resource.title}
         </h4>
 
         {/* Teacher Association with Name + [Initial] */}
-        <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs">
-          <div className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0">
-            {resource.teacher?.initial || "FAC"}
+        {resource.teacher?.id && onFilterInstructor ? (
+          <button
+            type="button"
+            onClick={() => onFilterInstructor(resource.teacher.id)}
+            title={language === "bn" ? "এই শিক্ষকের সব ম্যাটেরিয়াল দেখুন" : "Filter by this instructor"}
+            className="w-full flex items-center gap-2 p-2 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-700/60 hover:border-blue-400 text-xs text-left transition-colors"
+          >
+            <div className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0">
+              {resource.teacher?.initial || "FAC"}
+            </div>
+            <div className="truncate flex-1">
+              <p className="font-bold text-slate-800 dark:text-slate-200 truncate text-[11px]">
+                {resource.teacher.name} {resource.teacher.initial ? `[${resource.teacher.initial}]` : ""}
+              </p>
+              <p className="text-[10px] text-slate-400">{language === "bn" ? "ফিল্টার করতে ক্লিক করুন" : "Click to filter instructor"}</p>
+            </div>
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 p-2 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-700/60 text-xs">
+            <div className="w-6 h-6 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-bold text-[10px] flex items-center justify-center shrink-0">
+              {resource.teacher?.initial || "FAC"}
+            </div>
+            <div className="truncate">
+              <p className="font-bold text-slate-800 dark:text-slate-200 truncate text-[11px]">
+                {resource.teacher ? `${resource.teacher.name} ${resource.teacher.initial ? `[${resource.teacher.initial}]` : ""}` : (language === "bn" ? "ডিপার্টমেন্ট শিক্ষক" : "Department Faculty")}
+              </p>
+              <p className="text-[10px] text-slate-400">{language === "bn" ? "শিক্ষক" : "Instructor"}</p>
+            </div>
           </div>
-          <div className="truncate">
-            <p className="font-bold text-slate-800 dark:text-slate-200 truncate text-[11px]">
-              {resource.teacher ? `${resource.teacher.name} ${resource.teacher.initial ? `[${resource.teacher.initial}]` : ""}` : (language === "bn" ? "ডিপার্টমেন্ট শিক্ষক" : "Department Faculty")}
-            </p>
-            <p className="text-[10px] text-slate-400">{language === "bn" ? "শিক্ষক" : "Instructor"}</p>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Card Footer Actions */}
