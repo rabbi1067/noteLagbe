@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   X,
   Lock,
@@ -19,8 +19,81 @@ import {
   Columns,
   Maximize
 } from "lucide-react";
+import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { api } from "@/lib/api";
+import { api, API_BASE_URL, getToken } from "@/lib/api";
+
+type ViewerDocKind = "pdf" | "image" | "drive-embed" | "unsupported";
+
+function getGoogleDrivePreviewUrl(rawUrl?: string | null): string | null {
+  if (!rawUrl) return null;
+  const trimmed = rawUrl.trim();
+  const driveMatch = trimmed.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?[^#]*id=)([a-zA-Z0-9_-]{10,})/);
+  if (driveMatch?.[1]) {
+    return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+  }
+  const docsMatch = trimmed.match(/docs\.google\.com\/(document|presentation|spreadsheets)\/d\/([a-zA-Z0-9_-]+)/);
+  if (docsMatch?.[1] && docsMatch?.[2]) {
+    return `https://docs.google.com/${docsMatch[1]}/d/${docsMatch[2]}/preview`;
+  }
+  return null;
+}
+
+function getAuthStreamUrl(resourceId: number | string, isAdminMode?: boolean, download = false): string {
+  const base = `${API_BASE_URL}/${isAdminMode ? "admin/" : ""}resources/${resourceId}/file`;
+  return `${base}?${download ? "download=true" : "preview=true"}`;
+}
+
+async function inspectBlobFormat(
+  blob: Blob,
+  headerContentType: string,
+  fallbackUrl?: string
+): Promise<{ kind: ViewerDocKind; normalizedBlob: Blob }> {
+  const ct = (headerContentType || blob.type || "").split(";")[0].trim().toLowerCase();
+  const headBytes = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
+
+  const startsWith = (...sig: number[]) =>
+    headBytes.length >= sig.length && sig.every((b, idx) => headBytes[idx] === b);
+
+  // Magic-byte PDF detection (%PDF) fixes un-extensioned Cloudinary raw URLs served as application/octet-stream
+  if (startsWith(0x25, 0x50, 0x44, 0x46)) {
+    const mime = "application/pdf";
+    return { kind: "pdf", normalizedBlob: ct === mime ? blob : new Blob([blob], { type: mime }) };
+  }
+
+  let detectedImgMime = "";
+  if (startsWith(0x89, 0x50, 0x4e, 0x47)) detectedImgMime = "image/png";
+  else if (startsWith(0xff, 0xd8, 0xff)) detectedImgMime = "image/jpeg";
+  else if (startsWith(0x47, 0x49, 0x46, 0x38)) detectedImgMime = "image/gif";
+  else if (startsWith(0x52, 0x49, 0x46, 0x46) && headBytes[8] === 0x57 && headBytes[9] === 0x45) detectedImgMime = "image/webp";
+
+  if (detectedImgMime || ct.startsWith("image/")) {
+    const mime = detectedImgMime || ct;
+    return { kind: "image", normalizedBlob: ct === mime ? blob : new Blob([blob], { type: mime }) };
+  }
+
+  if (ct === "application/pdf") {
+    return { kind: "pdf", normalizedBlob: blob };
+  }
+
+  const lowerUrl = (fallbackUrl || "").toLowerCase();
+  if (
+    startsWith(0x50, 0x4b, 0x03, 0x04) ||
+    ct.includes("wordprocessingml") ||
+    ct.includes("msword") ||
+    ct.includes("zip") ||
+    /\.(docx?|pptx?|xlsx?|zip|rar)(\?|$)/i.test(lowerUrl)
+  ) {
+    return { kind: "unsupported", normalizedBlob: blob };
+  }
+
+  if (lowerUrl.includes(".pdf")) {
+    const mime = "application/pdf";
+    return { kind: "pdf", normalizedBlob: new Blob([blob], { type: mime }) };
+  }
+
+  return { kind: "unsupported", normalizedBlob: blob };
+}
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 
@@ -84,6 +157,17 @@ export default function PDFViewerModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, isFullscreen, onClose]);
 
+  const [docLoading, setDocLoading] = useState(false);
+  const [docError, setDocError] = useState<string | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [detectedKind, setDetectedKind] = useState<ViewerDocKind>("pdf");
+  const [retryTick, setRetryTick] = useState(0);
+
+  const drivePreviewUrl = useMemo(
+    () => getGoogleDrivePreviewUrl(resource?.fileUrl),
+    [resource?.fileUrl]
+  );
+
   // Reset controls whenever a new resource is opened
   useEffect(() => {
     if (isOpen) {
@@ -91,6 +175,136 @@ export default function PDFViewerModal({
       setRotation(0);
     }
   }, [isOpen, resource?.id]);
+
+  // Fetch document securely via Authorization header and render from local Blob URL
+  useEffect(() => {
+    if (!isOpen || !resource || !isUnlocked || (!resource.id && !resource.fileUrl)) {
+      setBlobUrl(null);
+      setDocError(null);
+      setDocLoading(false);
+      return;
+    }
+
+    if (!resource.id && drivePreviewUrl) {
+      setBlobUrl(null);
+      setDetectedKind("drive-embed");
+      setDocError(null);
+      setDocLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    let createdObjectUrl: string | null = null;
+    const controller = new AbortController();
+
+    const loadDocument = async () => {
+      setDocLoading(true);
+      setDocError(null);
+      setBlobUrl(null);
+
+      try {
+        const token = getToken();
+        const targetUrl = resource.id
+          ? getAuthStreamUrl(resource.id, isAdminMode, false)
+          : resource.fileUrl || "";
+
+        const headers: HeadersInit = {};
+        if (resource.id && token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        const res = await fetch(targetUrl, {
+          method: "GET",
+          headers,
+          signal: controller.signal,
+        });
+
+        const contentType = (res.headers.get("content-type") || "").toLowerCase();
+
+        if (!res.ok) {
+          let message = `Unable to load document (HTTP ${res.status}).`;
+          if (contentType.includes("application/json")) {
+            try {
+              const errData = await res.json();
+              if (errData?.message) message = errData.message;
+            } catch {}
+          }
+          if (drivePreviewUrl) {
+            if (!cancelled) {
+              setDetectedKind("drive-embed");
+              setDocError(null);
+            }
+            return;
+          }
+          throw new Error(message);
+        }
+
+        const rawBlob = await res.blob();
+        if (rawBlob.size === 0) {
+          throw new Error("The server returned an empty file.");
+        }
+
+        const previewText = (await rawBlob.slice(0, 512).text()).trim();
+        const lowerHead = previewText.toLowerCase();
+        if (
+          contentType.includes("application/json") ||
+          (previewText.startsWith("{") && previewText.includes('"status"'))
+        ) {
+          let jsonMsg = "Document could not be retrieved from storage.";
+          try {
+            const parsed = JSON.parse(await rawBlob.text());
+            if (parsed?.message) jsonMsg = parsed.message;
+          } catch {}
+          throw new Error(jsonMsg);
+        }
+
+        if (
+          contentType.startsWith("text/html") ||
+          lowerHead.startsWith("<!doctype html") ||
+          lowerHead.startsWith("<html")
+        ) {
+          if (drivePreviewUrl) {
+            if (!cancelled) {
+              setDetectedKind("drive-embed");
+              setDocError(null);
+            }
+            return;
+          }
+          throw new Error("Source returned a webpage instead of a viewable document.");
+        }
+
+        const { kind, normalizedBlob } = await inspectBlobFormat(rawBlob, contentType, resource.fileUrl);
+        if (cancelled) return;
+
+        setDetectedKind(kind);
+        createdObjectUrl = URL.createObjectURL(normalizedBlob);
+        setBlobUrl(createdObjectUrl);
+      } catch (err: unknown) {
+        if (cancelled || (err instanceof DOMException && err.name === "AbortError")) return;
+        if (drivePreviewUrl) {
+          setDetectedKind("drive-embed");
+          setDocError(null);
+        } else {
+          const msg = err instanceof Error ? err.message : "Failed to load document preview.";
+          setDocError(msg);
+        }
+      } finally {
+        if (!cancelled) {
+          setDocLoading(false);
+        }
+      }
+    };
+
+    loadDocument();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (createdObjectUrl) {
+        URL.revokeObjectURL(createdObjectUrl);
+      }
+    };
+  }, [isOpen, resource?.id, resource?.fileUrl, isUnlocked, isAdminMode, drivePreviewUrl, retryTick]);
 
   if (!isOpen || !resource) return null;
 
@@ -120,19 +334,56 @@ export default function PDFViewerModal({
   const handleResetRotation = () => setRotation(0);
   const toggleFullscreen = () => setIsFullscreen((prev) => !prev);
 
-  const secureFileUrl = resource?.id ? `/api/resources/${resource.id}/file` : resource?.fileUrl;
+  const openableTabUrl =
+    blobUrl || (detectedKind === "drive-embed" ? drivePreviewUrl : "") || resource.fileUrl || "";
 
   const handleDownload = async () => {
     if (!resource || !canDownloadAndOpen) return;
     try {
       if (resource.id) await api.resources.trackDownload(resource.id);
     } catch {}
-    const link = document.createElement("a");
-    link.href = resource.id ? `/api/resources/${resource.id}/file?download=true` : (resource.fileUrl || "");
-    link.download = "";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    const safeTitle = (resource.title || courseCode || "document").replace(/[^a-z0-9._-]+/gi, "_");
+    const triggerSave = (href: string, filename: string) => {
+      const link = document.createElement("a");
+      link.href = href;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    if (blobUrl) {
+      const ext = detectedKind === "image" ? "" : ".pdf";
+      const filename = safeTitle.includes(".") ? safeTitle : `${safeTitle}${ext}`;
+      triggerSave(blobUrl, filename);
+      return;
+    }
+
+    if (resource.id) {
+      try {
+        const token = getToken();
+        const dlEndpoint = getAuthStreamUrl(resource.id, isAdminMode, true);
+        const res = await fetch(dlEndpoint, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) {
+          throw new Error(`Download failed (HTTP ${res.status})`);
+        }
+        const dlBlob = await res.blob();
+        const tempUrl = URL.createObjectURL(dlBlob);
+        triggerSave(tempUrl, safeTitle);
+        setTimeout(() => URL.revokeObjectURL(tempUrl), 10000);
+        return;
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : "Download failed");
+        return;
+      }
+    }
+
+    if (resource.fileUrl) {
+      window.open(resource.fileUrl, "_blank", "noopener,noreferrer");
+    }
   };
 
   const displayTitle = resource.title || `${courseCode} Academic Document`;
@@ -183,16 +434,18 @@ export default function PDFViewerModal({
             {/* ONLY ADMINS GET DIRECT OPEN & DOWNLOAD BUTTONS */}
             {canDownloadAndOpen && isUnlocked && (resource.fileUrl || resource.id) && (
               <>
-                <a
-                  href={`${secureFileUrl}?preview=true`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
-                  title="Open in new window (Admin only)"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">New Tab</span>
-                </a>
+                {openableTabUrl && (
+                  <a
+                    href={openableTabUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 shadow-sm"
+                    title="Open in new window (Admin only)"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">New Tab</span>
+                  </a>
+                )}
                 <button
                   type="button"
                   onClick={handleDownload}
@@ -378,12 +631,91 @@ export default function PDFViewerModal({
                 ))}
               </div>
 
-              {/* Embedded Document Frame (with #toolbar=0 to suppress browser PDF download/print tools) */}
-              <iframe
-                src={`${secureFileUrl}?preview=true#toolbar=0&navpanes=0`}
-                className="w-full h-full border-none rounded-xl shadow-lg bg-white"
-                title={displayTitle}
-              />
+              {docLoading ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3 rounded-xl bg-slate-900/95 border border-slate-800 text-slate-200 p-6">
+                  <Loader2 className="w-9 h-9 animate-spin text-blue-400" />
+                  <p className="text-sm font-semibold">Loading document preview...</p>
+                  <p className="text-xs text-slate-400">Verifying credentials & streaming file securely</p>
+                </div>
+              ) : docError ? (
+                <div className="w-full h-full flex items-center justify-center p-6 rounded-xl bg-slate-900/95 border border-slate-800">
+                  <div className="max-w-md w-full rounded-2xl bg-slate-950/90 border border-rose-500/30 p-6 text-center space-y-4 shadow-xl">
+                    <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center mx-auto">
+                      <AlertCircle className="w-6 h-6 text-rose-400" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <h4 className="text-base font-bold text-white">Document Preview Unavailable</h4>
+                      <p className="text-xs text-slate-300 leading-relaxed break-words">{docError}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setRetryTick((t) => t + 1)}
+                        className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        Retry Preview
+                      </button>
+                      {canDownloadAndOpen && resource.fileUrl && (
+                        <a
+                          href={resource.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          Open Cloud Link
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : detectedKind === "image" && blobUrl ? (
+                <div className="w-full h-full flex items-center justify-center overflow-auto rounded-xl bg-slate-950 p-2">
+                  <img
+                    src={blobUrl}
+                    alt={displayTitle}
+                    className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                    draggable={false}
+                  />
+                </div>
+              ) : detectedKind === "drive-embed" && drivePreviewUrl ? (
+                <iframe
+                  src={drivePreviewUrl}
+                  className="w-full h-full border-none rounded-xl shadow-lg bg-white"
+                  title={displayTitle}
+                  allow="autoplay"
+                />
+              ) : detectedKind === "pdf" && blobUrl ? (
+                /* Embedded Document Frame (with #toolbar=0 to suppress browser PDF download/print tools) */
+                <iframe
+                  src={`${blobUrl}#toolbar=0&navpanes=0`}
+                  className="w-full h-full border-none rounded-xl shadow-lg bg-white"
+                  title={displayTitle}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center p-6 rounded-xl bg-slate-900/95 border border-slate-800">
+                  <div className="max-w-md w-full rounded-2xl bg-slate-950/90 border border-slate-800 p-6 text-center space-y-4">
+                    <FileText className="w-10 h-10 text-blue-400 mx-auto" />
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold text-white">Inline Preview Not Supported</h4>
+                      <p className="text-xs text-slate-400">
+                        This file format cannot be rendered directly inside the browser frame.
+                      </p>
+                    </div>
+                    {canDownloadAndOpen && (
+                      <button
+                        type="button"
+                        onClick={handleDownload}
+                        className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Download File
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             /* Locked Preview Overlay */

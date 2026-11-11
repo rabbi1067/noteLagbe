@@ -6168,10 +6168,10 @@ export default function AdminDashboardPage() {
                                         setImageRotate(0);
                                         setAdminPreviewImage(c.uploadedResource.fileUrl);
                                       }}
-                                      className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer"
+                                      className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
                                     >
                                       <Eye className="w-3.5 h-3.5" />
-                                      <span>View Image</span>
+                                      <span>View Document</span>
                                     </button>
                                   ) : (
                                     <button
@@ -6182,25 +6182,12 @@ export default function AdminDashboardPage() {
                                           courseCode: c.courseCode || c.uploadedResource?.course?.code || "SUBMISSION",
                                         })
                                       }
-                                      className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer"
+                                      className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
                                     >
                                       <Eye className="w-3.5 h-3.5" />
-                                      <span>Inspect Document</span>
+                                      <span>View Document</span>
                                     </button>
                                   )}
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setViewingResource({
-                                        ...c.uploadedResource,
-                                        courseCode: c.courseCode || c.uploadedResource?.course?.code || "SUBMISSION",
-                                      })
-                                    }
-                                    className="px-2 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
-                                  >
-                                    <ExternalLink className="w-3 h-3" />
-                                    <span>View Document</span>
-                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -10598,7 +10585,7 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                     <span>Uploaded Academic File:</span>
                   </span>
                   <div className="flex items-center gap-2">
-                    {isImageFile(editingContribution.uploadedResource.fileUrl) && (
+                    {isImageFile(editingContribution.uploadedResource.fileUrl) ? (
                       <button
                         type="button"
                         onClick={() => {
@@ -10611,16 +10598,24 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                         <Eye className="w-3 h-3" />
                         <span>View Full Image</span>
                       </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setViewingResource({
+                            ...editingContribution.uploadedResource,
+                            courseCode:
+                              editingContribution.courseCode ||
+                              editingContribution.uploadedResource?.course?.code ||
+                              "SUBMISSION",
+                          });
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>View Document</span>
+                      </button>
                     )}
-                    <a
-                      href={editingContribution.uploadedResource.fileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-1"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Inspect Link</span>
-                    </a>
                   </div>
                 </div>
 

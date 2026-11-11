@@ -466,6 +466,14 @@ public class AdminController {
         return ResponseEntity.ok(Map.of("success", true, "message", "Contribution request deleted successfully"));
     }
 
+    @GetMapping("/resources/{id}/file")
+    public ResponseEntity<byte[]> getAdminResourceFile(
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "false") boolean download,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return resourceService.streamResourceFile(id, download, userDetails != null ? userDetails.getUser() : null);
+    }
+
     // ==========================================
     // Free Access Waiver Management
     // ==========================================

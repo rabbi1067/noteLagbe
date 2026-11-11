@@ -343,7 +343,8 @@ public class ResourceService {
         // If resource is not approved, only admin or uploader can view
         if (r.getStatus() != ResourceStatus.APPROVED) {
             boolean isAdmin = user != null && user.getRole() != null &&
-                    (user.getRole().name().equals("ADMIN") || user.getRole().name().equals("SUPER_ADMIN"));
+                    (user.getRole() == Role.ROLE_ADMIN || user.getRole() == Role.ROLE_SUPER_ADMIN || user.getRole() == Role.ROLE_MANAGER ||
+                     user.getRole().name().contains("ADMIN") || user.getRole().name().contains("MANAGER"));
             boolean isUploader = user != null && r.getUploader() != null && user.getId().equals(r.getUploader().getId());
             if (!isAdmin && !isUploader) {
                 throw new ApiException("This material is pending approval and cannot be accessed yet.");
@@ -450,9 +451,35 @@ public class ResourceService {
 
         // Build list of candidate URLs to try in order of highest success probability:
         List<String> candidates = new java.util.ArrayList<>();
-        
-        // 1. The original target URL directly (clean raw Cloudinary URLs or external URLs)
-        candidates.add(targetUrl);
+
+        if (targetUrl.contains("docs.google.com/")) {
+            java.util.regex.Matcher docsMatcher = java.util.regex.Pattern
+                    .compile("docs\\.google\\.com/(document|presentation|spreadsheets)/d/([a-zA-Z0-9_-]+)")
+                    .matcher(targetUrl);
+            if (docsMatcher.find()) {
+                String docType = docsMatcher.group(1);
+                String docId = docsMatcher.group(2);
+                if ("presentation".equals(docType)) {
+                    candidates.add("https://docs.google.com/presentation/d/" + docId + "/export/pdf");
+                } else {
+                    candidates.add("https://docs.google.com/" + docType + "/d/" + docId + "/export?format=pdf");
+                }
+            }
+        } else if (targetUrl.contains("drive.google.com/") || targetUrl.contains("drive.usercontent.google.com/")) {
+            java.util.regex.Matcher driveMatcher = java.util.regex.Pattern
+                    .compile("(?:/file/d/|/d/|[?&]id=)([a-zA-Z0-9_-]{10,})")
+                    .matcher(targetUrl);
+            if (driveMatcher.find()) {
+                String fileId = driveMatcher.group(1);
+                candidates.add("https://drive.usercontent.google.com/download?id=" + fileId + "&export=download&confirm=t");
+                candidates.add("https://drive.google.com/uc?export=download&id=" + fileId + "&confirm=t");
+            }
+        }
+
+        // Fallback to the original target URL directly (clean raw Cloudinary URLs or external URLs)
+        if (!candidates.contains(targetUrl)) {
+            candidates.add(targetUrl);
+        }
 
         if (targetUrl.contains("cloudinary.com")) {
             if (targetUrl.contains("/raw/upload/")) {
@@ -496,6 +523,20 @@ public class ResourceService {
                 lastStatusCode = res.statusCode();
 
                 if (res.statusCode() >= 200 && res.statusCode() < 300 && res.body() != null && res.body().length > 0) {
+                    String contentType = res.headers().firstValue("Content-Type").orElse("").toLowerCase(java.util.Locale.ROOT);
+                    if (contentType.startsWith("text/html")) {
+                        lastErrorMsg = "Received HTML viewer page instead of binary file";
+                        log.debug("Skipping HTML response ({}) from candidate URL: {}", contentType, url);
+                        continue;
+                    }
+                    // Guard against HTML virus-scan/viewer pages served without explicit text/html Content-Type
+                    String head = new String(res.body(), 0, Math.min(res.body().length, 64), java.nio.charset.StandardCharsets.UTF_8)
+                            .trim().toLowerCase(java.util.Locale.ROOT);
+                    if (head.startsWith("<!doctype html") || head.startsWith("<html")) {
+                        lastErrorMsg = "Received HTML document instead of binary file";
+                        log.debug("Skipping HTML payload from candidate URL: {}", url);
+                        continue;
+                    }
                     log.info("Successfully fetched {} bytes for material from candidate URL: {}", res.body().length, url);
                     return res.body();
                 } else {

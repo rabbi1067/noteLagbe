@@ -1,10 +1,14 @@
 package com.notelagbe.controller;
 
 import com.notelagbe.entity.Resource;
+import com.notelagbe.entity.User;
+import com.notelagbe.repository.UserRepository;
 import com.notelagbe.security.CustomUserDetails;
+import com.notelagbe.security.JwtTokenProvider;
 import com.notelagbe.service.ResourceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,9 +19,15 @@ import java.util.Map;
 public class ResourceController {
 
     private final ResourceService resourceService;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
 
-    public ResourceController(ResourceService resourceService) {
+    public ResourceController(ResourceService resourceService,
+                              JwtTokenProvider jwtTokenProvider,
+                              UserRepository userRepository) {
         this.resourceService = resourceService;
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.userRepository = userRepository;
     }
 
     @GetMapping("/course/{code}")
@@ -56,8 +66,18 @@ public class ResourceController {
     public ResponseEntity<byte[]> getResourceFile(
             @PathVariable Long id,
             @RequestParam(required = false, defaultValue = "false") boolean download,
+            @RequestParam(required = false) String token,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return resourceService.streamResourceFile(id, download, userDetails != null ? userDetails.getUser() : null);
+        User user = userDetails != null ? userDetails.getUser() : null;
+        if (user == null && StringUtils.hasText(token)) {
+            try {
+                if (jwtTokenProvider.validateToken(token)) {
+                    String email = jwtTokenProvider.getUsernameFromToken(token);
+                    user = userRepository.findByEmail(email).orElse(null);
+                }
+            } catch (Exception ignored) {}
+        }
+        return resourceService.streamResourceFile(id, download, user);
     }
 
     @PostMapping("/{id}/download")
