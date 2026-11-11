@@ -176,19 +176,19 @@ public class ContributionService {
         return contributionRequestRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
-    @CacheEvict(value = {"courses", "course_details", "teachers", "teacher_details", "teacher_courses"}, allEntries = true)
+    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "teachers", "teacher_details", "teacher_courses"}, allEntries = true)
     @Transactional
     public ContributionRequest approveContribution(Long contributionId, String feedback) {
         return approveContribution(contributionId, feedback, null, null, null, null, null, null);
     }
 
-    @CacheEvict(value = {"courses", "course_details", "teachers", "teacher_details", "teacher_courses"}, allEntries = true)
+    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "teachers", "teacher_details", "teacher_courses"}, allEntries = true)
     @Transactional
     public ContributionRequest approveContribution(Long contributionId, String feedback, String editedTitle, Long teacherId, String resourceType, String semesterName, String courseCode) {
         return approveContribution(contributionId, feedback, editedTitle, teacherId, resourceType, semesterName, courseCode, null);
     }
 
-    @CacheEvict(value = {"courses", "course_details", "teachers", "teacher_details", "teacher_courses"}, allEntries = true)
+    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "teachers", "teacher_details", "teacher_courses"}, allEntries = true)
     @Transactional
     public ContributionRequest approveContribution(Long contributionId, String feedback, String editedTitle, Long teacherId, String resourceType, String semesterName, String courseCode, String department) {
         ContributionRequest cr = contributionRequestRepository.findById(contributionId)
@@ -250,7 +250,7 @@ public class ContributionService {
         LocalDateTime rewardExpiresAt = LocalDateTime.now().plusMonths(3);
 
         if (cr.getRequestedCourse1() != null) {
-            Optional<UnlockedCourse> existing1 = unlockedCourseRepository.findByUserIdAndCourseId(contributor.getId(), cr.getRequestedCourse1().getId());
+            Optional<UnlockedCourse> existing1 = unlockedCourseRepository.findByUserIdAndCourseIdAndTeacherIsNull(contributor.getId(), cr.getRequestedCourse1().getId());
             if (existing1.isPresent()) {
                 UnlockedCourse uc = existing1.get();
                 LocalDateTime base = (uc.getExpiresAt() != null && uc.getExpiresAt().isAfter(LocalDateTime.now())) ? uc.getExpiresAt() : LocalDateTime.now();
@@ -263,7 +263,7 @@ public class ContributionService {
         }
 
         if (cr.getRequestedCourse2() != null) {
-            Optional<UnlockedCourse> existing2 = unlockedCourseRepository.findByUserIdAndCourseId(contributor.getId(), cr.getRequestedCourse2().getId());
+            Optional<UnlockedCourse> existing2 = unlockedCourseRepository.findByUserIdAndCourseIdAndTeacherIsNull(contributor.getId(), cr.getRequestedCourse2().getId());
             if (existing2.isPresent()) {
                 UnlockedCourse uc = existing2.get();
                 LocalDateTime base = (uc.getExpiresAt() != null && uc.getExpiresAt().isAfter(LocalDateTime.now())) ? uc.getExpiresAt() : LocalDateTime.now();

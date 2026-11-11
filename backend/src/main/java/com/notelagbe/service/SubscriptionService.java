@@ -5,13 +5,17 @@ import com.notelagbe.repository.SubscriptionRepository;
 import com.notelagbe.repository.UnlockedCourseRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.CacheManager;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class SubscriptionService {
@@ -21,13 +25,25 @@ public class SubscriptionService {
     private final SubscriptionRepository subscriptionRepository;
     private final UnlockedCourseRepository unlockedCourseRepository;
     private final NotificationService notificationService;
+    private final CacheManager cacheManager;
 
     public SubscriptionService(SubscriptionRepository subscriptionRepository,
                                UnlockedCourseRepository unlockedCourseRepository,
-                               NotificationService notificationService) {
+                               NotificationService notificationService,
+                               CacheManager cacheManager) {
         this.subscriptionRepository = subscriptionRepository;
         this.unlockedCourseRepository = unlockedCourseRepository;
         this.notificationService = notificationService;
+        this.cacheManager = cacheManager;
+    }
+
+    private void evictUnlockCaches() {
+        if (cacheManager != null) {
+            for (String name : List.of("courses", "course_details", "course_resources", "teacher_resources", "admin_analytics", "admin_stats")) {
+                var c = cacheManager.getCache(name);
+                if (c != null) c.clear();
+            }
+        }
     }
 
     /**
@@ -56,6 +72,7 @@ public class SubscriptionService {
                     userId,
                     List.of(UnlockSource.PURCHASED_QUOTA, UnlockSource.YEAR_UNLIMITED)
             );
+            evictUnlockCaches();
 
             // In-app alert
             try {
@@ -76,56 +93,109 @@ public class SubscriptionService {
         return Optional.of(sub);
     }
 
+    private boolean isStaffUser(User user) {
+        return user != null && user.getRole() != null &&
+                (user.getRole() == Role.ROLE_ADMIN || user.getRole() == Role.ROLE_SUPER_ADMIN || user.getRole() == Role.ROLE_MANAGER);
+    }
+
+    private boolean isUnlockRowValid(UnlockedCourse uc, boolean hasActiveSub) {
+        if (uc.getExpiresAt() != null && LocalDateTime.now().isAfter(uc.getExpiresAt())) {
+            unlockedCourseRepository.delete(uc);
+            return false;
+        }
+        UnlockSource src = uc.getSource();
+        if (src == UnlockSource.CONTRIBUTION_REWARD || src == UnlockSource.FREE_WAIVER || src == UnlockSource.ADMIN_GIFT) {
+            return true;
+        }
+        if (hasActiveSub) {
+            return true;
+        }
+        unlockedCourseRepository.delete(uc);
+        return false;
+    }
+
     /**
-     * Determines whether a course is currently unlocked for the user.
-     * Evaluates staff overrides, active subscription validity, quota, and contribution awards (3-month semester access).
+     * Determines whether a course is currently unlocked in full (all faculty) for the user.
+     * Faculty-scoped ADMIN_GIFT grants do NOT unlock full-course access.
      */
     @Transactional
     public boolean isCourseUnlocked(User user, Course course) {
         if (user == null || course == null) return false;
+        if (isStaffUser(user)) return true;
 
-        // Staff have permanent administrative access
-        if (user.getRole() == Role.ROLE_ADMIN || user.getRole() == Role.ROLE_SUPER_ADMIN || user.getRole() == Role.ROLE_MANAGER) {
+        Optional<Subscription> validSub = getValidActiveSubscription(user.getId());
+        if (validSub.isPresent() && validSub.get().isUnlimited()) {
             return true;
         }
 
-        Optional<Subscription> validSub = getValidActiveSubscription(user.getId());
-        if (validSub.isPresent()) {
-            if (validSub.get().isUnlimited()) {
+        boolean hasActiveSub = validSub.isPresent();
+        List<UnlockedCourse> unlocks = unlockedCourseRepository.findAllByUserIdAndCourseId(user.getId(), course.getId());
+        for (UnlockedCourse uc : unlocks) {
+            if (uc.getTeacher() == null && isUnlockRowValid(uc, hasActiveSub)) {
                 return true;
-            }
-            Optional<UnlockedCourse> ucOpt = unlockedCourseRepository.findByUserIdAndCourseId(user.getId(), course.getId());
-            if (ucOpt.isPresent()) {
-                UnlockedCourse uc = ucOpt.get();
-                if (uc.getExpiresAt() != null && LocalDateTime.now().isAfter(uc.getExpiresAt())) {
-                    unlockedCourseRepository.delete(uc);
-                    return false;
-                }
-                return true;
-            }
-            return false;
-        }
-
-        // Check if unlocked via non-subscription sources (e.g., 3-month contribution rewards or waivers)
-        Optional<UnlockedCourse> ucOpt = unlockedCourseRepository.findByUserIdAndCourseId(user.getId(), course.getId());
-        if (ucOpt.isPresent()) {
-            UnlockedCourse uc = ucOpt.get();
-            // If the 3-month contribution access or reward validity has passed, automatically expire and delete
-            if (uc.getExpiresAt() != null && LocalDateTime.now().isAfter(uc.getExpiresAt())) {
-                unlockedCourseRepository.delete(uc);
-                return false;
-            }
-            UnlockSource src = uc.getSource();
-            if (src == UnlockSource.CONTRIBUTION_REWARD || src == UnlockSource.FREE_WAIVER || src == UnlockSource.ADMIN_GIFT) {
-                return true;
-            } else {
-                // Relock orphaned quota unlock because subscription has expired
-                unlockedCourseRepository.delete(uc);
-                return false;
             }
         }
-
         return false;
+    }
+
+    /**
+     * Determines whether a specific faculty's materials under a course are unlocked for the user.
+     */
+    @Transactional
+    public boolean isCourseUnlocked(User user, Course course, Teacher teacher) {
+        if (user == null || course == null) return false;
+        if (isCourseUnlocked(user, course)) return true;
+        if (teacher == null || teacher.getId() == null) return false;
+
+        Optional<Subscription> validSub = getValidActiveSubscription(user.getId());
+        boolean hasActiveSub = validSub.isPresent();
+        List<UnlockedCourse> unlocks = unlockedCourseRepository.findAllByUserIdAndCourseId(user.getId(), course.getId());
+        for (UnlockedCourse uc : unlocks) {
+            if (uc.getTeacher() != null
+                    && teacher.getId().equals(uc.getTeacher().getId())
+                    && isUnlockRowValid(uc, hasActiveSub)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns teacher IDs specifically unlocked via faculty-scoped grants under this course.
+     */
+    @Transactional
+    public Set<Long> getUnlockedTeacherIds(User user, Course course) {
+        if (user == null || course == null || isStaffUser(user)) return Collections.emptySet();
+
+        Optional<Subscription> validSub = getValidActiveSubscription(user.getId());
+        if (validSub.isPresent() && validSub.get().isUnlimited()) {
+            return Collections.emptySet();
+        }
+
+        boolean hasActiveSub = validSub.isPresent();
+        List<UnlockedCourse> unlocks = unlockedCourseRepository.findAllByUserIdAndCourseId(user.getId(), course.getId());
+        Set<Long> teacherIds = new HashSet<>();
+        for (UnlockedCourse uc : unlocks) {
+            if (uc.getTeacher() != null && isUnlockRowValid(uc, hasActiveSub)) {
+                teacherIds.add(uc.getTeacher().getId());
+            }
+        }
+        return teacherIds;
+    }
+
+    @Transactional
+    public boolean hasAnyUnlockForCourse(User user, Course course) {
+        return isCourseUnlocked(user, course) || !getUnlockedTeacherIds(user, course).isEmpty();
+    }
+
+    /**
+     * Checks whether a specific resource is unlocked for the user (either full course or matching faculty gift).
+     */
+    @Transactional
+    public boolean isResourceUnlocked(User user, Resource resource) {
+        if (user == null || resource == null || resource.getCourse() == null) return false;
+        if (isCourseUnlocked(user, resource.getCourse())) return true;
+        return resource.getTeacher() != null && isCourseUnlocked(user, resource.getCourse(), resource.getTeacher());
     }
 
     /**
@@ -135,8 +205,10 @@ public class SubscriptionService {
     @Transactional
     public void autoExpireSubscriptions() {
         LocalDateTime now = LocalDateTime.now();
+        boolean changed = false;
         List<Subscription> expiredSubs = subscriptionRepository.findByActiveTrueAndEndDateBefore(now);
         for (Subscription sub : expiredSubs) {
+            changed = true;
             sub.setActive(false);
             subscriptionRepository.save(sub);
             unlockedCourseRepository.deleteByUserIdAndSourceIn(
@@ -157,20 +229,27 @@ public class SubscriptionService {
             log.info("Auto-expired subscription id={} for user={}", sub.getId(), sub.getUser().getEmail());
         }
 
-        // Auto-expire individual unlocked courses (e.g. 3-month contribution rewards whose validity has elapsed)
+        // Auto-expire individual unlocked courses (e.g. contribution rewards or gifted access whose validity has elapsed)
         List<UnlockedCourse> expiredUnlocks = unlockedCourseRepository.findByExpiresAtNotNullAndExpiresAtBefore(now);
         for (UnlockedCourse uc : expiredUnlocks) {
+            changed = true;
+            String courseCode = uc.getCourse() != null ? uc.getCourse().getCode() : "course";
+            String facultySuffix = uc.getTeacher() != null ? " (" + uc.getTeacher().getName() + ")" : "";
             try {
                 notificationService.createNotification(
                         uc.getUser(),
-                        "Course Reward Access Concluded ⏳",
-                        "Your 3-month free access to " + (uc.getCourse() != null ? uc.getCourse().getCode() : "course") + " has concluded. Thank you for contributing to NoteLagbe!",
+                        uc.getSource() == UnlockSource.ADMIN_GIFT ? "Gifted Faculty Access Ended ⏳" : "Course Reward Access Concluded ⏳",
+                        "Your temporary access to " + courseCode + facultySuffix + " has concluded.",
                         "COURSE_EXPIRED",
                         "/pricing"
                 );
             } catch (Exception ignored) {}
             unlockedCourseRepository.delete(uc);
             log.info("Auto-expired unlocked course id={} for user={}", uc.getId(), uc.getUser().getEmail());
+        }
+
+        if (changed) {
+            evictUnlockCaches();
         }
     }
 }

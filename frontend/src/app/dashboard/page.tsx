@@ -344,9 +344,24 @@ export default function StudentDashboardPage() {
       const isUnlimited = Boolean(user?.unlimited || isAdmin);
       const myCourses = isUnlimited
         ? (allCourses || [])
-        : (allCourses || []).filter((c: any) =>
-            c.unlocked || user?.unlockedCourseCodes?.includes(c.code)
-          );
+        : (allCourses || [])
+            .map((c: any) => {
+              const matchingDetails = (user?.unlockedCourseDetails || []).filter(
+                (d: any) => !d.isExpired && d.courseCode?.toLowerCase() === c.code?.toLowerCase()
+              );
+              const isFullUnlocked =
+                Boolean(c.unlocked) ||
+                Boolean(user?.unlockedCourseCodes?.some((code: string) => code?.toLowerCase() === c.code?.toLowerCase())) ||
+                matchingDetails.some((d: any) => !d.teacherId);
+              const giftedDetails = matchingDetails.filter((d: any) => d.teacherId != null);
+              if (!isFullUnlocked && giftedDetails.length === 0) return null;
+              return {
+                ...c,
+                _isFullAccess: isFullUnlocked,
+                _giftedDetails: giftedDetails,
+              };
+            })
+            .filter(Boolean);
 
       setUnlockedCourseDetails(myCourses);
       setPayments(pData || []);
@@ -1212,9 +1227,15 @@ export default function StudentDashboardPage() {
                         <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">
                           {c.code}
                         </span>
-                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Full Access
-                        </span>
+                        {c._isFullAccess === false && c._giftedDetails?.length > 0 ? (
+                          <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                            🎁 Faculty: {c._giftedDetails.map((g: any) => g.teacherInitial || g.teacherName).join(", ")}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Full Access
+                          </span>
+                        )}
                       </div>
                       <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100 line-clamp-1">
                         {c.title}
@@ -1259,9 +1280,15 @@ export default function StudentDashboardPage() {
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
-                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Full Access
-                      </span>
+                      {c._isFullAccess === false && c._giftedDetails?.length > 0 ? (
+                        <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                          🎁 Faculty: {c._giftedDetails.map((g: any) => g.teacherInitial || g.teacherName).join(", ")}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Full Access
+                        </span>
+                      )}
                       <Link
                         href={`/courses/${c.code}`}
                         className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-all"

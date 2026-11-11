@@ -12,15 +12,22 @@ import java.util.List;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final LiveSyncService liveSyncService;
 
-    public NotificationService(NotificationRepository notificationRepository) {
+    public NotificationService(NotificationRepository notificationRepository,
+                               LiveSyncService liveSyncService) {
         this.notificationRepository = notificationRepository;
+        this.liveSyncService = liveSyncService;
     }
 
     @Transactional
     public Notification createNotification(User user, String title, String message, String type, String link) {
         Notification notification = new Notification(user, title, message, type, link);
-        return notificationRepository.save(notification);
+        Notification saved = notificationRepository.save(notification);
+        try {
+            liveSyncService.broadcast("notification", "created", user != null ? user.getId() : null);
+        } catch (Exception ignored) {}
+        return saved;
     }
 
     public List<Notification> getUserNotifications(Long userId) {

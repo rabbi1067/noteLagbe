@@ -12,6 +12,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 
 @Service
 public class EmailService {
@@ -33,6 +34,9 @@ public class EmailService {
 
     @org.springframework.beans.factory.annotation.Value("${spring.mail.port:587}")
     private int mailPort;
+
+    @org.springframework.beans.factory.annotation.Value("${app.frontend-url:https://note-lagbe-sandy.vercel.app}")
+    private String frontendUrl;
 
     public EmailService(SystemSettingRepository systemSettingRepository,
                         @Autowired(required = false) JavaMailSender mailSender) {
@@ -239,6 +243,103 @@ public class EmailService {
             log.info("Waiver approval email sent successfully to: {}", user.getEmail());
         } catch (Exception e) {
             log.warn("Failed to send waiver approval email to {}: {}", user.getEmail(), e.getMessage());
+        }
+    }
+
+    @Async
+    public void sendCourseGiftEmail(User user,
+                                    String courseCode,
+                                    String courseTitle,
+                                    String teacherLabel,
+                                    Integer validityMonths,
+                                    String adminNote) {
+        if (user == null || user.getEmail() == null || user.getEmail().trim().isEmpty()) {
+            return;
+        }
+        if (!isEmailNotificationsEnabled()) {
+            log.info("Skipping gift email notification: Email notifications are disabled by admin.");
+            return;
+        }
+        if (!isSmtpConfigured() || mailSender == null) {
+            log.info("SMTP not configured. Skipping live gift email dispatch to {} ({} - {}).",
+                    user.getEmail(), courseCode, teacherLabel);
+            return;
+        }
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            String safeCode = HtmlUtils.htmlEscape(courseCode != null ? courseCode : "Course");
+            String safeTitle = HtmlUtils.htmlEscape(courseTitle != null ? courseTitle : "");
+            String safeFaculty = HtmlUtils.htmlEscape(teacherLabel != null ? teacherLabel : "Assigned Faculty");
+            String safeName = HtmlUtils.htmlEscape(user.getName() != null ? user.getName() : "Student");
+            String validityStr = (validityMonths != null && validityMonths > 0)
+                    ? validityMonths + (validityMonths == 1 ? " Month" : " Months")
+                    : "Permanent Lifetime Access";
+            String noteBlock = (adminNote != null && !adminNote.trim().isEmpty())
+                    ? "<div style=\"margin-top: 14px; padding: 12px 14px; background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 8px; font-size: 13px; color: #92400e;\"><strong>Admin Note:</strong> " + HtmlUtils.htmlEscape(adminNote.trim()) + "</div>"
+                    : "";
+
+            String baseUrl = (frontendUrl != null && !frontendUrl.isBlank()) ? frontendUrl.replaceAll("/+$", "") : "https://note-lagbe-sandy.vercel.app";
+            String targetUrl = baseUrl + "/courses/" + java.net.URLEncoder.encode(courseCode != null ? courseCode.trim() : "", java.nio.charset.StandardCharsets.UTF_8);
+
+            helper.setTo(user.getEmail());
+            helper.setSubject("🎁 NoteLagbe: Gift Access Unlocked for " + courseCode + " (" + teacherLabel + ")");
+
+            String html = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <style>
+                        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; color: #e2e8f0; margin: 0; padding: 20px; }
+                        .card { max-width: 580px; margin: 0 auto; background: #111a2e; border-radius: 20px; padding: 32px; border: 1px solid #1e293b; box-shadow: 0 12px 32px rgba(0,0,0,0.35); }
+                        .badge { display: inline-block; padding: 5px 12px; background: rgba(245, 158, 11, 0.16); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 999px; font-size: 12px; font-weight: bold; }
+                        .title { font-size: 22px; font-weight: 800; color: #ffffff; margin-top: 12px; margin-bottom: 8px; }
+                        .box { background: #0f172a; border: 1px solid #1e293b; border-radius: 14px; padding: 18px; margin: 20px 0; }
+                        .row { margin-bottom: 10px; font-size: 14px; }
+                        .label { color: #94a3b8; font-weight: 500; display: inline-block; min-width: 145px; }
+                        .val { color: #f8fafc; font-weight: 700; }
+                        .btn { display: inline-block; background: linear-gradient(90deg, #f59e0b, #d97706); color: #0f172a; text-decoration: none; padding: 12px 26px; border-radius: 12px; font-weight: 800; font-size: 14px; margin-top: 18px; }
+                        .footer { margin-top: 28px; font-size: 12px; color: #64748b; text-align: center; }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <span class="badge">Southeast University • NoteLagbe Gift Access</span>
+                        <div class="title">Faculty Course Access Gifted! 🎁</div>
+                        <p style="font-size: 14px; color: #cbd5e1; line-height: 1.6;">
+                            Dear <strong>%s</strong>,<br>
+                            NoteLagbe Administration has granted you complimentary gift access to materials for the following course and faculty member:
+                        </p>
+                        <div class="box">
+                            <div class="row"><span class="label">Course Code:</span><span class="val" style="color: #60a5fa;">%s</span></div>
+                            <div class="row"><span class="label">Course Title:</span><span class="val">%s</span></div>
+                            <div class="row"><span class="label">Unlocked Faculty:</span><span class="val" style="color: #fbbf24;">%s</span></div>
+                            <div class="row" style="margin-bottom:0;"><span class="label">Validity Period:</span><span class="val" style="color: #34d399;">%s</span></div>
+                        </div>
+                        %s
+                        <p style="font-size: 13px; color: #94a3b8; line-height: 1.5;">
+                            You can now open NoteLagbe to preview and study all handwritten notes and past exam questions uploaded under <strong>%s</strong> for <strong>%s</strong>.
+                        </p>
+                        <div style="text-align: center;">
+                            <a href="%s" class="btn">Open %s Materials →</a>
+                        </div>
+                        <div class="footer">
+                            NoteLagbe — Southeast University CSE Notes & Question Bank Archive<br>
+                            Permanent Campus: 251/A and 252, Tejgaon I/A, Dhaka-1208
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """.formatted(safeName, safeCode, safeTitle, safeFaculty, HtmlUtils.htmlEscape(validityStr), noteBlock, safeFaculty, safeCode, targetUrl, safeCode);
+
+            helper.setText(html, true);
+            mailSender.send(message);
+            log.info("Course gift email sent successfully to {} ({} - {})", user.getEmail(), courseCode, teacherLabel);
+        } catch (Exception e) {
+            log.warn("Failed to send course gift email to {}: {}", user.getEmail(), e.getMessage());
         }
     }
 

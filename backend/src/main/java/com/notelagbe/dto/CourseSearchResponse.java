@@ -21,7 +21,8 @@ public class CourseSearchResponse {
     private int notesCount;
     private int questionsCount;
 
-    private boolean unlocked; // True if current user has unlocked it
+    private boolean unlocked; // True if current user has unlocked full course
+    private List<Long> unlockedTeacherIds = new java.util.ArrayList<>(); // Faculty IDs unlocked via teacher-scoped gift
     private int unlockCount;
     private boolean trending;
 
@@ -74,6 +75,9 @@ public class CourseSearchResponse {
 
     public boolean isUnlocked() { return unlocked; }
     public void setUnlocked(boolean unlocked) { this.unlocked = unlocked; }
+
+    public List<Long> getUnlockedTeacherIds() { return unlockedTeacherIds; }
+    public void setUnlockedTeacherIds(List<Long> unlockedTeacherIds) { this.unlockedTeacherIds = unlockedTeacherIds; }
 
     public int getUnlockCount() { return unlockCount; }
     public void setUnlockCount(int unlockCount) { this.unlockCount = unlockCount; }

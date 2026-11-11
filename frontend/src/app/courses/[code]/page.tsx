@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -60,7 +60,7 @@ import coursesCatalogData from "@/data/courses_catalog.json";
 export default function CourseDetailPage() {
   const params = useParams();
   const code = (params?.code as string)?.toUpperCase();
-  const { user, isAuthenticated, hasUnlocked, setShowAuthModal, refreshProfile } = useAuth();
+  const { user, isAuthenticated, hasUnlocked, hasUnlockedForTeacher, setShowAuthModal, refreshProfile } = useAuth();
   const { language, t } = useLanguage();
 
   // Instant 0ms Pre-population from client storage or verified SEU curriculum catalog
@@ -223,6 +223,33 @@ export default function CourseDetailPage() {
 
   const isCourseUnlocked = course ? (course.unlocked || hasUnlocked(code)) : false;
 
+  const unlockedTeacherDetails = useMemo(
+    () =>
+      (user?.unlockedCourseDetails || []).filter(
+        (d) => !d.isExpired && d.courseCode?.toLowerCase() === code?.toLowerCase() && d.teacherId != null
+      ),
+    [user?.unlockedCourseDetails, code]
+  );
+
+  const hasAnyCourseAccess =
+    isCourseUnlocked ||
+    unlockedTeacherDetails.length > 0 ||
+    (course?.unlockedTeacherIds?.length ?? 0) > 0;
+
+  const isResourceUnlockedForView = useCallback(
+    (res: any): boolean => {
+      if (!res) return false;
+      if (isCourseUnlocked || Boolean(res.fileUrl)) return true;
+      const tId = res.teacher?.id;
+      if (tId == null) return false;
+      return (
+        hasUnlockedForTeacher(code, tId) ||
+        Boolean(course?.unlockedTeacherIds?.some((id: number) => Number(id) === Number(tId)))
+      );
+    },
+    [isCourseUnlocked, hasUnlockedForTeacher, code, course?.unlockedTeacherIds]
+  );
+
   const handleUnlockCourse = async () => {
     if (!isAuthenticated) {
       setShowAuthModal(true);
@@ -249,7 +276,7 @@ export default function CourseDetailPage() {
       return;
     }
 
-    if (!isCourseUnlocked) {
+    if (!hasAnyCourseAccess) {
       toast.error(language === "bn" ? "অফলাইন স্টাডি প্যাক ডাউনলোড করতে প্রথমে কোর্সটি আনলক করুন।" : "Please unlock this course to download the offline study pack.");
       return;
     }
@@ -699,7 +726,7 @@ export default function CourseDetailPage() {
                   <span>{t("course.allFacultyUnlocked", "All Faculty Unlocked")}</span>
                 </div>
                 {(() => {
-                  const detail = user?.unlockedCourseDetails?.find((d) => d.courseCode?.toLowerCase() === code?.toLowerCase());
+                  const detail = user?.unlockedCourseDetails?.find((d) => d.courseCode?.toLowerCase() === code?.toLowerCase() && !d.teacherId);
                   if (detail && detail.remainingDays > 0) {
                     return (
                       <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-300 font-extrabold flex items-center gap-1">
@@ -720,21 +747,34 @@ export default function CourseDetailPage() {
                 })()}
               </div>
             ) : (
-              <button
-                onClick={handleUnlockCourse}
-                disabled={unlocking}
-                className="py-3 px-5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/25 transition-all flex flex-col items-center justify-center gap-0.5"
-              >
-                <div className="flex items-center gap-2">
-                  <Unlock className="w-4 h-4" />
-                  <span>{unlocking ? t("course.unlocking", "Unlocking...") : t("course.unlockAllFaculty", "Unlock Course (All Faculty)")}</span>
-                </div>
-                <span className="text-[10px] font-normal text-blue-100">{t("course.oneQuota", "1 Quota • Unlocks all instructors")}</span>
-              </button>
+              <div className="space-y-2">
+                {unlockedTeacherDetails.length > 0 && (
+                  <div className="py-2 px-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-700 dark:text-amber-300 text-[11px] font-bold flex flex-col items-center justify-center gap-0.5 text-center">
+                    <span>
+                      🎁 {language === "bn" ? "গিফট আনলক সক্রিয়:" : "Faculty Gift Active:"}{" "}
+                      {unlockedTeacherDetails.map((d) => d.teacherInitial || d.teacherName).join(", ")}
+                    </span>
+                    <span className="text-[10px] font-normal opacity-90">
+                      {language === "bn" ? "শুধুমাত্র নির্দিষ্ট শিক্ষকের নোট আনলকড" : "Only selected faculty materials unlocked"}
+                    </span>
+                  </div>
+                )}
+                <button
+                  onClick={handleUnlockCourse}
+                  disabled={unlocking}
+                  className="w-full py-3 px-5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/25 transition-all flex flex-col items-center justify-center gap-0.5"
+                >
+                  <div className="flex items-center gap-2">
+                    <Unlock className="w-4 h-4" />
+                    <span>{unlocking ? t("course.unlocking", "Unlocking...") : t("course.unlockAllFaculty", "Unlock Course (All Faculty)")}</span>
+                  </div>
+                  <span className="text-[10px] font-normal text-blue-100">{t("course.oneQuota", "1 Quota • Unlocks all instructors")}</span>
+                </button>
+              </div>
             )}
 
             {/* Offline Study Mode (ZIP) CTA */}
-            {isCourseUnlocked ? (
+            {hasAnyCourseAccess ? (
               <button
                 onClick={handleDownloadOfflineZip}
                 disabled={downloadingZip}
@@ -752,7 +792,9 @@ export default function CourseDetailPage() {
                       : (language === "bn" ? "অফলাইন স্টাডি প্যাক (ZIP)" : "Offline Study Pack (ZIP)")}
                   </span>
                   <span className="text-[10px] font-normal text-emerald-100/90 leading-tight">
-                    {language === "bn" ? "১-ক্লিকে সব হ্যান্ডনোট ও প্রশ্ন ডাউনলোড" : "1-Click Download All Approved Notes"}
+                    {!isCourseUnlocked && unlockedTeacherDetails.length > 0
+                      ? (language === "bn" ? "গিফটকৃত ফ্যাকাল্টির ফাইল ডাউনলোড" : "Downloads unlocked faculty materials")
+                      : (language === "bn" ? "১-ক্লিকে সব হ্যান্ডনোট ও প্রশ্ন ডাউনলোড" : "1-Click Download All Approved Notes")}
                   </span>
                 </div>
               </button>
@@ -873,6 +915,10 @@ export default function CourseDetailPage() {
           {/* Individual Faculty Cards with Name + [Initial] */}
           {courseFacultyList.map((tItem: any) => {
             const isSelected = selectedFacultyId === tItem.id;
+            const isThisTeacherGifted =
+              !isCourseUnlocked &&
+              (hasUnlockedForTeacher(code, tItem.id) ||
+                Boolean(course?.unlockedTeacherIds?.some((id: number) => Number(id) === Number(tItem.id))));
             const tRes = resources.filter(r => r.teacher?.id === tItem.id);
             const notesCount = tRes.filter(r => r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "LAB_REPORT").length;
             const examsCount = tRes.filter(r => r.type === "MID_QUESTION" || r.type === "FINAL_QUESTION" || r.type === "LAB_QUIZ" || r.type === "LAB_FINAL").length;
@@ -884,6 +930,8 @@ export default function CourseDetailPage() {
                 className={`p-4 rounded-2xl text-left border transition-all flex items-center gap-3 relative ${
                   isSelected
                     ? "bg-blue-50 dark:bg-blue-950/40 border-blue-500 ring-2 ring-blue-500/20 shadow-sm"
+                    : isThisTeacherGifted
+                    ? "bg-amber-50/40 dark:bg-amber-950/20 border-amber-400/50 hover:border-amber-400"
                     : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300"
                 }`}
               >
@@ -899,7 +947,12 @@ export default function CourseDetailPage() {
                   <p className="font-bold text-xs text-slate-900 dark:text-white truncate">
                     {tItem.name} {tItem.initial ? `[${tItem.initial}]` : ""}
                   </p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                    {isThisTeacherGifted && (
+                      <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                        🎁 Unlocked
+                      </span>
+                    )}
                     {notesCount > 0 && (
                       <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">
                         {notesCount} {t("course.notesCount", "Notes")}
@@ -910,7 +963,7 @@ export default function CourseDetailPage() {
                         {examsCount} {t("course.examsCount", "Exams")}
                       </span>
                     )}
-                    {notesCount === 0 && examsCount === 0 && (
+                    {notesCount === 0 && examsCount === 0 && !isThisTeacherGifted && (
                       <span className="text-[10px] text-slate-400">{t("course.facultyRole", "Faculty")}</span>
                     )}
                   </div>
@@ -1004,7 +1057,7 @@ export default function CourseDetailPage() {
 
             {/* Quick 1-Click ZIP Download button */}
             <button
-              onClick={isCourseUnlocked ? handleDownloadOfflineZip : handleUnlockCourse}
+              onClick={hasAnyCourseAccess ? handleDownloadOfflineZip : handleUnlockCourse}
               disabled={downloadingZip}
               className="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-sm cursor-pointer"
               title={language === "bn" ? "অফলাইন স্টাডি প্যাক ডাউনলোড (.ZIP)" : "Download Offline Study Pack (.ZIP)"}
@@ -1017,7 +1070,7 @@ export default function CourseDetailPage() {
               <span className="hidden sm:inline font-bold">
                 {language === "bn" ? "অফলাইন ZIP" : "Offline ZIP"}
               </span>
-              {!isCourseUnlocked && (
+              {!hasAnyCourseAccess && (
                 <span className="text-[10px] text-amber-500 font-bold">🔒</span>
               )}
             </button>
@@ -1093,7 +1146,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "হ্যান্ড নোট" : "Hand Note"}
                         tagColor="teal"
-                        isCourseUnlocked={isCourseUnlocked}
+                        isCourseUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1130,7 +1183,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "ল্যাব কুইজ" : "Lab Quiz"}
                         tagColor="purple"
-                        isCourseUnlocked={isCourseUnlocked}
+                        isCourseUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1167,7 +1220,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "ল্যাব ফাইনাল" : "Lab Final"}
                         tagColor="rose"
-                        isCourseUnlocked={isCourseUnlocked}
+                        isCourseUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1204,7 +1257,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "প্রজেক্ট লিংক" : "Project Link"}
                         tagColor="emerald"
-                        isCourseUnlocked={isCourseUnlocked}
+                        isCourseUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1241,7 +1294,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "ডক ফাইল নোট" : "Doc File Note"}
                         tagColor="cyan"
-                        isCourseUnlocked={isCourseUnlocked}
+                        isCourseUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1269,7 +1322,7 @@ export default function CourseDetailPage() {
                       resource={res}
                       categoryTag={language === "bn" ? "ল্যাব ম্যানুয়াল" : "Lab Manual"}
                       tagColor="amber"
-                      isCourseUnlocked={isCourseUnlocked}
+                      isCourseUnlocked={isResourceUnlockedForView(res)}
                       onOpenViewer={handleOpenViewer}
                     />
                   ))}
@@ -1312,7 +1365,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "হ্যান্ড নোট" : "Hand Notes"}
                         tagColor="emerald"
-                        isCourseUnlocked={isCourseUnlocked}
+                        isCourseUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1349,7 +1402,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "মিডটার্ম" : "Midterm"}
                         tagColor="blue"
-                        isCourseUnlocked={isCourseUnlocked}
+                        isCourseUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1386,7 +1439,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "ফাইনাল" : "Final"}
                         tagColor="indigo"
-                        isCourseUnlocked={isCourseUnlocked}
+                        isCourseUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1423,7 +1476,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "কুইজ / সিটি" : "Quiz / CT"}
                         tagColor="purple"
-                        isCourseUnlocked={isCourseUnlocked}
+                        isCourseUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1460,7 +1513,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "ডক ফাইল নোট" : "Doc File Note"}
                         tagColor="cyan"
-                        isCourseUnlocked={isCourseUnlocked}
+                        isCourseUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -2128,7 +2181,7 @@ export default function CourseDetailPage() {
         onClose={() => setViewerOpen(false)}
         resource={selectedResource}
         courseCode={code}
-        isUnlocked={isCourseUnlocked}
+        isUnlocked={Boolean(selectedResource && isResourceUnlockedForView(selectedResource))}
         onUnlockedSuccess={loadCourseData}
       />
 

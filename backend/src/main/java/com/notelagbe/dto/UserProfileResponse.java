@@ -34,10 +34,14 @@ public class UserProfileResponse {
     private String activeAccessSource; // "SUBSCRIPTION" | "CONTRIBUTION_REWARD" | "STAFF" | "NONE"
 
     public static class UnlockedCourseDetail {
+        private Long id;
         private Long courseId;
         private String courseCode;
         private String courseTitle;
         private String department;
+        private Long teacherId;
+        private String teacherName;
+        private String teacherInitial;
         private String source;
         private LocalDateTime unlockedAt;
         private LocalDateTime expiresAt;
@@ -47,13 +51,18 @@ public class UserProfileResponse {
 
         public UnlockedCourseDetail() {}
 
-        public UnlockedCourseDetail(Long courseId, String courseCode, String courseTitle, String department,
+        public UnlockedCourseDetail(Long id, Long courseId, String courseCode, String courseTitle, String department,
+                                    Long teacherId, String teacherName, String teacherInitial,
                                     String source, LocalDateTime unlockedAt, LocalDateTime expiresAt,
                                     long remainingDays, long remainingHours, boolean isExpired) {
+            this.id = id;
             this.courseId = courseId;
             this.courseCode = courseCode;
             this.courseTitle = courseTitle;
             this.department = department;
+            this.teacherId = teacherId;
+            this.teacherName = teacherName;
+            this.teacherInitial = teacherInitial;
             this.source = source;
             this.unlockedAt = unlockedAt;
             this.expiresAt = expiresAt;
@@ -61,6 +70,9 @@ public class UserProfileResponse {
             this.remainingHours = remainingHours;
             this.isExpired = isExpired;
         }
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
 
         public Long getCourseId() { return courseId; }
         public void setCourseId(Long courseId) { this.courseId = courseId; }
@@ -73,6 +85,15 @@ public class UserProfileResponse {
 
         public String getDepartment() { return department; }
         public void setDepartment(String department) { this.department = department; }
+
+        public Long getTeacherId() { return teacherId; }
+        public void setTeacherId(Long teacherId) { this.teacherId = teacherId; }
+
+        public String getTeacherName() { return teacherName; }
+        public void setTeacherName(String teacherName) { this.teacherName = teacherName; }
+
+        public String getTeacherInitial() { return teacherInitial; }
+        public void setTeacherInitial(String teacherInitial) { this.teacherInitial = teacherInitial; }
 
         public String getSource() { return source; }
         public void setSource(String source) { this.source = source; }

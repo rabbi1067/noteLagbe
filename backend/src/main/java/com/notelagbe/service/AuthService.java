@@ -260,12 +260,19 @@ public class AuthService {
             }
 
             if (!expired && uc.getCourse() != null) {
-                validUnlockedCodes.add(uc.getCourse().getCode());
+                // Only full-course unlocks grant course-wide unlockedCourseCodes access; faculty-scoped gifts remain restricted to that teacher
+                if (uc.getTeacher() == null && !validUnlockedCodes.contains(uc.getCourse().getCode())) {
+                    validUnlockedCodes.add(uc.getCourse().getCode());
+                }
                 details.add(new UserProfileResponse.UnlockedCourseDetail(
+                        uc.getId(),
                         uc.getCourse().getId(),
                         uc.getCourse().getCode(),
                         uc.getCourse().getTitle(),
                         uc.getCourse().getDepartment() != null ? uc.getCourse().getDepartment() : "CSE",
+                        uc.getTeacher() != null ? uc.getTeacher().getId() : null,
+                        uc.getTeacher() != null ? uc.getTeacher().getName() : null,
+                        uc.getTeacher() != null ? uc.getTeacher().getInitial() : null,
                         uc.getSource().name(),
                         uc.getUnlockedAt(),
                         exp,

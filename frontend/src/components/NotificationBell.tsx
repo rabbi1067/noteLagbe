@@ -18,7 +18,8 @@ import {
   Layers,
   Inbox,
   Megaphone,
-  Radio
+  Radio,
+  Gift
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -159,7 +160,7 @@ export default function NotificationBell() {
     if (!payload || payload.entity === "notice" || payload.entity === "all") {
       fetchCampusNotices();
     }
-    if (isAuthenticated && (!payload || payload.entity === "notification" || payload.entity === "all")) {
+    if (isAuthenticated && (!payload || payload.entity === "notification" || payload.entity === "course_unlock" || payload.entity === "all")) {
       fetchUnreadCount();
       if (isOpen) fetchNotifications();
     }
@@ -531,6 +532,7 @@ export default function NotificationBell() {
                   filteredNotifications.map((n) => {
                     const isRead = n.isRead === true || n.read === true;
                     const isApproved = n.type === "PAYMENT_APPROVED" || n.type === "SUBSCRIPTION_ACTIVATED" || n.type === "WAIVER_APPROVED";
+                    const isGift = n.type === "COURSE_GIFT";
                     const isRejected = n.type === "PAYMENT_REJECTED" || n.type === "WAIVER_REJECTED";
                     const isCalendar = n.type === "CALENDAR" || n.type === "EXAM";
                     const isCourse = n.type === "COURSE_UPDATE" || n.type === "RESOURCE_ADDED";
@@ -546,7 +548,9 @@ export default function NotificationBell() {
                         {/* Type Icon Badge */}
                         <div
                           className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 shadow-xs ${
-                            isApproved
+                            isGift
+                              ? "bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 border border-amber-300 dark:border-amber-700/60"
+                              : isApproved
                               ? "bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50"
                               : isRejected
                               ? "bg-red-100 dark:bg-red-950/80 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/50"
@@ -557,7 +561,9 @@ export default function NotificationBell() {
                               : "bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50"
                           }`}
                         >
-                          {isApproved ? (
+                          {isGift ? (
+                            <Gift className="w-4 h-4" />
+                          ) : isApproved ? (
                             <CheckCircle2 className="w-4 h-4" />
                           ) : isRejected ? (
                             <AlertCircle className="w-4 h-4" />

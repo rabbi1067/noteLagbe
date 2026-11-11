@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "unlocked_courses", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"user_id", "course_id"})
+    @UniqueConstraint(columnNames = {"user_id", "course_id", "teacher_id"})
 })
 public class UnlockedCourse {
 
@@ -20,6 +20,11 @@ public class UnlockedCourse {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
+
+    // Optional: null means full-course unlock across all faculty; non-null restricts access to that specific faculty
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "teacher_id")
+    private Teacher teacher;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
@@ -40,8 +45,13 @@ public class UnlockedCourse {
     }
 
     public UnlockedCourse(User user, Course course, UnlockSource source, LocalDateTime expiresAt) {
+        this(user, course, null, source, expiresAt);
+    }
+
+    public UnlockedCourse(User user, Course course, Teacher teacher, UnlockSource source, LocalDateTime expiresAt) {
         this.user = user;
         this.course = course;
+        this.teacher = teacher;
         this.source = source;
         this.unlockedAt = LocalDateTime.now();
         this.expiresAt = expiresAt;
@@ -55,6 +65,11 @@ public class UnlockedCourse {
 
     public Course getCourse() { return course; }
     public void setCourse(Course course) { this.course = course; }
+
+    public Teacher getTeacher() { return teacher; }
+    public void setTeacher(Teacher teacher) { this.teacher = teacher; }
+
+    public boolean isTeacherScoped() { return this.teacher != null; }
 
     public UnlockSource getSource() { return source; }
     public void setSource(UnlockSource source) { this.source = source; }

@@ -271,7 +271,7 @@ export default function LiveRemainingCountdown({
           <div className="flex flex-wrap gap-2 pt-1">
             {user.unlockedCourseDetails.map((uc) => (
               <Link
-                key={uc.courseCode}
+                key={uc.id ?? `${uc.courseCode}-${uc.teacherId ?? "ALL"}`}
                 href={`/courses/${encodeURIComponent(uc.courseCode)}`}
                 className="group inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700/80 hover:border-emerald-500/50 transition-all text-xs"
               >
@@ -281,8 +281,13 @@ export default function LiveRemainingCountdown({
                 <span className="text-slate-300 text-[11px] truncate max-w-[120px] sm:max-w-[180px]">
                   {uc.courseTitle}
                 </span>
+                {uc.teacherName && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    🎁 {uc.teacherInitial || uc.teacherName}
+                  </span>
+                )}
                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  {uc.remainingDays}d left
+                  {uc.expiresAt ? `${uc.remainingDays}d left` : "Lifetime"}
                 </span>
               </Link>
             ))}

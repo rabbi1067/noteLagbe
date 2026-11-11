@@ -515,14 +515,29 @@ export default function CoursesPage() {
               {/* Card Footer: Action */}
               <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between mt-auto">
                 <div className="flex items-center gap-2 text-xs flex-wrap">
-                  {course.unlocked && (() => {
-                    const detail = user?.unlockedCourseDetails?.find((d: any) => d.courseCode?.toLowerCase() === course.code?.toLowerCase());
+                  {(course.unlocked || (user?.unlockedCourseDetails || []).some((d: any) => !d.isExpired && d.courseCode?.toLowerCase() === course.code?.toLowerCase())) && (() => {
+                    const details = (user?.unlockedCourseDetails || []).filter((d: any) => !d.isExpired && d.courseCode?.toLowerCase() === course.code?.toLowerCase());
+                    const fullDetail = details.find((d: any) => !d.teacherId);
+                    const giftDetails = details.filter((d: any) => d.teacherId != null);
+                    if (course.unlocked || fullDetail) {
+                      const detail = fullDetail || details[0];
+                      return (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>
+                            {language === "bn" ? "আনলকড" : "Unlocked"}
+                            {detail && detail.remainingDays > 0 ? ` (${detail.remainingDays}d)` : ""}
+                          </span>
+                        </span>
+                      );
+                    }
+                    const firstGift = giftDetails[0];
                     return (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/60 flex items-center gap-1">
                         <span>
-                          {language === "bn" ? "আনলকড" : "Unlocked"}
-                          {detail && detail.remainingDays > 0 ? ` (${detail.remainingDays}d)` : ""}
+                          🎁 {firstGift?.teacherInitial || firstGift?.teacherName || (language === "bn" ? "গিফটড ফ্যাকাল্টি" : "Gifted Faculty")}
+                          {giftDetails.length > 1 ? ` +${giftDetails.length - 1}` : ""}
+                          {firstGift && firstGift.remainingDays > 0 ? ` (${firstGift.remainingDays}d)` : ""}
                         </span>
                       </span>
                     );

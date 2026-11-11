@@ -88,51 +88,46 @@ public class ResourceService {
 
         List<Resource> resources = resourceRepository.findByCourseIdAndStatus(course.getId(), ResourceStatus.APPROVED);
 
-        boolean isUnlocked = checkCourseUnlocked(user, course);
+        boolean fullCourseUnlocked = checkCourseUnlocked(user, course);
+        java.util.Set<Long> unlockedTeacherIds = fullCourseUnlocked
+                ? java.util.Collections.emptySet()
+                : subscriptionService.getUnlockedTeacherIds(user, course);
 
-        // If not unlocked, mask the direct file URLs for students
-        if (!isUnlocked) {
-            return resources.stream().map(r -> {
-                Resource masked = new Resource();
-                masked.setId(r.getId());
-                masked.setTitle(r.getTitle());
-                masked.setType(r.getType());
-                masked.setFileUrl(null); // Locked!
-                masked.setPreviewUrl(r.getPreviewUrl());
-                masked.setSemesterName(r.getSemesterName());
-                masked.setAcademicYear(r.getAcademicYear());
-                masked.setCourse(r.getCourse());
-                masked.setTeacher(r.getTeacher());
-                masked.setStatus(r.getStatus());
-                masked.setDownloadsCount(r.getDownloadsCount());
-                masked.setCreatedAt(r.getCreatedAt());
-                return masked;
-            }).toList();
-        }
+        // Mask the direct file URLs for resources the student has not unlocked (full course or gifted faculty)
+        return resources.stream().map(r -> {
+            boolean resourceUnlocked = fullCourseUnlocked
+                    || (r.getTeacher() != null && unlockedTeacherIds.contains(r.getTeacher().getId()));
+            if (!resourceUnlocked) {
+                return maskLockedResource(r);
+            }
+            return r;
+        }).toList();
+    }
 
-        return resources;
+    private Resource maskLockedResource(Resource r) {
+        Resource masked = new Resource();
+        masked.setId(r.getId());
+        masked.setTitle(r.getTitle());
+        masked.setType(r.getType());
+        masked.setFileUrl(null); // Locked!
+        masked.setPreviewUrl(r.getPreviewUrl());
+        masked.setSemesterName(r.getSemesterName());
+        masked.setAcademicYear(r.getAcademicYear());
+        masked.setCourse(r.getCourse());
+        masked.setTeacher(r.getTeacher());
+        masked.setStatus(r.getStatus());
+        masked.setDownloadsCount(r.getDownloadsCount());
+        masked.setCreatedAt(r.getCreatedAt());
+        return masked;
     }
 
     @Cacheable(value = "teacher_resources", key = "(#user != null ? #user.id : 0) + '_' + #teacherId", unless = "#result == null")
     public List<Resource> getResourcesForTeacher(Long teacherId, User user) {
         List<Resource> resources = resourceRepository.findByTeacherIdAndStatus(teacherId, ResourceStatus.APPROVED);
         return resources.stream().map(r -> {
-            boolean isUnlocked = checkCourseUnlocked(user, r.getCourse());
+            boolean isUnlocked = subscriptionService.isResourceUnlocked(user, r);
             if (!isUnlocked) {
-                Resource masked = new Resource();
-                masked.setId(r.getId());
-                masked.setTitle(r.getTitle());
-                masked.setType(r.getType());
-                masked.setFileUrl(null); // Locked!
-                masked.setPreviewUrl(r.getPreviewUrl());
-                masked.setSemesterName(r.getSemesterName());
-                masked.setAcademicYear(r.getAcademicYear());
-                masked.setCourse(r.getCourse());
-                masked.setTeacher(r.getTeacher());
-                masked.setStatus(r.getStatus());
-                masked.setDownloadsCount(r.getDownloadsCount());
-                masked.setCreatedAt(r.getCreatedAt());
-                return masked;
+                return maskLockedResource(r);
             }
             return r;
         }).toList();

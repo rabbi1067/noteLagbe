@@ -95,8 +95,9 @@ public class CourseService {
                 .filter(u -> u.getCourse() != null)
                 .collect(Collectors.groupingBy(u -> u.getCourse().getId(), Collectors.counting()));
 
-        // Pre-compute user unlocked course IDs
+        // Pre-compute user unlocked course IDs (full-course) and gifted faculty IDs per course
         Set<Long> userUnlockedCourseIds = new HashSet<>();
+        Map<Long, List<Long>> userUnlockedTeacherIdsByCourse = new HashMap<>();
         boolean isStaff = user != null && user.getRole() != null &&
                 (user.getRole() == Role.ROLE_ADMIN || user.getRole() == Role.ROLE_SUPER_ADMIN || user.getRole() == Role.ROLE_MANAGER);
         boolean isAllUnlocked = isStaff;
@@ -106,11 +107,23 @@ public class CourseService {
             if (validSub.isPresent() && validSub.get().isUnlimited()) {
                 isAllUnlocked = true;
             } else {
+                boolean hasActiveSub = validSub.isPresent();
                 List<UnlockedCourse> userUnlocks = unlockedCourseRepository.findByUserId(user.getId());
                 java.time.LocalDateTime now = java.time.LocalDateTime.now();
                 for (UnlockedCourse uc : userUnlocks) {
                     if (uc.getCourse() != null && (uc.getExpiresAt() == null || !now.isAfter(uc.getExpiresAt()))) {
-                        userUnlockedCourseIds.add(uc.getCourse().getId());
+                        boolean validSource = hasActiveSub
+                                || uc.getSource() == UnlockSource.CONTRIBUTION_REWARD
+                                || uc.getSource() == UnlockSource.FREE_WAIVER
+                                || uc.getSource() == UnlockSource.ADMIN_GIFT;
+                        if (!validSource) continue;
+                        if (uc.getTeacher() == null) {
+                            userUnlockedCourseIds.add(uc.getCourse().getId());
+                        } else {
+                            userUnlockedTeacherIdsByCourse
+                                    .computeIfAbsent(uc.getCourse().getId(), k -> new ArrayList<>())
+                                    .add(uc.getTeacher().getId());
+                        }
                     }
                 }
             }
@@ -137,7 +150,8 @@ public class CourseService {
                 resourcesByCourseId.getOrDefault(c.getId(), Collections.emptyList()),
                 teacherCoursesByCourseId.getOrDefault(c.getId(), Collections.emptyList()),
                 unlockCounts.getOrDefault(c.getId(), 0L),
-                allUnlockedFinal || userUnlockedCourseIds.contains(c.getId())
+                allUnlockedFinal || userUnlockedCourseIds.contains(c.getId()),
+                userUnlockedTeacherIdsByCourse.getOrDefault(c.getId(), Collections.emptyList())
         )).toList();
     }
 
@@ -148,7 +162,7 @@ public class CourseService {
         return toSearchResponse(course, user);
     }
 
-    @CacheEvict(value = {"courses", "course_details"}, allEntries = true)
+    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources"}, allEntries = true)
     @Transactional
     public boolean unlockCourse(String code, User user) {
         if (user.getRole() == Role.ROLE_ADMIN || user.getRole() == Role.ROLE_SUPER_ADMIN || user.getRole() == Role.ROLE_MANAGER) {
@@ -158,8 +172,8 @@ public class CourseService {
         Course course = courseRepository.findByCodeIgnoreCase(code.trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with code: " + code));
 
-        if (unlockedCourseRepository.existsByUserIdAndCourseId(user.getId(), course.getId())) {
-            return true; // Already unlocked
+        if (unlockedCourseRepository.existsByUserIdAndCourseIdAndTeacherIsNull(user.getId(), course.getId())) {
+            return true; // Already unlocked full course
         }
 
         Subscription sub = subscriptionService.getValidActiveSubscription(user.getId())
@@ -295,6 +309,7 @@ public class CourseService {
 
         // Check if unlocked via SubscriptionService (handles expiration, quotas, and automatic locking)
         res.setUnlocked(subscriptionService.isCourseUnlocked(user, course));
+        res.setUnlockedTeacherIds(new ArrayList<>(subscriptionService.getUnlockedTeacherIds(user, course)));
 
         // Real database unlock count (Zero fake/demo offsets)
         long realCount = unlockedCourseRepository.countByCourseId(course.getId());
@@ -309,7 +324,8 @@ public class CourseService {
             List<Resource> courseResources,
             List<TeacherCourse> tcs,
             long realCount,
-            boolean isUnlocked) {
+            boolean isUnlocked,
+            List<Long> unlockedTeacherIds) {
         CourseSearchResponse res = new CourseSearchResponse();
         res.setId(course.getId());
         res.setCode(course.getCode());
@@ -412,6 +428,7 @@ public class CourseService {
         }
 
         res.setUnlocked(isUnlocked);
+        res.setUnlockedTeacherIds(unlockedTeacherIds != null ? unlockedTeacherIds : Collections.emptyList());
         res.setUnlockCount((int) realCount);
         res.setTrending(realCount >= 10);
 
@@ -602,7 +619,7 @@ public class CourseService {
         Course course = courseRepository.findByCodeIgnoreCase(courseCode.trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with code: " + courseCode));
 
-        if (!subscriptionService.isCourseUnlocked(user, course)) {
+        if (!subscriptionService.hasAnyUnlockForCourse(user, course)) {
             throw new ApiException("Course " + course.getCode() + " is locked. You must unlock this course before downloading the offline study pack.");
         }
     }
@@ -611,7 +628,9 @@ public class CourseService {
         verifyCourseUnlockedForDownload(courseCode, user);
         Course course = courseRepository.findByCodeIgnoreCase(courseCode.trim()).get();
 
-        List<Resource> resources = resourceRepository.findByCourseIdAndStatus(course.getId(), ResourceStatus.APPROVED);
+        List<Resource> resources = resourceRepository.findByCourseIdAndStatus(course.getId(), ResourceStatus.APPROVED).stream()
+                .filter(r -> subscriptionService.isResourceUnlocked(user, r))
+                .toList();
 
         try (ZipOutputStream zos = new ZipOutputStream(outputStream)) {
             // 1. Generate Interactive Offline Study Guide HTML

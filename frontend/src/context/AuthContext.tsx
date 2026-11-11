@@ -7,10 +7,14 @@ import { subscribeToSync, SyncPayload } from "@/lib/sync";
 import { toast } from "sonner";
 
 export interface UnlockedCourseDetail {
+  id?: number;
   courseId: number;
   courseCode: string;
   courseTitle: string;
   department: string;
+  teacherId?: number | null;
+  teacherName?: string | null;
+  teacherInitial?: string | null;
   source: string;
   unlockedAt: string;
   expiresAt?: string;
@@ -57,6 +61,7 @@ interface AuthContextType {
   logout: () => void;
   refreshProfile: () => Promise<void>;
   hasUnlocked: (courseCode: string) => boolean;
+  hasUnlockedForTeacher: (courseCode: string, teacherId?: number | null) => boolean;
   showAuthModal: boolean;
   setShowAuthModal: (show: boolean) => void;
   showSpotlight: boolean;
@@ -222,6 +227,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         payload.entity === "waiver" ||
         payload.entity === "subscription" ||
         payload.entity === "contribution" ||
+        payload.entity === "course_unlock" ||
+        payload.entity === "notification" ||
         payload.entity === "user" ||
         payload.entity === "staff" ||
         payload.entity === "all"
@@ -292,6 +299,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ) ?? false;
   };
 
+  const hasUnlockedForTeacher = (courseCode: string, teacherId?: number | null): boolean => {
+    if (hasUnlocked(courseCode)) return true;
+    if (!user || teacherId == null) return false;
+    return user.unlockedCourseDetails?.some(
+      (d) =>
+        !d.isExpired &&
+        d.courseCode?.toLowerCase() === courseCode.toLowerCase() &&
+        d.teacherId != null &&
+        Number(d.teacherId) === Number(teacherId)
+    ) ?? false;
+  };
+
   const isStaffUser = user?.role === "ROLE_ADMIN" || user?.role === "ROLE_SUPER_ADMIN" || user?.role === "ROLE_MANAGER";
 
   return (
@@ -309,6 +328,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         refreshProfile,
         hasUnlocked,
+        hasUnlockedForTeacher,
         showAuthModal,
         setShowAuthModal,
         showSpotlight,

@@ -11,6 +11,7 @@ import com.notelagbe.repository.ResourceRepository;
 import com.notelagbe.repository.ReviewRepository;
 import com.notelagbe.repository.TeacherCourseRepository;
 import com.notelagbe.repository.TeacherRepository;
+import com.notelagbe.repository.UnlockedCourseRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -35,19 +36,22 @@ public class TeacherService {
     private final LiveSyncService liveSyncService;
     private final ReviewRepository reviewRepository;
     private final CloudinaryService cloudinaryService;
+    private final UnlockedCourseRepository unlockedCourseRepository;
 
     public TeacherService(TeacherRepository teacherRepository,
                           TeacherCourseRepository teacherCourseRepository,
                           ResourceRepository resourceRepository,
                           LiveSyncService liveSyncService,
                           ReviewRepository reviewRepository,
-                          CloudinaryService cloudinaryService) {
+                          CloudinaryService cloudinaryService,
+                          UnlockedCourseRepository unlockedCourseRepository) {
         this.teacherRepository = teacherRepository;
         this.teacherCourseRepository = teacherCourseRepository;
         this.resourceRepository = resourceRepository;
         this.liveSyncService = liveSyncService;
         this.reviewRepository = reviewRepository;
         this.cloudinaryService = cloudinaryService;
+        this.unlockedCourseRepository = unlockedCourseRepository;
     }
 
     @Cacheable(value = "teachers", key = "#category != null ? #category.name() : 'ALL'", unless = "#result == null || #result.isEmpty()")
@@ -192,6 +196,8 @@ public class TeacherService {
             rev.setTeacher(null);
             reviewRepository.save(rev);
         }
+
+        unlockedCourseRepository.deleteByTeacherId(teacher.getId());
 
         teacherRepository.delete(teacher);
         liveSyncService.broadcast("teacher", "deleted", id);

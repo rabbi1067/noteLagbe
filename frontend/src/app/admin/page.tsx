@@ -803,12 +803,13 @@ export default function AdminDashboardPage() {
   const [showGiftCourseModal, setShowGiftCourseModal] = useState(false);
   const [giftTargetStudent, setGiftTargetStudent] = useState<any | null>(null);
   const [giftCourseCode, setGiftCourseCode] = useState("");
+  const [giftTeacherId, setGiftTeacherId] = useState<number | "">("");
   const [giftValidityMonths, setGiftValidityMonths] = useState<number | null>(4);
   const [giftNote, setGiftNote] = useState("");
   const [giftingCourse, setGiftingCourse] = useState(false);
   const [studentUnlockedCourses, setStudentUnlockedCourses] = useState<any[]>([]);
   const [loadingStudentUnlocks, setLoadingStudentUnlocks] = useState(false);
-  const [revokingCourseId, setRevokingCourseId] = useState<number | null>(null);
+  const [revokingUnlockKey, setRevokingUnlockKey] = useState<number | null>(null);
 
   // Admin Profile & Security State
   const [adminProfile, setAdminProfile] = useState<any>(null);
@@ -1859,6 +1860,7 @@ export default function AdminDashboardPage() {
     }
     setGiftTargetStudent(student);
     setGiftCourseCode("");
+    setGiftTeacherId("");
     setGiftValidityMonths(4);
     setGiftNote("");
     setShowGiftCourseModal(true);
@@ -1888,19 +1890,28 @@ export default function AdminDashboardPage() {
       toast.error("Please select a target course to gift.");
       return;
     }
+    if (!giftTeacherId) {
+      toast.error("Please select 1 faculty member under this course to gift.");
+      return;
+    }
 
     setGiftingCourse(true);
     try {
       const res = await api.admin.giftCourseToStudent(giftTargetStudent.id, {
         courseCode: giftCourseCode,
+        teacherId: Number(giftTeacherId),
         validityMonths: giftValidityMonths,
         note: giftNote.trim() || undefined,
       });
 
       confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
-      toast.success(res.message || `Course ${giftCourseCode} gifted successfully!`);
-      // Reset course selector so admin can immediately gift another course if desired
+      const notifSuffix = res.emailQueued
+        ? " 🔔 Bell & Email Notification sent!"
+        : " 🔔 Bell Notification sent!";
+      toast.success((res.message || `Faculty access for ${giftCourseCode} gifted successfully!`) + notifSuffix);
+      // Reset selectors so admin can immediately gift another faculty or course if desired
       setGiftCourseCode("");
+      setGiftTeacherId("");
       setGiftNote("");
       // Refresh the student's unlocked courses list in real-time
       fetchStudentUnlockedCourses(giftTargetStudent.id);
@@ -1919,24 +1930,33 @@ export default function AdminDashboardPage() {
     }
     if (!giftTargetStudent) return;
 
+    const facultyLabel = unlockedCourse.teacherName
+      ? ` — Faculty: ${unlockedCourse.teacherName}${unlockedCourse.teacherInitial ? ` [${unlockedCourse.teacherInitial}]` : ""}`
+      : " (All Faculty)";
+
     openDeleteConfirm({
-      title: "Revoke Gifted Course Access",
-      itemType: "Course Access",
-      itemName: `${unlockedCourse.courseCode} (${unlockedCourse.courseTitle})`,
-      warningText: `Are you sure you want to revoke access to ${unlockedCourse.courseCode} for ${giftTargetStudent.name}? The student will immediately lose access to this course's materials unless they unlock it through a subscription.`,
+      title: "Revoke Course / Faculty Access",
+      itemType: unlockedCourse.teacherName ? "Faculty Gift Access" : "Course Access",
+      itemName: `${unlockedCourse.courseCode} (${unlockedCourse.courseTitle})${facultyLabel}`,
+      warningText: `Are you sure you want to revoke access to ${unlockedCourse.courseCode}${facultyLabel} for ${giftTargetStudent.name}? The student will immediately lose access unless unlocked through a subscription.`,
       confirmButtonText: "Revoke Access",
       onConfirm: async () => {
-        setRevokingCourseId(unlockedCourse.courseId);
+        setRevokingUnlockKey(unlockedCourse.id || unlockedCourse.courseId);
         try {
-          await api.admin.revokeStudentUnlockedCourse(giftTargetStudent.id, unlockedCourse.courseId);
-          toast.success(`Access to ${unlockedCourse.courseCode} has been revoked.`);
+          await api.admin.revokeStudentUnlockedCourse(
+            giftTargetStudent.id,
+            unlockedCourse.courseId,
+            unlockedCourse.id,
+            unlockedCourse.teacherId ?? undefined
+          );
+          toast.success(`Access to ${unlockedCourse.courseCode}${facultyLabel} has been revoked.`);
           fetchStudentUnlockedCourses(giftTargetStudent.id);
           notifyDataChanged("course_unlock", "revoked", giftTargetStudent.id);
         } catch (err: any) {
           toast.error(err.message || "Failed to revoke course access.");
           throw err;
         } finally {
-          setRevokingCourseId(null);
+          setRevokingUnlockKey(null);
         }
       },
     });
@@ -10056,9 +10076,14 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
               <div className="text-right shrink-0">
                 <span className="text-[11px] font-bold text-slate-400 block">Active Unlocks</span>
                 <span className="text-sm font-black text-amber-500">
-                  {studentUnlockedCourses.length} Courses
+                  {studentUnlockedCourses.length} {studentUnlockedCourses.length === 1 ? "Grant" : "Grants"}
                 </span>
               </div>
+            </div>
+
+            {/* Policy Note */}
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
+              <strong className="font-extrabold">Single-Faculty Gift Mode:</strong> Each gift unlocks <strong>1 Course + 1 Specific Faculty</strong> so other sections remain protected. Subscriptions &amp; contribution rewards continue to unlock full courses.
             </div>
 
             {/* Gift Form */}
@@ -10066,16 +10091,99 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
               {/* Course Selector (1 Course at a time) */}
               <div>
                 <label className="font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
-                  <span>Target Course to Gift * (1 Course per gift)</span>
-                  <span className="text-[10px] text-slate-400">Can gift multiple courses sequentially</span>
+                  <span>1. Target Course to Gift *</span>
+                  <span className="text-[10px] text-slate-400">Can gift multiple courses/faculty sequentially</span>
                 </label>
                 <SearchableCourseSelect
                   courses={courses}
                   value={giftCourseCode}
-                  onChange={(code: string) => setGiftCourseCode(code)}
+                  onChange={(code: string) => {
+                    setGiftCourseCode(code);
+                    setGiftTeacherId("");
+                  }}
                   placeholder="Search and select course to gift..."
                 />
               </div>
+
+              {/* Faculty Selector Under Course (1 Faculty required for gift) */}
+              {giftCourseCode && (() => {
+                const selectedCourseObj = courses.find(
+                  (c: any) => c.code?.toLowerCase() === giftCourseCode.toLowerCase()
+                );
+                const courseTeachers: any[] = selectedCourseObj?.teachers || [];
+                const courseTeacherIds = new Set(courseTeachers.map((t: any) => Number(t.id)));
+                const giftFacultyOptions = [
+                  ...courseTeachers.map((t: any) => {
+                    const count = (t.notesCount || 0) + (t.questionsCount || 0);
+                    return {
+                      id: Number(t.id),
+                      name: t.name,
+                      initial: t.initial,
+                      designation: count > 0 ? `${giftCourseCode} Instructor (${count} Materials)` : `${giftCourseCode} Instructor`,
+                      department: selectedCourseObj?.department || t.department,
+                    };
+                  }),
+                  ...teachers
+                    .filter((t: any) => !courseTeacherIds.has(Number(t.id)))
+                    .map((t: any) => ({
+                      id: Number(t.id),
+                      name: t.name,
+                      initial: t.initial,
+                      designation: t.designation || "Faculty Directory",
+                      department: t.department,
+                    })),
+                ];
+
+                return (
+                  <div className="p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2.5 animate-in fade-in duration-200">
+                    <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                      <span>2. Target Faculty under {giftCourseCode} * (1 Faculty)</span>
+                      <span className="text-[10px] text-amber-500 font-semibold">
+                        {courseTeachers.length} assigned w/ archive
+                      </span>
+                    </label>
+
+                    {courseTeachers.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {courseTeachers.map((t: any) => {
+                          const isSelected = Number(giftTeacherId) === Number(t.id);
+                          const count = (t.notesCount || 0) + (t.questionsCount || 0);
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => setGiftTeacherId(Number(t.id))}
+                              className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                isSelected
+                                  ? "bg-amber-500 text-slate-950 border-amber-400 shadow-sm shadow-amber-500/30"
+                                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-500/50"
+                              }`}
+                            >
+                              <span>{t.name}{t.initial ? ` [${t.initial}]` : ""}</span>
+                              {count > 0 && (
+                                <span className={`text-[9px] px-1.5 py-0.2 rounded-full ${
+                                  isSelected ? "bg-slate-950/20 text-slate-950" : "bg-blue-500/15 text-blue-500"
+                                }`}>
+                                  {count}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <SearchableTeacherSelect
+                      teachers={giftFacultyOptions}
+                      value={giftTeacherId}
+                      onChange={(id) => setGiftTeacherId(id)}
+                      allowGeneral={false}
+                      required={true}
+                      placeholder={`Search faculty under ${giftCourseCode} or full directory...`}
+                    />
+                  </div>
+                );
+              })()}
 
               {/* Validity Duration */}
               <div>
@@ -10130,11 +10238,11 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                 </button>
                 <button
                   type="submit"
-                  disabled={giftingCourse || !giftCourseCode}
+                  disabled={giftingCourse || !giftCourseCode || !giftTeacherId}
                   className="px-5 py-2.5 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/25 disabled:opacity-50 flex items-center gap-1.5 transition-all cursor-pointer"
                 >
                   <Gift className="w-4 h-4" />
-                  <span>{giftingCourse ? "Gifting Course..." : "Confirm & Gift Course 🎁"}</span>
+                  <span>{giftingCourse ? "Gifting Faculty Access..." : "Confirm & Gift Faculty Access 🎁"}</span>
                 </button>
               </div>
             </form>
@@ -10158,7 +10266,7 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                       key={uc.id}
                       className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs"
                     >
-                      <div className="space-y-0.5 min-w-0">
+                      <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
                             {uc.courseCode}
@@ -10170,20 +10278,31 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                             {uc.source}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                          {uc.expiresAt
-                            ? `Valid until: ${new Date(uc.expiresAt).toLocaleDateString()}`
-                            : "Permanent Lifetime Access"}
-                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {uc.teacherName ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                              🎁 Faculty: {uc.teacherName}{uc.teacherInitial ? ` [${uc.teacherInitial}]` : ""}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                              🌐 All Faculty (Full Course)
+                            </span>
+                          )}
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                            {uc.expiresAt
+                              ? `Valid until: ${new Date(uc.expiresAt).toLocaleDateString()}`
+                              : "Permanent Lifetime"}
+                          </span>
+                        </div>
                       </div>
 
                       {isSuperAdmin && (
                         <button
                           type="button"
                           onClick={() => handleRevokeUnlockedCourse(uc)}
-                          disabled={revokingCourseId === uc.courseId}
+                          disabled={revokingUnlockKey === (uc.id || uc.courseId)}
                           className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-rose-500 hover:text-white hover:bg-rose-600 border border-rose-500/30 transition-all shrink-0 cursor-pointer disabled:opacity-40"
-                          title="Revoke student course access"
+                          title="Revoke student unlock access"
                         >
                           Revoke
                         </button>

@@ -10,6 +10,7 @@ import com.notelagbe.repository.CourseRepository;
 import com.notelagbe.repository.PaymentRequestRepository;
 import com.notelagbe.repository.SubscriptionRepository;
 import com.notelagbe.repository.UnlockedCourseRepository;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -97,6 +98,7 @@ public class PaymentService {
         return list;
     }
 
+    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "admin_analytics", "admin_stats"}, allEntries = true)
     @Transactional
     public PaymentRequest approvePayment(Long paymentId, String adminNotes) {
         PaymentRequest pr = paymentRequestRepository.findById(paymentId)
@@ -135,7 +137,7 @@ public class PaymentService {
                     if (code == null) code = (String) item.get("code");
                     if (code != null) {
                         courseRepository.findByCodeIgnoreCase(code.trim()).ifPresent(course -> {
-                            if (!unlockedCourseRepository.existsByUserIdAndCourseId(pr.getUser().getId(), course.getId())) {
+                            if (!unlockedCourseRepository.existsByUserIdAndCourseIdAndTeacherIsNull(pr.getUser().getId(), course.getId())) {
                                 unlockedCourseRepository.save(new UnlockedCourse(pr.getUser(), course, UnlockSource.PURCHASED_QUOTA, sub.getEndDate()));
                             }
                         });

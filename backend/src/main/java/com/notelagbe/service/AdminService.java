@@ -18,6 +18,7 @@ import com.notelagbe.entity.*;
 import com.notelagbe.exception.ApiException;
 import com.notelagbe.exception.ResourceNotFoundException;
 import com.notelagbe.repository.*;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,8 @@ public class AdminService {
     private final SubscriptionRepository subscriptionRepository;
     private final UserCourseReviewRepository userCourseReviewRepository;
     private final LiveSyncService liveSyncService;
+    private final NotificationService notificationService;
+    private final EmailService emailService;
 
     public AdminService(UserRepository userRepository,
                         TeacherRepository teacherRepository,
@@ -58,7 +61,9 @@ public class AdminService {
                         UnlockedCourseRepository unlockedCourseRepository,
                         SubscriptionRepository subscriptionRepository,
                         UserCourseReviewRepository userCourseReviewRepository,
-                        LiveSyncService liveSyncService) {
+                        LiveSyncService liveSyncService,
+                        NotificationService notificationService,
+                        EmailService emailService) {
         this.userRepository = userRepository;
         this.teacherRepository = teacherRepository;
         this.courseRepository = courseRepository;
@@ -73,6 +78,8 @@ public class AdminService {
         this.subscriptionRepository = subscriptionRepository;
         this.userCourseReviewRepository = userCourseReviewRepository;
         this.liveSyncService = liveSyncService;
+        this.notificationService = notificationService;
+        this.emailService = emailService;
     }
 
     public AdminDashboardStats getDashboardStats() {
@@ -333,6 +340,7 @@ public class AdminService {
         liveSyncService.broadcast("staff", "deleted", userId);
     }
 
+    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "teachers", "teacher_details", "admin_analytics", "admin_stats"}, allEntries = true)
     @Transactional
     public Map<String, Object> giftCourseToStudent(Long studentId, GiftCourseRequest req, User currentUser) {
         // Security: Strictly restricted to Super Admin
@@ -351,15 +359,23 @@ public class AdminService {
             throw new ApiException("Target course code is required.");
         }
 
+        if (req.getTeacherId() == null || req.getTeacherId() <= 0) {
+            throw new ApiException("Please select a specific faculty member under this course to gift.");
+        }
+
         Course course = courseRepository.findByCodeIgnoreCase(req.getCourseCode().trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with code: " + req.getCourseCode()));
+
+        Teacher teacher = teacherRepository.findById(req.getTeacherId())
+                .orElseThrow(() -> new ResourceNotFoundException("Faculty member not found with ID: " + req.getTeacherId()));
 
         LocalDateTime expiresAt = null;
         if (req.getValidityMonths() != null && req.getValidityMonths() > 0) {
             expiresAt = LocalDateTime.now().plusMonths(req.getValidityMonths());
         }
 
-        Optional<UnlockedCourse> existingOpt = unlockedCourseRepository.findByUserIdAndCourseId(student.getId(), course.getId());
+        Optional<UnlockedCourse> existingOpt = unlockedCourseRepository.findByUserIdAndCourseIdAndTeacherId(
+                student.getId(), course.getId(), teacher.getId());
         UnlockedCourse uc;
         boolean isExtension = false;
         if (existingOpt.isPresent()) {
@@ -369,39 +385,65 @@ public class AdminService {
             uc.setUnlockedAt(LocalDateTime.now());
             isExtension = true;
         } else {
-            uc = new UnlockedCourse(student, course, UnlockSource.ADMIN_GIFT, expiresAt);
+            uc = new UnlockedCourse(student, course, teacher, UnlockSource.ADMIN_GIFT, expiresAt);
         }
         unlockedCourseRepository.save(uc);
 
-        // In-App Notification to student
+        String teacherLabel = teacher.getName() + (teacher.getInitial() != null && !teacher.getInitial().isBlank() ? " [" + teacher.getInitial() + "]" : "");
+
+        // 1. In-App Bell Notification + real-time SSE trigger for NotificationBell
+        boolean bellNotified = false;
         try {
-            String validityText = expiresAt == null ? "permanent lifetime access" : "full access for " + req.getValidityMonths() + " months";
-            String noteText = (req.getNote() != null && !req.getNote().trim().isEmpty()) 
-                    ? " Admin Message: \"" + req.getNote().trim() + "\"" 
+            String validityText = expiresAt == null ? "permanent lifetime access" : "access for " + req.getValidityMonths() + " months";
+            String noteText = (req.getNote() != null && !req.getNote().trim().isEmpty())
+                    ? " Admin Message: \"" + req.getNote().trim() + "\""
                     : "";
-            Notification notification = new Notification(
+            notificationService.createNotification(
                     student,
-                    "Course Access Gift from Administration! 🎁",
-                    "Super Admin has gifted you " + validityText + " to " + course.getCode() + " (" + course.getTitle() + ")!" + noteText,
+                    "Faculty Course Gift from Administration! 🎁",
+                    "Super Admin has gifted you " + validityText + " to " + course.getCode() + " (" + course.getTitle() + ") — Faculty: " + teacherLabel + "!" + noteText,
                     "COURSE_GIFT",
                     "/courses/" + course.getCode()
             );
-            notificationRepository.save(notification);
+            bellNotified = true;
+        } catch (Exception ignored) {}
+
+        // 2. Async Email Notification to student
+        boolean emailQueued = false;
+        try {
+            if (student.getEmail() != null && !student.getEmail().isBlank()
+                    && emailService.isEmailNotificationsEnabled()
+                    && emailService.isSmtpConfigured()) {
+                emailQueued = true;
+            }
+            emailService.sendCourseGiftEmail(
+                    student,
+                    course.getCode(),
+                    course.getTitle(),
+                    teacherLabel,
+                    req.getValidityMonths(),
+                    req.getNote()
+            );
         } catch (Exception ignored) {}
 
         liveSyncService.broadcast("course_unlock", "gifted", student.getId());
 
         Map<String, Object> res = new LinkedHashMap<>();
         res.put("success", true);
-        res.put("message", "Course " + course.getCode() + " successfully gifted to " + student.getName() + "!");
+        res.put("message", course.getCode() + " (" + teacherLabel + ") successfully gifted to " + student.getName() + "!");
         res.put("courseId", course.getId());
         res.put("courseCode", course.getCode());
         res.put("courseTitle", course.getTitle());
+        res.put("teacherId", teacher.getId());
+        res.put("teacherName", teacher.getName());
+        res.put("teacherInitial", teacher.getInitial());
         res.put("studentId", student.getId());
         res.put("studentName", student.getName());
         res.put("studentEmail", student.getEmail());
         res.put("expiresAt", expiresAt);
         res.put("isExtension", isExtension);
+        res.put("bellNotified", bellNotified);
+        res.put("emailQueued", emailQueued);
         return res;
     }
 
@@ -421,6 +463,9 @@ public class AdminService {
             item.put("courseCode", uc.getCourse().getCode());
             item.put("courseTitle", uc.getCourse().getTitle());
             item.put("department", uc.getCourse().getDepartment());
+            item.put("teacherId", uc.getTeacher() != null ? uc.getTeacher().getId() : null);
+            item.put("teacherName", uc.getTeacher() != null ? uc.getTeacher().getName() : null);
+            item.put("teacherInitial", uc.getTeacher() != null ? uc.getTeacher().getInitial() : null);
             item.put("source", uc.getSource().name());
             item.put("unlockedAt", uc.getUnlockedAt());
             item.put("expiresAt", uc.getExpiresAt());
@@ -429,15 +474,37 @@ public class AdminService {
         }).toList();
     }
 
+    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "teachers", "teacher_details", "admin_analytics", "admin_stats"}, allEntries = true)
     @Transactional
-    public Map<String, Object> revokeStudentUnlockedCourse(Long studentId, Long courseId, User currentUser) {
+    public Map<String, Object> revokeStudentUnlockedCourse(Long studentId, Long courseId, Long unlockId, Long teacherId, User currentUser) {
         if (currentUser.getRole() != Role.ROLE_SUPER_ADMIN) {
             throw new ApiException("Access Denied: Only Super Administrators can revoke unlocked course access.");
         }
 
-        Optional<UnlockedCourse> ucOpt = unlockedCourseRepository.findByUserIdAndCourseId(studentId, courseId);
-        if (ucOpt.isPresent()) {
-            unlockedCourseRepository.delete(ucOpt.get());
+        if (unlockId != null) {
+            UnlockedCourse uc = unlockedCourseRepository.findById(unlockId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Unlock record not found."));
+            if (uc.getUser() == null || !uc.getUser().getId().equals(studentId)) {
+                throw new ApiException("Unlock record does not belong to the specified student.");
+            }
+            unlockedCourseRepository.delete(uc);
+            liveSyncService.broadcast("course_unlock", "revoked", studentId);
+            return Map.of("success", true, "message", "Access revoked successfully.");
+        }
+
+        if (teacherId != null) {
+            Optional<UnlockedCourse> ucOpt = unlockedCourseRepository.findByUserIdAndCourseIdAndTeacherId(studentId, courseId, teacherId);
+            if (ucOpt.isPresent()) {
+                unlockedCourseRepository.delete(ucOpt.get());
+                liveSyncService.broadcast("course_unlock", "revoked", studentId);
+                return Map.of("success", true, "message", "Gifted faculty access revoked successfully.");
+            }
+            throw new ResourceNotFoundException("Faculty gift record was not found for this student.");
+        }
+
+        List<UnlockedCourse> matches = unlockedCourseRepository.findAllByUserIdAndCourseId(studentId, courseId);
+        if (!matches.isEmpty()) {
+            unlockedCourseRepository.deleteAll(matches);
             liveSyncService.broadcast("course_unlock", "revoked", studentId);
             return Map.of("success", true, "message", "Course access revoked successfully.");
         } else {

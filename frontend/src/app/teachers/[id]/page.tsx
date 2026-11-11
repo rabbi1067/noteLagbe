@@ -881,10 +881,15 @@ export default function TeacherDetailPage() {
 
                             <button
                               onClick={() => setActiveResource(res)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl font-bold text-xs text-white bg-purple-600 hover:bg-purple-700 shadow-sm transition-all shrink-0"
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl font-bold text-xs shadow-sm transition-all shrink-0 cursor-pointer ${
+                                res.fileUrl
+                                  ? "text-white bg-purple-600 hover:bg-purple-700"
+                                  : "text-slate-700 dark:text-slate-200 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
+                              }`}
                             >
-                              <span>{language === "bn" ? "প্রিভিউ" : "Preview"}</span>
-                              <ExternalLink className="w-3 h-3" />
+                              {!res.fileUrl && <Lock className="w-3 h-3 text-amber-500" />}
+                              <span>{res.fileUrl ? (language === "bn" ? "প্রিভিউ" : "Preview") : (language === "bn" ? "লকড" : "Unlock")}</span>
+                              {res.fileUrl && <ExternalLink className="w-3 h-3" />}
                             </button>
                           </div>
                         ))}

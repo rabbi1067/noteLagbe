@@ -13,15 +13,25 @@ import java.util.Optional;
 public interface UnlockedCourseRepository extends JpaRepository<UnlockedCourse, Long> {
     List<UnlockedCourse> findByUserId(Long userId);
     long countByCourseId(Long courseId);
-    boolean existsByUserIdAndCourseId(Long userId, Long courseId);
-    boolean existsByUserIdAndCourseCodeIgnoreCase(Long userId, String code);
-    Optional<UnlockedCourse> findByUserIdAndCourseId(Long userId, Long courseId);
+    List<UnlockedCourse> findAllByUserIdAndCourseId(Long userId, Long courseId);
+
+    // Full-course unlock lookups (teacher == null)
+    boolean existsByUserIdAndCourseIdAndTeacherIsNull(Long userId, Long courseId);
+    Optional<UnlockedCourse> findByUserIdAndCourseIdAndTeacherIsNull(Long userId, Long courseId);
+
+    // Faculty-scoped unlock lookups (teacher != null)
+    boolean existsByUserIdAndCourseIdAndTeacherId(Long userId, Long courseId, Long teacherId);
+    Optional<UnlockedCourse> findByUserIdAndCourseIdAndTeacherId(Long userId, Long courseId, Long teacherId);
 
     List<UnlockedCourse> findByExpiresAtNotNullAndExpiresAtBefore(java.time.LocalDateTime dateTime);
 
     @Modifying
     @Transactional
     void deleteByUserIdAndSourceIn(Long userId, Collection<UnlockSource> sources);
+
+    @Modifying
+    @Transactional
+    void deleteByTeacherId(Long teacherId);
 
     void deleteByCourseId(Long courseId);
     void deleteByUserId(Long userId);

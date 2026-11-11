@@ -351,7 +351,8 @@ public class AdminController {
             @Valid @RequestBody GiftCourseRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Map<String, Object> res = adminService.giftCourseToStudent(userId, request, userDetails.getUser());
-        logAdminAction("COURSE_GIFT", "USER_MANAGEMENT", "Super Admin gifted course " + request.getCourseCode() + " to student ID #" + userId);
+        String facultyTag = res.get("teacherName") != null ? " (Faculty: " + res.get("teacherName") + ")" : "";
+        logAdminAction("COURSE_GIFT", "USER_MANAGEMENT", "Super Admin gifted course " + request.getCourseCode() + facultyTag + " to student ID #" + userId);
         evictAnalyticsCache();
         return ResponseEntity.ok(res);
     }
@@ -368,9 +369,11 @@ public class AdminController {
     public ResponseEntity<Map<String, Object>> revokeStudentUnlockedCourse(
             @PathVariable Long userId,
             @PathVariable Long courseId,
+            @RequestParam(required = false) Long unlockId,
+            @RequestParam(required = false) Long teacherId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        Map<String, Object> res = adminService.revokeStudentUnlockedCourse(userId, courseId, userDetails.getUser());
-        logAdminAction("COURSE_REVOKE", "USER_MANAGEMENT", "Super Admin revoked course ID #" + courseId + " from student ID #" + userId);
+        Map<String, Object> res = adminService.revokeStudentUnlockedCourse(userId, courseId, unlockId, teacherId, userDetails.getUser());
+        logAdminAction("COURSE_REVOKE", "USER_MANAGEMENT", "Super Admin revoked unlock for course ID #" + courseId + (teacherId != null ? " (faculty #" + teacherId + ")" : "") + " from student ID #" + userId);
         evictAnalyticsCache();
         return ResponseEntity.ok(res);
     }
