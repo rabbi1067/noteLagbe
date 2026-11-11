@@ -84,6 +84,7 @@ export function clearClientApiCache() {
 if (typeof window !== "undefined") {
   window.addEventListener("notelagbe:sync-data", () => clearClientApiCache());
   window.addEventListener("notelagbe:session-expired", () => clearClientApiCache());
+  window.addEventListener("notelagbe:account-blocked", () => clearClientApiCache());
 }
 
 async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -104,17 +105,22 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
   });
 
   if (!response.ok) {
-    if (response.status === 401 && typeof window !== "undefined") {
-      removeToken();
-      window.dispatchEvent(new Event("notelagbe:session-expired"));
-    }
-    
     let errorMessage = "An error occurred";
+    let errorCode = "";
+    let isAccountBlocked = false;
+
     try {
       const errorData = await response.json();
       if (response.status === 429 && typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("notelagbe:rate-limit-hit", { detail: { endpoint, ...errorData } }));
       }
+      errorCode = errorData.code || "";
+      isAccountBlocked = Boolean(
+        errorData.blocked ||
+          errorCode === "ACCOUNT_BLOCKED" ||
+          errorData.error === "Account Blocked" ||
+          errorData.error === "Account Suspended"
+      );
       errorMessage = errorData.bengaliMessage || errorData.message || errorData.error || errorMessage;
     } catch {
       if (response.status === 429) {
@@ -123,7 +129,35 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
         errorMessage = `HTTP error ${response.status}: ${response.statusText}`;
       }
     }
-    throw new Error(errorMessage);
+
+    if (typeof window !== "undefined") {
+      const isAuthCredentialAttempt =
+        endpoint.startsWith("/auth/login") ||
+        endpoint.startsWith("/auth/google") ||
+        endpoint.startsWith("/auth/forgot-password") ||
+        endpoint.startsWith("/auth/reset-password");
+
+      if (isAccountBlocked || (response.status === 403 && errorCode === "ACCOUNT_BLOCKED")) {
+        const reason = Boolean(token) && !isAuthCredentialAttempt ? "auto_logout" : "login_denied";
+        if (reason === "auto_logout") {
+          removeToken();
+        }
+        window.dispatchEvent(
+          new CustomEvent("notelagbe:account-blocked", {
+            detail: { message: errorMessage, reason, code: "ACCOUNT_BLOCKED" },
+          })
+        );
+      } else if (response.status === 401 && token && !isAuthCredentialAttempt) {
+        removeToken();
+        window.dispatchEvent(new Event("notelagbe:session-expired"));
+      }
+    }
+
+    const err = new Error(errorMessage) as Error & { code?: string; status?: number; blocked?: boolean };
+    err.code = errorCode || (isAccountBlocked ? "ACCOUNT_BLOCKED" : undefined);
+    err.status = response.status;
+    err.blocked = isAccountBlocked;
+    throw err;
   }
 
   // Handle 204 No Content

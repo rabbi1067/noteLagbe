@@ -11,6 +11,7 @@ import com.notelagbe.service.ActivityLogService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -32,21 +33,36 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest request, HttpServletRequest httpRequest) {
-        AuthResponse res = authService.login(request);
         try {
-            if (res != null && res.getEmail() != null) {
+            AuthResponse res = authService.login(request);
+            try {
+                if (res != null && res.getEmail() != null) {
+                    activityLogService.logAuth(
+                            "USER_LOGIN",
+                            "User authenticated successfully via password: " + res.getEmail(),
+                            res.getEmail(),
+                            res.getName(),
+                            res.getRole(),
+                            httpRequest,
+                            "SUCCESS"
+                    );
+                }
+            } catch (Exception ignored) {}
+            return ResponseEntity.ok(res);
+        } catch (DisabledException ex) {
+            try {
                 activityLogService.logAuth(
-                        "USER_LOGIN",
-                        "User authenticated successfully via password: " + res.getEmail(),
-                        res.getEmail(),
-                        res.getName(),
-                        res.getRole(),
+                        "USER_LOGIN_BLOCKED",
+                        "Blocked account attempted password login: " + request.getEmail(),
+                        request.getEmail(),
+                        null,
+                        "BLOCKED",
                         httpRequest,
-                        "SUCCESS"
+                        "FAILED"
                 );
-            }
-        } catch (Exception ignored) {}
-        return ResponseEntity.ok(res);
+            } catch (Exception ignored) {}
+            throw ex;
+        }
     }
 
     @PostMapping("/register")
@@ -70,21 +86,36 @@ public class AuthController {
 
     @PostMapping("/google")
     public ResponseEntity<AuthResponse> googleLogin(@Valid @RequestBody GoogleLoginRequest request, HttpServletRequest httpRequest) {
-        AuthResponse res = authService.loginWithGoogle(request);
         try {
-            if (res != null && res.getEmail() != null) {
+            AuthResponse res = authService.loginWithGoogle(request);
+            try {
+                if (res != null && res.getEmail() != null) {
+                    activityLogService.logAuth(
+                            "USER_LOGIN_GOOGLE",
+                            "User authenticated via Google Single Sign-On: " + res.getEmail(),
+                            res.getEmail(),
+                            res.getName(),
+                            res.getRole(),
+                            httpRequest,
+                            "SUCCESS"
+                    );
+                }
+            } catch (Exception ignored) {}
+            return ResponseEntity.ok(res);
+        } catch (DisabledException ex) {
+            try {
                 activityLogService.logAuth(
-                        "USER_LOGIN_GOOGLE",
-                        "User authenticated via Google Single Sign-On: " + res.getEmail(),
-                        res.getEmail(),
-                        res.getName(),
-                        res.getRole(),
+                        "USER_LOGIN_BLOCKED",
+                        "Blocked account attempted Google SSO login: " + request.getEmail(),
+                        request.getEmail(),
+                        request.getName(),
+                        "BLOCKED",
                         httpRequest,
-                        "SUCCESS"
+                        "FAILED"
                 );
-            }
-        } catch (Exception ignored) {}
-        return ResponseEntity.ok(res);
+            } catch (Exception ignored) {}
+            throw ex;
+        }
     }
 
     @PostMapping("/logout")

@@ -2,9 +2,17 @@ import { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+const backendBaseUrl =
+  process.env.BACKEND_INTERNAL_URL ||
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  process.env.BACKEND_URL ||
+  (process.env.NODE_ENV === "development"
+    ? "http://localhost:8888"
+    : "https://notelagbe-backend.onrender.com");
+
 export async function GET(request: NextRequest) {
   try {
-    const backendRes = await fetch("http://localhost:8888/api/sync/events", {
+    const backendRes = await fetch(`${backendBaseUrl}/api/sync/events`, {
       headers: {
         Accept: "text/event-stream",
       },

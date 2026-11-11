@@ -122,12 +122,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(org.springframework.security.authentication.DisabledException.class)
     public ResponseEntity<ErrorResponse> handleDisabled(org.springframework.security.authentication.DisabledException ex, HttpServletRequest request) {
+        String msg = (ex.getMessage() != null && !ex.getMessage().isBlank() && !"User is disabled".equalsIgnoreCase(ex.getMessage().trim()))
+                ? ex.getMessage()
+                : "Your account has been suspended or blocked by an administrator. Please contact support.";
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.FORBIDDEN.value(),
-                "Account Suspended",
-                "Your account has been suspended or blocked by an administrator. Please contact support.",
+                "Account Blocked",
+                msg,
                 request.getRequestURI()
         );
+        error.setCode("ACCOUNT_BLOCKED");
         return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
     }
 
@@ -139,6 +143,7 @@ public class GlobalExceptionHandler {
                 "Your account is currently locked. Please contact support.",
                 request.getRequestURI()
         );
+        error.setCode("ACCOUNT_LOCKED");
         return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
     }
 

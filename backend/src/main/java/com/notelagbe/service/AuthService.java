@@ -14,6 +14,7 @@ import com.notelagbe.repository.UnlockedCourseRepository;
 import com.notelagbe.repository.UserRepository;
 import com.notelagbe.security.JwtTokenProvider;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -73,16 +74,28 @@ public class AuthService {
         this.cloudinaryService = cloudinaryService;
     }
 
+    private void assertUserNotBlocked(User user) {
+        if (user != null && !user.isEnabled()) {
+            throw new DisabledException(
+                    "Your account has been blocked by an administrator. Please contact support for assistance."
+            );
+        }
+    }
+
     public AuthResponse login(AuthRequest request) {
+        String cleanEmail = request.getEmail().toLowerCase().trim();
+        userRepository.findByEmail(cleanEmail).ifPresent(this::assertUserNotBlocked);
+
         Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail().toLowerCase().trim(), request.getPassword())
+                new UsernamePasswordAuthenticationToken(cleanEmail, request.getPassword())
         );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String token = tokenProvider.generateToken(authentication);
 
-        User user = userRepository.findByEmail(request.getEmail().toLowerCase().trim())
+        User user = userRepository.findByEmail(cleanEmail)
                 .orElseThrow(() -> new ApiException("User not found"));
+        assertUserNotBlocked(user);
 
         return new AuthResponse(
                 token,
@@ -167,6 +180,7 @@ public class AuthService {
         User user;
         if (existingUser.isPresent()) {
             user = existingUser.get();
+            assertUserNotBlocked(user);
             if (request.getAvatarUrl() != null && user.getAvatarUrl() == null) {
                 user.setAvatarUrl(request.getAvatarUrl());
                 userRepository.save(user);
@@ -446,6 +460,7 @@ public class AuthService {
         String cleanEmail = email.trim().toLowerCase();
         User user = userRepository.findByEmail(cleanEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("No registered account found with email '" + cleanEmail + "' in the Southeast University directory. Please check your spelling or register a new account."));
+        assertUserNotBlocked(user);
 
         String resetToken = UUID.randomUUID().toString();
         user.setResetToken(resetToken);
@@ -478,6 +493,7 @@ public class AuthService {
         String cleanEmail = email.trim().toLowerCase();
         User user = userRepository.findByEmail(cleanEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("No registered account found with email '" + cleanEmail + "'."));
+        assertUserNotBlocked(user);
 
         if (user.getResetToken() == null || !user.getResetToken().equals(resetToken.trim())) {
             throw new ApiException("Invalid or expired password reset token. Please request a new verification.");

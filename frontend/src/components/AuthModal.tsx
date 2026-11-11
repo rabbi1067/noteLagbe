@@ -123,7 +123,7 @@ export default function AuthModal() {
       try {
         await login(cleanEmail, cleanPassword);
       } catch (err: any) {
-        toast.error(err.message || "Authentication failed");
+        if (err?.code !== "ACCOUNT_BLOCKED" && !err?.blocked) { toast.error(err.message || "Authentication failed"); }
       } finally {
         setLoading(false);
       }
@@ -159,7 +159,7 @@ export default function AuthModal() {
       }
     } catch (err: any) {
       const errMsg = err?.message || "ডাটাবেজে এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি।";
-      toast.error(errMsg);
+      if (err?.code !== "ACCOUNT_BLOCKED" && !err?.blocked) { toast.error(errMsg); }
     } finally {
       setForgotLoading(false);
     }
@@ -198,7 +198,7 @@ export default function AuthModal() {
         toast.error(res.message || "পাসওয়ার্ড পরিবর্তন করা যায়নি।");
       }
     } catch (err: any) {
-      toast.error(err?.message || "পাসওয়ার্ড রিসেট করতে সমস্যা হয়েছে।");
+      if (err?.code !== "ACCOUNT_BLOCKED" && !err?.blocked) { toast.error(err?.message || "পাসওয়ার্ড রিসেট করতে সমস্যা হয়েছে।"); }
     } finally {
       setResetLoading(false);
     }

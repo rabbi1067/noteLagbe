@@ -1869,7 +1869,7 @@ export default function AdminDashboardPage() {
       itemType: "Access Control",
       itemName: `${staff.name} (${staff.email})`,
       warningText: isBlocking
-        ? `Are you sure you want to block login access for ${staff.name}? The user will immediately be barred from signing into the system.`
+        ? `Are you sure you want to block login access for ${staff.name}? They will be immediately signed out if currently logged in and barred from signing back in.`
         : `Are you sure you want to restore active access permissions for ${staff.name}?`,
       confirmButtonText: isBlocking ? "Block Access" : "Restore Access",
       onConfirm: async () => {

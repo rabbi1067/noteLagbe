@@ -1,10 +1,11 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { api, getToken, setToken, removeToken } from "@/lib/api";
 import { subscribeToSync, SyncPayload } from "@/lib/sync";
 import { toast } from "sonner";
+import AccountBlockedModal, { AccountBlockedNotice } from "@/components/AccountBlockedModal";
 
 export interface UnlockedCourseDetail {
   id?: number;
@@ -66,6 +67,8 @@ interface AuthContextType {
   setShowAuthModal: (show: boolean) => void;
   showSpotlight: boolean;
   setShowSpotlight: (show: boolean) => void;
+  blockedNotice: AccountBlockedNotice | null;
+  dismissBlockedNotice: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -77,6 +80,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showSpotlight, setShowSpotlight] = useState<boolean>(false);
+  const [blockedNotice, setBlockedNotice] = useState<AccountBlockedNotice | null>(null);
+  const userRef = useRef<UserProfile | null>(null);
+  const lastProfileCheckRef = useRef<number>(0);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   // Keyboard shortcut Ctrl+K / Cmd+K for Spotlight search
   useEffect(() => {
@@ -90,20 +100,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const refreshProfile = async () => {
+  const clearLocalSession = useCallback(() => {
+    removeToken();
+    try {
+      localStorage.removeItem("notelagbe_user");
+    } catch {}
+    userRef.current = null;
+    setTokenState(null);
+    setUser(null);
+  }, []);
+
+  const forceBlockedLogout = useCallback(
+    (
+      reason: "auto_logout" | "login_denied",
+      message?: string,
+      email?: string
+    ) => {
+      const targetEmail = email || userRef.current?.email;
+      if (reason === "auto_logout") {
+        clearLocalSession();
+        setShowAuthModal(false);
+        router.push("/");
+      }
+      setBlockedNotice({
+        reason,
+        message,
+        email: targetEmail,
+      });
+    },
+    [clearLocalSession, router]
+  );
+
+  const refreshProfile = useCallback(async () => {
+    if (!getToken()) return;
+    lastProfileCheckRef.current = Date.now();
     try {
       const profile = await api.auth.getMe();
       setUser(profile);
+      userRef.current = profile;
       if (typeof window !== "undefined") {
         localStorage.setItem("notelagbe_user", JSON.stringify(profile));
       }
     } catch (err: any) {
+      if (err?.code === "ACCOUNT_BLOCKED" || err?.blocked) {
+        forceBlockedLogout("auto_logout", err?.message, userRef.current?.email);
+        return;
+      }
       const msg = err?.message || "";
-      if (msg.includes("401") || msg.includes("403") || msg.includes("Unauthorized") || msg.includes("Forbidden")) {
-        logout(false);
+      if (
+        err?.status === 401 ||
+        msg.includes("401") ||
+        msg.includes("Unauthorized") ||
+        msg.includes("no longer exists")
+      ) {
+        clearLocalSession();
+        router.push("/");
       }
     }
-  };
+  }, [clearLocalSession, forceBlockedLogout, router]);
 
   useEffect(() => {
     const storedToken = getToken();
@@ -113,14 +167,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const savedUser = localStorage.getItem("notelagbe_user");
         if (savedUser) {
           const parsed = JSON.parse(savedUser);
-          if (parsed && parsed.name) setUser(parsed);
+          if (parsed && parsed.name) {
+            setUser(parsed);
+            userRef.current = parsed;
+          }
         }
       } catch {}
       refreshProfile().finally(() => setIsLoading(false));
     } else {
       setIsLoading(false);
     }
-  }, []);
+  }, [refreshProfile]);
 
   // -------------------------------------------------------------
   // Enterprise Inactivity Session Expiry & Security Guardian (OWASP)
@@ -219,6 +276,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [token, user]);
 
+  // Global listener for ACCOUNT_BLOCKED HTTP interceptor events (works both logged-in and during login attempts)
+  useEffect(() => {
+    const handleAccountBlockedEvent = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail || {};
+      const reason: "auto_logout" | "login_denied" =
+        detail.reason === "auto_logout" || Boolean(userRef.current)
+          ? "auto_logout"
+          : "login_denied";
+      forceBlockedLogout(reason, detail.message, detail.email || userRef.current?.email);
+    };
+
+    window.addEventListener("notelagbe:account-blocked", handleAccountBlockedEvent);
+    return () => {
+      window.removeEventListener("notelagbe:account-blocked", handleAccountBlockedEvent);
+    };
+  }, [forceBlockedLogout]);
+
+  // Active session heartbeat & tab visibility check (auto-logs out blocked users even when idle or when SSE is buffered)
+  useEffect(() => {
+    if (!token || !user) return;
+
+    const verifyIfDue = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (!getToken()) return;
+      if (Date.now() - lastProfileCheckRef.current < 5000) return;
+      void refreshProfile();
+    };
+
+    const heartbeatId = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (getToken()) {
+        void refreshProfile();
+      }
+    }, 20000);
+
+    window.addEventListener("focus", verifyIfDue);
+    document.addEventListener("visibilitychange", verifyIfDue);
+
+    return () => {
+      clearInterval(heartbeatId);
+      window.removeEventListener("focus", verifyIfDue);
+      document.removeEventListener("visibilitychange", verifyIfDue);
+    };
+  }, [token, user, refreshProfile]);
+
   // Universal Live Sync: Automatically keep user profile, subscription, and quota in sync across tabs
   useEffect(() => {
     const handleSync = (payload: SyncPayload) => {
@@ -235,36 +337,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ) {
         if (getToken()) {
           if (payload.entity === "user" && (payload.action === "blocked" || payload.action === "deleted")) {
-            const currentUserId = user?.id;
-            if (payload.data && currentUserId && String(payload.data) === String(currentUserId)) {
-              logout();
-              toast.error(payload.action === "blocked"
-                ? "Your account has been suspended by an administrator."
-                : "Your account has been removed by an administrator.");
+            const activeUser = userRef.current;
+            if (payload.data && activeUser?.id && String(payload.data) === String(activeUser.id)) {
+              if (payload.action === "blocked") {
+                forceBlockedLogout(
+                  "auto_logout",
+                  "An administrator has blocked your account from User Accounts & RBAC. You have been signed out automatically.",
+                  activeUser.email
+                );
+              } else {
+                clearLocalSession();
+                router.push("/");
+                toast.error("Your account has been removed by an administrator.");
+              }
               return;
             }
           }
-          refreshProfile().catch(() => {});
+          void refreshProfile();
         }
       }
     };
     return subscribeToSync(handleSync);
-  }, []);
+  }, [clearLocalSession, forceBlockedLogout, refreshProfile, router]);
 
   const login = async (email: string, pass: string) => {
-    const res = await api.auth.login({ email, password: pass });
-    setToken(res.token);
-    setTokenState(res.token);
-    await refreshProfile();
-    setShowAuthModal(false);
-    toast.success(`Welcome back, ${res.name}!`);
+    try {
+      const res = await api.auth.login({ email, password: pass });
+      setToken(res.token);
+      setTokenState(res.token);
+      await refreshProfile();
+      setShowAuthModal(false);
+      setBlockedNotice(null);
+      toast.success(`Welcome back, ${res.name}!`);
 
-    // Strict Role-Based Redirection
-    const isStaff = res.role === "ROLE_ADMIN" || res.role === "ROLE_SUPER_ADMIN" || res.role === "ROLE_MANAGER";
-    if (isStaff) {
-      router.push("/admin");
-    } else {
-      router.push("/dashboard");
+      // Strict Role-Based Redirection
+      const isStaff = res.role === "ROLE_ADMIN" || res.role === "ROLE_SUPER_ADMIN" || res.role === "ROLE_MANAGER";
+      if (isStaff) {
+        router.push("/admin");
+      } else {
+        router.push("/dashboard");
+      }
+    } catch (err: any) {
+      if (err?.code === "ACCOUNT_BLOCKED" || err?.blocked) {
+        setBlockedNotice({
+          reason: "login_denied",
+          message: err?.message,
+          email,
+        });
+      }
+      throw err;
     }
   };
 
@@ -280,9 +401,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = (showToast: boolean = true) => {
     api.auth.logout().catch(() => {});
-    removeToken();
-    setTokenState(null);
-    setUser(null);
+    clearLocalSession();
     if (showToast) {
       toast.info("Signed out successfully.");
     }
@@ -333,9 +452,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setShowAuthModal,
         showSpotlight,
         setShowSpotlight,
+        blockedNotice,
+        dismissBlockedNotice: () => setBlockedNotice(null),
       }}
     >
       {children}
+      <AccountBlockedModal notice={blockedNotice} onClose={() => setBlockedNotice(null)} />
     </AuthContext.Provider>
   );
 }
