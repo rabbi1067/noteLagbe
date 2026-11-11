@@ -8,6 +8,7 @@ import com.notelagbe.dto.UserProfileResponse;
 import com.notelagbe.security.CustomUserDetails;
 import com.notelagbe.service.AuthService;
 import com.notelagbe.service.ActivityLogService;
+import com.notelagbe.service.EmailService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -25,10 +26,14 @@ public class AuthController {
 
     private final AuthService authService;
     private final ActivityLogService activityLogService;
+    private final EmailService emailService;
 
-    public AuthController(AuthService authService, ActivityLogService activityLogService) {
+    public AuthController(AuthService authService,
+                          ActivityLogService activityLogService,
+                          EmailService emailService) {
         this.authService = authService;
         this.activityLogService = activityLogService;
+        this.emailService = emailService;
     }
 
     @PostMapping("/login")
@@ -261,5 +266,17 @@ public class AuthController {
             );
         } catch (Exception ignored) {}
         return ResponseEntity.ok(res);
+    }
+
+    @PostMapping("/mail-relay-verify")
+    public ResponseEntity<Map<String, Object>> verifyMailRelayChallenge(
+            @RequestBody(required = false) Map<String, String> body) {
+        String relayNonce = body != null ? body.get("relayNonce") : null;
+        String payloadHash = body != null ? body.get("payloadHash") : null;
+        boolean authorized = emailService.verifyAndConsumeRelayNonce(relayNonce, payloadHash);
+        if (!authorized) {
+            return ResponseEntity.status(403).body(Map.of("authorized", false));
+        }
+        return ResponseEntity.ok(Map.of("authorized", true));
     }
 }

@@ -18,6 +18,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.HtmlUtils;
 
+import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -25,8 +26,13 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class EmailService {
@@ -43,6 +49,7 @@ public class EmailService {
     public static final String SETTING_KEY_API_KEY = "EMAIL_API_KEY";
     public static final String SETTING_KEY_WEBHOOK_URL = "EMAIL_WEBHOOK_URL";
 
+    public static final String PROVIDER_VERCEL_RELAY = "VERCEL_RELAY";
     public static final String PROVIDER_SMTP = "SMTP";
     public static final String PROVIDER_BREVO = "BREVO";
     public static final String PROVIDER_RESEND = "RESEND";
@@ -51,10 +58,15 @@ public class EmailService {
     private static final String BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
     private static final String RESEND_ENDPOINT = "https://api.resend.com/emails";
     private static final String APPS_SCRIPT_PREFIX = "https://script.google.com/macros/s/";
+    private static final int MAX_PENDING_RELAY_NONCES = 500;
+    private static final long RELAY_NONCE_TTL_SECONDS = 90L;
 
     private final SystemSettingRepository systemSettingRepository;
     private final JavaMailSender injectedMailSender;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final SecureRandom secureRandom = new SecureRandom();
+    private final Map<String, RelayAuthorization> pendingRelayNonces = new ConcurrentHashMap<>();
+    private volatile boolean directSmtpBlockedDetected = false;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NORMAL)
@@ -81,6 +93,9 @@ public class EmailService {
     @Value("${email.apps-script.secret:}")
     private String envAppsScriptSecret = "";
 
+    @Value("${email.vercel-relay.auto-fallback:true}")
+    private boolean autoVercelRelayFallback = true;
+
     @Value("${spring.mail.username:}")
     private String envMailUsername = "";
 
@@ -102,7 +117,9 @@ public class EmailService {
         this.injectedMailSender = mailSender;
     }
 
-    private record EffectiveEmailConfig(
+    private record RelayAuthorization(String payloadHash, Instant expiresAt) {}
+
+    protected record EffectiveEmailConfig(
             String provider,
             String senderEmail,
             String senderName,
@@ -137,13 +154,14 @@ public class EmailService {
             return PROVIDER_SMTP;
         }
         String upper = raw.trim().toUpperCase(Locale.ROOT);
-        if (PROVIDER_BREVO.equals(upper)
+        if (PROVIDER_VERCEL_RELAY.equals(upper)
+                || PROVIDER_BREVO.equals(upper)
                 || PROVIDER_RESEND.equals(upper)
                 || PROVIDER_APPS_SCRIPT.equals(upper)
                 || PROVIDER_SMTP.equals(upper)) {
             return upper;
         }
-        throw new ApiException("Unsupported email provider: " + raw + ". Choose APPS_SCRIPT, BREVO, RESEND, or SMTP.");
+        throw new ApiException("Unsupported email provider: " + raw + ". Choose VERCEL_RELAY, APPS_SCRIPT, BREVO, RESEND, or SMTP.");
     }
 
     private static boolean isValidAppsScriptUrl(String url) {
@@ -152,6 +170,74 @@ public class EmailService {
         }
         String trimmed = url.trim();
         return trimmed.startsWith(APPS_SCRIPT_PREFIX) && !trimmed.contains("..") && trimmed.length() <= 500;
+    }
+
+    private static boolean isValidRelayUrl(String url) {
+        if (!hasText(url)) {
+            return false;
+        }
+        String trimmed = url.trim();
+        if (trimmed.contains("..") || trimmed.contains(" ") || trimmed.length() > 500) {
+            return false;
+        }
+        return trimmed.startsWith("https://")
+                || trimmed.startsWith("http://localhost:")
+                || trimmed.startsWith("http://127.0.0.1:");
+    }
+
+    private String resolveVercelRelayUrl(EffectiveEmailConfig cfg) {
+        if (hasText(cfg.webhookUrl())) {
+            return cfg.webhookUrl().trim();
+        }
+        return resolveFrontendBaseUrl() + "/api/mail-relay";
+    }
+
+    private String issueRelayNonce(String toEmail, String subject, String html) {
+        Instant now = Instant.now();
+        pendingRelayNonces.entrySet().removeIf(e -> now.isAfter(e.getValue().expiresAt()));
+        if (pendingRelayNonces.size() >= MAX_PENDING_RELAY_NONCES) {
+            throw new ApiException("Mail relay queue is temporarily full. Please try again in a moment.");
+        }
+        byte[] randomBytes = new byte[32];
+        secureRandom.nextBytes(randomBytes);
+        String nonce = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+        String payloadHash = computeRelayPayloadHash(toEmail, subject, html);
+        pendingRelayNonces.put(nonce, new RelayAuthorization(payloadHash, now.plusSeconds(RELAY_NONCE_TTL_SECONDS)));
+        return nonce;
+    }
+
+    /**
+     * Verifies and atomically consumes a single-use challenge nonce issued right before calling
+     * NoteLagbe's Next.js Vercel relay endpoint, proving the request originated from this backend.
+     */
+    public boolean verifyAndConsumeRelayNonce(String relayNonce, String payloadHash) {
+        if (!hasText(relayNonce) || !hasText(payloadHash)) {
+            return false;
+        }
+        RelayAuthorization auth = pendingRelayNonces.remove(relayNonce.trim());
+        if (auth == null || Instant.now().isAfter(auth.expiresAt())) {
+            return false;
+        }
+        byte[] expected = auth.payloadHash().getBytes(StandardCharsets.UTF_8);
+        byte[] actual = payloadHash.trim().toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(expected, actual);
+    }
+
+    static String computeRelayPayloadHash(String toEmail, String subject, String html) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            String canonical = (toEmail != null ? toEmail : "") + "\n"
+                    + (subject != null ? subject : "") + "\n"
+                    + (html != null ? html : "");
+            byte[] digest = md.digest(canonical.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
     }
 
     private static boolean hasText(String s) {
@@ -222,7 +308,14 @@ public class EmailService {
 
         String secret;
         boolean ready;
-        if (PROVIDER_APPS_SCRIPT.equals(provider)) {
+        if (PROVIDER_VERCEL_RELAY.equals(provider)) {
+            String rawPass = dbSmtpPass.orElse(hasText(envMailPassword) ? envMailPassword : "");
+            secret = sanitizeSmtpPassword(smtpHost, rawPass);
+            String targetRelayUrl = resolveVercelRelayUrl(new EffectiveEmailConfig(
+                    provider, senderEmail, senderName, smtpHost, smtpPort, webhookUrl, secret, false, false
+            ));
+            ready = hasText(smtpHost) && smtpPort > 0 && hasText(senderEmail) && hasText(secret) && isValidRelayUrl(targetRelayUrl);
+        } else if (PROVIDER_APPS_SCRIPT.equals(provider)) {
             secret = dbApiKey.orElse(hasText(envAppsScriptSecret) ? envAppsScriptSecret.trim() : "");
             ready = isValidAppsScriptUrl(webhookUrl) && hasText(senderEmail) && hasText(secret);
         } else if (PROVIDER_BREVO.equals(provider)) {
@@ -254,6 +347,9 @@ public class EmailService {
 
     public String getSmtpHost() {
         EffectiveEmailConfig cfg = resolveConfig();
+        if (PROVIDER_VERCEL_RELAY.equals(cfg.provider())) {
+            return "Vercel Relay → " + cfg.smtpHost() + ":" + cfg.smtpPort() + " (HTTPS 443)";
+        }
         if (PROVIDER_APPS_SCRIPT.equals(cfg.provider())) {
             return "script.google.com (Gmail HTTPS 443)";
         }
@@ -283,10 +379,13 @@ public class EmailService {
         String statusMessage;
         if (!cfg.ready()) {
             statusMessage = PROVIDER_SMTP.equals(cfg.provider())
-                    ? "Email delivery not configured (enter Apps Script, Brevo, Resend, or SMTP credentials)"
+                    ? "Email delivery not configured (enter Vercel Relay, Brevo, Resend, or SMTP credentials)"
                     : cfg.provider() + " HTTPS gateway selected, but required URL, sender email, or secret is missing";
+        } else if (PROVIDER_VERCEL_RELAY.equals(cfg.provider())) {
+            statusMessage = "Vercel Gmail Relay Ready (" + resolveVercelRelayUrl(cfg) + ")";
         } else if (PROVIDER_SMTP.equals(cfg.provider())) {
-            statusMessage = "SMTP Authenticated (" + cfg.smtpHost() + ":" + cfg.smtpPort() + ")";
+            statusMessage = "SMTP Authenticated (" + cfg.smtpHost() + ":" + cfg.smtpPort()
+                    + (autoVercelRelayFallback ? " + Vercel Auto-Relay" : "") + ")";
         } else {
             statusMessage = cfg.provider() + " HTTPS API Ready (Port 443)";
         }
@@ -331,6 +430,7 @@ public class EmailService {
             String secret,
             boolean clearSavedConfig
     ) {
+        directSmtpBlockedDetected = false;
         if (clearSavedConfig) {
             for (String key : List.of(
                     SETTING_KEY_PROVIDER,
@@ -364,7 +464,8 @@ public class EmailService {
             throw new ApiException("Provided password or API key exceeds maximum allowed length.");
         }
 
-        if (PROVIDER_SMTP.equals(provider)) {
+        if (PROVIDER_SMTP.equals(provider) || PROVIDER_VERCEL_RELAY.equals(provider)) {
+            boolean isVercelRelay = PROVIDER_VERCEL_RELAY.equals(provider);
             String cleanHost = hasText(smtpHost) ? smtpHost.trim() : "smtp.gmail.com";
             if (cleanHost.contains(" ") || cleanHost.contains("://") || cleanHost.length() > 180) {
                 throw new ApiException("Please enter a valid SMTP host (for example: smtp.gmail.com).");
@@ -373,22 +474,30 @@ public class EmailService {
             if (cleanPort < 1 || cleanPort > 65535) {
                 throw new ApiException("SMTP port must be between 1 and 65535.");
             }
+            String cleanRelayUrl = null;
+            if (isVercelRelay && hasText(webhookUrl)) {
+                cleanRelayUrl = webhookUrl.trim();
+                if (!isValidRelayUrl(cleanRelayUrl)) {
+                    throw new ApiException("Optional custom Vercel relay URL must start with https:// (leave blank to auto-use " + resolveFrontendBaseUrl() + "/api/mail-relay).");
+                }
+            }
 
+            boolean previousSmtpCompatible = PROVIDER_SMTP.equals(current.provider()) || PROVIDER_VERCEL_RELAY.equals(current.provider());
             String effectivePass = hasText(incomingSecret)
                     ? sanitizeSmtpPassword(cleanHost, incomingSecret)
-                    : (PROVIDER_SMTP.equals(current.provider()) ? current.secret() : "");
+                    : (previousSmtpCompatible ? current.secret() : "");
             if (!hasText(effectivePass)) {
                 throw new ApiException("SMTP password / Google App Password is required.");
             }
 
-            saveOrDeleteDbSetting(SETTING_KEY_PROVIDER, PROVIDER_SMTP);
+            saveOrDeleteDbSetting(SETTING_KEY_PROVIDER, provider);
             saveOrDeleteDbSetting(SETTING_KEY_SENDER_EMAIL, cleanEmail);
             saveOrDeleteDbSetting(SETTING_KEY_SENDER_NAME, cleanName);
             saveOrDeleteDbSetting(SETTING_KEY_SMTP_HOST, cleanHost);
             saveOrDeleteDbSetting(SETTING_KEY_SMTP_PORT, String.valueOf(cleanPort));
             saveOrDeleteDbSetting(SETTING_KEY_SMTP_PASSWORD, effectivePass);
             saveOrDeleteDbSetting(SETTING_KEY_API_KEY, null);
-            saveOrDeleteDbSetting(SETTING_KEY_WEBHOOK_URL, null);
+            saveOrDeleteDbSetting(SETTING_KEY_WEBHOOK_URL, cleanRelayUrl);
         } else if (PROVIDER_APPS_SCRIPT.equals(provider)) {
             String cleanUrl = webhookUrl != null ? webhookUrl.trim() : "";
             if (!isValidAppsScriptUrl(cleanUrl)) {
@@ -753,7 +862,7 @@ public class EmailService {
         } catch (Exception e) {
             log.error("Failed to send password reset security code to {} via {}: {}", user.getEmail(), cfg.provider(), e.getMessage());
             if (isSmtpPortBlockedTimeout(e)) {
-                throw new ApiException("SMTP connection timed out (cloud hosts like Render Free block SMTP ports 465/587). Ask Super Admin to switch Email Delivery to Brevo/Resend HTTPS API in System Settings.");
+                throw new ApiException("SMTP connection timed out (cloud hosts like Render Free block SMTP ports 465/587). Ask Super Admin to select Vercel Gmail Relay or Brevo/Resend HTTPS API in System Settings.");
             }
             throw new ApiException("Failed to send verification code to your email. Please try again later.");
         }
@@ -765,7 +874,7 @@ public class EmailService {
         }
         EffectiveEmailConfig cfg = resolveConfig();
         if (!cfg.ready()) {
-            return Map.of("success", false, "message", "Email delivery credentials are not configured yet. Configure SMTP or Brevo/Resend HTTPS API below first.");
+            return Map.of("success", false, "message", "Email delivery credentials are not configured yet. Configure Vercel Gmail Relay or SMTP / API credentials below first.");
         }
         if (!hasText(targetEmail)) {
             return Map.of("success", false, "message", "Target email address is required.");
@@ -808,7 +917,7 @@ public class EmailService {
         } catch (Exception e) {
             log.error("Failed to send test email to {} via {}: {}", targetEmail, cfg.provider(), e.getMessage());
             String detail = isSmtpPortBlockedTimeout(e)
-                    ? "SMTP connection timed out — Render Free tier blocks outbound SMTP ports (465/587). Switch provider to Brevo HTTPS API or Resend HTTPS API (Port 443) right here in System Settings!"
+                    ? "SMTP connection timed out — Render Free tier blocks outbound SMTP ports (465/587). Switch provider to Vercel Gmail Relay (Port 443) right here in System Settings!"
                     : "Delivery failed (" + cfg.provider() + "): " + e.getMessage();
             return Map.of("success", false, "message", detail);
         }
@@ -822,6 +931,10 @@ public class EmailService {
         if (!cfg.ready()) {
             throw new ApiException("Email delivery service is not configured right now.");
         }
+        if (PROVIDER_VERCEL_RELAY.equals(cfg.provider())) {
+            sendViaVercelRelay(cfg, toEmail, subject, html);
+            return;
+        }
         if (PROVIDER_APPS_SCRIPT.equals(cfg.provider())) {
             sendViaAppsScript(cfg, toEmail, subject, html);
             return;
@@ -834,7 +947,23 @@ public class EmailService {
             sendViaResendApi(cfg, toEmail, subject, html);
             return;
         }
-        sendViaSmtp(cfg, toEmail, subject, html);
+        if (autoVercelRelayFallback && directSmtpBlockedDetected && isValidRelayUrl(resolveVercelRelayUrl(cfg))) {
+            sendViaVercelRelay(cfg, toEmail, subject, html);
+            return;
+        }
+        try {
+            sendViaSmtp(cfg, toEmail, subject, html);
+        } catch (Exception e) {
+            if (autoVercelRelayFallback
+                    && isSmtpPortBlockedTimeout(e)
+                    && isValidRelayUrl(resolveVercelRelayUrl(cfg))) {
+                directSmtpBlockedDetected = true;
+                log.warn("Direct SMTP unreachable ({}). Automatically falling back via Vercel Gmail Relay...", e.getMessage());
+                sendViaVercelRelay(cfg, toEmail, subject, html);
+                return;
+            }
+            throw e;
+        }
     }
 
     protected JavaMailSender createMailSenderForConfig(EffectiveEmailConfig cfg) {
@@ -857,9 +986,9 @@ public class EmailService {
             props.put("mail.smtp.starttls.enable", "true");
             props.put("mail.smtp.starttls.required", "true");
         }
-        props.put("mail.smtp.connectiontimeout", "10000");
-        props.put("mail.smtp.timeout", "10000");
-        props.put("mail.smtp.writetimeout", "10000");
+        props.put("mail.smtp.connectiontimeout", "5000");
+        props.put("mail.smtp.timeout", "5000");
+        props.put("mail.smtp.writetimeout", "5000");
         return sender;
     }
 
@@ -929,18 +1058,63 @@ public class EmailService {
         body.put("html", html);
 
         HttpResponse<String> response = postJson(cfg.webhookUrl().trim(), Map.of(), body);
+        parseJsonBridgeResponse(
+                "Google Apps Script",
+                response,
+                "Google Apps Script returned non-JSON output. Set 'Who has access' to 'Anyone' and create a New deployment."
+        );
+    }
+
+    private void sendViaVercelRelay(EffectiveEmailConfig cfg, String toEmail, String subject, String html) throws Exception {
+        String relayUrl = resolveVercelRelayUrl(cfg);
+        if (!isValidRelayUrl(relayUrl)) {
+            throw new ApiException("Invalid Vercel Mail Relay URL.");
+        }
+        String relayNonce = issueRelayNonce(toEmail, subject, html);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("relayNonce", relayNonce);
+        body.put("smtpHost", cfg.smtpHost());
+        body.put("smtpPort", cfg.smtpPort());
+        body.put("username", cfg.senderEmail());
+        body.put("password", cfg.secret());
+        body.put("senderEmail", cfg.senderEmail());
+        body.put("senderName", cfg.senderName());
+        body.put("to", toEmail);
+        body.put("subject", subject);
+        body.put("html", html);
+
+        try {
+            HttpResponse<String> response = postJson(relayUrl, Map.of(), body);
+            parseJsonBridgeResponse(
+                    "Vercel Gmail Relay",
+                    response,
+                    "Vercel Mail Relay returned an unexpected non-JSON response. Make sure the latest frontend deployment is live on Vercel."
+            );
+        } finally {
+            pendingRelayNonces.remove(relayNonce);
+        }
+    }
+
+    private void parseJsonBridgeResponse(String providerLabel, HttpResponse<String> response, String nonJsonHint) throws Exception {
         String respBody = response.body() != null ? response.body().trim() : "";
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new ApiException("Google Apps Script bridge returned HTTP " + response.statusCode() + ": " + summarizeHttpError(respBody));
+            if (respBody.startsWith("{")) {
+                Map<?, ?> parsedErr = objectMapper.readValue(respBody, Map.class);
+                Object errObj = parsedErr.get("error");
+                if (errObj != null && !errObj.toString().isBlank()) {
+                    throw new ApiException(providerLabel + " failed: " + errObj);
+                }
+            }
+            throw new ApiException(providerLabel + " returned HTTP " + response.statusCode() + ": " + summarizeHttpError(respBody));
         }
         if (!respBody.startsWith("{")) {
-            throw new ApiException("Google Apps Script returned non-JSON output. Set 'Who has access' to 'Anyone' and create a New deployment.");
+            throw new ApiException(nonJsonHint);
         }
         Map<?, ?> parsed = objectMapper.readValue(respBody, Map.class);
         Object okVal = parsed.get("ok");
         if (!(okVal instanceof Boolean b && b)) {
             Object errObj = parsed.get("error");
-            throw new ApiException("Google Apps Script email failed: " + (errObj != null ? errObj.toString() : summarizeHttpError(respBody)));
+            throw new ApiException(providerLabel + " email failed: " + (errObj != null ? errObj.toString() : summarizeHttpError(respBody)));
         }
     }
 
@@ -948,7 +1122,7 @@ public class EmailService {
         String json = objectMapper.writeValueAsString(payload);
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(12))
+                .timeout(Duration.ofSeconds(20))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8));
         headers.forEach(builder::header);
@@ -966,13 +1140,19 @@ public class EmailService {
     private static boolean isSmtpPortBlockedTimeout(Throwable error) {
         Throwable cursor = error;
         while (cursor != null) {
-            if (cursor instanceof SocketTimeoutException) {
+            if (cursor instanceof SocketTimeoutException || cursor instanceof ConnectException) {
                 return true;
             }
             String msg = cursor.getMessage();
-            if (msg != null && (msg.toLowerCase(Locale.ROOT).contains("timed out")
-                    || msg.toLowerCase(Locale.ROOT).contains("connect timeout"))) {
-                return true;
+            if (msg != null) {
+                String lower = msg.toLowerCase(Locale.ROOT);
+                if (lower.contains("timed out")
+                        || lower.contains("connect timeout")
+                        || lower.contains("couldn't connect")
+                        || lower.contains("connection refused")
+                        || lower.contains("network is unreachable")) {
+                    return true;
+                }
             }
             cursor = cursor.getCause();
         }

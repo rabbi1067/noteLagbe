@@ -100,11 +100,12 @@ public class RateLimitFilter implements Filter {
         String path = request.getRequestURI();
         String method = request.getMethod();
 
-        // Whitelist static files, h2 console, uploads, SSE sync streams, and admin read analytics
+        // Whitelist static files, h2 console, uploads, SSE sync streams, mail-relay challenge callbacks, and admin read analytics
         if (path.startsWith("/h2-console") ||
             path.startsWith("/static") ||
             path.startsWith("/uploads") ||
             path.startsWith("/api/sync") ||
+            "/api/auth/mail-relay-verify".equals(path) ||
             (path.startsWith("/api/admin") && "GET".equalsIgnoreCase(method))) {
             filterChain.doFilter(servletRequest, servletResponse);
             return;

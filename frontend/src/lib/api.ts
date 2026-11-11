@@ -579,7 +579,7 @@ export const api = {
       request<{
         emailNotificationsEnabled: boolean;
         smtpConfigured: boolean;
-        provider?: "APPS_SCRIPT" | "SMTP" | "BREVO" | "RESEND" | string;
+        provider?: "VERCEL_RELAY" | "APPS_SCRIPT" | "SMTP" | "BREVO" | "RESEND" | string;
         smtpSender: string;
         senderEmail?: string;
         senderName?: string;

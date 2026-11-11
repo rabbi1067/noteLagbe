@@ -1,6 +1,7 @@
 package com.notelagbe.service;
 
 import com.notelagbe.controller.AdminController;
+import com.notelagbe.controller.AuthController;
 import com.notelagbe.entity.Role;
 import com.notelagbe.entity.SystemSetting;
 import com.notelagbe.entity.User;
@@ -9,6 +10,7 @@ import com.notelagbe.repository.SystemSettingRepository;
 import com.notelagbe.repository.UserRepository;
 import com.notelagbe.security.CustomUserDetails;
 import com.notelagbe.service.review.ReviewModerationService;
+import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,10 +19,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cache.CacheManager;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.lang.reflect.Method;
+import java.net.SocketTimeoutException;
 import java.net.http.HttpResponse;
 import java.util.*;
 
@@ -62,9 +66,16 @@ class EmailDeliveryConfigurationTest {
         Map<String, Object> lastPayload;
         int nextStatus = 201;
         String nextBody = "{\"messageId\":\"<test@brevo>\"}";
+        Runnable onPost;
+        JavaMailSender overrideMailSender;
 
         TestableEmailService(SystemSettingRepository repo, JavaMailSender sender) {
             super(repo, sender);
+        }
+
+        @Override
+        protected JavaMailSender createMailSenderForConfig(EffectiveEmailConfig cfg) {
+            return overrideMailSender != null ? overrideMailSender : super.createMailSenderForConfig(cfg);
         }
 
         @Override
@@ -73,6 +84,9 @@ class EmailDeliveryConfigurationTest {
             this.lastUrl = url;
             this.lastHeaders = headers;
             this.lastPayload = payload;
+            if (onPost != null) {
+                onPost.run();
+            }
             HttpResponse<String> resp = mock(HttpResponse.class);
             when(resp.statusCode()).thenReturn(nextStatus);
             lenient().when(resp.body()).thenReturn(nextBody);
@@ -289,5 +303,91 @@ class EmailDeliveryConfigurationTest {
                 eq(superAdmin),
                 eq(httpRequest)
         );
+    }
+
+    @Test
+    void vercelRelayDispatchesWithOneTimeChallengeNonceAndSupportsAutomaticSmtpFallback() {
+        Map<String, Object> saved = emailService.saveEmailConfig(
+                "VERCEL_RELAY",
+                "fazlerabbicse65@gmail.com",
+                "NoteLagbe SEU",
+                "smtp.gmail.com",
+                587,
+                "",
+                "abcd efgh ijkl mnop",
+                false
+        );
+
+        assertEquals(true, saved.get("smtpConfigured"));
+        assertEquals("VERCEL_RELAY", saved.get("provider"));
+        assertEquals("Vercel Relay → smtp.gmail.com:587 (HTTPS 443)", saved.get("smtpHost"));
+        assertEquals("abcdefghijklmnop", inMemorySettings.get(EmailService.SETTING_KEY_SMTP_PASSWORD).getSettingValue());
+        assertFalse(saved.toString().contains("abcdefghijklmnop"), "Raw App Password must never appear in settings summary");
+
+        User student = new User();
+        student.setName("Fazle Rabbi");
+        student.setEmail("2023200000686@seu.edu.bd");
+
+        emailService.nextStatus = 200;
+        emailService.nextBody = "{\"ok\":true}";
+        final boolean[] callbackVerified = {false};
+        final boolean[] replayRejected = {false};
+        emailService.onPost = () -> {
+            String nonce = String.valueOf(emailService.lastPayload.get("relayNonce"));
+            String expectedHash = EmailService.computeRelayPayloadHash(
+                    String.valueOf(emailService.lastPayload.get("to")),
+                    String.valueOf(emailService.lastPayload.get("subject")),
+                    String.valueOf(emailService.lastPayload.get("html"))
+            );
+            assertFalse(emailService.verifyAndConsumeRelayNonce(nonce, "0".repeat(64)));
+            // Consumed on wrong hash attempt -> next real hash attempt wouldn't work unless we issue fresh; verify cleanup behavior cleanly!
+            callbackVerified[0] = true;
+            replayRejected[0] = !emailService.verifyAndConsumeRelayNonce(nonce, expectedHash);
+        };
+
+        emailService.sendPasswordResetCodeEmail(student, "998877", 10);
+        assertTrue(callbackVerified[0]);
+        assertTrue(replayRejected[0]);
+        assertEquals("https://note-lagbe-sandy.vercel.app/api/mail-relay", emailService.lastUrl);
+        assertEquals("abcdefghijklmnop", emailService.lastPayload.get("password"));
+        assertTrue(emailService.lastPayload.get("html").toString().contains("998877"));
+
+        // Verify exact happy-path one-time nonce consumption + AuthController endpoint behavior
+        emailService.saveEmailConfig("SMTP", "sender@gmail.com", "NoteLagbe", "smtp.gmail.com", 587, "", "abcd efgh ijkl mnop", false);
+        JavaMailSender blockedSender = mock(JavaMailSender.class);
+        MimeMessage mimeMessage = mock(MimeMessage.class);
+        when(blockedSender.createMimeMessage()).thenReturn(mimeMessage);
+        doThrow(new MailSendException("SMTP port blocked", new SocketTimeoutException("connect timed out")))
+                .when(blockedSender).send(any(MimeMessage.class));
+        emailService.overrideMailSender = blockedSender;
+
+        final boolean[] fallbackAuthorized = {false};
+        emailService.onPost = () -> {
+            String nonce = String.valueOf(emailService.lastPayload.get("relayNonce"));
+            String validHash = EmailService.computeRelayPayloadHash(
+                    String.valueOf(emailService.lastPayload.get("to")),
+                    String.valueOf(emailService.lastPayload.get("subject")),
+                    String.valueOf(emailService.lastPayload.get("html"))
+            );
+            AuthController authController = new AuthController(authService, activityLogService, emailService);
+            ResponseEntity<Map<String, Object>> okRes = authController.verifyMailRelayChallenge(
+                    Map.of("relayNonce", nonce, "payloadHash", validHash)
+            );
+            assertEquals(200, okRes.getStatusCode().value());
+            assertEquals(true, okRes.getBody().get("authorized"));
+
+            // Replay attempt with same single-use nonce must fail with HTTP 403
+            ResponseEntity<Map<String, Object>> replayRes = authController.verifyMailRelayChallenge(
+                    Map.of("relayNonce", nonce, "payloadHash", validHash)
+            );
+            assertEquals(403, replayRes.getStatusCode().value());
+            assertEquals(false, replayRes.getBody().get("authorized"));
+            fallbackAuthorized[0] = true;
+        };
+
+        emailService.sendPasswordResetCodeEmail(student, "112233", 10);
+        assertTrue(fallbackAuthorized[0], "Blocked SMTP on Render Free must automatically fall back to Vercel Gmail Relay");
+        assertEquals("https://note-lagbe-sandy.vercel.app/api/mail-relay", emailService.lastUrl);
+        assertTrue(emailService.lastPayload.get("html").toString().contains("112233"));
     }
 }

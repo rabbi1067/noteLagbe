@@ -2640,7 +2640,7 @@ export default function AdminDashboardPage() {
         senderName: emailSenderNameInput.trim(),
         smtpHost: emailHostInput.trim(),
         smtpPort: emailPortInput,
-        webhookUrl: emailWebhookUrlInput.trim(),
+        webhookUrl: emailProvider === "APPS_SCRIPT" ? emailWebhookUrlInput.trim() : "",
         secret: emailSecretInput.trim(),
       });
       setSmtpConfigured(updated.smtpConfigured);
@@ -2712,8 +2712,8 @@ export default function AdminDashboardPage() {
         {
           description:
             language === "bn"
-              ? "নিচের 'Configure Email / SMTP' বাটনে ক্লিক করে আপনার SMTP বা Brevo/Resend তথ্য সেট করুন।"
-              : "Click 'Configure Email / SMTP' below to enter your SMTP App Password or Brevo/Resend HTTPS API key.",
+              ? "নিচের 'Configure Email / SMTP' বাটনে ক্লিক করে Vercel Gmail Relay বা আপনার Gmail App Password সেট করুন।"
+              : "Click 'Configure Email / SMTP' below to enter your Gmail App Password (works automatically via NoteLagbe Vercel Relay).",
         }
       );
       if (isSuperAdmin) setShowEmailConfigForm(true);
@@ -7788,45 +7788,30 @@ export default function AdminDashboardPage() {
                         </div>
                         <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
                           {language === "bn"
-                            ? "Render Free-তে আউটবাউন্ড SMTP পোর্ট (465/587) ব্লক থাকে। তাই Render Free সার্ভারের জন্য Brevo HTTPS API (Port 443) ব্যবহার করা সেরা, অথবা নিচের কনফিগারেশন ফর্মে আপনার SMTP বা Brevo API Key সরাসরি সেভ করুন।"
-                            : "Cloud hosts such as Render Free block outbound SMTP ports (25/465/587). Use Brevo HTTPS API (Port 443, works with your Gmail address) or configure your custom SMTP gateway below."}
+                            ? "Render Free-তে আউটবাউন্ড SMTP পোর্ট (465/587) ব্লক থাকে। তাই NoteLagbe স্বয়ংক্রিয়ভাবে Vercel Gmail Relay (Port 443)-এর মাধ্যমে আপনার Gmail App Password দিয়ে OTP পাঠাতে পারে — কোনো থার্ড-পার্টি অ্যাকাউন্ট ছাড়াই।"
+                            : "Cloud hosts such as Render Free block outbound SMTP ports (25/465/587). NoteLagbe includes a built-in Vercel Gmail Relay (Port 443) so your regular Gmail App Password works without any third-party account."}
                         </p>
 
                         {showSmtpGuide && (
                           <div className="p-3.5 rounded-xl bg-slate-900/90 border border-amber-500/30 space-y-2 text-[11px] text-slate-200">
                             <p className="font-bold text-amber-400">
                               {language === "bn"
-                                ? "ফোন ভেরিফিকেশন ছাড়াই Gmail Apps Script / Brevo সেটআপ:"
-                                : "Zero-SMS Setup (Gmail via Google Apps Script on Port 443):"}
+                                ? "সবচেয়ে সহজ উপায়: Vercel Gmail Relay (কোনো নতুন অ্যাকাউন্ট লাগবে না):"
+                                : "Easiest Zero-Account Setup: NoteLagbe Built-in Vercel Gmail Relay:"}
                             </p>
                             <ol className="list-decimal list-inside space-y-1.5 text-slate-300">
                               <li>
-                                <strong>Recommended (No Phone SMS, No Custom Domain):</strong> Open{" "}
-                                <code>script.google.com</code> → New project → paste the relay script below →{" "}
-                                <em>Deploy → New deployment → Web app</em> (Execute as: <strong>Me</strong>, Who has access:{" "}
-                                <strong>Anyone</strong>).
-                                <pre className="mt-1.5 p-2.5 rounded-lg bg-black text-emerald-400 font-mono text-[10px] overflow-x-auto leading-relaxed">
-{`function doPost(e) {
-  var d = JSON.parse(e.postData.contents);
-  if (d.secret !== "NoteLagbeSecret2026") {
-    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "Unauthorized" }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-  GmailApp.sendEmail(d.to, d.subject, " ", { htmlBody: d.html, name: d.senderName || "NoteLagbe" });
-  return ContentService.createTextOutput(JSON.stringify({ ok: true }))
-    .setMimeType(ContentService.MimeType.JSON);
-}`}
-                                </pre>
+                                Select <strong>Vercel Gmail Relay</strong> (or keep <strong>SMTP</strong> with automatic Vercel fallback) in{" "}
+                                <strong>Configure Email / SMTP</strong> below.
                               </li>
                               <li>
-                                Select <strong>Gmail via Google Apps Script</strong> in{" "}
-                                <strong>Configure Email / SMTP</strong> below, paste the Web App{" "}
-                                <code>/exec</code> URL, your Gmail address, and the same secret token (
-                                <code>NoteLagbeSecret2026</code> or your own).
+                                Enter your <strong>Gmail address</strong> and 16-character{" "}
+                                <strong>Google App Password</strong> (or set <code>SPRING_MAIL_USERNAME</code> and{" "}
+                                <code>SPRING_MAIL_PASSWORD</code> once on Render).
                               </li>
                               <li>
-                                <strong>Alternatives:</strong> <code>BREVO_API_KEY</code> (if phone verified) or{" "}
-                                <code>SMTP</code> (<code>smtp.gmail.com:587</code> on local/paid servers).
+                                Click <strong>Save Settings</strong> then <strong>Send Test Email</strong> — NoteLagbe relays securely over HTTPS Port 443 via{" "}
+                                <code>/api/mail-relay</code>.
                               </li>
                             </ol>
                           </div>
@@ -7868,10 +7853,11 @@ export default function AdminDashboardPage() {
                               onChange={(e) => setEmailProvider(e.target.value)}
                               className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
                             >
-                              <option value="APPS_SCRIPT">Gmail via Google Apps Script (Port 443 — No SMS, Works on Render Free)</option>
+                              <option value="VERCEL_RELAY">Vercel Gmail Relay (Port 443 — Uses Gmail App Password, Zero 3rd-Party Accounts)</option>
+                              <option value="SMTP">Google / Custom SMTP (Auto-falls back to Vercel Relay if Port 587 blocked)</option>
+                              <option value="APPS_SCRIPT">Gmail via Google Apps Script (Port 443 — No App Password Needed)</option>
                               <option value="BREVO">Brevo HTTPS API (Port 443 — Works on Render Free)</option>
                               <option value="RESEND">Resend HTTPS API (Port 443 — Verified Domain)</option>
-                              <option value="SMTP">Google / Custom SMTP (Port 587/465 — Local / Paid Host)</option>
                             </select>
                           </div>
 
@@ -7918,7 +7904,7 @@ export default function AdminDashboardPage() {
                             </div>
                           )}
 
-                          {emailProvider === "SMTP" && (
+                          {(emailProvider === "SMTP" || emailProvider === "VERCEL_RELAY") && (
                             <>
                               <div className="space-y-1">
                                 <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
@@ -7952,7 +7938,7 @@ export default function AdminDashboardPage() {
 
                           <div className="sm:col-span-2 space-y-1">
                             <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                              {emailProvider === "SMTP"
+                              {emailProvider === "SMTP" || emailProvider === "VERCEL_RELAY"
                                 ? language === "bn"
                                   ? "Google App Password / SMTP পাসওয়ার্ড"
                                   : "Google App Password / SMTP Password"
