@@ -287,10 +287,23 @@ export const api = {
     changePassword: (data: { currentPassword: string; newPassword: string }) =>
       request<any>("/auth/password", { method: "PUT", body: JSON.stringify(data) }),
     forgotPassword: (email: string) =>
-      request<{ success: boolean; exists: boolean; email: string; name?: string; studentId?: string; resetToken?: string; message: string }>(
-        "/auth/forgot-password",
-        { method: "POST", body: JSON.stringify({ email }) }
-      ),
+      request<{
+        success: boolean;
+        codeSent: boolean;
+        email: string;
+        expiresInSeconds?: number;
+        resendCooldownSeconds?: number;
+        message: string;
+      }>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
+    verifyResetCode: (data: { email: string; code: string }) =>
+      request<{
+        success: boolean;
+        verified: boolean;
+        email: string;
+        resetToken: string;
+        expiresInSeconds?: number;
+        message: string;
+      }>("/auth/verify-reset-code", { method: "POST", body: JSON.stringify(data) }),
     resetPassword: (data: { email: string; resetToken: string; newPassword: string }) =>
       request<{ success: boolean; message: string }>("/auth/reset-password", {
         method: "POST",

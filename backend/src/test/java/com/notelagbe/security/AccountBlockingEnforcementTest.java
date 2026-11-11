@@ -10,6 +10,7 @@ import com.notelagbe.repository.UnlockedCourseRepository;
 import com.notelagbe.repository.UserRepository;
 import com.notelagbe.service.AuthService;
 import com.notelagbe.service.CloudinaryService;
+import com.notelagbe.service.EmailService;
 import com.notelagbe.service.LiveSyncService;
 import com.notelagbe.service.SubscriptionService;
 import org.junit.jupiter.api.AfterEach;
@@ -45,6 +46,7 @@ class AccountBlockingEnforcementTest {
     @Mock private SubscriptionService subscriptionService;
     @Mock private LiveSyncService liveSyncService;
     @Mock private CloudinaryService cloudinaryService;
+    @Mock private EmailService emailService;
     @Mock private UserDetailsServiceImpl userDetailsService;
 
     private AuthService authService;
@@ -63,7 +65,8 @@ class AccountBlockingEnforcementTest {
                 tokenProvider,
                 subscriptionService,
                 liveSyncService,
-                cloudinaryService
+                cloudinaryService,
+                emailService
         );
         jwtAuthenticationFilter = new JwtAuthenticationFilter(tokenProvider, userDetailsService);
     }

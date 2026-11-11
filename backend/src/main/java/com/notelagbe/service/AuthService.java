@@ -24,15 +24,21 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
@@ -48,6 +54,13 @@ public class AuthService {
     private final SubscriptionService subscriptionService;
     private final LiveSyncService liveSyncService;
     private final CloudinaryService cloudinaryService;
+    private final EmailService emailService;
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final int OTP_EXPIRY_MINUTES = 10;
+    private static final int RESET_TOKEN_EXPIRY_MINUTES = 10;
+    private static final int OTP_RESEND_COOLDOWN_SECONDS = 45;
+    private static final int MAX_OTP_ATTEMPTS = 5;
 
     @org.springframework.beans.factory.annotation.Value("${app.admin.initial-email:}")
     private String initialAdminEmail;
@@ -61,7 +74,8 @@ public class AuthService {
                        JwtTokenProvider tokenProvider,
                        SubscriptionService subscriptionService,
                        LiveSyncService liveSyncService,
-                       CloudinaryService cloudinaryService) {
+                       CloudinaryService cloudinaryService,
+                       EmailService emailService) {
         this.userRepository = userRepository;
         this.courseRepository = courseRepository;
         this.subscriptionRepository = subscriptionRepository;
@@ -72,6 +86,7 @@ public class AuthService {
         this.subscriptionService = subscriptionService;
         this.liveSyncService = liveSyncService;
         this.cloudinaryService = cloudinaryService;
+        this.emailService = emailService;
     }
 
     private void assertUserNotBlocked(User user) {
@@ -452,59 +467,186 @@ public class AuthService {
         );
     }
 
+    private void clearResetOtp(User user) {
+        user.setResetOtpHash(null);
+        user.setResetOtpExpiry(null);
+        user.setResetOtpAttempts(0);
+    }
+
+    private String sha256Hex(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm unavailable", e);
+        }
+    }
+
+    /**
+     * Step 1: Validate that the email exists and is active, then generate and email a 6-digit OTP security code.
+     * Never exposes user identity or password reset authorization before email OTP verification.
+     */
     @Transactional
     public Map<String, Object> verifyEmailForPasswordReset(String email) {
         if (email == null || email.trim().isEmpty()) {
-            throw new ApiException("University registered email is required.");
+            throw new ApiException("Registered email address is required.");
         }
         String cleanEmail = email.trim().toLowerCase();
         User user = userRepository.findByEmail(cleanEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("No registered account found with email '" + cleanEmail + "' in the Southeast University directory. Please check your spelling or register a new account."));
+                .orElseThrow(() -> new ResourceNotFoundException("This email does not exist."));
         assertUserNotBlocked(user);
 
-        String resetToken = UUID.randomUUID().toString();
-        user.setResetToken(resetToken);
-        user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(30));
+        LocalDateTime now = LocalDateTime.now();
+        if (user.getResetOtpLastSentAt() != null) {
+            LocalDateTime nextAllowedAt = user.getResetOtpLastSentAt().plusSeconds(OTP_RESEND_COOLDOWN_SECONDS);
+            if (nextAllowedAt.isAfter(now)) {
+                long waitSeconds = Math.max(1L, Duration.between(now, nextAllowedAt).getSeconds());
+                throw new ApiException("Please wait " + waitSeconds + " seconds before requesting another security code.");
+            }
+        }
+
+        String securityCode = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        user.setResetOtpHash(passwordEncoder.encode(securityCode));
+        user.setResetOtpExpiry(now.plusMinutes(OTP_EXPIRY_MINUTES));
+        user.setResetOtpAttempts(0);
+        user.setResetOtpLastSentAt(now);
+        // Revoke any stale verified reset token until the new security code is confirmed
+        user.setResetToken(null);
+        user.setResetTokenExpiry(null);
+        userRepository.save(user);
+
+        emailService.sendPasswordResetCodeEmail(user, securityCode, OTP_EXPIRY_MINUTES);
+
+        return Map.of(
+                "success", true,
+                "codeSent", true,
+                "email", user.getEmail(),
+                "expiresInSeconds", OTP_EXPIRY_MINUTES * 60,
+                "resendCooldownSeconds", OTP_RESEND_COOLDOWN_SECONDS,
+                "message", "Security code sent to your email address. Valid for " + OTP_EXPIRY_MINUTES + " minutes."
+        );
+    }
+
+    /**
+     * Step 2: Verify the 6-digit security code sent to the user's email and issue a single-use reset token.
+     */
+    @Transactional(noRollbackFor = ApiException.class)
+    public Map<String, Object> verifyPasswordResetCode(String email, String code) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new ApiException("Registered email address is required.");
+        }
+        if (code == null || code.trim().isEmpty()) {
+            throw new ApiException("Security code is required.");
+        }
+
+        String cleanCode = code.trim().replaceAll("\\s+", "");
+        if (!cleanCode.matches("\\d{6}")) {
+            throw new ApiException("Please enter the 6-digit security code sent to your email.");
+        }
+
+        String cleanEmail = email.trim().toLowerCase();
+        User user = userRepository.findByEmail(cleanEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("This email does not exist."));
+        assertUserNotBlocked(user);
+
+        if (user.getResetOtpHash() == null || user.getResetOtpExpiry() == null) {
+            throw new ApiException("No active security code found. Please request a new code.");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        if (user.getResetOtpExpiry().isBefore(now)) {
+            clearResetOtp(user);
+            userRepository.save(user);
+            throw new ApiException("Security code has expired. Please request a new code.");
+        }
+
+        int currentAttempts = user.getResetOtpAttempts() != null ? user.getResetOtpAttempts() : 0;
+        if (currentAttempts >= MAX_OTP_ATTEMPTS) {
+            clearResetOtp(user);
+            userRepository.save(user);
+            throw new ApiException("Too many incorrect attempts. Please request a new security code.");
+        }
+
+        if (!passwordEncoder.matches(cleanCode, user.getResetOtpHash())) {
+            int nextAttempts = currentAttempts + 1;
+            if (nextAttempts >= MAX_OTP_ATTEMPTS) {
+                clearResetOtp(user);
+                userRepository.save(user);
+                throw new ApiException("Too many incorrect verification attempts. This security code has been invalidated; please request a new code.");
+            }
+            user.setResetOtpAttempts(nextAttempts);
+            userRepository.save(user);
+            int remaining = MAX_OTP_ATTEMPTS - nextAttempts;
+            throw new ApiException("Invalid security code. " + remaining + (remaining == 1 ? " attempt remaining." : " attempts remaining."));
+        }
+
+        // Code verified: consume OTP immediately and mint a single-use cryptographic reset token
+        clearResetOtp(user);
+        byte[] randomBytes = new byte[32];
+        SECURE_RANDOM.nextBytes(randomBytes);
+        String rawResetToken = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+        user.setResetToken(sha256Hex(rawResetToken));
+        user.setResetTokenExpiry(now.plusMinutes(RESET_TOKEN_EXPIRY_MINUTES));
         userRepository.save(user);
 
         return Map.of(
                 "success", true,
-                "exists", true,
+                "verified", true,
                 "email", user.getEmail(),
-                "name", user.getName(),
-                "studentId", user.getStudentId() != null ? user.getStudentId() : "",
-                "resetToken", resetToken,
-                "message", "Account verified! You can now set a new password."
+                "resetToken", rawResetToken,
+                "expiresInSeconds", RESET_TOKEN_EXPIRY_MINUTES * 60,
+                "message", "Security code verified! You can now set a new password."
         );
     }
 
-    @Transactional
+    /**
+     * Step 3: Set a new password using the single-use verified reset token from Step 2.
+     */
+    @Transactional(noRollbackFor = ApiException.class)
     public Map<String, Object> resetPasswordWithToken(String email, String resetToken, String newPassword) {
         if (email == null || email.trim().isEmpty()) {
             throw new ApiException("Registered email is required.");
         }
         if (resetToken == null || resetToken.trim().isEmpty()) {
-            throw new ApiException("Reset verification token is required.");
+            throw new ApiException("Security code verification is required before resetting your password.");
         }
         if (newPassword == null || newPassword.trim().length() < 6) {
             throw new ApiException("New password must be at least 6 characters long.");
         }
+        if (newPassword.trim().length() > 64) {
+            throw new ApiException("New password cannot exceed 64 characters.");
+        }
 
         String cleanEmail = email.trim().toLowerCase();
         User user = userRepository.findByEmail(cleanEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("No registered account found with email '" + cleanEmail + "'."));
+                .orElseThrow(() -> new ResourceNotFoundException("This email does not exist."));
         assertUserNotBlocked(user);
 
-        if (user.getResetToken() == null || !user.getResetToken().equals(resetToken.trim())) {
-            throw new ApiException("Invalid or expired password reset token. Please request a new verification.");
+        if (user.getResetToken() == null || user.getResetTokenExpiry() == null) {
+            throw new ApiException("Security code verification is required before resetting your password.");
         }
-        if (user.getResetTokenExpiry() != null && user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
-            throw new ApiException("The password reset token has expired. Please verify your email again.");
+        if (user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            user.setResetToken(null);
+            user.setResetTokenExpiry(null);
+            userRepository.save(user);
+            throw new ApiException("Your verification session has expired. Please request a new security code.");
+        }
+
+        byte[] expectedDigest = user.getResetToken().getBytes(StandardCharsets.UTF_8);
+        byte[] presentedDigest = sha256Hex(resetToken.trim()).getBytes(StandardCharsets.UTF_8);
+        if (!MessageDigest.isEqual(expectedDigest, presentedDigest)) {
+            throw new ApiException("Invalid or expired security verification. Please verify your email code again.");
         }
 
         user.setPassword(passwordEncoder.encode(newPassword.trim()));
         user.setResetToken(null);
         user.setResetTokenExpiry(null);
+        clearResetOtp(user);
         userRepository.save(user);
 
         liveSyncService.broadcast("user", "password_reset", user.getId());

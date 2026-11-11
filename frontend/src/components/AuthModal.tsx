@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { 
@@ -18,7 +18,9 @@ import {
   Send, 
   CheckCircle2,
   Info,
-  Phone
+  Phone,
+  Clock,
+  RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
 import { notifyDataChanged } from "@/lib/sync";
@@ -39,25 +41,63 @@ export default function AuthModal() {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Forgot password specific state
+  // Forgot password 3-step OTP recovery state
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
-  const [verifiedAccount, setVerifiedAccount] = useState<{
-    name: string;
-    email: string;
-    studentId?: string;
-    resetToken: string;
-  } | null>(null);
+  const [resetStep, setResetStep] = useState<"email" | "code" | "password">("email");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [resetToken, setResetToken] = useState("");
+  const [codeExpiresIn, setCodeExpiresIn] = useState(0);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
+  useEffect(() => {
+    if (!showAuthModal || authMode !== "forgot" || resetStep !== "code") return;
+    if (codeExpiresIn <= 0 && resendCooldown <= 0) return;
+
+    const timer = setInterval(() => {
+      setCodeExpiresIn((prev) => (prev > 0 ? prev - 1 : 0));
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [showAuthModal, authMode, resetStep, codeExpiresIn > 0, resendCooldown > 0]);
+
   if (!showAuthModal) return null;
 
   const isRegister = authMode === "register";
   const isForgot = authMode === "forgot";
+
+  const resetForgotFlow = () => {
+    setResetStep("email");
+    setOtpCode("");
+    setResetToken("");
+    setCodeExpiresIn(0);
+    setResendCooldown(0);
+    setNewPassword("");
+    setConfirmPassword("");
+  };
+
+  const formatTimer = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  };
+
+  const maskEmail = (raw: string) => {
+    const clean = raw.trim();
+    const at = clean.indexOf("@");
+    if (at <= 2) return clean;
+    const local = clean.slice(0, at);
+    const domain = clean.slice(at);
+    const visibleStart = local.slice(0, Math.min(3, local.length - 1));
+    return `${visibleStart}***${domain}`;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,8 +172,7 @@ export default function AuthModal() {
     }
   };
 
-  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const requestSecurityCode = async (isResend = false) => {
     const cleanForgotEmail = forgotEmail.trim().toLowerCase();
 
     if (!cleanForgotEmail) {
@@ -148,28 +187,97 @@ export default function AuthModal() {
     setForgotLoading(true);
     try {
       const res = await api.auth.forgotPassword(cleanForgotEmail);
-      if (res && res.success && res.resetToken) {
-        setVerifiedAccount({
-          name: res.name || "Student",
-          email: res.email || cleanForgotEmail,
-          studentId: res.studentId,
-          resetToken: res.resetToken,
-        });
-        toast.success(language === "bn" ? `অ্যাকাউন্ট ভেরিফাইড! (${res.name || cleanForgotEmail}) নতুন পাসওয়ার্ড দিন।` : `Account verified! (${res.name || cleanForgotEmail}) Please set your new password.`);
+      if (res && res.success && res.codeSent) {
+        setForgotEmail(res.email || cleanForgotEmail);
+        setOtpCode("");
+        setResetToken("");
+        setCodeExpiresIn(res.expiresInSeconds || 600);
+        setResendCooldown(res.resendCooldownSeconds || 45);
+        setResetStep("code");
+        toast.success(
+          language === "bn"
+            ? isResend
+              ? "আপনার ইমেইলে নতুন ৬-ডিজিটের সিকিউরিটি কোড পাঠানো হয়েছে।"
+              : "আপনার ইমেইলে ৬-ডিজিটের সিকিউরিটি কোড পাঠানো হয়েছে।"
+            : isResend
+              ? "A new 6-digit security code has been sent to your email."
+              : "A 6-digit security code has been sent to your email."
+        );
       } else {
-        toast.error(res.message || (language === "bn" ? "এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি।" : "No account was found with this email address."));
+        toast.error(
+          res?.message ||
+            (language === "bn" ? "এই ইমেইলটি ডাটাবেজে নেই।" : "This email does not exist.")
+        );
       }
     } catch (err: any) {
-      const errMsg = err?.message || (language === "bn" ? "ডাটাবেজে এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি।" : "No account found with this email in the database.");
-      if (err?.code !== "ACCOUNT_BLOCKED" && !err?.blocked) { toast.error(errMsg); }
+      if (err?.code !== "ACCOUNT_BLOCKED" && !err?.blocked) {
+        const rawMsg = typeof err?.message === "string" ? err.message : "";
+        const isNotFound = /does not exist|not found|no registered account/i.test(rawMsg);
+        toast.error(
+          isNotFound
+            ? language === "bn"
+              ? "এই ইমেইলটি ডাটাবেজে নেই।"
+              : "This email does not exist."
+            : rawMsg || (language === "bn" ? "সিকিউরিটি কোড পাঠানো যায়নি।" : "Unable to send security code.")
+        );
+      }
     } finally {
       setForgotLoading(false);
     }
   };
 
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await requestSecurityCode(false);
+  };
+
+  const handleVerifyCodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanCode = otpCode.replace(/\D/g, "");
+    if (cleanCode.length !== 6) {
+      toast.error(language === "bn" ? "৬-ডিজিটের সিকিউরিটি কোড লিখুন।" : "Please enter the 6-digit security code.");
+      return;
+    }
+
+    setOtpLoading(true);
+    try {
+      const res = await api.auth.verifyResetCode({
+        email: forgotEmail.trim().toLowerCase(),
+        code: cleanCode,
+      });
+      if (res && res.success && res.verified && res.resetToken) {
+        setResetToken(res.resetToken);
+        setResetStep("password");
+        toast.success(
+          language === "bn"
+            ? "সিকিউরিটি কোড ভেরিফাইড হয়েছে! এখন নতুন পাসওয়ার্ড দিন।"
+            : "Security code verified! You can now set your new password."
+        );
+      } else {
+        toast.error(
+          res?.message ||
+            (language === "bn" ? "সিকিউরিটি কোডটি সঠিক নয়।" : "Invalid security code.")
+        );
+      }
+    } catch (err: any) {
+      if (err?.code !== "ACCOUNT_BLOCKED" && !err?.blocked) {
+        toast.error(
+          err?.message ||
+            (language === "bn" ? "সিকিউরিটি কোড যাচাই করা যায়নি।" : "Failed to verify security code.")
+        );
+      }
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
   const handleResetPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!verifiedAccount) return;
+    if (!resetToken) {
+      setResetStep("code");
+      toast.error(language === "bn" ? "আগে ইমেইলের সিকিউরিটি কোড ভেরিফাই করুন।" : "Please verify your email security code first.");
+      return;
+    }
 
     if (!newPassword || newPassword.trim().length < 6) {
       toast.error(language === "bn" ? "নতুন পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।" : "New password must be at least 6 characters long.");
@@ -182,25 +290,26 @@ export default function AuthModal() {
 
     setResetLoading(true);
     try {
+      const cleanEmail = forgotEmail.trim().toLowerCase();
       const res = await api.auth.resetPassword({
-        email: verifiedAccount.email,
-        resetToken: verifiedAccount.resetToken,
+        email: cleanEmail,
+        resetToken,
         newPassword: newPassword.trim(),
       });
 
       if (res && res.success) {
         toast.success(language === "bn" ? "পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে! এখন লগইন করুন।" : "Password updated successfully! Please sign in now.");
-        setEmail(verifiedAccount.email);
+        setEmail(cleanEmail);
         setPassword(newPassword.trim());
-        setVerifiedAccount(null);
-        setNewPassword("");
-        setConfirmPassword("");
+        resetForgotFlow();
         setAuthMode("signin");
       } else {
         toast.error(res.message || (language === "bn" ? "পাসওয়ার্ড পরিবর্তন করা যায়নি।" : "Unable to update password."));
       }
     } catch (err: any) {
-      if (err?.code !== "ACCOUNT_BLOCKED" && !err?.blocked) { toast.error(err?.message || (language === "bn" ? "পাসওয়ার্ড রিসেট করতে সমস্যা হয়েছে।" : "Failed to reset password. Please try again.")); }
+      if (err?.code !== "ACCOUNT_BLOCKED" && !err?.blocked) {
+        toast.error(err?.message || (language === "bn" ? "পাসওয়ার্ড রিসেট করতে সমস্যা হয়েছে।" : "Failed to reset password. Please try again."));
+      }
     } finally {
       setResetLoading(false);
     }
@@ -214,7 +323,10 @@ export default function AuthModal() {
       >
         {/* Close Button */}
         <button
-          onClick={() => setShowAuthModal(false)}
+          onClick={() => {
+            resetForgotFlow();
+            setShowAuthModal(false);
+          }}
           className="absolute top-5 right-5 p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           title="Close"
           aria-label="Close"
@@ -228,15 +340,27 @@ export default function AuthModal() {
             {isForgot ? <KeyRound className="w-6 h-6" /> : <Lock className="w-6 h-6" />}
           </div>
           <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            {isForgot 
-              ? "Reset Your Password" 
-              : isRegister 
-                ? "Create Student Account" 
+            {isForgot
+              ? language === "bn"
+                ? "পাসওয়ার্ড রিসেট করুন"
+                : "Reset Your Password"
+              : isRegister
+                ? "Create Student Account"
                 : "Welcome to NoteLagbe"}
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             {isForgot
-              ? "Enter your university email to recover your access"
+              ? resetStep === "email"
+                ? language === "bn"
+                  ? "সিকিউরিটি কোড পেতে আপনার রেজিস্টার্ড ইমেইল দিন"
+                  : "Enter your registered email to receive a 6-digit security code"
+                : resetStep === "code"
+                  ? language === "bn"
+                    ? "আপনার ইমেইলে পাঠানো ৬-ডিজিটের সিকিউরিটি কোড লিখুন"
+                    : "Enter the 6-digit security code sent to your email"
+                  : language === "bn"
+                    ? "আপনার অ্যাকাউন্টের জন্য নতুন পাসওয়ার্ড সেট করুন"
+                    : "Create a strong new password for your account"
               : "Southeast University Academic Resource & Question Archive"}
           </p>
         </div>
@@ -274,40 +398,65 @@ export default function AuthModal() {
         {/* FORGOT PASSWORD VIEW */}
         {isForgot ? (
           <div className="space-y-4">
-            {verifiedAccount ? (
-              /* STEP 2: ACCOUNT VERIFIED IN DATABASE -> SET NEW PASSWORD */
+            {/* 3-Step Security Progress Indicator */}
+            <div className="grid grid-cols-3 gap-1.5 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/60 text-[11px] font-bold">
+              {[
+                { key: "email", labelEn: "1. Email", labelBn: "১. ইমেইল" },
+                { key: "code", labelEn: "2. Code", labelBn: "২. কোড" },
+                { key: "password", labelEn: "3. Reset", labelBn: "৩. পাসওয়ার্ড" },
+              ].map((step, idx) => {
+                const currentIdx = resetStep === "email" ? 0 : resetStep === "code" ? 1 : 2;
+                const isDone = idx < currentIdx;
+                const isActive = idx === currentIdx;
+                return (
+                  <div
+                    key={step.key}
+                    className={`py-1.5 px-2 rounded-xl text-center transition-all ${
+                      isActive
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : isDone
+                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                          : "text-slate-400 dark:text-slate-500"
+                    }`}
+                  >
+                    {language === "bn" ? step.labelBn : step.labelEn}
+                  </div>
+                );
+              })}
+            </div>
+
+            {resetStep === "password" ? (
+              /* STEP 3: CODE VERIFIED -> SET NEW PASSWORD */
               <form onSubmit={handleResetPasswordSubmit} className="space-y-3.5">
-                <div className="p-3.5 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span className="text-xs font-bold text-blue-950 dark:text-blue-200">
-                      {language === "bn" ? "অ্যাকাউন্ট ভেরিফাইড (ডাটাবেজ)" : "Database Verified Account"}
+                <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/35 border border-emerald-200 dark:border-emerald-800/60">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span className="text-xs font-bold text-emerald-900 dark:text-emerald-300">
+                      {language === "bn" ? "সিকিউরিটি কোড ভেরিফাইড" : "Security Code Verified"}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-700 dark:text-slate-300">
-                    <p className="font-semibold text-slate-900 dark:text-white">{verifiedAccount.name}</p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{verifiedAccount.email}</p>
-                    {verifiedAccount.studentId && (
-                      <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-[10px] font-bold text-blue-800 dark:text-blue-300">
-                        ID: {verifiedAccount.studentId}
-                      </span>
-                    )}
-                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                    {language === "bn"
+                      ? `${maskEmail(forgotEmail)} অ্যাকাউন্টের জন্য নতুন পাসওয়ার্ড দিন।`
+                      : `Set a strong new password for ${maskEmail(forgotEmail)}.`}
+                  </p>
                 </div>
 
                 {/* New Password */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    New Password <span className="text-red-500">*</span>
+                    {language === "bn" ? "নতুন পাসওয়ার্ড" : "New Password"} <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type={showNewPassword ? "text" : "password"}
                       required
-                      placeholder="Minimum 6 characters"
+                      minLength={6}
+                      maxLength={64}
+                      placeholder={language === "bn" ? "কমপক্ষে ৬ অক্ষর" : "Minimum 6 characters"}
                       value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
+                      onChange={(e) => setNewPassword(e.target.value.slice(0, 64))}
                       className="w-full text-xs pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <button
@@ -323,16 +472,18 @@ export default function AuthModal() {
                 {/* Confirm Password */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Confirm New Password <span className="text-red-500">*</span>
+                    {language === "bn" ? "নতুন পাসওয়ার্ড নিশ্চিত করুন" : "Confirm New Password"} <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type={showConfirmPassword ? "text" : "password"}
                       required
-                      placeholder="Re-enter new password"
+                      minLength={6}
+                      maxLength={64}
+                      placeholder={language === "bn" ? "আবার নতুন পাসওয়ার্ড লিখুন" : "Re-enter new password"}
                       value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      onChange={(e) => setConfirmPassword(e.target.value.slice(0, 64))}
                       className="w-full text-xs pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <button
@@ -348,38 +499,124 @@ export default function AuthModal() {
                 <button
                   type="submit"
                   disabled={resetLoading}
-                  className="w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.99] transition-all shadow-md shadow-blue-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.99] transition-all shadow-md shadow-blue-500/25 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {resetLoading ? (
                     <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
                   ) : (
                     <>
                       <CheckCircle2 className="w-4 h-4" />
-                      Save New Password & Sign In
+                      {language === "bn" ? "নতুন পাসওয়ার্ড সেভ করে লগইন করুন" : "Save New Password & Sign In"}
                     </>
                   )}
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setVerifiedAccount(null);
-                    setNewPassword("");
-                    setConfirmPassword("");
-                  }}
-                  className="w-full py-2 px-4 rounded-xl font-semibold text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-all flex items-center justify-center gap-1.5"
+                  onClick={resetForgotFlow}
+                  className="w-full py-2 px-4 rounded-xl font-semibold text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
-                  Change Email / Start Over
+                  {language === "bn" ? "ইমেইল পরিবর্তন করুন / আবার শুরু করুন" : "Change Email / Start Over"}
                 </button>
               </form>
+            ) : resetStep === "code" ? (
+              /* STEP 2: VERIFY 6-DIGIT SECURITY CODE FROM EMAIL */
+              <form onSubmit={handleVerifyCodeSubmit} className="space-y-3.5">
+                <div className="p-3.5 rounded-2xl bg-blue-50 dark:bg-blue-950/35 border border-blue-200 dark:border-blue-800/60 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-blue-950 dark:text-blue-200 flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                      {language === "bn" ? "সিকিউরিটি কোড পাঠানো হয়েছে" : "Verification Code Sent"}
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                        codeExpiresIn > 0
+                          ? "bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300"
+                          : "bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-300"
+                      }`}
+                    >
+                      <Clock className="w-3 h-3" />
+                      {codeExpiresIn > 0
+                        ? formatTimer(codeExpiresIn)
+                        : language === "bn"
+                          ? "মেয়াদ শেষ"
+                          : "Expired"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                    {language === "bn"
+                      ? `${maskEmail(forgotEmail)} ইমেইলের ইনবক্স (বা স্প্যাম ফোল্ডার) চেক করে ৬-ডিজিটের সিকিউরিটি কোডটি দিন।`
+                      : `Check ${maskEmail(forgotEmail)} (including Spam/Junk) and enter the 6-digit security code below.`}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    {language === "bn" ? "৬-ডিজিট সিকিউরিটি কোড" : "6-Digit Security Code"} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    required
+                    maxLength={6}
+                    placeholder="000000"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    className="w-full py-3 px-4 text-center text-lg font-mono font-black tracking-[0.55em] rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={otpLoading || otpCode.length !== 6}
+                  className="w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.99] transition-all shadow-md shadow-blue-500/25 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {otpLoading ? (
+                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4" />
+                      {language === "bn" ? "সিকিউরিটি কোড যাচাই করুন" : "Verify Security Code"}
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={forgotLoading || resendCooldown > 0}
+                    onClick={() => requestSecurityCode(true)}
+                    className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 disabled:text-slate-400 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${forgotLoading ? "animate-spin" : ""}`} />
+                    {resendCooldown > 0
+                      ? language === "bn"
+                        ? `${resendCooldown} সেকেন্ড পর আবার পাঠান`
+                        : `Resend in ${resendCooldown}s`
+                      : language === "bn"
+                        ? "নতুন কোড পাঠান"
+                        : "Resend Security Code"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetForgotFlow}
+                    className="text-[11px] font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 flex items-center gap-1 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3 h-3" />
+                    {language === "bn" ? "ইমেইল বদলান" : "Change Email"}
+                  </button>
+                </div>
+              </form>
             ) : (
-              /* STEP 1: VERIFY EMAIL IN DATABASE */
+              /* STEP 1: ENTER EMAIL TO RECEIVE SECURITY CODE */
               <form onSubmit={handleForgotPasswordSubmit} className="space-y-3.5">
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Registered University Email <span className="text-red-500">*</span>
+                      {language === "bn" ? "রেজিস্টার্ড ইমেইল ঠিকানা" : "Registered Email Address"} <span className="text-red-500">*</span>
                     </label>
                   </div>
                   <div className="relative">
@@ -387,17 +624,17 @@ export default function AuthModal() {
                     <input
                       type="email"
                       required
-                      placeholder="e.g. 2022100010045@seu.edu.bd or name@seu.edu.bd"
+                      placeholder="e.g. 2022100010045@seu.edu.bd or name@gmail.com"
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
                       className="w-full text-xs pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1">
-                    <Info className="w-3 h-3 text-blue-500 shrink-0" />
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                     {language === "bn"
-                    ? "শুধুমাত্র ডাটাবেজে রেজিস্টার্ড ইমেইল থাকলেই পাসওয়ার্ড রিসেট করা যাবে।"
-                    : "Password reset is only available for emails registered in the database."}
+                      ? "অ্যাকাউন্ট থাকলে আপনার ইমেইলে একটি ৬-ডিজিটের সিকিউরিটি কোড পাঠানো হবে।"
+                      : "We will send a 6-digit security verification code to your registered email."}
                   </p>
                 </div>
 
@@ -411,18 +648,21 @@ export default function AuthModal() {
                   ) : (
                     <>
                       <Send className="w-3.5 h-3.5" />
-                      Verify Email in Database
+                      {language === "bn" ? "সিকিউরিটি কোড পাঠান" : "Send Security Code"}
                     </>
                   )}
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setAuthMode("signin")}
+                  onClick={() => {
+                    resetForgotFlow();
+                    setAuthMode("signin");
+                  }}
                   className="w-full py-2.5 px-4 rounded-xl font-semibold text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
-                  Return to Sign In
+                  {language === "bn" ? "সাইন ইন-এ ফিরে যান" : "Return to Sign In"}
                 </button>
               </form>
             )}
@@ -525,6 +765,7 @@ export default function AuthModal() {
                   <button
                     type="button"
                     onClick={() => {
+                      resetForgotFlow();
                       setForgotEmail(email);
                       setAuthMode("forgot");
                     }}

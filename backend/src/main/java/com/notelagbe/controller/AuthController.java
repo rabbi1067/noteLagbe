@@ -209,11 +209,31 @@ public class AuthController {
         Map<String, Object> res = authService.verifyEmailForPasswordReset(email);
         try {
             activityLogService.logActivity(
-                    "PASSWORD_RESET_REQUEST",
+                    "PASSWORD_RESET_CODE_SENT",
                     "AUTH",
-                    "Password reset requested for email: " + email,
+                    "Password reset security code sent to: " + email,
                     email,
-                    (String) res.get("name"),
+                    null,
+                    "STUDENT",
+                    ActivityLogService.getClientIp(httpRequest),
+                    "SUCCESS"
+            );
+        } catch (Exception ignored) {}
+        return ResponseEntity.ok(res);
+    }
+
+    @PostMapping("/verify-reset-code")
+    public ResponseEntity<Map<String, Object>> verifyResetCode(@RequestBody Map<String, String> body, HttpServletRequest httpRequest) {
+        String email = body.get("email");
+        String code = body.get("code");
+        Map<String, Object> res = authService.verifyPasswordResetCode(email, code);
+        try {
+            activityLogService.logActivity(
+                    "PASSWORD_RESET_CODE_VERIFIED",
+                    "AUTH",
+                    "Password reset security code verified for: " + email,
+                    email,
+                    null,
                     "STUDENT",
                     ActivityLogService.getClientIp(httpRequest),
                     "SUCCESS"

@@ -57,7 +57,12 @@ public class RateLimitFilter implements Filter {
     private Bucket createBucketForPath(String path) {
         Bandwidth limit;
 
-        if (path.startsWith("/api/auth/login") || path.startsWith("/api/auth/register")) {
+        if (path.startsWith("/api/auth/forgot-password") ||
+            path.startsWith("/api/auth/verify-reset-code") ||
+            path.startsWith("/api/auth/reset-password")) {
+            // Strict recovery tier: 8 attempts / min (prevents email enumeration & OTP brute force)
+            limit = Bandwidth.builder().capacity(8).refillGreedy(8, Duration.ofMinutes(1)).build();
+        } else if (path.startsWith("/api/auth/login") || path.startsWith("/api/auth/register")) {
             // Strict tier: 15 attempts / min (brute force protection)
             limit = Bandwidth.builder().capacity(15).refillGreedy(15, Duration.ofMinutes(1)).build();
         } else if (path.startsWith("/api/reviews")) {
@@ -170,6 +175,11 @@ public class RateLimitFilter implements Filter {
     }
 
     private String getTierKey(String path) {
+        if (path.startsWith("/api/auth/forgot-password") ||
+            path.startsWith("/api/auth/verify-reset-code") ||
+            path.startsWith("/api/auth/reset-password")) {
+            return "auth_reset";
+        }
         if (path.startsWith("/api/auth")) return "auth";
         if (path.startsWith("/api/reviews")) return "reviews";
         if (path.startsWith("/api/payments")) return "payments";

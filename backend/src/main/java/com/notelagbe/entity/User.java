@@ -46,6 +46,11 @@ public class User {
     private String resetToken;
     private LocalDateTime resetTokenExpiry;
 
+    private String resetOtpHash;
+    private LocalDateTime resetOtpExpiry;
+    private Integer resetOtpAttempts = 0;
+    private LocalDateTime resetOtpLastSentAt;
+
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public User() {}
@@ -102,4 +107,16 @@ public class User {
 
     public LocalDateTime getResetTokenExpiry() { return resetTokenExpiry; }
     public void setResetTokenExpiry(LocalDateTime resetTokenExpiry) { this.resetTokenExpiry = resetTokenExpiry; }
+
+    public String getResetOtpHash() { return resetOtpHash; }
+    public void setResetOtpHash(String resetOtpHash) { this.resetOtpHash = resetOtpHash; }
+
+    public LocalDateTime getResetOtpExpiry() { return resetOtpExpiry; }
+    public void setResetOtpExpiry(LocalDateTime resetOtpExpiry) { this.resetOtpExpiry = resetOtpExpiry; }
+
+    public Integer getResetOtpAttempts() { return resetOtpAttempts; }
+    public void setResetOtpAttempts(Integer resetOtpAttempts) { this.resetOtpAttempts = resetOtpAttempts; }
+
+    public LocalDateTime getResetOtpLastSentAt() { return resetOtpLastSentAt; }
+    public void setResetOtpLastSentAt(LocalDateTime resetOtpLastSentAt) { this.resetOtpLastSentAt = resetOtpLastSentAt; }
 }

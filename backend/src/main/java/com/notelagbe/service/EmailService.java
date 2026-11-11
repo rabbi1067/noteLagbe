@@ -3,6 +3,7 @@ package com.notelagbe.service;
 import com.notelagbe.entity.PlanType;
 import com.notelagbe.entity.SystemSetting;
 import com.notelagbe.entity.User;
+import com.notelagbe.exception.ApiException;
 import com.notelagbe.repository.SystemSettingRepository;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
@@ -340,6 +341,83 @@ public class EmailService {
             log.info("Course gift email sent successfully to {} ({} - {})", user.getEmail(), courseCode, teacherLabel);
         } catch (Exception e) {
             log.warn("Failed to send course gift email to {}: {}", user.getEmail(), e.getMessage());
+        }
+    }
+
+    /**
+     * Synchronously sends a 6-digit password reset OTP email.
+     * Bypasses promotional notification opt-outs because account security verification is mandatory.
+     */
+    public void sendPasswordResetCodeEmail(User user, String securityCode, int expiryMinutes) {
+        if (user == null || user.getEmail() == null || user.getEmail().trim().isEmpty()) {
+            throw new ApiException("Registered email address is required to send security code.");
+        }
+        if (!isSmtpConfigured() || mailSender == null) {
+            log.error("Cannot dispatch password reset OTP to {}: SMTP credentials are missing.", user.getEmail());
+            throw new ApiException("Email delivery service is not configured right now. Please contact support.");
+        }
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            String safeName = HtmlUtils.htmlEscape(user.getName() != null ? user.getName() : "Student");
+            String safeCode = HtmlUtils.htmlEscape(securityCode);
+            String baseUrl = (frontendUrl != null && !frontendUrl.isBlank())
+                    ? frontendUrl.replaceAll("/+$", "")
+                    : "https://note-lagbe-sandy.vercel.app";
+
+            helper.setTo(user.getEmail());
+            helper.setSubject("🔐 NoteLagbe Security Code: Password Reset Verification");
+
+            String html = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <style>
+                        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; color: #e2e8f0; margin: 0; padding: 20px; }
+                        .card { max-width: 540px; margin: 0 auto; background: #111a2e; border-radius: 20px; padding: 32px; border: 1px solid #1e293b; box-shadow: 0 12px 32px rgba(0,0,0,0.4); }
+                        .badge { display: inline-block; padding: 5px 12px; background: rgba(59, 130, 246, 0.16); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 999px; font-size: 12px; font-weight: bold; }
+                        .title { font-size: 22px; font-weight: 800; color: #ffffff; margin-top: 14px; margin-bottom: 8px; }
+                        .code-box { background: #090f1e; border: 1px dashed #3b82f6; border-radius: 16px; padding: 22px; margin: 22px 0; text-align: center; }
+                        .code { font-family: 'Courier New', Consolas, monospace; font-size: 34px; font-weight: 900; letter-spacing: 10px; color: #ffffff; }
+                        .meta { font-size: 12px; color: #94a3b8; margin-top: 8px; }
+                        .warn { background: rgba(244, 63, 94, 0.1); border-left: 4px solid #f43f5e; border-radius: 8px; padding: 12px 14px; font-size: 12px; color: #fda4af; line-height: 1.5; margin-top: 16px; }
+                        .footer { margin-top: 26px; font-size: 12px; color: #64748b; text-align: center; }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <span class="badge">Account Security • One-Time Passcode</span>
+                        <div class="title">Password Reset Verification Code</div>
+                        <p style="font-size: 14px; color: #cbd5e1; line-height: 1.6;">
+                            Hello <strong>%s</strong>,<br>
+                            We received a request to reset the password for your NoteLagbe account. Enter the 6-digit security code below to continue:
+                        </p>
+                        <div class="code-box">
+                            <div class="code">%s</div>
+                            <div class="meta">Valid for <strong>%d minutes</strong> • Do not share this code with anyone</div>
+                        </div>
+                        <div class="warn">
+                            <strong>Didn't request this?</strong> You can safely ignore this email. No changes will be made to your account unless this code is entered and verified.
+                        </div>
+                        <div class="footer">
+                            NoteLagbe — Southeast University Archive (%s)
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """.formatted(safeName, safeCode, expiryMinutes, HtmlUtils.htmlEscape(baseUrl));
+
+            helper.setText(html, true);
+            mailSender.send(message);
+            log.info("Password reset security code sent to {}", user.getEmail());
+        } catch (ApiException ae) {
+            throw ae;
+        } catch (Exception e) {
+            log.error("Failed to send password reset security code to {}: {}", user.getEmail(), e.getMessage());
+            throw new ApiException("Failed to send verification code to your email. Please try again later.");
         }
     }
 
