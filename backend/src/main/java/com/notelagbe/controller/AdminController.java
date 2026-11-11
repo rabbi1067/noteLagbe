@@ -425,9 +425,11 @@ public class AdminController {
     // ==========================================
     // Staff & Team Management (Super Admin & Admin only)
     // ==========================================
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'MANAGER')")
     @GetMapping("/staff")
-    public ResponseEntity<List<StaffResponseDto>> getAllStaff() {
-        return ResponseEntity.ok(adminService.getAllStaff());
+    public ResponseEntity<List<StaffResponseDto>> getAllStaff(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(adminService.getAllStaff(resolveActor(userDetails)));
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")

@@ -27,7 +27,13 @@ import { notifyDataChanged } from "@/lib/sync";
 import { api, warmupBackend } from "@/lib/api";
 
 export default function AuthModal() {
-  const { showAuthModal, setShowAuthModal, login, register } = useAuth();
+  const { showAuthModal } = useAuth();
+  if (!showAuthModal) return null;
+  return <AuthModalContent />;
+}
+
+function AuthModalContent() {
+  const { setShowAuthModal, login, register } = useAuth();
   const { language } = useLanguage();
   
   // Modes: "signin" | "register" | "forgot"
@@ -62,10 +68,8 @@ export default function AuthModal() {
   const visibleWaitSeconds = isAnyAuthPending ? authWaitSeconds : 0;
 
   useEffect(() => {
-    if (showAuthModal) {
-      void warmupBackend();
-    }
-  }, [showAuthModal]);
+    void warmupBackend();
+  }, []);
 
   useEffect(() => {
     if (!isAnyAuthPending) return;
@@ -83,7 +87,7 @@ export default function AuthModal() {
   }, []);
 
   useEffect(() => {
-    if (!showAuthModal || authMode !== "forgot" || resetStep !== "code") return;
+    if (authMode !== "forgot" || resetStep !== "code") return;
     if (codeExpiresIn <= 0 && resendCooldown <= 0) return;
 
     const timer = setInterval(() => {
@@ -92,12 +96,21 @@ export default function AuthModal() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [showAuthModal, authMode, resetStep, codeExpiresIn > 0, resendCooldown > 0]);
-
-  if (!showAuthModal) return null;
+  }, [authMode, resetStep, codeExpiresIn > 0, resendCooldown > 0]);
 
   const isRegister = authMode === "register";
   const isForgot = authMode === "forgot";
+
+  const clearCredentialFields = () => {
+    setName("");
+    setEmail("");
+    setPassword("");
+    setStudentId("");
+    setPhone("");
+    setShowPassword(false);
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+  };
 
   const resetForgotFlow = () => {
     setResetStep("email");
@@ -107,6 +120,8 @@ export default function AuthModal() {
     setResendCooldown(0);
     setNewPassword("");
     setConfirmPassword("");
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
   };
 
   const formatTimer = (totalSeconds: number) => {
@@ -181,6 +196,7 @@ export default function AuthModal() {
       setLoading(true);
       try {
         await register(cleanName, cleanEmail, cleanPassword, cleanId || undefined, cleanPhone || undefined);
+        clearCredentialFields();
         notifyDataChanged("user", "created");
         notifyDataChanged("staff", "created");
       } catch (err: any) {
@@ -194,6 +210,7 @@ export default function AuthModal() {
       setLoading(true);
       try {
         await login(cleanEmail, cleanPassword);
+        clearCredentialFields();
       } catch (err: any) {
         if (err?.code !== "ACCOUNT_BLOCKED" && !err?.blocked) { toast.error(err.message || "Authentication failed"); }
       } finally {
@@ -336,7 +353,8 @@ export default function AuthModal() {
       if (res && res.success) {
         toast.success(language === "bn" ? "পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে! এখন লগইন করুন।" : "Password updated successfully! Please sign in now.");
         setEmail(cleanEmail);
-        setPassword(newPassword.trim());
+        setPassword("");
+        setShowPassword(false);
         resetForgotFlow();
         setAuthMode("signin");
       } else {
@@ -361,6 +379,7 @@ export default function AuthModal() {
         <button
           onClick={() => {
             resetForgotFlow();
+            clearCredentialFields();
             setShowAuthModal(false);
           }}
           className="absolute top-5 right-5 p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -406,7 +425,11 @@ export default function AuthModal() {
           <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-4 text-xs font-semibold">
             <button
               type="button"
-              onClick={() => setAuthMode("signin")}
+              onClick={() => {
+                setPassword("");
+                setShowPassword(false);
+                setAuthMode("signin");
+              }}
               className={`py-2 rounded-lg transition-all ${
                 !isRegister
                   ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold"
@@ -417,7 +440,11 @@ export default function AuthModal() {
             </button>
             <button
               type="button"
-              onClick={() => setAuthMode("register")}
+              onClick={() => {
+                setPassword("");
+                setShowPassword(false);
+                setAuthMode("register");
+              }}
               className={`py-2 rounded-lg transition-all ${
                 isRegister
                   ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold"
@@ -463,7 +490,7 @@ export default function AuthModal() {
 
             {resetStep === "password" ? (
               /* STEP 3: CODE VERIFIED -> SET NEW PASSWORD */
-              <form onSubmit={handleResetPasswordSubmit} className="space-y-3.5">
+              <form onSubmit={handleResetPasswordSubmit} autoComplete="off" className="space-y-3.5">
                 <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/35 border border-emerald-200 dark:border-emerald-800/60">
                   <div className="flex items-center gap-2 mb-0.5">
                     <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -486,7 +513,9 @@ export default function AuthModal() {
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
+                      name="nl-reset-new-password"
                       type={showNewPassword ? "text" : "password"}
+                      autoComplete="new-password"
                       required
                       minLength={6}
                       maxLength={64}
@@ -513,7 +542,9 @@ export default function AuthModal() {
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
+                      name="nl-reset-confirm-password"
                       type={showConfirmPassword ? "text" : "password"}
+                      autoComplete="new-password"
                       required
                       minLength={6}
                       maxLength={64}
@@ -558,7 +589,7 @@ export default function AuthModal() {
               </form>
             ) : resetStep === "code" ? (
               /* STEP 2: VERIFY 6-DIGIT SECURITY CODE FROM EMAIL */
-              <form onSubmit={handleVerifyCodeSubmit} className="space-y-3.5">
+              <form onSubmit={handleVerifyCodeSubmit} autoComplete="off" className="space-y-3.5">
                 <div className="p-3.5 rounded-2xl bg-blue-50 dark:bg-blue-950/35 border border-blue-200 dark:border-blue-800/60 space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-bold text-blue-950 dark:text-blue-200 flex items-center gap-1.5">
@@ -592,6 +623,7 @@ export default function AuthModal() {
                     {language === "bn" ? "৬-ডিজিট সিকিউরিটি কোড" : "6-Digit Security Code"} <span className="text-red-500">*</span>
                   </label>
                   <input
+                    name="nl-reset-otp"
                     type="text"
                     inputMode="numeric"
                     autoComplete="one-time-code"
@@ -648,7 +680,7 @@ export default function AuthModal() {
               </form>
             ) : (
               /* STEP 1: ENTER EMAIL TO RECEIVE SECURITY CODE */
-              <form onSubmit={handleForgotPasswordSubmit} className="space-y-3.5">
+              <form onSubmit={handleForgotPasswordSubmit} autoComplete="off" className="space-y-3.5">
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
@@ -658,7 +690,11 @@ export default function AuthModal() {
                   <div className="relative">
                     <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
+                      name="nl-forgot-email"
                       type="email"
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
                       required
                       placeholder="e.g. 2022100010045@seu.edu.bd or name@gmail.com"
                       value={forgotEmail}
@@ -705,7 +741,7 @@ export default function AuthModal() {
           </div>
         ) : (
           /* SIGN IN & REGISTER FORM */
-          <form onSubmit={handleSubmit} className="space-y-3.5">
+          <form onSubmit={handleSubmit} autoComplete="off" className="space-y-3.5">
             {isRegister && (
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -717,7 +753,9 @@ export default function AuthModal() {
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
+                    name="nl-register-name"
                     type="text"
+                    autoComplete="off"
                     required
                     minLength={2}
                     maxLength={60}
@@ -740,7 +778,11 @@ export default function AuthModal() {
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
+                  name="nl-auth-email"
                   type="email"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   required
                   maxLength={100}
                   placeholder="name@seu.edu.bd or personal email"
@@ -760,7 +802,11 @@ export default function AuthModal() {
                   <span className="text-[10px] text-slate-400 font-mono">{studentId.length}/20</span>
                 </div>
                 <input
+                  name="nl-register-student-id"
                   type="text"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   maxLength={20}
                   placeholder="e.g. 2022100010045"
                   value={studentId}
@@ -781,7 +827,9 @@ export default function AuthModal() {
                 <div className="relative">
                   <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
+                    name="nl-register-phone"
                     type="tel"
+                    autoComplete="off"
                     maxLength={15}
                     placeholder="e.g. 01712345678"
                     value={phone}
@@ -802,6 +850,8 @@ export default function AuthModal() {
                     type="button"
                     onClick={() => {
                       resetForgotFlow();
+                      setPassword("");
+                      setShowPassword(false);
                       setForgotEmail(email);
                       setAuthMode("forgot");
                     }}
@@ -816,7 +866,9 @@ export default function AuthModal() {
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
+                  name="nl-auth-password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
                   required
                   minLength={6}
                   maxLength={64}

@@ -1085,7 +1085,12 @@ export default function AdminDashboardPage() {
       setStats(sData);
       setResources(rData || []);
       setPayments(pData || []);
-      setStaffList(staffData || []);
+      const visibleStaffList = Array.isArray(staffData)
+        ? isSuperAdmin
+          ? staffData
+          : staffData.filter((u: any) => u.role === "ROLE_STUDENT")
+        : [];
+      setStaffList(visibleStaffList);
       setContributions(cData || []);
       setWaivers(wData || []);
       if (isSuperAdmin) {
@@ -3314,10 +3319,15 @@ export default function AdminDashboardPage() {
     paymentPage * PAYMENT_PAGE_SIZE
   );
 
-  const studentUsersCount = staffList.filter((u) => u.role === "ROLE_STUDENT").length;
-  const staffUsersCount = staffList.filter((u) => u.role !== "ROLE_STUDENT").length;
+  const visibleDirectoryUsers = isSuperAdmin
+    ? staffList
+    : staffList.filter((u) => u.role === "ROLE_STUDENT");
+  const studentUsersCount = visibleDirectoryUsers.filter((u) => u.role === "ROLE_STUDENT").length;
+  const staffUsersCount = isSuperAdmin
+    ? visibleDirectoryUsers.filter((u) => u.role !== "ROLE_STUDENT").length
+    : 0;
 
-  const filteredUsers = staffList.filter((u) => {
+  const filteredUsers = visibleDirectoryUsers.filter((u) => {
     const term = userSearch.toLowerCase().trim();
     if (term) {
       const matchName = u.name?.toLowerCase().includes(term);
@@ -3326,10 +3336,11 @@ export default function AdminDashboardPage() {
       if (!matchName && !matchEmail && !matchStudentId) return false;
     }
 
-    if (userRoleCategory === "STUDENTS" && u.role !== "ROLE_STUDENT") return false;
-    if (userRoleCategory === "STAFF" && u.role === "ROLE_STUDENT") return false;
-
-    if (userSpecificRole !== "ALL" && u.role !== userSpecificRole) return false;
+    if (isSuperAdmin) {
+      if (userRoleCategory === "STUDENTS" && u.role !== "ROLE_STUDENT") return false;
+      if (userRoleCategory === "STAFF" && u.role === "ROLE_STUDENT") return false;
+      if (userSpecificRole !== "ALL" && u.role !== userSpecificRole) return false;
+    }
 
     if (userStatusFilter === "ACTIVE" && u.enabled === false) return false;
     if (userStatusFilter === "BLOCKED" && u.enabled !== false) return false;
@@ -4213,7 +4224,7 @@ export default function AdminDashboardPage() {
                     <span>User Accounts & RBAC</span>
                   </div>
                   <span className="font-mono text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-transparent">
-                    {staffList.length}
+                    {visibleDirectoryUsers.length}
                   </span>
                 </button>
 
@@ -4347,7 +4358,10 @@ export default function AdminDashboardPage() {
               {activeTab === "reviews" && "Moderate student ratings and course / teacher feedback submissions."}
               {activeTab === "notices" && "Broadcast real-time single-line ticker alerts, schedule news, and urgent campus announcements to the homepage."}
               {activeTab === "chat" && "Monitor live student conversations, voice notes, 24-hour pinned announcements, and enforce anti-harassment user blocking."}
-              {activeTab === "staff" && "Manage university student profiles, course managers, and administrative RBAC staff credentials."}
+              {activeTab === "staff" &&
+                (isSuperAdmin
+                  ? "Manage university student profiles, course managers, and administrative RBAC staff credentials."
+                  : "Manage university student profiles, access statuses, and verified academic credentials.")}
               {activeTab === "settings" && "Configure university system alerts, SMTP server, and platform policies."}
             </p>
           </div>
@@ -7400,7 +7414,9 @@ export default function AdminDashboardPage() {
                   <div className="flex items-center gap-2">
                     <Users className="w-5 h-5 text-blue-500 dark:text-blue-400" />
                     <h3 className="font-black text-sm text-slate-900 dark:text-white">
-                      All University Accounts & Access Control (RBAC)
+                      {isSuperAdmin
+                        ? "All University Accounts & Access Control (RBAC)"
+                        : "Student Accounts Directory & Access Control"}
                     </h3>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-2xl">
@@ -7448,21 +7464,23 @@ export default function AdminDashboardPage() {
 
                   {/* Filter Selects */}
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* Specific Role Dropdown */}
-                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
-                      <Filter className="w-3.5 h-3.5 text-slate-400" />
-                      <select
-                        value={userSpecificRole}
-                        onChange={(e) => setUserSpecificRole(e.target.value)}
-                        className="bg-transparent text-slate-700 dark:text-slate-300 font-bold focus:outline-none text-xs"
-                      >
-                        <option value="ALL">All Role Types</option>
-                        <option value="ROLE_STUDENT">Students Only</option>
-                        <option value="ROLE_ADMIN">Administrators</option>
-                        <option value="ROLE_MANAGER">Course Managers</option>
-                        <option value="ROLE_SUPER_ADMIN">Super Administrators</option>
-                      </select>
-                    </div>
+                    {/* Specific Role Dropdown (Super Admin Only) */}
+                    {isSuperAdmin && (
+                      <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+                        <Filter className="w-3.5 h-3.5 text-slate-400" />
+                        <select
+                          value={userSpecificRole}
+                          onChange={(e) => setUserSpecificRole(e.target.value)}
+                          className="bg-transparent text-slate-700 dark:text-slate-300 font-bold focus:outline-none text-xs"
+                        >
+                          <option value="ALL">All Role Types</option>
+                          <option value="ROLE_STUDENT">Students Only</option>
+                          <option value="ROLE_ADMIN">Administrators</option>
+                          <option value="ROLE_MANAGER">Course Managers</option>
+                          <option value="ROLE_SUPER_ADMIN">Super Administrators</option>
+                        </select>
+                      </div>
+                    )}
 
                     {/* Status Dropdown */}
                     <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
@@ -7482,36 +7500,44 @@ export default function AdminDashboardPage() {
                 {/* Role Category Pills */}
                 <div className="flex items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/80 overflow-x-auto text-xs">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Quick View:</span>
-                  <button
-                    onClick={() => setUserRoleCategory("ALL")}
-                    className={`px-3 py-1 rounded-lg font-bold text-xs transition-colors shrink-0 ${
-                      userRoleCategory === "ALL"
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                    }`}
-                  >
-                    All Accounts ({staffList.length})
-                  </button>
-                  <button
-                    onClick={() => setUserRoleCategory("STUDENTS")}
-                    className={`px-3 py-1 rounded-lg font-bold text-xs transition-colors shrink-0 ${
-                      userRoleCategory === "STUDENTS"
-                        ? "bg-emerald-600 text-white"
-                        : "bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                    }`}
-                  >
-                    Students ({studentUsersCount})
-                  </button>
-                  <button
-                    onClick={() => setUserRoleCategory("STAFF")}
-                    className={`px-3 py-1 rounded-lg font-bold text-xs transition-colors shrink-0 ${
-                      userRoleCategory === "STAFF"
-                        ? "bg-purple-600 text-white"
-                        : "bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                    }`}
-                  >
-                    Staff & Admins ({staffUsersCount})
-                  </button>
+                  {isSuperAdmin ? (
+                    <>
+                      <button
+                        onClick={() => setUserRoleCategory("ALL")}
+                        className={`px-3 py-1 rounded-lg font-bold text-xs transition-colors shrink-0 ${
+                          userRoleCategory === "ALL"
+                            ? "bg-blue-600 text-white"
+                            : "bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                        }`}
+                      >
+                        All Accounts ({visibleDirectoryUsers.length})
+                      </button>
+                      <button
+                        onClick={() => setUserRoleCategory("STUDENTS")}
+                        className={`px-3 py-1 rounded-lg font-bold text-xs transition-colors shrink-0 ${
+                          userRoleCategory === "STUDENTS"
+                            ? "bg-emerald-600 text-white"
+                            : "bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                        }`}
+                      >
+                        Students ({studentUsersCount})
+                      </button>
+                      <button
+                        onClick={() => setUserRoleCategory("STAFF")}
+                        className={`px-3 py-1 rounded-lg font-bold text-xs transition-colors shrink-0 ${
+                          userRoleCategory === "STAFF"
+                            ? "bg-purple-600 text-white"
+                            : "bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                        }`}
+                      >
+                        Staff & Admins ({staffUsersCount})
+                      </button>
+                    </>
+                  ) : (
+                    <span className="px-3 py-1 rounded-lg font-bold text-xs bg-emerald-600 text-white shrink-0">
+                      Student Accounts ({studentUsersCount})
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -10894,7 +10920,15 @@ export default function AdminDashboardPage() {
       {/* ========================================================================= */}
       {/* MODAL 4: PROVISION USER / STAFF ACCOUNT                                   */}
       {/* ========================================================================= */}
-      {showStaffModal && (
+      {showStaffModal && (() => {
+        const closeStaffModal = () => {
+          setStaffName("");
+          setStaffEmail("");
+          setStaffStudentId("");
+          setStaffPassword("");
+          setShowStaffModal(false);
+        };
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
           <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
@@ -10914,18 +10948,21 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
               <button
-                onClick={() => setShowStaffModal(false)}
+                type="button"
+                onClick={closeStaffModal}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateStaff} className="space-y-4 text-xs">
+            <form onSubmit={handleCreateStaff} autoComplete="off" className="space-y-4 text-xs">
               <div>
                 <label className="font-bold text-slate-700 dark:text-slate-300 mb-1 block">Full Name *</label>
                 <input
+                  name="nl-staff-name"
                   type="text"
+                  autoComplete="off"
                   required
                   value={staffName}
                   onChange={(e) => setStaffName(e.target.value)}
@@ -10937,7 +10974,11 @@ export default function AdminDashboardPage() {
               <div>
                 <label className="font-bold text-slate-700 dark:text-slate-300 mb-1 block">University Email *</label>
                 <input
+                  name="nl-staff-email"
                   type="email"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   required
                   value={staffEmail}
                   onChange={(e) => setStaffEmail(e.target.value)}
@@ -10950,7 +10991,11 @@ export default function AdminDashboardPage() {
                 <div>
                   <label className="font-bold text-slate-700 dark:text-slate-300 mb-1 block">Student ID Number</label>
                   <input
+                    name="nl-staff-student-id"
                     type="text"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
                     value={staffStudentId}
                     onChange={(e) => setStaffStudentId(e.target.value)}
                     placeholder="e.g. 2021000000012"
@@ -10962,7 +11007,9 @@ export default function AdminDashboardPage() {
               <div>
                 <label className="font-bold text-slate-700 dark:text-slate-300 mb-1 block">Initial Password *</label>
                 <input
+                  name="nl-staff-password"
                   type="password"
+                  autoComplete="new-password"
                   required
                   value={staffPassword}
                   onChange={(e) => setStaffPassword(e.target.value)}
@@ -11003,7 +11050,7 @@ export default function AdminDashboardPage() {
               <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setShowStaffModal(false)}
+                  onClick={closeStaffModal}
                   className="px-4 py-2.5 rounded-xl font-bold text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                 >
                   Cancel
@@ -11023,7 +11070,8 @@ export default function AdminDashboardPage() {
             </form>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* MODAL 4B: EDIT USER / STAFF ACCOUNT                                      */}

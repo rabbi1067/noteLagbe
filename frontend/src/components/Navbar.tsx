@@ -212,7 +212,10 @@ export default function Navbar() {
                       <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
 
                       <button
-                        onClick={logout}
+                        onClick={() => {
+                          setUserDropdownOpen(false);
+                          logout();
+                        }}
                         className="w-full text-left flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 font-semibold"
                       >
                         <LogOut className="w-4 h-4" />

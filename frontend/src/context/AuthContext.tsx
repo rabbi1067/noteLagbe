@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { api, getToken, setToken, removeToken, warmupBackend } from "@/lib/api";
+import { api, getToken, setToken, removeToken, warmupBackend, clearClientApiCache } from "@/lib/api";
 import { subscribeToSync, SyncPayload } from "@/lib/sync";
 import { toast } from "sonner";
 import AccountBlockedModal, { AccountBlockedNotice } from "@/components/AccountBlockedModal";
@@ -102,12 +102,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clearLocalSession = useCallback(() => {
     removeToken();
+    clearClientApiCache();
     try {
       localStorage.removeItem("notelagbe_user");
     } catch {}
+    lastProfileCheckRef.current = 0;
     userRef.current = null;
     setTokenState(null);
     setUser(null);
+    setShowAuthModal(false);
+    setShowSpotlight(false);
   }, []);
 
   const forceBlockedLogout = useCallback(

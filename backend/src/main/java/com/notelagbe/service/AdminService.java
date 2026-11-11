@@ -135,9 +135,12 @@ public class AdminService {
         return stats;
     }
 
-    public List<StaffResponseDto> getAllStaff() {
-        List<User> allUsers = userRepository.findAll(Sort.by(Sort.Direction.DESC, "id"));
-        return allUsers.stream().map(u -> new StaffResponseDto(
+    public List<StaffResponseDto> getAllStaff(User currentUser) {
+        boolean isSuperAdmin = currentUser != null && currentUser.getRole() == Role.ROLE_SUPER_ADMIN;
+        List<User> visibleUsers = isSuperAdmin
+                ? userRepository.findAll(Sort.by(Sort.Direction.DESC, "id"))
+                : userRepository.findByRoleOrderByIdDesc(Role.ROLE_STUDENT);
+        return visibleUsers.stream().map(u -> new StaffResponseDto(
                 u.getId(),
                 u.getName(),
                 u.getEmail(),
