@@ -283,6 +283,25 @@ public class ResourceService {
     }
 
     @Transactional
+    public Resource updateResourceFile(Long id, String fileUrl) {
+        if (fileUrl == null || fileUrl.trim().isEmpty()) {
+            throw new ApiException("A valid fileUrl is required.");
+        }
+        String trimmed = fileUrl.trim();
+        if (trimmed.length() > 500) {
+            throw new ApiException("File URL cannot exceed 500 characters.");
+        }
+        Resource r = resourceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Resource not found with ID: " + id));
+        r.setFileUrl(trimmed);
+        Resource updated = resourceRepository.save(r);
+        evictCaches();
+        liveSyncService.broadcast("resource", "updated", id);
+        liveSyncService.broadcast("contribution", "updated", id);
+        return updated;
+    }
+
+    @Transactional
     public void deleteResource(Long id) {
         Resource r = resourceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found: " + id));

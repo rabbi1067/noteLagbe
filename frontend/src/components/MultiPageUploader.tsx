@@ -14,8 +14,17 @@ import {
   Layers,
   Image as ImageIcon,
   AlertCircle,
+  RotateCw,
+  RotateCcw,
 } from "lucide-react";
-import { mergeFilesToSinglePdf } from "@/lib/pdfMerger";
+import {
+  mergeFilesToSinglePdf,
+  computeAutoPortraitRotations,
+  inspectImageFile,
+  isImageFileObject,
+  normalizeRotationDegrees,
+  RotationDegrees,
+} from "@/lib/pdfMerger";
 import { toast } from "sonner";
 
 export interface UploadResult {
@@ -50,6 +59,9 @@ export default function MultiPageUploader({
   maxFileSizeMb = 50,
 }: MultiPageUploaderProps) {
   const [pageFiles, setPageFiles] = useState<File[]>([]);
+  const [pageRotations, setPageRotations] = useState<RotationDegrees[]>([]);
+  const [pageIsLandscapeRaw, setPageIsLandscapeRaw] = useState<boolean[]>([]);
+  const [autoAlignedCount, setAutoAlignedCount] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processStatus, setProcessStatus] = useState<string>("");
   const [uploadedResult, setUploadedResult] = useState<UploadResult | null>(
@@ -66,6 +78,8 @@ export default function MultiPageUploader({
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const addMoreInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadSeqRef = useRef(0);
+  const rotationDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync initial values if parent updates them (e.g. edit mode in modal or form reset)
   useEffect(() => {
@@ -78,6 +92,9 @@ export default function MultiPageUploader({
     } else if (!initialUrl) {
       setUploadedResult(null);
       setPageFiles([]);
+      setPageRotations([]);
+      setPageIsLandscapeRaw([]);
+      setAutoAlignedCount(0);
       if (localMergedBlobUrl) {
         URL.revokeObjectURL(localMergedBlobUrl);
         setLocalMergedBlobUrl(null);
@@ -95,7 +112,7 @@ export default function MultiPageUploader({
     });
   }, [pageFiles]);
 
-  // Clean up object URLs when pageFiles change or component unmounts
+  // Clean up object URLs and pending debounce timers when component unmounts
   useEffect(() => {
     return () => {
       previews.forEach((url) => {
@@ -106,6 +123,14 @@ export default function MultiPageUploader({
       }
     };
   }, [previews, localMergedBlobUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (rotationDebounceRef.current) {
+        clearTimeout(rotationDebounceRef.current);
+      }
+    };
+  }, []);
 
   // Theme styling helpers
   const isEmerald = accentColor === "emerald";
@@ -125,7 +150,7 @@ export default function MultiPageUploader({
 
   // Process & Merge files, then upload to backend
   const processAndUploadFiles = useCallback(
-    async (filesToProcess: File[]) => {
+    async (filesToProcess: File[], rotationsList?: RotationDegrees[]) => {
       if (!filesToProcess || filesToProcess.length === 0) return;
 
       // Check max size
@@ -139,6 +164,14 @@ export default function MultiPageUploader({
         return;
       }
 
+      const seq = ++uploadSeqRef.current;
+      const rotationMap: Record<number, number> = {};
+      if (rotationsList) {
+        rotationsList.forEach((rot, idx) => {
+          rotationMap[idx] = rot;
+        });
+      }
+
       setIsProcessing(true);
       const isMultiPage = filesToProcess.length > 1;
 
@@ -148,39 +181,49 @@ export default function MultiPageUploader({
         if (isMultiPage) {
           setProcessStatus(
             language === "bn"
-              ? `${filesToProcess.length}টি পৃষ্ঠা ১টি PDF ফাইলে মার্জ হচ্ছে...`
-              : `Merging ${filesToProcess.length} pages into 1 single PDF...`
+              ? `${filesToProcess.length}টি পৃষ্ঠা একই ফরম্যাটে (Portrait A4) PDF ফাইলে মার্জ হচ্ছে...`
+              : `Normalizing & merging ${filesToProcess.length} pages into 1 uniform PDF...`
           );
 
           finalFileToUpload = await mergeFilesToSinglePdf(
             filesToProcess,
             titleHint || "Exam_Material",
             (curr, tot) => {
+              if (uploadSeqRef.current !== seq) return;
               setProcessStatus(
                 language === "bn"
                   ? `মার্জ হচ্ছে (পৃষ্ঠা ${curr}/${tot})...`
                   : `Merging (Page ${curr}/${tot})...`
               );
-            }
+            },
+            { pageRotations: rotationMap, autoAlignMixed: true }
           );
         } else {
-          // If 1 image, convert to standard crisp single-page PDF so it looks professional,
-          // OR if it's already a PDF or docx, upload directly
+          // Single image or PDF: convert image to normalized A4 PDF, or normalize mixed-page PDF
           const single = filesToProcess[0];
-          if (single.type.startsWith("image/") || /\.(jpe?g|png|webp)$/i.test(single.name)) {
+          if (isImageFileObject(single)) {
             setProcessStatus(
               language === "bn"
-                ? "ছবিটি পরিষ্কার PDF ডকুমেন্টে রূপান্তর হচ্ছে..."
-                : "Converting image to clean PDF document..."
+                ? "ছবিটি পরিষ্কার A4 PDF ডকুমেন্টে রূপান্তর হচ্ছে..."
+                : "Converting image to clean A4 PDF document..."
             );
             finalFileToUpload = await mergeFilesToSinglePdf(
               [single],
-              titleHint || single.name.replace(/\.[^/.]+$/, "")
+              titleHint || single.name.replace(/\.[^/.]+$/, ""),
+              undefined,
+              { pageRotations: rotationMap, autoAlignMixed: true }
             );
           } else {
-            finalFileToUpload = single;
+            finalFileToUpload = await mergeFilesToSinglePdf(
+              [single],
+              titleHint || single.name.replace(/\.[^/.]+$/, ""),
+              undefined,
+              { pageRotations: rotationMap, autoAlignMixed: true }
+            );
           }
         }
+
+        if (uploadSeqRef.current !== seq) return;
 
         // Cache local blob URL so client can preview all merged pages instantly
         const blobUrl = URL.createObjectURL(finalFileToUpload);
@@ -196,6 +239,7 @@ export default function MultiPageUploader({
         );
 
         const res = await uploadFn(finalFileToUpload);
+        if (uploadSeqRef.current !== seq) return;
 
         const uploadData: UploadResult = {
           url: res.url,
@@ -211,13 +255,14 @@ export default function MultiPageUploader({
         toast.success(
           isMultiPage
             ? language === "bn"
-              ? `সফল! ${filesToProcess.length}টি পৃষ্ঠা সফলভাবে ১টি PDF এ মার্জ এবং আপলোড হয়েছে!`
-              : `Success! ${filesToProcess.length} pages merged into 1 PDF and uploaded!`
+              ? `সফল! ${filesToProcess.length}টি পৃষ্ঠা একই ফরম্যাটে ১টি PDF এ মার্জ এবং আপলোড হয়েছে!`
+              : `Success! ${filesToProcess.length} pages normalized into 1 uniform PDF and uploaded!`
             : language === "bn"
             ? "ফাইল সফলভাবে আপলোড সম্পন্ন হয়েছে!"
             : "File uploaded successfully!"
         );
       } catch (err: any) {
+        if (uploadSeqRef.current !== seq) return;
         console.error("MultiPage upload error:", err);
         toast.error(
           err.message ||
@@ -226,11 +271,54 @@ export default function MultiPageUploader({
               : "Failed to merge or upload file")
         );
       } finally {
-        setIsProcessing(false);
-        setProcessStatus("");
+        if (uploadSeqRef.current === seq) {
+          setIsProcessing(false);
+          setProcessStatus("");
+        }
       }
     },
     [uploadFn, onUploadSuccess, titleHint, language, maxFileSizeMb]
+  );
+
+  // Inspect raw orientations + compute auto-alignment + trigger merge/upload
+  const resolveOrientationsAndUpload = useCallback(
+    async (nextFiles: File[], preserveRotations?: Record<number, number>) => {
+      if (rotationDebounceRef.current) {
+        clearTimeout(rotationDebounceRef.current);
+        rotationDebounceRef.current = null;
+      }
+
+      const rawFlags = await Promise.all(
+        nextFiles.map(async (f) => {
+          if (!isImageFileObject(f)) return false;
+          try {
+            const info = await inspectImageFile(f);
+            return info.isLandscape;
+          } catch {
+            return false;
+          }
+        })
+      );
+
+      const analysis = await computeAutoPortraitRotations(nextFiles, preserveRotations);
+      const nextRotations = nextFiles.map((_, idx) => analysis.rotations[idx] ?? 0);
+
+      setPageFiles(nextFiles);
+      setPageRotations(nextRotations);
+      setPageIsLandscapeRaw(rawFlags);
+      setAutoAlignedCount(analysis.autoAlignedIndices.length);
+
+      if (analysis.autoAlignedIndices.length > 0) {
+        toast.info(
+          language === "bn"
+            ? `${analysis.autoAlignedIndices.length}টি ঘোরানো (sideways) ছবি স্বয়ংক্রিয়ভাবে সোজা Portrait ফরম্যাটে ঠিক করা হয়েছে।`
+            : `Auto-aligned ${analysis.autoAlignedIndices.length} sideways photo(s) to match uniform Portrait format.`
+        );
+      }
+
+      processAndUploadFiles(nextFiles, nextRotations);
+    },
+    [language, processAndUploadFiles]
   );
 
   // Handle newly selected files from primary input
@@ -238,8 +326,7 @@ export default function MultiPageUploader({
     const filesArray = Array.from(newFileList);
     if (filesArray.length === 0) return;
 
-    setPageFiles(filesArray);
-    processAndUploadFiles(filesArray);
+    resolveOrientationsAndUpload(filesArray);
   };
 
   // Append additional pages (+ Add Page)
@@ -247,48 +334,126 @@ export default function MultiPageUploader({
     const additional = Array.from(newFileList);
     if (additional.length === 0) return;
 
+    const preserveMap: Record<number, number> = {};
+    pageRotations.forEach((rot, idx) => {
+      preserveMap[idx] = rot;
+    });
     const combined = [...pageFiles, ...additional];
-    setPageFiles(combined);
-    processAndUploadFiles(combined);
+    resolveOrientationsAndUpload(combined, preserveMap);
   };
 
   // Reorder: Move file left / earlier
   const handleMoveLeft = (index: number) => {
     if (index <= 0) return;
-    const next = [...pageFiles];
-    const temp = next[index - 1];
-    next[index - 1] = next[index];
-    next[index] = temp;
-    setPageFiles(next);
-    processAndUploadFiles(next);
+    if (rotationDebounceRef.current) {
+      clearTimeout(rotationDebounceRef.current);
+      rotationDebounceRef.current = null;
+    }
+    const nextFiles = [...pageFiles];
+    [nextFiles[index - 1], nextFiles[index]] = [nextFiles[index], nextFiles[index - 1]];
+
+    const nextRots = [...pageRotations];
+    [nextRots[index - 1], nextRots[index]] = [nextRots[index] ?? 0, nextRots[index - 1] ?? 0];
+
+    const nextFlags = [...pageIsLandscapeRaw];
+    [nextFlags[index - 1], nextFlags[index]] = [nextFlags[index] ?? false, nextFlags[index - 1] ?? false];
+
+    setPageFiles(nextFiles);
+    setPageRotations(nextRots);
+    setPageIsLandscapeRaw(nextFlags);
+    processAndUploadFiles(nextFiles, nextRots);
   };
 
   // Reorder: Move file right / later
   const handleMoveRight = (index: number) => {
     if (index >= pageFiles.length - 1) return;
-    const next = [...pageFiles];
-    const temp = next[index + 1];
-    next[index + 1] = next[index];
-    next[index] = temp;
-    setPageFiles(next);
-    processAndUploadFiles(next);
+    if (rotationDebounceRef.current) {
+      clearTimeout(rotationDebounceRef.current);
+      rotationDebounceRef.current = null;
+    }
+    const nextFiles = [...pageFiles];
+    [nextFiles[index + 1], nextFiles[index]] = [nextFiles[index], nextFiles[index + 1]];
+
+    const nextRots = [...pageRotations];
+    [nextRots[index + 1], nextRots[index]] = [nextRots[index] ?? 0, nextRots[index + 1] ?? 0];
+
+    const nextFlags = [...pageIsLandscapeRaw];
+    [nextFlags[index + 1], nextFlags[index]] = [nextFlags[index] ?? false, nextFlags[index + 1] ?? false];
+
+    setPageFiles(nextFiles);
+    setPageRotations(nextRots);
+    setPageIsLandscapeRaw(nextFlags);
+    processAndUploadFiles(nextFiles, nextRots);
+  };
+
+  // Rotate a specific page by delta degrees (-90 or +90) and debounce PDF rebuild
+  const handleRotatePage = (index: number, deltaDeg: number) => {
+    const nextRots = pageFiles.map((_, i) =>
+      i === index
+        ? normalizeRotationDegrees((pageRotations[i] ?? 0) + deltaDeg)
+        : pageRotations[i] ?? 0
+    );
+    setPageRotations(nextRots);
+
+    if (rotationDebounceRef.current) {
+      clearTimeout(rotationDebounceRef.current);
+    }
+    const snapshotFiles = [...pageFiles];
+    rotationDebounceRef.current = setTimeout(() => {
+      rotationDebounceRef.current = null;
+      processAndUploadFiles(snapshotFiles, nextRots);
+    }, 600);
+  };
+
+  // One-click Align All Sideways Images to Portrait A4
+  const handleAlignAllPortrait = () => {
+    if (rotationDebounceRef.current) {
+      clearTimeout(rotationDebounceRef.current);
+      rotationDebounceRef.current = null;
+    }
+    const nextRots: RotationDegrees[] = pageFiles.map((f, idx) => {
+      if (!isImageFileObject(f)) return pageRotations[idx] ?? 0;
+      const isRawLand = pageIsLandscapeRaw[idx] ?? false;
+      const currentRot = pageRotations[idx] ?? 0;
+      const isEffectivelyLand = (currentRot === 90 || currentRot === 270) ? !isRawLand : isRawLand;
+      return isEffectivelyLand ? normalizeRotationDegrees(currentRot + 90) : currentRot;
+    });
+    setPageRotations(nextRots);
+    processAndUploadFiles(pageFiles, nextRots);
   };
 
   // Remove a specific page
   const handleRemovePage = (index: number) => {
-    const next = pageFiles.filter((_, i) => i !== index);
-    setPageFiles(next);
-    if (next.length > 0) {
-      processAndUploadFiles(next);
+    if (rotationDebounceRef.current) {
+      clearTimeout(rotationDebounceRef.current);
+      rotationDebounceRef.current = null;
+    }
+    const nextFiles = pageFiles.filter((_, i) => i !== index);
+    const nextRots = pageRotations.filter((_, i) => i !== index);
+    const nextFlags = pageIsLandscapeRaw.filter((_, i) => i !== index);
+    setPageFiles(nextFiles);
+    setPageRotations(nextRots);
+    setPageIsLandscapeRaw(nextFlags);
+    if (nextFiles.length > 0) {
+      processAndUploadFiles(nextFiles, nextRots);
     } else {
       setUploadedResult(null);
+      setAutoAlignedCount(0);
       if (onClear) onClear();
     }
   };
 
   // Full clear
   const handleFullClear = () => {
+    if (rotationDebounceRef.current) {
+      clearTimeout(rotationDebounceRef.current);
+      rotationDebounceRef.current = null;
+    }
+    uploadSeqRef.current++;
     setPageFiles([]);
+    setPageRotations([]);
+    setPageIsLandscapeRaw([]);
+    setAutoAlignedCount(0);
     setUploadedResult(null);
     if (localMergedBlobUrl) {
       URL.revokeObjectURL(localMergedBlobUrl);
@@ -412,7 +577,16 @@ export default function MultiPageUploader({
       )}
 
       {/* Case 2: Multi-Page Gallery & Reordering Grid (When 1 or more pages are in state) */}
-      {pageFiles.length > 0 && (
+      {pageFiles.length > 0 && (() => {
+        const remainingLandscapeCount = pageFiles.reduce((acc, f, idx) => {
+          if (!isImageFileObject(f)) return acc;
+          const isRawLand = pageIsLandscapeRaw[idx] ?? false;
+          const rot = pageRotations[idx] ?? 0;
+          const isEffLand = rot === 90 || rot === 270 ? !isRawLand : isRawLand;
+          return isEffLand ? acc + 1 : acc;
+        }, 0);
+
+        return (
         <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3.5">
           {/* Gallery Header */}
           <div className="flex items-center justify-between flex-wrap gap-2 pb-2.5 border-b border-slate-200 dark:border-slate-800">
@@ -421,7 +595,7 @@ export default function MultiPageUploader({
                 <Layers className="w-4 h-4" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-black text-xs text-slate-900 dark:text-white">
                     {language === "bn"
                       ? `নির্বাচিত পৃষ্ঠা (${pageFiles.length}টি)`
@@ -431,19 +605,39 @@ export default function MultiPageUploader({
                     <span
                       className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${badgeClass}`}
                     >
-                      ✓ Auto-Merged PDF
+                      ✓ Uniform A4 PDF
+                    </span>
+                  )}
+                  {autoAlignedCount > 0 && (
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25">
+                      ↻ {autoAlignedCount} Auto-Aligned
                     </span>
                   )}
                 </div>
                 <p className="text-[10px] text-slate-500 dark:text-slate-400">
                   {language === "bn"
-                    ? "ক্রম পরিবর্তন করতে তীরচিহ্ন (← / →) চাপুন। সেভ করার সময় সবগুলো ১টি PDF ডকুমেন্টে রূপান্তর হবে।"
-                    : "Use arrows (← / →) to reorder pages. All pages merge cleanly into 1 PDF on save."}
+                    ? "ক্রম বদলাতে (← / →) ও বাঁকা ছবি সোজা করতে (↺ / ↻) চাপুন — সবগুলো একই Portrait A4 ফরম্যাটে সেভ হবে।"
+                    : "Use (← / →) to reorder and (↺ / ↻) to fix sideways photos — all pages merge into the same A4 format."}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {remainingLandscapeCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleAlignAllPortrait}
+                  disabled={isProcessing}
+                  className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  title="Rotate sideways images 90° to Portrait format"
+                >
+                  <RotateCw className="w-3 h-3" />
+                  <span>
+                    {language === "bn" ? "সব Portrait করুন" : "Align Portrait"}
+                  </span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => addMoreInputRef.current?.click()}
@@ -470,16 +664,26 @@ export default function MultiPageUploader({
           <div className="flex items-center gap-3 overflow-x-auto pb-2 pt-1 scrollbar-thin">
             {pageFiles.map((file, idx) => {
               const previewUrl = previews[idx];
+              const rot = pageRotations[idx] ?? 0;
+              const isSidewaysRot = rot === 90 || rot === 270;
+              const isImg = isImageFileObject(file);
               return (
                 <div
                   key={`${file.name}-${idx}`}
-                  className="group relative shrink-0 w-28 sm:w-32 rounded-xl bg-white dark:bg-[#090e1a] border border-slate-200 dark:border-slate-800 p-2 shadow-xs hover:border-blue-400 dark:hover:border-blue-500 transition-all flex flex-col items-center"
+                  className="group relative shrink-0 w-32 sm:w-36 rounded-xl bg-white dark:bg-[#090e1a] border border-slate-200 dark:border-slate-800 p-2 shadow-xs hover:border-blue-400 dark:hover:border-blue-500 transition-all flex flex-col items-center"
                 >
-                  {/* Page Number Badge */}
-                  <div className="w-full flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                      {language === "bn" ? `পৃষ্ঠা ${idx + 1}` : `Page ${idx + 1}`}
-                    </span>
+                  {/* Page Number & Rotation Badge */}
+                  <div className="w-full flex items-center justify-between mb-1.5 gap-1">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                        {language === "bn" ? `পৃষ্ঠা ${idx + 1}` : `Page ${idx + 1}`}
+                      </span>
+                      {rot !== 0 && (
+                        <span className="text-[9px] font-mono font-bold px-1 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                          {rot}°
+                        </span>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => handleRemovePage(idx)}
@@ -491,13 +695,18 @@ export default function MultiPageUploader({
                     </button>
                   </div>
 
-                  {/* Thumbnail / Icon Container */}
-                  <div className="w-full h-24 rounded-lg bg-slate-100 dark:bg-slate-800/80 overflow-hidden flex items-center justify-center relative border border-slate-200/50 dark:border-slate-700/50">
+                  {/* Thumbnail / Icon Container (uncropped object-contain so sideways pages remain clearly visible) */}
+                  <div className="w-full h-24 rounded-lg bg-slate-100 dark:bg-slate-950/90 overflow-hidden flex items-center justify-center relative border border-slate-200/50 dark:border-slate-700/50 p-1">
                     {previewUrl ? (
                       <img
                         src={previewUrl}
                         alt={`Page ${idx + 1}`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        style={{
+                          transform: `rotate(${rot}deg)`,
+                        }}
+                        className={`object-contain rounded transition-transform duration-200 ${
+                          isSidewaysRot ? "max-w-[78px] max-h-[78px]" : "max-w-full max-h-full"
+                        }`}
                       />
                     ) : (
                       <div className="flex flex-col items-center justify-center gap-1 text-slate-400">
@@ -517,7 +726,7 @@ export default function MultiPageUploader({
                     {(file.size / 1024).toFixed(0)} KB
                   </p>
 
-                  {/* Reorder Buttons (Move Left / Right) */}
+                  {/* Reorder (← / →) & Per-Page Rotate (↺ / ↻) Controls */}
                   <div className="flex items-center gap-1 mt-1.5 w-full justify-center">
                     <button
                       type="button"
@@ -528,6 +737,28 @@ export default function MultiPageUploader({
                     >
                       <ChevronLeft className="w-3 h-3" />
                     </button>
+                    {isImg && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleRotatePage(idx, -90)}
+                          disabled={isProcessing}
+                          className="p-1 rounded bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400 disabled:opacity-30 hover:bg-blue-50 dark:hover:bg-blue-950/60 transition-colors cursor-pointer"
+                          title="Rotate 90° Counter-Clockwise"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRotatePage(idx, 90)}
+                          disabled={isProcessing}
+                          className="p-1 rounded bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400 disabled:opacity-30 hover:bg-blue-50 dark:hover:bg-blue-950/60 transition-colors cursor-pointer"
+                          title="Rotate 90° Clockwise"
+                        >
+                          <RotateCw className="w-3 h-3" />
+                        </button>
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={() => handleMoveRight(idx)}
@@ -547,7 +778,7 @@ export default function MultiPageUploader({
               type="button"
               onClick={() => addMoreInputRef.current?.click()}
               disabled={isProcessing}
-              className="shrink-0 w-24 sm:w-28 h-[160px] rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 bg-white/40 dark:bg-slate-800/40 flex flex-col items-center justify-center gap-2 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer group"
+              className="shrink-0 w-24 sm:w-28 h-[168px] rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 bg-white/40 dark:bg-slate-800/40 flex flex-col items-center justify-center gap-2 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer group"
             >
               <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-colors">
                 <Plus className="w-4 h-4" />
@@ -558,7 +789,8 @@ export default function MultiPageUploader({
             </button>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Case 3: Processing & Uploading Status Bar */}
       {isProcessing && (

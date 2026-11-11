@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   X,
   Lock,
@@ -17,11 +17,17 @@ import {
   Minimize2,
   FileText,
   Columns,
-  Maximize
+  Maximize,
+  ChevronLeft,
+  ChevronRight,
+  Save,
+  AlertCircle,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
-import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { api, API_BASE_URL, getToken } from "@/lib/api";
+import { normalizeAndRotatePdfBytes, normalizeRotationDegrees } from "@/lib/pdfMerger";
 
 type ViewerDocKind = "pdf" | "image" | "drive-embed" | "unsupported";
 
@@ -105,6 +111,7 @@ interface PDFViewerModalProps {
   isUnlocked: boolean;
   onUnlockedSuccess: () => void;
   isAdminMode?: boolean;
+  onFileUpdated?: (newFileUrl: string) => void;
 }
 
 export default function PDFViewerModal({
@@ -115,53 +122,44 @@ export default function PDFViewerModal({
   isUnlocked,
   onUnlockedSuccess,
   isAdminMode = false,
+  onFileUpdated,
 }: PDFViewerModalProps) {
   const { user, isAuthenticated, setShowAuthModal } = useAuth();
   const [unlocking, setUnlocking] = useState(false);
   const [zoom, setZoom] = useState(100);
-  const [rotation, setRotation] = useState(0); // 0, 90, 180, 270 degrees
+  const [rotation, setRotation] = useState(0); // 0, 90, 180, 270 degrees (for images/embeds)
   const [viewWidthMode, setViewWidthMode] = useState<"narrow" | "wide">("wide");
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Per-page PDF orientation normalization & rotation state
+  const [rawPdfBytes, setRawPdfBytes] = useState<Uint8Array | null>(null);
+  const [activePdfBytes, setActivePdfBytes] = useState<Uint8Array | null>(null);
+  const [pdfPageCount, setPdfPageCount] = useState(0);
+  const [activePdfPage, setActivePdfPage] = useState(1);
+  const [pageExtraRotations, setPageExtraRotations] = useState<Record<number, number>>({});
+  const [autoAlignMixedPdf, setAutoAlignMixedPdf] = useState(true);
+  const [autoAlignedPagesList, setAutoAlignedPagesList] = useState<number[]>([]);
+  const [pdfChangedFromRaw, setPdfChangedFromRaw] = useState(false);
+  const [savingFixedPdf, setSavingFixedPdf] = useState(false);
 
   // Download and external new-tab privileges are ONLY enabled in Admin mode (inside /admin console).
   // On student course pages (/courses/[code]), all users (students & staff) experience the pure in-website reader!
   const canDownloadAndOpen = Boolean(isAdminMode);
 
-  // Keyboard accessibility & hotkeys for reading
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      if (e.key === "Escape") {
-        if (isFullscreen) {
-          setIsFullscreen(false);
-        } else {
-          onClose();
-        }
-      } else if (e.key === "+" || e.key === "=") {
-        setZoom((prev) => Math.min(prev + 20, 300));
-      } else if (e.key === "-" || e.key === "_") {
-        setZoom((prev) => Math.max(prev - 20, 50));
-      } else if (e.key === "0") {
-        setZoom(100);
-      } else if (e.key === "r" || e.key === "R") {
-        setRotation((prev) => (prev + 90) % 360);
-      } else if (e.key === "f" || e.key === "F") {
-        setIsFullscreen((prev) => !prev);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, isFullscreen, onClose]);
-
   const [docLoading, setDocLoading] = useState(false);
   const [docError, setDocError] = useState<string | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const activeBlobUrlRef = useRef<string | null>(null);
   const [detectedKind, setDetectedKind] = useState<ViewerDocKind>("pdf");
   const [retryTick, setRetryTick] = useState(0);
+
+  const replaceBlobUrl = useCallback((nextUrl: string | null) => {
+    if (activeBlobUrlRef.current && activeBlobUrlRef.current !== nextUrl) {
+      URL.revokeObjectURL(activeBlobUrlRef.current);
+    }
+    activeBlobUrlRef.current = nextUrl;
+    setBlobUrl(nextUrl);
+  }, []);
 
   const drivePreviewUrl = useMemo(
     () => getGoogleDrivePreviewUrl(resource?.fileUrl),
@@ -173,20 +171,31 @@ export default function PDFViewerModal({
     if (isOpen) {
       setZoom(100);
       setRotation(0);
+      setActivePdfPage(1);
+      setPageExtraRotations({});
+      setAutoAlignMixedPdf(true);
+      setAutoAlignedPagesList([]);
+      setPdfChangedFromRaw(false);
     }
   }, [isOpen, resource?.id]);
 
   // Fetch document securely via Authorization header and render from local Blob URL
   useEffect(() => {
     if (!isOpen || !resource || !isUnlocked || (!resource.id && !resource.fileUrl)) {
-      setBlobUrl(null);
+      replaceBlobUrl(null);
+      setRawPdfBytes(null);
+      setActivePdfBytes(null);
+      setPdfPageCount(0);
       setDocError(null);
       setDocLoading(false);
       return;
     }
 
     if (!resource.id && drivePreviewUrl) {
-      setBlobUrl(null);
+      replaceBlobUrl(null);
+      setRawPdfBytes(null);
+      setActivePdfBytes(null);
+      setPdfPageCount(0);
       setDetectedKind("drive-embed");
       setDocError(null);
       setDocLoading(false);
@@ -194,13 +203,15 @@ export default function PDFViewerModal({
     }
 
     let cancelled = false;
-    let createdObjectUrl: string | null = null;
     const controller = new AbortController();
 
     const loadDocument = async () => {
       setDocLoading(true);
       setDocError(null);
-      setBlobUrl(null);
+      replaceBlobUrl(null);
+      setRawPdfBytes(null);
+      setActivePdfBytes(null);
+      setPdfPageCount(0);
 
       try {
         const token = getToken();
@@ -277,8 +288,38 @@ export default function PDFViewerModal({
         if (cancelled) return;
 
         setDetectedKind(kind);
-        createdObjectUrl = URL.createObjectURL(normalizedBlob);
-        setBlobUrl(createdObjectUrl);
+
+        if (kind === "pdf") {
+          const rawBytes = new Uint8Array(await normalizedBlob.arrayBuffer());
+          if (cancelled) return;
+          setRawPdfBytes(rawBytes);
+
+          try {
+            const norm = await normalizeAndRotatePdfBytes(rawBytes, {
+              autoAlignMixed: true,
+              targetOrientation: "AUTO_UNIFORM",
+            });
+            if (cancelled) return;
+
+            setPdfPageCount(norm.pageCount);
+            setActivePdfPage(1);
+            setPageExtraRotations({});
+            setAutoAlignMixedPdf(true);
+            setAutoAlignedPagesList(norm.autoAlignedPages);
+            setPdfChangedFromRaw(norm.changed);
+            setActivePdfBytes(norm.bytes);
+
+            const displayBlob = new Blob([norm.bytes as any], { type: "application/pdf" });
+            replaceBlobUrl(URL.createObjectURL(displayBlob));
+          } catch {
+            if (cancelled) return;
+            setActivePdfBytes(rawBytes);
+            setPdfPageCount(0);
+            replaceBlobUrl(URL.createObjectURL(normalizedBlob));
+          }
+        } else {
+          replaceBlobUrl(URL.createObjectURL(normalizedBlob));
+        }
       } catch (err: unknown) {
         if (cancelled || (err instanceof DOMException && err.name === "AbortError")) return;
         if (drivePreviewUrl) {
@@ -300,11 +341,131 @@ export default function PDFViewerModal({
     return () => {
       cancelled = true;
       controller.abort();
-      if (createdObjectUrl) {
-        URL.revokeObjectURL(createdObjectUrl);
+      if (activeBlobUrlRef.current) {
+        URL.revokeObjectURL(activeBlobUrlRef.current);
+        activeBlobUrlRef.current = null;
       }
     };
-  }, [isOpen, resource?.id, resource?.fileUrl, isUnlocked, isAdminMode, drivePreviewUrl, retryTick]);
+  }, [isOpen, resource?.id, resource?.fileUrl, isUnlocked, isAdminMode, drivePreviewUrl, retryTick, replaceBlobUrl]);
+
+  const rebuildPdfWithRotations = useCallback(
+    async (nextMap: Record<number, number>, nextAutoAlign: boolean) => {
+      if (!rawPdfBytes) return;
+      try {
+        const res = await normalizeAndRotatePdfBytes(rawPdfBytes, {
+          autoAlignMixed: nextAutoAlign,
+          pageExtraRotations: nextMap,
+          targetOrientation: "AUTO_UNIFORM",
+        });
+        setActivePdfBytes(res.bytes);
+        setAutoAlignedPagesList(res.autoAlignedPages);
+        setPdfChangedFromRaw(res.changed);
+        const updatedBlob = new Blob([res.bytes as any], { type: "application/pdf" });
+        replaceBlobUrl(URL.createObjectURL(updatedBlob));
+      } catch (err) {
+        console.error("Failed to normalize/rotate PDF page:", err);
+        toast.error("Unable to rotate this PDF page.");
+      }
+    },
+    [rawPdfBytes, replaceBlobUrl]
+  );
+
+  const handleRotateActivePdfPage = useCallback(
+    async (deltaDeg: number) => {
+      if (!rawPdfBytes || pdfPageCount === 0) return;
+      const currentEffective =
+        pageExtraRotations[activePdfPage] !== undefined
+          ? pageExtraRotations[activePdfPage]
+          : autoAlignedPagesList.includes(activePdfPage)
+          ? 90
+          : 0;
+      const nextRot = normalizeRotationDegrees(currentEffective + deltaDeg);
+      const nextMap = { ...pageExtraRotations, [activePdfPage]: nextRot };
+      setPageExtraRotations(nextMap);
+      await rebuildPdfWithRotations(nextMap, autoAlignMixedPdf);
+    },
+    [rawPdfBytes, pdfPageCount, pageExtraRotations, activePdfPage, autoAlignedPagesList, autoAlignMixedPdf, rebuildPdfWithRotations]
+  );
+
+  const handleResetPdfRotations = useCallback(async () => {
+    setPageExtraRotations({});
+    setAutoAlignMixedPdf(false);
+    await rebuildPdfWithRotations({}, false);
+  }, [rebuildPdfWithRotations]);
+
+  const handleToggleAutoAlignPdf = useCallback(async () => {
+    const nextAuto = !autoAlignMixedPdf;
+    setPageExtraRotations({});
+    setAutoAlignMixedPdf(nextAuto);
+    await rebuildPdfWithRotations({}, nextAuto);
+  }, [autoAlignMixedPdf, rebuildPdfWithRotations]);
+
+  const handleSaveFixedPdfToServer = useCallback(async () => {
+    if (!canDownloadAndOpen || !resource?.id || !activePdfBytes) return;
+    setSavingFixedPdf(true);
+    try {
+      const safeTitle = (resource.title || courseCode || "normalized_document")
+        .replace(/[^a-z0-9._-]+/gi, "_")
+        .replace(/\.pdf$/i, "");
+      const fixedFile = new File([activePdfBytes as any], `${safeTitle}.pdf`, {
+        type: "application/pdf",
+      });
+      const uploadRes = await api.admin.uploadMaterialFile(fixedFile);
+      await api.admin.updateResourceFile(resource.id, uploadRes.url);
+
+      setRawPdfBytes(activePdfBytes);
+      setPageExtraRotations({});
+      setAutoAlignedPagesList([]);
+      setPdfChangedFromRaw(false);
+      toast.success("Fixed uniform PDF saved permanently!");
+      if (onFileUpdated) {
+        onFileUpdated(uploadRes.url);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to save normalized PDF");
+    } finally {
+      setSavingFixedPdf(false);
+    }
+  }, [canDownloadAndOpen, resource?.id, resource?.title, courseCode, activePdfBytes, onFileUpdated]);
+
+  const rotateShortcutRef = useRef<() => void>(() => {});
+  rotateShortcutRef.current = () => {
+    if (detectedKind === "pdf" && rawPdfBytes && pdfPageCount > 0) {
+      void handleRotateActivePdfPage(90);
+    } else {
+      setRotation((prev) => (prev + 90) % 360);
+    }
+  };
+
+  // Keyboard accessibility & hotkeys for reading
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === "Escape") {
+        if (isFullscreen) {
+          setIsFullscreen(false);
+        } else {
+          onClose();
+        }
+      } else if (e.key === "+" || e.key === "=") {
+        setZoom((prev) => Math.min(prev + 20, 300));
+      } else if (e.key === "-" || e.key === "_") {
+        setZoom((prev) => Math.max(prev - 20, 50));
+      } else if (e.key === "0") {
+        setZoom(100);
+      } else if (e.key === "r" || e.key === "R") {
+        rotateShortcutRef.current();
+      } else if (e.key === "f" || e.key === "F") {
+        setIsFullscreen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isFullscreen, onClose]);
 
   if (!isOpen || !resource) return null;
 
@@ -559,29 +720,119 @@ export default function PDFViewerModal({
                 </button>
               </div>
 
-              {/* Rotate ("Side Korao") Button */}
-              <div className="flex items-center bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <button
-                  type="button"
-                  onClick={handleRotateClockwise}
-                  className="px-2.5 py-1 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 font-bold text-[11px] cursor-pointer"
-                  title="Rotate document 90° clockwise (Side korao) [Key: R]"
-                >
-                  <RotateCw className="w-3.5 h-3.5 text-blue-500" />
-                  <span>{rotation === 0 ? "Rotate 90°" : `${rotation}°`}</span>
-                </button>
+              {/* Rotate Controls (Per-Page PDF Normalization vs Global Image Rotate) */}
+              {detectedKind === "pdf" && rawPdfBytes && pdfPageCount > 0 ? (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {pdfPageCount > 1 && (
+                    <div className="flex items-center bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                      <button
+                        type="button"
+                        disabled={activePdfPage <= 1}
+                        onClick={() => setActivePdfPage((p) => Math.max(1, p - 1))}
+                        className="p-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors cursor-pointer"
+                        title="Previous Page"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="px-2 text-[11px] font-mono font-bold text-slate-700 dark:text-slate-200">
+                        Pg {activePdfPage}/{pdfPageCount}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={activePdfPage >= pdfPageCount}
+                        onClick={() => setActivePdfPage((p) => Math.min(pdfPageCount, p + 1))}
+                        className="p-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors cursor-pointer"
+                        title="Next Page"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
 
-                {rotation !== 0 && (
+                  <div className="flex items-center bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => handleRotateActivePdfPage(-90)}
+                      className="p-1 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                      title={`Rotate Page ${activePdfPage} 90° Counter-Clockwise`}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-blue-500" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRotateActivePdfPage(90)}
+                      className="px-2 py-1 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-1 font-bold text-[11px] cursor-pointer"
+                      title={`Rotate Page ${activePdfPage} 90° Clockwise [Key: R]`}
+                    >
+                      <RotateCw className="w-3.5 h-3.5 text-blue-500" />
+                      <span>Rotate {pdfPageCount > 1 ? `Pg ${activePdfPage}` : "90°"}</span>
+                    </button>
+                    {(pdfChangedFromRaw || Object.keys(pageExtraRotations).length > 0) && (
+                      <button
+                        type="button"
+                        onClick={handleResetPdfRotations}
+                        className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border-l border-slate-200 dark:border-slate-700 ml-0.5 cursor-pointer"
+                        title="Restore original PDF pages"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {autoAlignedPagesList.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleToggleAutoAlignPdf}
+                      className={`px-2.5 py-1 rounded-xl text-[10px] font-bold border transition-colors cursor-pointer ${
+                        autoAlignMixedPdf
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 hover:bg-emerald-500/20"
+                          : "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700"
+                      }`}
+                      title={`Pages ${autoAlignedPagesList.join(", ")} were normalized to Portrait A4. Click to toggle.`}
+                    >
+                      {autoAlignMixedPdf
+                        ? `✓ Pg ${autoAlignedPagesList.join(",")} Aligned`
+                        : "Original Format"}
+                    </button>
+                  )}
+
+                  {canDownloadAndOpen && resource.id && pdfChangedFromRaw && (
+                    <button
+                      type="button"
+                      onClick={handleSaveFixedPdfToServer}
+                      disabled={savingFixedPdf}
+                      className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                      title="Persist uniform normalized PDF to database & storage"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{savingFixedPdf ? "Saving..." : "Save Fixed PDF"}</span>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                   <button
                     type="button"
-                    onClick={handleResetRotation}
-                    className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border-l border-slate-200 dark:border-slate-700 ml-0.5"
-                    title="Reset rotation to 0°"
+                    onClick={handleRotateClockwise}
+                    className="px-2.5 py-1 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 font-bold text-[11px] cursor-pointer"
+                    title="Rotate document 90° clockwise (Side korao) [Key: R]"
                   >
-                    <X className="w-3 h-3" />
+                    <RotateCw className="w-3.5 h-3.5 text-blue-500" />
+                    <span>{rotation === 0 ? "Rotate 90°" : `${rotation}°`}</span>
                   </button>
-                )}
-              </div>
+
+                  {rotation !== 0 && (
+                    <button
+                      type="button"
+                      onClick={handleResetRotation}
+                      className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border-l border-slate-200 dark:border-slate-700 ml-0.5"
+                      title="Reset rotation to 0°"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Right: Security & Reader Status Notice */}
@@ -689,7 +940,8 @@ export default function PDFViewerModal({
               ) : detectedKind === "pdf" && blobUrl ? (
                 /* Embedded Document Frame (with #toolbar=0 to suppress browser PDF download/print tools) */
                 <iframe
-                  src={`${blobUrl}#toolbar=0&navpanes=0`}
+                  key={`${blobUrl}-p${activePdfPage}`}
+                  src={`${blobUrl}#page=${activePdfPage}&toolbar=0&navpanes=0`}
                   className="w-full h-full border-none rounded-xl shadow-lg bg-white"
                   title={displayTitle}
                 />

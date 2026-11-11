@@ -379,6 +379,23 @@ public class AdminController {
         return ResponseEntity.ok(updated);
     }
 
+    @PatchMapping("/resources/{id}/file")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'MANAGER')")
+    public ResponseEntity<Resource> updateResourceFile(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
+        String fileUrl = body != null ? body.get("fileUrl") : null;
+        Resource updated = resourceService.updateResourceFile(id, fileUrl);
+        logAdminAction(actor, "RESOURCE_FILE_FIXED", "CONTENT",
+                formatActorPrefix(actor) + " normalized/fixed document orientation for material #" + id
+                        + ": \"" + updated.getTitle() + "\""
+                        + (updated.getCourse() != null ? " (" + updated.getCourse().getCode() + ")" : ""));
+        evictAnalyticsCache();
+        return ResponseEntity.ok(updated);
+    }
+
     @DeleteMapping("/resources/{id}")
     public ResponseEntity<Map<String, Object>> deleteResource(
             @PathVariable Long id,

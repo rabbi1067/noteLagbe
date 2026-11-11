@@ -405,6 +405,11 @@ export const api = {
     },
     createResource: (data: any) => request<any>("/admin/resources", { method: "POST", body: JSON.stringify(data) }),
     updateResource: (id: number, data: any) => request<any>(`/admin/resources/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    updateResourceFile: (id: number, fileUrl: string) =>
+      request<any>(`/admin/resources/${id}/file`, {
+        method: "PATCH",
+        body: JSON.stringify({ fileUrl }),
+      }),
     deleteResource: (id: number) => request<any>(`/admin/resources/${id}`, { method: "DELETE" }),
 
     // Course Management & Assignments

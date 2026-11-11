@@ -11162,6 +11162,19 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
           isUnlocked={true}
           onUnlockedSuccess={() => {}}
           isAdminMode={true}
+          onFileUpdated={(newUrl) => {
+            const targetId = viewingResource?.id;
+            setViewingResource((prev: any) => (prev ? { ...prev, fileUrl: newUrl } : null));
+            if (targetId) {
+              setEditingContribution((prev: any) =>
+                prev?.uploadedResource?.id === targetId
+                  ? { ...prev, uploadedResource: { ...prev.uploadedResource, fileUrl: newUrl } }
+                  : prev
+              );
+              notifyDataChanged("resource", "updated", targetId);
+            }
+            loadAllAdminData();
+          }}
         />
       )}
 

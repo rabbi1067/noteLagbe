@@ -321,4 +321,53 @@ class AdminAuditAndClearLogsTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(activityLogService, times(1)).clearAllLogs();
     }
+
+    @Test
+    void updateResourceFileUpdatesUrlOnlyAndAuditsAction() {
+        Resource existing = new Resource();
+        existing.setId(55L);
+        existing.setTitle("Class Test");
+        existing.setCourse(course);
+        existing.setStatus(ResourceStatus.PENDING);
+        existing.setFileUrl("https://res.cloudinary.com/demo/raw/upload/old.pdf");
+
+        ResourceService realResourceService = new ResourceService(
+                resourceRepository,
+                courseRepository,
+                teacherRepository,
+                unlockedCourseRepository,
+                subscriptionRepository,
+                mock(SubscriptionService.class),
+                liveSyncService,
+                contributionRequestRepository,
+                mock(CloudinaryService.class),
+                mock(TeacherCourseRepository.class),
+                cacheManager);
+
+        assertThrows(ApiException.class, () -> realResourceService.updateResourceFile(55L, "   "));
+
+        when(resourceRepository.findById(55L)).thenReturn(Optional.of(existing));
+        when(resourceRepository.save(any(Resource.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Resource saved = realResourceService.updateResourceFile(55L, "https://res.cloudinary.com/demo/raw/upload/fixed.pdf");
+        assertEquals("https://res.cloudinary.com/demo/raw/upload/fixed.pdf", saved.getFileUrl());
+        assertEquals(ResourceStatus.PENDING, saved.getStatus());
+        assertEquals("Class Test", saved.getTitle());
+
+        CustomUserDetails adminDetails = new CustomUserDetails(regularAdmin);
+        when(resourceService.updateResourceFile(55L, "https://res.cloudinary.com/demo/raw/upload/fixed.pdf"))
+                .thenReturn(saved);
+
+        adminController.updateResourceFile(55L, Map.of("fileUrl", "https://res.cloudinary.com/demo/raw/upload/fixed.pdf"), adminDetails);
+
+        verify(activityLogService).logActivity(
+                eq("RESOURCE_FILE_FIXED"),
+                eq("CONTENT"),
+                argThat(d -> d.contains("[ADMIN] Campus Moderator (admin@seu.edu.bd)")
+                        && d.contains("material #55")
+                        && d.contains("Class Test")
+                        && d.contains("CSE361")),
+                eq(regularAdmin),
+                eq(httpRequest));
+    }
 }
