@@ -60,7 +60,7 @@ public class PaymentService {
         String cleanSlip = inputSanitizationService.sanitizePlainText(request.getSlipUrl());
 
         if (paymentRequestRepository.existsByTransactionId(cleanTrx)) {
-            throw new ApiException("This Transaction ID has already been submitted / এই ট্রানজেকশন আইডি ইতিপূর্বে সাবমিট করা হয়েছে!");
+            throw new ApiException("This Transaction ID has already been submitted.");
         }
 
         PaymentRequest pr = new PaymentRequest();

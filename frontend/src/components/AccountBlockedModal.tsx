@@ -2,6 +2,7 @@
 
 import React from "react";
 import { ShieldBan, AlertTriangle, LogOut, Mail, X } from "lucide-react";
+import { useLanguage } from "@/context/LanguageContext";
 
 export interface AccountBlockedNotice {
   reason: "auto_logout" | "login_denied";
@@ -19,6 +20,7 @@ interface AccountBlockedModalProps {
  * either while the user has an active session (auto-logout) or during a login attempt.
  */
 export default function AccountBlockedModal({ notice, onClose }: AccountBlockedModalProps) {
+  const { language } = useLanguage();
   if (!notice) return null;
 
   const isAutoLogout = notice.reason === "auto_logout";
@@ -63,32 +65,45 @@ export default function AccountBlockedModal({ notice, onClose }: AccountBlockedM
 
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/15 text-rose-300 border border-rose-500/30">
               <AlertTriangle className="w-3 h-3" />
-              {isAutoLogout ? "Session Auto-Signed Out" : "Login Restricted"}
+              {language === "bn"
+                ? isAutoLogout
+                  ? "সেশন স্বয়ংক্রিয়ভাবে লগ-আউট হয়েছে"
+                  : "লগ-ইন সীমাবদ্ধ"
+                : isAutoLogout
+                  ? "Session Auto-Signed Out"
+                  : "Login Restricted"}
             </span>
 
             <h3
               id="account-blocked-title"
               className="text-lg sm:text-xl font-black text-white tracking-tight"
             >
-              {isAutoLogout
-                ? "Your Account Has Been Blocked"
-                : "Account Access Suspended"}
+              {language === "bn"
+                ? isAutoLogout
+                  ? "আপনার অ্যাকাউন্ট ব্লক করা হয়েছে"
+                  : "অ্যাকাউন্ট অ্যাক্সেস স্থগিত করা হয়েছে"
+                : isAutoLogout
+                  ? "Your Account Has Been Blocked"
+                  : "Account Access Suspended"}
             </h3>
           </div>
 
           {/* Explanation Box */}
           <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-4 space-y-2.5 text-xs leading-relaxed">
-            <p className="text-slate-200 font-medium">
-              {notice.message ||
-                (isAutoLogout
-                  ? "An administrator has blocked your account from User Accounts & RBAC. You have been automatically signed out for security."
-                  : "This account has been blocked by an administrator and cannot sign in right now.")}
-            </p>
-            <p className="text-rose-300/90 font-medium border-t border-slate-800 pt-2">
-              {isAutoLogout
-                ? "অ্যাডমিন আপনার অ্যাকাউন্টটি ব্লক করেছেন, তাই আপনাকে স্বয়ংক্রিয়ভাবে লগ-আউট করা হয়েছে। পরবর্তীতে আর লগ-ইন করতে পারবেন না।"
-                : "অ্যাডমিন আপনার অ্যাকাউন্টটি ব্লক করেছেন। অ্যাকাউন্ট পুনরায় চালু না করা পর্যন্ত আপনি লগ-ইন করতে পারবেন না।"}
-            </p>
+            {language === "bn" ? (
+              <p className="text-rose-200 font-medium">
+                {isAutoLogout
+                  ? "অ্যাডমিন আপনার অ্যাকাউন্টটি ব্লক করেছেন, তাই আপনাকে স্বয়ংক্রিয়ভাবে লগ-আউট করা হয়েছে। অ্যাকাউন্ট পুনরায় চালু না করা পর্যন্ত আর লগ-ইন করতে পারবেন না।"
+                  : "অ্যাডমিন আপনার অ্যাকাউন্টটি ব্লক করেছেন। অ্যাকাউন্ট পুনরায় চালু না করা পর্যন্ত আপনি লগ-ইন করতে পারবেন না।"}
+              </p>
+            ) : (
+              <p className="text-slate-200 font-medium">
+                {notice.message ||
+                  (isAutoLogout
+                    ? "An administrator has blocked your account from User Accounts & RBAC. You have been automatically signed out for security."
+                    : "This account has been blocked by an administrator and cannot sign in right now.")}
+              </p>
+            )}
 
             {notice.email && (
               <div className="flex items-center gap-2 pt-1 text-[11px] font-mono text-slate-400">
@@ -104,7 +119,7 @@ export default function AccountBlockedModal({ notice, onClose }: AccountBlockedM
               onClick={onClose}
               className="w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 transition-all shadow-lg shadow-rose-600/25 cursor-pointer"
             >
-              Understood / ঠিক আছে
+              {language === "bn" ? "ঠিক আছে" : "Understood"}
             </button>
           </div>
         </div>

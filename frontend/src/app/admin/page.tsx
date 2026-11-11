@@ -10874,7 +10874,7 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                    Material Title (হাতে গোনা পরিচ্ছন্ন শিরোনাম) <span className="text-red-500">*</span>
+                    {language === "bn" ? "ম্যাটেরিয়াল শিরোনাম (পরিচ্ছন্ন টাইটেল)" : "Material Title"} <span className="text-red-500">*</span>
                   </label>
                   <span className="text-[10px] font-mono text-slate-400">
                     {contribEditTitle.length}/80
@@ -11002,7 +11002,7 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
               {/* Admin Feedback Message */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Approval Feedback to Student (ঐচ্ছিক মেসেজ)
+                  {language === "bn" ? "শিক্ষার্থীর জন্য অ্যাপ্রুভাল ফিডব্যাক (ঐচ্ছিক)" : "Approval Feedback to Student (Optional)"}
                 </label>
                 <input
                   type="text"

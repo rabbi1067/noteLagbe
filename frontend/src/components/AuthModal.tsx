@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { 
   X, 
   Lock, 
@@ -25,6 +26,7 @@ import { api } from "@/lib/api";
 
 export default function AuthModal() {
   const { showAuthModal, setShowAuthModal, login, register } = useAuth();
+  const { language } = useLanguage();
   
   // Modes: "signin" | "register" | "forgot"
   const [authMode, setAuthMode] = useState<"signin" | "register" | "forgot">("signin");
@@ -135,11 +137,11 @@ export default function AuthModal() {
     const cleanForgotEmail = forgotEmail.trim().toLowerCase();
 
     if (!cleanForgotEmail) {
-      toast.error("অনুগ্রহ করে আপনার রেজিস্টার্ড ইমেইল দিন।");
+      toast.error(language === "bn" ? "অনুগ্রহ করে আপনার রেজিস্টার্ড ইমেইল দিন।" : "Please enter your registered email address.");
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanForgotEmail)) {
-      toast.error("সঠিক ইমেইল ফরম্যাট দিন (e.g. name@seu.edu.bd)।");
+      toast.error(language === "bn" ? "সঠিক ইমেইল ফরম্যাট দিন (e.g. name@seu.edu.bd)।" : "Please enter a valid email address (e.g. name@seu.edu.bd).");
       return;
     }
 
@@ -153,12 +155,12 @@ export default function AuthModal() {
           studentId: res.studentId,
           resetToken: res.resetToken,
         });
-        toast.success(`অ্যাকাউন্ট ভেরিফাইড! (${res.name || cleanForgotEmail}) নতুন পাসওয়ার্ড দিন।`);
+        toast.success(language === "bn" ? `অ্যাকাউন্ট ভেরিফাইড! (${res.name || cleanForgotEmail}) নতুন পাসওয়ার্ড দিন।` : `Account verified! (${res.name || cleanForgotEmail}) Please set your new password.`);
       } else {
-        toast.error(res.message || "এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি।");
+        toast.error(res.message || (language === "bn" ? "এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি।" : "No account was found with this email address."));
       }
     } catch (err: any) {
-      const errMsg = err?.message || "ডাটাবেজে এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি।";
+      const errMsg = err?.message || (language === "bn" ? "ডাটাবেজে এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি।" : "No account found with this email in the database.");
       if (err?.code !== "ACCOUNT_BLOCKED" && !err?.blocked) { toast.error(errMsg); }
     } finally {
       setForgotLoading(false);
@@ -170,11 +172,11 @@ export default function AuthModal() {
     if (!verifiedAccount) return;
 
     if (!newPassword || newPassword.trim().length < 6) {
-      toast.error("নতুন পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।");
+      toast.error(language === "bn" ? "নতুন পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।" : "New password must be at least 6 characters long.");
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error("পাসওয়ার্ড দুটি মেলেনি! দয়া করে আবার চেক করুন।");
+      toast.error(language === "bn" ? "পাসওয়ার্ড দুটি মেলেনি! দয়া করে আবার চেক করুন।" : "Passwords do not match! Please check again.");
       return;
     }
 
@@ -187,7 +189,7 @@ export default function AuthModal() {
       });
 
       if (res && res.success) {
-        toast.success("পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে! এখন লগইন করুন।");
+        toast.success(language === "bn" ? "পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে! এখন লগইন করুন।" : "Password updated successfully! Please sign in now.");
         setEmail(verifiedAccount.email);
         setPassword(newPassword.trim());
         setVerifiedAccount(null);
@@ -195,10 +197,10 @@ export default function AuthModal() {
         setConfirmPassword("");
         setAuthMode("signin");
       } else {
-        toast.error(res.message || "পাসওয়ার্ড পরিবর্তন করা যায়নি।");
+        toast.error(res.message || (language === "bn" ? "পাসওয়ার্ড পরিবর্তন করা যায়নি।" : "Unable to update password."));
       }
     } catch (err: any) {
-      if (err?.code !== "ACCOUNT_BLOCKED" && !err?.blocked) { toast.error(err?.message || "পাসওয়ার্ড রিসেট করতে সমস্যা হয়েছে।"); }
+      if (err?.code !== "ACCOUNT_BLOCKED" && !err?.blocked) { toast.error(err?.message || (language === "bn" ? "পাসওয়ার্ড রিসেট করতে সমস্যা হয়েছে।" : "Failed to reset password. Please try again.")); }
     } finally {
       setResetLoading(false);
     }
@@ -279,7 +281,7 @@ export default function AuthModal() {
                   <div className="flex items-center gap-2 mb-1">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                     <span className="text-xs font-bold text-blue-950 dark:text-blue-200">
-                      অ্যাকাউন্ট ভেরিফাইড (Database Verified)
+                      {language === "bn" ? "অ্যাকাউন্ট ভেরিফাইড (ডাটাবেজ)" : "Database Verified Account"}
                     </span>
                   </div>
                   <div className="text-xs text-slate-700 dark:text-slate-300">
@@ -393,7 +395,9 @@ export default function AuthModal() {
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1">
                     <Info className="w-3 h-3 text-blue-500 shrink-0" />
-                    শুধুমাত্র ডাটাবেজে রেজিস্টার্ড ইমেইল থাকলেই পাসওয়ার্ড রিসেট করা যাবে।
+                    {language === "bn"
+                    ? "শুধুমাত্র ডাটাবেজে রেজিস্টার্ড ইমেইল থাকলেই পাসওয়ার্ড রিসেট করা যাবে।"
+                    : "Password reset is only available for emails registered in the database."}
                   </p>
                 </div>
 

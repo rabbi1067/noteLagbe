@@ -58,13 +58,13 @@ public class InputSanitizationService {
      */
     public String validateGenuineText(String text, String fieldName, int minLen, int maxLen, boolean checkProfanity) {
         if (text == null || text.trim().isEmpty()) {
-            throw new ApiException(fieldName + " cannot be empty / " + fieldName + " খালি রাখা যাবে না।");
+            throw new ApiException(fieldName + " cannot be empty.");
         }
 
         // 1. Detect direct HTML/script/XSS injection attempts
         if (SCRIPT_OR_HTML_PATTERN.matcher(text).find() || text.contains("<") || text.contains(">")) {
             throw new ApiException(
-                    "HTML tags, scripts, and code snippets are not allowed in " + fieldName + " / কোনো প্রকার HTML বা স্ক্রিপ্ট দেওয়া যাবে না।"
+                    "HTML tags, scripts, and code snippets are not allowed in " + fieldName + "."
             );
         }
 
@@ -74,26 +74,26 @@ public class InputSanitizationService {
         // 3. Length boundaries
         if (clean.length() < minLen) {
             throw new ApiException(
-                    fieldName + " must be at least " + minLen + " characters long / " + fieldName + " কমপক্ষে " + minLen + " অক্ষরের হতে হবে।"
+                    fieldName + " must be at least " + minLen + " characters long."
             );
         }
         if (clean.length() > maxLen) {
             throw new ApiException(
-                    fieldName + " cannot exceed " + maxLen + " characters / " + fieldName + " " + maxLen + " অক্ষরের বেশি হতে পারবে না।"
+                    fieldName + " cannot exceed " + maxLen + " characters."
             );
         }
 
         // 4. Excessive repeating characters spam check (e.g. "aaaaaaa", "zzzzzzz", "111111")
         if (REPEATING_CHARS_STRICT.matcher(clean).find()) {
             throw new ApiException(
-                    fieldName + " contains excessive repetitive spam characters / অতিরিক্ত পুনরাবৃত্তিমূলক অক্ষর দেওয়া যাবে না।"
+                    fieldName + " contains excessive repetitive spam characters."
             );
         }
 
         // 5. Gibberish consonant keyboard mash check (e.g. "asdfghjklzxcvbnm", "qwrtsdfg")
         if (CONSONANT_MASH.matcher(clean).find()) {
             throw new ApiException(
-                    fieldName + " contains unrecognized gibberish. Please write meaningful words / অর্থপূর্ণ বাক্য লিখুন, এলোমেলো অক্ষর দেওয়া যাবে না।"
+                    fieldName + " contains unrecognized gibberish. Please write meaningful words."
             );
         }
 
@@ -107,7 +107,7 @@ public class InputSanitizationService {
             }
             if (uniqueChars.size() < 4) {
                 throw new ApiException(
-                        fieldName + " does not appear to be meaningful text. Please provide genuine content / অর্থপূর্ণ ও পরিষ্কার মন্তব্য লিখুন।"
+                        fieldName + " does not appear to be meaningful text. Please provide genuine content."
                 );
             }
         }
@@ -115,7 +115,7 @@ public class InputSanitizationService {
         // 7. Profanity & abusive language check
         if (checkProfanity && profanityFilterService.containsProfanity(clean)) {
             throw new ApiException(
-                    fieldName + " contains inappropriate or abusive language. Please keep your submission respectful / আপত্তিকর বা অসম্মানজনক শব্দ ব্যবহার করা যাবে না।"
+                    fieldName + " contains inappropriate or abusive language. Please keep your submission respectful."
             );
         }
 
@@ -149,7 +149,7 @@ public class InputSanitizationService {
         }
 
         if (REPEATING_CHARS_CHAT.matcher(clean).find()) {
-            throw new ApiException("Message contains repetitive spam characters / অতিরিক্ত পুনরাবৃত্তিমূলক অক্ষর পাঠানো যাবে না।");
+            throw new ApiException("Message contains repetitive spam characters.");
         }
 
         if (CONSONANT_MASH.matcher(clean).find()) {
@@ -172,14 +172,14 @@ public class InputSanitizationService {
      */
     public String sanitizeAndValidateTransactionId(String trxId) {
         if (trxId == null || trxId.trim().isEmpty()) {
-            throw new ApiException("Transaction ID is required / ট্রানজেকশন আইডি দিন।");
+            throw new ApiException("Transaction ID is required.");
         }
 
         String clean = trxId.trim().replaceAll("\\s+", "").toUpperCase();
 
         if (!TRX_ID_REGEX.matcher(clean).matches()) {
             throw new ApiException(
-                    "Invalid Transaction ID. Must be 6 to 25 uppercase alphanumeric characters (e.g. BL9A7XYZ89) / সঠিক ট্রানজেকশন আইডি প্রদান করুন (যেমন: BL9A7XYZ89)।"
+                    "Invalid Transaction ID. Must be 6 to 25 uppercase alphanumeric characters (e.g. BL9A7XYZ89)."
             );
         }
 
@@ -191,7 +191,7 @@ public class InputSanitizationService {
      */
     public String sanitizeAndValidatePhoneNumber(String phone) {
         if (phone == null || phone.trim().isEmpty()) {
-            throw new ApiException("Mobile phone number is required / মোবাইল নম্বর দিন।");
+            throw new ApiException("Mobile phone number is required.");
         }
 
         String clean = phone.trim().replaceAll("[\\s\\-\\(\\)]", "");
@@ -204,7 +204,7 @@ public class InputSanitizationService {
 
         if (!BD_PHONE_REGEX.matcher(clean).matches()) {
             throw new ApiException(
-                    "Invalid phone number. Please enter a valid 11-digit Bangladeshi mobile number (e.g. 01712345678) / সঠিক ১১ ডিজিটের বাংলাদেশী মোবাইল নম্বর দিন (যেমন: 01712345678)।"
+                    "Invalid phone number. Please enter a valid 11-digit Bangladeshi mobile number (e.g. 01712345678)."
             );
         }
 
@@ -216,14 +216,14 @@ public class InputSanitizationService {
      */
     public String sanitizeAndValidateStudentId(String studentId) {
         if (studentId == null || studentId.trim().isEmpty()) {
-            throw new ApiException("Student ID is required / স্টুডেন্ট আইডি দিন।");
+            throw new ApiException("Student ID is required.");
         }
 
         String clean = studentId.trim();
 
         if (!STUDENT_ID_REGEX.matcher(clean).matches()) {
             throw new ApiException(
-                    "Invalid Student ID format. Only alphanumeric characters and hyphens allowed (5-20 chars) / সঠিক স্টুডেন্ট আইডি প্রদান করুন।"
+                    "Invalid Student ID format. Only alphanumeric characters and hyphens allowed (5-20 chars)."
             );
         }
 

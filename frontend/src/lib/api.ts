@@ -124,7 +124,9 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
       errorMessage = errorData.bengaliMessage || errorData.message || errorData.error || errorMessage;
     } catch {
       if (response.status === 429) {
-        errorMessage = "Too many requests! Please slow down and wait a moment before trying again. / আপনি খুব দ্রুত ক্লিক করছেন, দয়া করে কিছুক্ষণ অপেক্ষা করুন।";
+        errorMessage = isBanglaLocale()
+        ? "আপনি খুব দ্রুত ক্লিক করছেন, দয়া করে কিছুক্ষণ অপেক্ষা করে আবার চেষ্টা করুন।"
+        : "Too many requests! Please slow down and wait a moment before trying again.";
       } else {
         errorMessage = `HTTP error ${response.status}: ${response.statusText}`;
       }
@@ -168,6 +170,15 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
   return response.json();
 }
 
+function isBanglaLocale(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem("notelagbe_language") === "bn";
+  } catch {
+    return false;
+  }
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const method = (options.method || "GET").toUpperCase();
   const isMutation = ["POST", "PUT", "DELETE", "PATCH"].includes(method);
@@ -182,7 +193,11 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     
     // Drop rapid clicks arriving within 350ms on the exact same endpoint
     if (now - lastTime < 350) {
-      throw new Error("You are clicking too fast! Please wait a moment. / অতিরিক্ত ক্লিক করবেন না, দয়া করে এক মুহূর্ত অপেক্ষা করুন।");
+      throw new Error(
+        isBanglaLocale()
+          ? "অতিরিক্ত ক্লিক করবেন না, দয়া করে এক মুহূর্ত অপেক্ষা করুন।"
+          : "You are clicking too fast! Please wait a moment."
+      );
     }
     lastMutationTimestamps.set(endpoint, now);
 
