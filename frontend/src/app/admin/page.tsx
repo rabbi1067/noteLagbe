@@ -422,6 +422,18 @@ export default function AdminDashboardPage() {
   const [smtpConfigured, setSmtpConfigured] = useState<boolean>(false);
   const [smtpSender, setSmtpSender] = useState<string>("Not Configured");
   const [smtpHost, setSmtpHost] = useState<string>("smtp.gmail.com:587 (TLS)");
+  const [emailProvider, setEmailProvider] = useState<string>("SMTP");
+  const [emailSenderInput, setEmailSenderInput] = useState<string>("");
+  const [emailSenderNameInput, setEmailSenderNameInput] = useState<string>("NoteLagbe • Southeast University");
+  const [emailHostInput, setEmailHostInput] = useState<string>("smtp.gmail.com");
+  const [emailPortInput, setEmailPortInput] = useState<number>(587);
+  const [emailSecretInput, setEmailSecretInput] = useState<string>("");
+  const [showEmailSecret, setShowEmailSecret] = useState<boolean>(false);
+  const [emailHasSecret, setEmailHasSecret] = useState<boolean>(false);
+  const [emailSecretPreview, setEmailSecretPreview] = useState<string>("");
+  const [emailCredentialSource, setEmailCredentialSource] = useState<string>("NOT_CONFIGURED");
+  const [savingEmailConfig, setSavingEmailConfig] = useState<boolean>(false);
+  const [showEmailConfigForm, setShowEmailConfigForm] = useState<boolean>(false);
   const [togglingEmail, setTogglingEmail] = useState(false);
   const [testingEmail, setTestingEmail] = useState(false);
   const [showSmtpGuide, setShowSmtpGuide] = useState(false);
@@ -1065,8 +1077,16 @@ export default function AdminDashboardPage() {
         api.admin.getSettings().catch(() => ({
           emailNotificationsEnabled: true,
           smtpConfigured: false,
+          provider: "SMTP",
           smtpSender: "Not Configured",
+          senderEmail: "",
+          senderName: "NoteLagbe • Southeast University",
           smtpHost: "smtp.gmail.com:587 (TLS)",
+          rawSmtpHost: "smtp.gmail.com",
+          smtpPort: 587,
+          hasSecret: false,
+          secretPreview: "",
+          credentialSource: "NOT_CONFIGURED",
           statusMessage: "Default",
         })),
         api.admin.getReviews().catch(() => []),
@@ -1111,6 +1131,14 @@ export default function AdminDashboardPage() {
         }
         if (settingsData.smtpSender) setSmtpSender(settingsData.smtpSender);
         if (settingsData.smtpHost) setSmtpHost(settingsData.smtpHost);
+        if (settingsData.provider) setEmailProvider(settingsData.provider);
+        if (settingsData.senderEmail !== undefined) setEmailSenderInput(settingsData.senderEmail || "");
+        if (settingsData.senderName) setEmailSenderNameInput(settingsData.senderName);
+        if (settingsData.rawSmtpHost) setEmailHostInput(settingsData.rawSmtpHost);
+        if (settingsData.smtpPort) setEmailPortInput(settingsData.smtpPort);
+        if (typeof settingsData.hasSecret === "boolean") setEmailHasSecret(settingsData.hasSecret);
+        if (settingsData.secretPreview !== undefined) setEmailSecretPreview(settingsData.secretPreview || "");
+        if (settingsData.credentialSource) setEmailCredentialSource(settingsData.credentialSource);
       }
       if (cList && cList.length > 0 && !resCourseCode) {
         setResCourseCode(cList[0].code);
@@ -2595,12 +2623,94 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleSaveEmailConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSuperAdmin) {
+      toast.error(language === "bn" ? "শুধুমাত্র সুপার অ্যাডমিন ইমেইল কনফিগারেশন পরিবর্তন করতে পারবেন।" : "Only Super Administrators can update email delivery settings.");
+      return;
+    }
+    setSavingEmailConfig(true);
+    try {
+      const updated = await api.admin.saveEmailConfig({
+        provider: emailProvider,
+        senderEmail: emailSenderInput.trim(),
+        senderName: emailSenderNameInput.trim(),
+        smtpHost: emailHostInput.trim(),
+        smtpPort: emailPortInput,
+        secret: emailSecretInput.trim(),
+      });
+      setSmtpConfigured(updated.smtpConfigured);
+      setSmtpSender(updated.smtpSender);
+      setSmtpHost(updated.smtpHost);
+      setEmailProvider(updated.provider);
+      setEmailSenderInput(updated.senderEmail || "");
+      setEmailSenderNameInput(updated.senderName || "NoteLagbe • Southeast University");
+      setEmailHostInput(updated.rawSmtpHost || "smtp.gmail.com");
+      setEmailPortInput(updated.smtpPort || 587);
+      setEmailHasSecret(updated.hasSecret);
+      setEmailSecretPreview(updated.secretPreview || "");
+      setEmailCredentialSource(updated.credentialSource || "ADMIN_PANEL");
+      setEmailSecretInput("");
+      setShowEmailConfigForm(false);
+      toast.success(
+        language === "bn"
+          ? "ইমেইল ও SMTP কনফিগারেশন সফলভাবে সংরক্ষিত হয়েছে!"
+          : "Email delivery settings saved! Click 'Send Test Email' to verify live inbox delivery."
+      );
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to save email configuration.");
+    } finally {
+      setSavingEmailConfig(false);
+    }
+  };
+
+  const handleResetEmailConfig = async () => {
+    if (!isSuperAdmin) return;
+    setSavingEmailConfig(true);
+    try {
+      const updated = await api.admin.saveEmailConfig({
+        provider: "SMTP",
+        senderEmail: "",
+        clearSavedConfig: true,
+      });
+      setSmtpConfigured(updated.smtpConfigured);
+      setSmtpSender(updated.smtpSender);
+      setSmtpHost(updated.smtpHost);
+      setEmailProvider(updated.provider);
+      setEmailSenderInput(updated.senderEmail || "");
+      setEmailSenderNameInput(updated.senderName || "NoteLagbe • Southeast University");
+      setEmailHostInput(updated.rawSmtpHost || "smtp.gmail.com");
+      setEmailPortInput(updated.smtpPort || 587);
+      setEmailHasSecret(updated.hasSecret);
+      setEmailSecretPreview(updated.secretPreview || "");
+      setEmailCredentialSource(updated.credentialSource || "NOT_CONFIGURED");
+      setEmailSecretInput("");
+      toast.success(
+        language === "bn"
+          ? "কাস্টম সেটিংস মুছে সার্ভার ডিফল্টে ফিরিয়ে আনা হয়েছে।"
+          : "Reverted to server environment defaults."
+      );
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to reset email settings.");
+    } finally {
+      setSavingEmailConfig(false);
+    }
+  };
+
   const handleTestEmail = async () => {
     if (!smtpConfigured) {
-      toast.error("Google App Password is not configured in backend!", {
-        description: "Set SPRING_MAIL_USERNAME and SPRING_MAIL_PASSWORD to dispatch real emails.",
-      });
-      setShowSmtpGuide(true);
+      toast.error(
+        language === "bn"
+          ? "ইমেইল ডেলিভারি ক্রেডেনশিয়াল কনফিগার করা নেই!"
+          : "Email delivery credentials are not configured yet!",
+        {
+          description:
+            language === "bn"
+              ? "নিচের 'Configure Email / SMTP' বাটনে ক্লিক করে আপনার SMTP বা Brevo/Resend তথ্য সেট করুন।"
+              : "Click 'Configure Email / SMTP' below to enter your SMTP App Password or Brevo/Resend HTTPS API key.",
+        }
+      );
+      if (isSuperAdmin) setShowEmailConfigForm(true);
       return;
     }
     setTestingEmail(true);
@@ -2613,7 +2723,7 @@ export default function AdminDashboardPage() {
         toast.error(res.message || "Failed to dispatch test email.");
       }
     } catch (err: any) {
-      toast.error(err.message || "Error testing SMTP connection");
+      toast.error(err.message || "Error testing email delivery connection");
     } finally {
       setTestingEmail(false);
     }
@@ -7538,7 +7648,7 @@ export default function AdminDashboardPage() {
 
                 {/* Column 2: SMTP Email Notifications & Platform Runtime */}
                 <div className="space-y-6 w-full">
-                  {/* Card 3: SMTP Email Notifications */}
+                  {/* Card 3: Email & Password-Reset Delivery Engine */}
                   <div className="p-6 sm:p-7 rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 space-y-5 shadow-sm w-full">
                     <div className="flex items-start justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
                       <div className="space-y-1">
@@ -7546,10 +7656,16 @@ export default function AdminDashboardPage() {
                           <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
                             <Mail className="w-5 h-5" />
                           </div>
-                          <h3 className="text-base font-black text-slate-900 dark:text-white">Automated SMTP Email Notifications</h3>
+                          <h3 className="text-base font-black text-slate-900 dark:text-white">
+                            {language === "bn"
+                              ? "ইমেইল ও ওটিপি ডেলিভারি ইঞ্জিন"
+                              : "Automated Email & OTP Delivery Engine"}
+                          </h3>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed pt-1">
-                          When enabled, branded emails are automatically dispatched via Google App Password SMTP to students upon subscription payment verification and waiver approvals.
+                          {language === "bn"
+                            ? "সক্রিয় থাকলে পেমেন্ট, ওয়েভার, গিফট ও পাসওয়ার্ড রিসেট ৬-ডিজিট নিরাপত্তা কোড সরাসরি শিক্ষার্থীর ইনবক্সে পাঠানো হয়।"
+                            : "Dispatches password-reset 6-digit security codes, payment approvals, waiver confirmations, and gift notifications directly to student inboxes."}
                         </p>
                       </div>
 
@@ -7564,14 +7680,19 @@ export default function AdminDashboardPage() {
                           }`}
                         >
                           {!emailNotificationsEnabled
-                            ? "DISABLED (OFF)"
+                            ? language === "bn"
+                              ? "বন্ধ (OFF)"
+                              : "DISABLED (OFF)"
                             : smtpConfigured
-                            ? "LIVE SMTP CONNECTED"
-                            : "PENDING APP PASSWORD"}
+                            ? `${emailProvider} LIVE`
+                            : language === "bn"
+                            ? "কনফিগার প্রয়োজন"
+                            : "SETUP REQUIRED"}
                         </span>
                         {emailNotificationsEnabled && !smtpConfigured && (
                           <span className="text-[10px] font-bold text-amber-500 flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" /> Dev Simulation Mode
+                            <AlertCircle className="w-3 h-3" />{" "}
+                            {language === "bn" ? "সিমুলেশন মোড" : "Simulation Mode (OTP Blocked)"}
                           </span>
                         )}
                       </div>
@@ -7579,70 +7700,288 @@ export default function AdminDashboardPage() {
 
                     <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 space-y-2 text-xs">
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-500 dark:text-slate-400">SMTP Gateway:</span>
+                        <span className="text-slate-500 dark:text-slate-400">
+                          {language === "bn" ? "ডেলিভারি গেটওয়ে:" : "Active Gateway:"}
+                        </span>
                         <span className="font-mono font-bold text-slate-700 dark:text-slate-300">{smtpHost}</span>
                       </div>
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-500 dark:text-slate-400">Dispatcher Protocol:</span>
-                        <span className="font-bold text-slate-700 dark:text-slate-300">Spring MailSender & JavaMail</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-500 dark:text-slate-400">Authenticated Sender:</span>
-                        <span className={`font-mono font-semibold ${smtpConfigured ? "text-blue-500 dark:text-blue-400" : "text-amber-500 dark:text-amber-400"}`}>
-                          {smtpConfigured ? smtpSender : "Not Configured (Google App Password Missing)"}
+                        <span className="text-slate-500 dark:text-slate-400">
+                          {language === "bn" ? "প্রোটোকল ও সোর্স:" : "Provider & Source:"}
+                        </span>
+                        <span className="font-bold text-slate-700 dark:text-slate-300">
+                          {emailProvider} •{" "}
+                          {emailCredentialSource === "ADMIN_PANEL"
+                            ? "Admin Console"
+                            : emailCredentialSource === "ENVIRONMENT"
+                            ? "Server Env Vars"
+                            : "Unconfigured"}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-500 dark:text-slate-400">Auto-Dispatched Events:</span>
-                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Payments, Waivers & Rewards</span>
+                        <span className="text-slate-500 dark:text-slate-400">
+                          {language === "bn" ? "প্রেরক ইমেইল:" : "Authenticated Sender:"}
+                        </span>
+                        <span className={`font-mono font-semibold ${smtpConfigured ? "text-blue-500 dark:text-blue-400" : "text-amber-500 dark:text-amber-400"}`}>
+                          {smtpConfigured
+                            ? smtpSender
+                            : language === "bn"
+                            ? "কনফিগার করা নেই"
+                            : "Not Configured (Credentials Missing)"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500 dark:text-slate-400">
+                          {language === "bn" ? "সাপোর্টেড ইভেন্ট:" : "Enabled Events:"}
+                        </span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                          Password OTP, Payments, Waivers &amp; Gifts
+                        </span>
                       </div>
                       <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-200/60 dark:border-slate-800/60">
-                        <span className="text-slate-500 dark:text-slate-400">Inbox Delivery Status:</span>
+                        <span className="text-slate-500 dark:text-slate-400">
+                          {language === "bn" ? "ইনবক্স ডেলিভারি স্ট্যাটাস:" : "Inbox Delivery Status:"}
+                        </span>
                         <span className={`font-bold ${smtpConfigured ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
                           {smtpConfigured
-                            ? "Active (Emails dispatched to student inboxes)"
-                            : "Simulated in Server Logs (No real email leaves server)"}
+                            ? language === "bn"
+                              ? "সক্রিয় (শিক্ষার্থীর ইনবক্সে ইমেইল যাচ্ছে)"
+                              : "Active (Real emails & OTP codes dispatched)"
+                            : language === "bn"
+                            ? "সেটআপ বাকি (পাসওয়ার্ড রিসেট কোড যাবে না)"
+                            : "Inactive (Password-reset OTP requires live gateway)"}
                         </span>
                       </div>
                     </div>
 
-                    {/* Pending App Password Alert Box */}
+                    {/* Alert banner + Guide when Email Gateway isn't configured */}
                     {!smtpConfigured && (
                       <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-2.5">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 font-black text-amber-600 dark:text-amber-400">
                             <AlertCircle className="w-4 h-4 shrink-0" />
-                            <span>Kono Google App Password set kora nei</span>
+                            <span>
+                              {language === "bn"
+                                ? "ইমেইল ডেলিভারি (SMTP / API Key) সেট করা নেই"
+                                : "Email Delivery Gateway Not Configured"}
+                            </span>
                           </div>
                           <button
                             type="button"
                             onClick={() => setShowSmtpGuide(!showSmtpGuide)}
-                            className="text-[11px] font-bold text-amber-700 dark:text-amber-300 underline cursor-pointer hover:opacity-80"
+                            className="text-[11px] font-bold text-amber-700 dark:text-amber-300 underline cursor-pointer hover:opacity-80 shrink-0"
                           >
-                            {showSmtpGuide ? "Hide Setup Guide" : "Setup Instructions"}
+                            {showSmtpGuide
+                              ? language === "bn"
+                                ? "গাইড লুকান"
+                                : "Hide Guide"
+                              : language === "bn"
+                              ? "সেটআপ গাইড"
+                              : "Setup Guide"}
                           </button>
                         </div>
                         <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
-                          Notification toggle switch ta ON thakleo Google Gmail theke email delivery korte ekta 16-character <strong>Google App Password</strong> proyojon. Akhon system safe simulation mode-e cholche (payment ba waiver approve korle transaction thik-i hobe, kintu student inbox-e kono real email jabe na).
+                          {language === "bn"
+                            ? "Render Free-তে আউটবাউন্ড SMTP পোর্ট (465/587) ব্লক থাকে। তাই Render Free সার্ভারের জন্য Brevo HTTPS API (Port 443) ব্যবহার করা সেরা, অথবা নিচের কনফিগারেশন ফর্মে আপনার SMTP বা Brevo API Key সরাসরি সেভ করুন।"
+                            : "Cloud hosts such as Render Free block outbound SMTP ports (25/465/587). Use Brevo HTTPS API (Port 443, works with your Gmail address) or configure your custom SMTP gateway below."}
                         </p>
 
                         {showSmtpGuide && (
                           <div className="p-3.5 rounded-xl bg-slate-900/90 border border-amber-500/30 space-y-2 text-[11px] text-slate-200">
-                            <p className="font-bold text-amber-400">Google App Password set korar niyam:</p>
+                            <p className="font-bold text-amber-400">
+                              {language === "bn"
+                                ? "Brevo HTTPS API Key বা Gmail App Password সেটআপ:"
+                                : "Quick Setup (Brevo HTTPS API or Google SMTP):"}
+                            </p>
                             <ol className="list-decimal list-inside space-y-1.5 text-slate-300">
-                              <li>Google Account &gt; <strong>Security</strong> &gt; <strong>2-Step Verification</strong> on korun.</li>
-                              <li>Niche <strong>App passwords</strong>-e click korun.</li>
-                              <li>App name hishebe <code>NoteLagbe</code> likhe <strong>Create</strong> korun (ekta 16-digit password paben).</li>
-                              <li>Render dashboard (Environment tab) ba local backend-e ei environment variables gula add korun:
-                                <pre className="mt-1.5 p-2.5 rounded-lg bg-black text-emerald-400 font-mono text-[10px] overflow-x-auto leading-relaxed">
-{`SPRING_MAIL_USERNAME=your_seu_email@gmail.com
-SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
-                                </pre>
+                              <li>
+                                <strong>Brevo (Render Free Recommended):</strong> Create free account at{" "}
+                                <code>app.brevo.com</code> &rarr; verify your Gmail under{" "}
+                                <em>Senders, Domains &amp; Dedicated IPs</em> &rarr; create a key under{" "}
+                                <em>SMTP &amp; API &rarr; API Keys</em>.
+                              </li>
+                              <li>
+                                Paste your sender Gmail and <code>xkeysib-...</code> key in{" "}
+                                <strong>Configure Gateway</strong> below (or set{" "}
+                                <code>BREVO_API_KEY</code> &amp; <code>EMAIL_FROM</code> in Render Environment Vars).
+                              </li>
+                              <li>
+                                <strong>Local / Paid SMTP:</strong> Use <code>smtp.gmail.com</code> port{" "}
+                                <code>587</code> with your 16-digit Google App Password.
                               </li>
                             </ol>
                           </div>
                         )}
                       </div>
+                    )}
+
+                    {/* Super Admin Interactive Gateway Config Form */}
+                    {isSuperAdmin && showEmailConfigForm && (
+                      <form
+                        onSubmit={handleSaveEmailConfig}
+                        className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-blue-500/30 space-y-4 text-xs"
+                      >
+                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                          <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white">
+                            <KeyRound className="w-4 h-4 text-blue-500" />
+                            <span>
+                              {language === "bn"
+                                ? "ইমেইল ডেলিভারি / SMTP কনফিগারেশন"
+                                : "Configure Email / SMTP Gateway"}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowEmailConfigForm(false)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="sm:col-span-2 space-y-1">
+                            <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                              {language === "bn" ? "ডেলিভারি প্রোভাইডার" : "Delivery Gateway Provider"}
+                            </label>
+                            <select
+                              value={emailProvider}
+                              onChange={(e) => setEmailProvider(e.target.value)}
+                              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                            >
+                              <option value="BREVO">Brevo HTTPS API (Port 443 — Works on Render Free)</option>
+                              <option value="RESEND">Resend HTTPS API (Port 443 — Verified Domain)</option>
+                              <option value="SMTP">Google / Custom SMTP (Port 587/465 — Local / Paid Host)</option>
+                            </select>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                              {language === "bn" ? "প্রেরক ইমেইল *" : "Sender Email *"}
+                            </label>
+                            <input
+                              type="email"
+                              required
+                              placeholder="your_email@gmail.com"
+                              value={emailSenderInput}
+                              onChange={(e) => setEmailSenderInput(e.target.value)}
+                              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                              {language === "bn" ? "প্রেরকের নাম" : "Sender Display Name"}
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="NoteLagbe • Southeast University"
+                              value={emailSenderNameInput}
+                              onChange={(e) => setEmailSenderNameInput(e.target.value)}
+                              className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                            />
+                          </div>
+
+                          {emailProvider === "SMTP" && (
+                            <>
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                                  SMTP Host
+                                </label>
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder="smtp.gmail.com"
+                                  value={emailHostInput}
+                                  onChange={(e) => setEmailHostInput(e.target.value)}
+                                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                                  SMTP Port
+                                </label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={65535}
+                                  required
+                                  value={emailPortInput}
+                                  onChange={(e) => setEmailPortInput(Number(e.target.value) || 587)}
+                                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                                />
+                              </div>
+                            </>
+                          )}
+
+                          <div className="sm:col-span-2 space-y-1">
+                            <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                              {emailProvider === "SMTP"
+                                ? language === "bn"
+                                  ? "Google App Password / SMTP পাসওয়ার্ড"
+                                  : "Google App Password / SMTP Password"
+                                : `${emailProvider} API Key`}
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showEmailSecret ? "text" : "password"}
+                                required={!emailHasSecret}
+                                placeholder={
+                                  emailHasSecret
+                                    ? `Saved credential (${emailSecretPreview || "••••"}) — leave blank to keep`
+                                    : emailProvider === "BREVO"
+                                    ? "xkeysib-..."
+                                    : emailProvider === "RESEND"
+                                    ? "re_..."
+                                    : "xxxx xxxx xxxx xxxx"
+                                }
+                                value={emailSecretInput}
+                                onChange={(e) => setEmailSecretInput(e.target.value)}
+                                className="w-full pl-3 pr-9 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowEmailSecret(!showEmailSecret)}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white"
+                              >
+                                {showEmailSecret ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                          {emailCredentialSource === "ADMIN_PANEL" ? (
+                            <button
+                              type="button"
+                              disabled={savingEmailConfig}
+                              onClick={handleResetEmailConfig}
+                              className="px-3 py-2 rounded-xl text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                            >
+                              {language === "bn" ? "ডিফল্টে ফেরান" : "Revert to Env Defaults"}
+                            </button>
+                          ) : (
+                            <span />
+                          )}
+
+                          <button
+                            type="submit"
+                            disabled={savingEmailConfig}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 shadow-sm transition-all"
+                          >
+                            <Save className="w-3.5 h-3.5" />
+                            <span>
+                              {savingEmailConfig
+                                ? language === "bn"
+                                  ? "সংরক্ষণ হচ্ছে..."
+                                  : "Saving..."
+                                : language === "bn"
+                                ? "সেটিংস সংরক্ষণ করুন"
+                                : "Save Email Gateway"}
+                            </span>
+                          </button>
+                        </div>
+                      </form>
                     )}
 
                     <div className="pt-1 flex flex-wrap items-center gap-3">
@@ -7658,6 +7997,25 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                         <Mail className="w-4 h-4" />
                         <span>{emailNotificationsEnabled ? "Turn OFF Email Notifications" : "Turn ON Email Notifications"}</span>
                       </button>
+
+                      {isSuperAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => setShowEmailConfigForm(!showEmailConfigForm)}
+                          className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold bg-blue-600/10 hover:bg-blue-600/20 text-blue-600 dark:text-blue-400 border border-blue-500/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <Sliders className="w-3.5 h-3.5" />
+                          <span>
+                            {showEmailConfigForm
+                              ? language === "bn"
+                                ? "ফর্ম বন্ধ করুন"
+                                : "Close Setup Form"
+                              : language === "bn"
+                              ? "SMTP / API সেটআপ"
+                              : "Configure Email / SMTP"}
+                          </span>
+                        </button>
+                      )}
 
                       <button
                         onClick={handleTestEmail}

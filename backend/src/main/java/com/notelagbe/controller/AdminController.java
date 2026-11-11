@@ -768,35 +768,64 @@ public class AdminController {
     // ==========================================
     @GetMapping("/settings")
     public ResponseEntity<Map<String, Object>> getSystemSettings() {
-        return ResponseEntity.ok(Map.of(
-                "emailNotificationsEnabled", emailService.isEmailNotificationsEnabled(),
-                "smtpConfigured", emailService.isSmtpConfigured(),
-                "smtpSender", emailService.getSmtpSender(),
-                "smtpHost", emailService.getSmtpHost(),
-                "statusMessage", emailService.isSmtpConfigured()
-                        ? "Google SMTP Authenticated & Ready"
-                        : "Dev Simulation Mode (Google App Password not configured)"
-        ));
+        return ResponseEntity.ok(emailService.getSettingsSummary());
+    }
+
+    @PutMapping("/settings/email-config")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<Map<String, Object>> updateEmailConfiguration(
+            @RequestBody Map<String, Object> body,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        String provider = body != null && body.get("provider") != null ? body.get("provider").toString() : "SMTP";
+        String senderEmail = body != null && body.get("senderEmail") != null ? body.get("senderEmail").toString() : "";
+        String senderName = body != null && body.get("senderName") != null ? body.get("senderName").toString() : "";
+        String smtpHost = body != null && body.get("smtpHost") != null ? body.get("smtpHost").toString() : "smtp.gmail.com";
+        Integer smtpPort = 587;
+        if (body != null && body.get("smtpPort") != null && !body.get("smtpPort").toString().isBlank()) {
+            try {
+                smtpPort = Integer.parseInt(body.get("smtpPort").toString().trim());
+            } catch (NumberFormatException ex) {
+                throw new ApiException("SMTP port must be a valid number.");
+            }
+        }
+        String secret = body != null && body.get("secret") != null ? body.get("secret").toString() : "";
+        boolean clearSavedConfig = body != null && Boolean.parseBoolean(String.valueOf(body.getOrDefault("clearSavedConfig", false)));
+
+        User actor = resolveActor(userDetails);
+        Map<String, Object> summary = emailService.saveEmailConfig(
+                provider, senderEmail, senderName, smtpHost, smtpPort, secret, clearSavedConfig
+        );
+        String auditDetail = clearSavedConfig
+                ? formatActorPrefix(actor) + " reset email delivery configuration to server environment defaults"
+                : formatActorPrefix(actor) + " updated email delivery gateway (" + summary.get("provider")
+                        + " • Sender: " + summary.get("smtpSender") + ")";
+        logAdminAction(actor, "EMAIL_CONFIG_UPDATE", "SYSTEM", auditDetail);
+        return ResponseEntity.ok(summary);
     }
 
     @PostMapping("/settings/send-test-email")
     public ResponseEntity<Map<String, Object>> sendTestEmail(
             @RequestBody(required = false) Map<String, String> body,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         String recipient = body != null && body.containsKey("recipientEmail") && !body.get("recipientEmail").isBlank()
                 ? body.get("recipientEmail")
-                : (userDetails != null && userDetails.getUser() != null ? userDetails.getUser().getEmail() : "admin@seu.edu.bd");
+                : (actor != null && actor.getEmail() != null ? actor.getEmail() : "admin@seu.edu.bd");
         Map<String, Object> result = emailService.sendTestEmail(recipient);
-        logAdminAction("TEST_EMAIL", "SYSTEM", "Admin triggered test email to " + recipient + ": success=" + result.get("success"));
+        logAdminAction(actor, "TEST_EMAIL", "SYSTEM",
+                formatActorPrefix(actor) + " triggered test email to " + recipient + ": success=" + result.get("success"));
         return ResponseEntity.ok(result);
     }
 
     @PostMapping("/settings/email-toggle")
     public ResponseEntity<Map<String, Object>> toggleEmailNotifications(
-            @RequestBody Map<String, Boolean> body) {
+            @RequestBody Map<String, Boolean> body,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
         boolean enabled = body != null && body.getOrDefault("enabled", true);
         emailService.setEmailNotificationsEnabled(enabled);
-        logAdminAction("SETTINGS_UPDATE", "SYSTEM", "Admin updated notification settings: emailNotificationsEnabled=" + enabled);
+        logAdminAction(actor, "SETTINGS_UPDATE", "SYSTEM",
+                formatActorPrefix(actor) + " updated notification settings: emailNotificationsEnabled=" + enabled);
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "emailNotificationsEnabled", enabled

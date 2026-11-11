@@ -579,10 +579,45 @@ export const api = {
       request<{
         emailNotificationsEnabled: boolean;
         smtpConfigured: boolean;
+        provider?: "SMTP" | "BREVO" | "RESEND" | string;
         smtpSender: string;
+        senderEmail?: string;
+        senderName?: string;
         smtpHost: string;
+        rawSmtpHost?: string;
+        smtpPort?: number;
+        hasSecret?: boolean;
+        secretPreview?: string;
+        credentialSource?: string;
         statusMessage: string;
       }>("/admin/settings"),
+    saveEmailConfig: (data: {
+      provider: string;
+      senderEmail: string;
+      senderName?: string;
+      smtpHost?: string;
+      smtpPort?: number;
+      secret?: string;
+      clearSavedConfig?: boolean;
+    }) =>
+      request<{
+        emailNotificationsEnabled: boolean;
+        smtpConfigured: boolean;
+        provider: string;
+        smtpSender: string;
+        senderEmail: string;
+        senderName: string;
+        smtpHost: string;
+        rawSmtpHost: string;
+        smtpPort: number;
+        hasSecret: boolean;
+        secretPreview: string;
+        credentialSource: string;
+        statusMessage: string;
+      }>("/admin/settings/email-config", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
     toggleEmail: (enabled: boolean) =>
       request<{ success: boolean; emailNotificationsEnabled: boolean }>("/admin/settings/email-toggle", {
         method: "POST",
