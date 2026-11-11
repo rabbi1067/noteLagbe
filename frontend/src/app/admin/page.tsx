@@ -427,6 +427,7 @@ export default function AdminDashboardPage() {
   const [emailSenderNameInput, setEmailSenderNameInput] = useState<string>("NoteLagbe • Southeast University");
   const [emailHostInput, setEmailHostInput] = useState<string>("smtp.gmail.com");
   const [emailPortInput, setEmailPortInput] = useState<number>(587);
+  const [emailWebhookUrlInput, setEmailWebhookUrlInput] = useState<string>("");
   const [emailSecretInput, setEmailSecretInput] = useState<string>("");
   const [showEmailSecret, setShowEmailSecret] = useState<boolean>(false);
   const [emailHasSecret, setEmailHasSecret] = useState<boolean>(false);
@@ -1084,6 +1085,7 @@ export default function AdminDashboardPage() {
           smtpHost: "smtp.gmail.com:587 (TLS)",
           rawSmtpHost: "smtp.gmail.com",
           smtpPort: 587,
+          webhookUrl: "",
           hasSecret: false,
           secretPreview: "",
           credentialSource: "NOT_CONFIGURED",
@@ -1136,6 +1138,7 @@ export default function AdminDashboardPage() {
         if (settingsData.senderName) setEmailSenderNameInput(settingsData.senderName);
         if (settingsData.rawSmtpHost) setEmailHostInput(settingsData.rawSmtpHost);
         if (settingsData.smtpPort) setEmailPortInput(settingsData.smtpPort);
+        if (settingsData.webhookUrl !== undefined) setEmailWebhookUrlInput(settingsData.webhookUrl || "");
         if (typeof settingsData.hasSecret === "boolean") setEmailHasSecret(settingsData.hasSecret);
         if (settingsData.secretPreview !== undefined) setEmailSecretPreview(settingsData.secretPreview || "");
         if (settingsData.credentialSource) setEmailCredentialSource(settingsData.credentialSource);
@@ -2637,6 +2640,7 @@ export default function AdminDashboardPage() {
         senderName: emailSenderNameInput.trim(),
         smtpHost: emailHostInput.trim(),
         smtpPort: emailPortInput,
+        webhookUrl: emailWebhookUrlInput.trim(),
         secret: emailSecretInput.trim(),
       });
       setSmtpConfigured(updated.smtpConfigured);
@@ -2647,6 +2651,7 @@ export default function AdminDashboardPage() {
       setEmailSenderNameInput(updated.senderName || "NoteLagbe • Southeast University");
       setEmailHostInput(updated.rawSmtpHost || "smtp.gmail.com");
       setEmailPortInput(updated.smtpPort || 587);
+      setEmailWebhookUrlInput(updated.webhookUrl || "");
       setEmailHasSecret(updated.hasSecret);
       setEmailSecretPreview(updated.secretPreview || "");
       setEmailCredentialSource(updated.credentialSource || "ADMIN_PANEL");
@@ -2681,6 +2686,7 @@ export default function AdminDashboardPage() {
       setEmailSenderNameInput(updated.senderName || "NoteLagbe • Southeast University");
       setEmailHostInput(updated.rawSmtpHost || "smtp.gmail.com");
       setEmailPortInput(updated.smtpPort || 587);
+      setEmailWebhookUrlInput(updated.webhookUrl || "");
       setEmailHasSecret(updated.hasSecret);
       setEmailSecretPreview(updated.secretPreview || "");
       setEmailCredentialSource(updated.credentialSource || "NOT_CONFIGURED");
@@ -7790,24 +7796,37 @@ export default function AdminDashboardPage() {
                           <div className="p-3.5 rounded-xl bg-slate-900/90 border border-amber-500/30 space-y-2 text-[11px] text-slate-200">
                             <p className="font-bold text-amber-400">
                               {language === "bn"
-                                ? "Brevo HTTPS API Key বা Gmail App Password সেটআপ:"
-                                : "Quick Setup (Brevo HTTPS API or Google SMTP):"}
+                                ? "ফোন ভেরিফিকেশন ছাড়াই Gmail Apps Script / Brevo সেটআপ:"
+                                : "Zero-SMS Setup (Gmail via Google Apps Script on Port 443):"}
                             </p>
                             <ol className="list-decimal list-inside space-y-1.5 text-slate-300">
                               <li>
-                                <strong>Brevo (Render Free Recommended):</strong> Create free account at{" "}
-                                <code>app.brevo.com</code> &rarr; verify your Gmail under{" "}
-                                <em>Senders, Domains &amp; Dedicated IPs</em> &rarr; create a key under{" "}
-                                <em>SMTP &amp; API &rarr; API Keys</em>.
+                                <strong>Recommended (No Phone SMS, No Custom Domain):</strong> Open{" "}
+                                <code>script.google.com</code> → New project → paste the relay script below →{" "}
+                                <em>Deploy → New deployment → Web app</em> (Execute as: <strong>Me</strong>, Who has access:{" "}
+                                <strong>Anyone</strong>).
+                                <pre className="mt-1.5 p-2.5 rounded-lg bg-black text-emerald-400 font-mono text-[10px] overflow-x-auto leading-relaxed">
+{`function doPost(e) {
+  var d = JSON.parse(e.postData.contents);
+  if (d.secret !== "NoteLagbeSecret2026") {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "Unauthorized" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  GmailApp.sendEmail(d.to, d.subject, " ", { htmlBody: d.html, name: d.senderName || "NoteLagbe" });
+  return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+    .setMimeType(ContentService.MimeType.JSON);
+}`}
+                                </pre>
                               </li>
                               <li>
-                                Paste your sender Gmail and <code>xkeysib-...</code> key in{" "}
-                                <strong>Configure Gateway</strong> below (or set{" "}
-                                <code>BREVO_API_KEY</code> &amp; <code>EMAIL_FROM</code> in Render Environment Vars).
+                                Select <strong>Gmail via Google Apps Script</strong> in{" "}
+                                <strong>Configure Email / SMTP</strong> below, paste the Web App{" "}
+                                <code>/exec</code> URL, your Gmail address, and the same secret token (
+                                <code>NoteLagbeSecret2026</code> or your own).
                               </li>
                               <li>
-                                <strong>Local / Paid SMTP:</strong> Use <code>smtp.gmail.com</code> port{" "}
-                                <code>587</code> with your 16-digit Google App Password.
+                                <strong>Alternatives:</strong> <code>BREVO_API_KEY</code> (if phone verified) or{" "}
+                                <code>SMTP</code> (<code>smtp.gmail.com:587</code> on local/paid servers).
                               </li>
                             </ol>
                           </div>
@@ -7849,6 +7868,7 @@ export default function AdminDashboardPage() {
                               onChange={(e) => setEmailProvider(e.target.value)}
                               className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
                             >
+                              <option value="APPS_SCRIPT">Gmail via Google Apps Script (Port 443 — No SMS, Works on Render Free)</option>
                               <option value="BREVO">Brevo HTTPS API (Port 443 — Works on Render Free)</option>
                               <option value="RESEND">Resend HTTPS API (Port 443 — Verified Domain)</option>
                               <option value="SMTP">Google / Custom SMTP (Port 587/465 — Local / Paid Host)</option>
@@ -7881,6 +7901,22 @@ export default function AdminDashboardPage() {
                               className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
                             />
                           </div>
+
+                          {emailProvider === "APPS_SCRIPT" && (
+                            <div className="sm:col-span-2 space-y-1">
+                              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                                Google Apps Script Web App URL *
+                              </label>
+                              <input
+                                type="url"
+                                required
+                                placeholder="https://script.google.com/macros/s/.../exec"
+                                value={emailWebhookUrlInput}
+                                onChange={(e) => setEmailWebhookUrlInput(e.target.value)}
+                                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                              />
+                            </div>
+                          )}
 
                           {emailProvider === "SMTP" && (
                             <>
@@ -7920,6 +7956,10 @@ export default function AdminDashboardPage() {
                                 ? language === "bn"
                                   ? "Google App Password / SMTP পাসওয়ার্ড"
                                   : "Google App Password / SMTP Password"
+                                : emailProvider === "APPS_SCRIPT"
+                                ? language === "bn"
+                                  ? "Apps Script সিক্রেট টোকেন (সর্বনিম্ন ৮ অক্ষর)"
+                                  : "Apps Script Shared Secret Token (min 8 chars)"
                                 : `${emailProvider} API Key`}
                             </label>
                             <div className="relative">
@@ -7929,6 +7969,8 @@ export default function AdminDashboardPage() {
                                 placeholder={
                                   emailHasSecret
                                     ? `Saved credential (${emailSecretPreview || "••••"}) — leave blank to keep`
+                                    : emailProvider === "APPS_SCRIPT"
+                                    ? "NoteLagbeSecret2026"
                                     : emailProvider === "BREVO"
                                     ? "xkeysib-..."
                                     : emailProvider === "RESEND"

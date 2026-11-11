@@ -579,13 +579,14 @@ export const api = {
       request<{
         emailNotificationsEnabled: boolean;
         smtpConfigured: boolean;
-        provider?: "SMTP" | "BREVO" | "RESEND" | string;
+        provider?: "APPS_SCRIPT" | "SMTP" | "BREVO" | "RESEND" | string;
         smtpSender: string;
         senderEmail?: string;
         senderName?: string;
         smtpHost: string;
         rawSmtpHost?: string;
         smtpPort?: number;
+        webhookUrl?: string;
         hasSecret?: boolean;
         secretPreview?: string;
         credentialSource?: string;
@@ -597,6 +598,7 @@ export const api = {
       senderName?: string;
       smtpHost?: string;
       smtpPort?: number;
+      webhookUrl?: string;
       secret?: string;
       clearSavedConfig?: boolean;
     }) =>
@@ -610,6 +612,7 @@ export const api = {
         smtpHost: string;
         rawSmtpHost: string;
         smtpPort: number;
+        webhookUrl: string;
         hasSecret: boolean;
         secretPreview: string;
         credentialSource: string;

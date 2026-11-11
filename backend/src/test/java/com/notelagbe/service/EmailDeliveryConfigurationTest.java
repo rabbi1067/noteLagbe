@@ -186,6 +186,66 @@ class EmailDeliveryConfigurationTest {
     }
 
     @Test
+    void appsScriptConfigurationValidatesUrlSecretAndDispatchesOtp() {
+        String validWebhookUrl = "https://script.google.com/macros/s/AKfycbTestDeploymentId/exec";
+
+        assertThrows(ApiException.class, () -> emailService.saveEmailConfig(
+                "APPS_SCRIPT", "sender@gmail.com", "NoteLagbe", null, null,
+                "https://evil.example.com/steal", "NoteLagbeSecret2026", false
+        ));
+        assertThrows(ApiException.class, () -> emailService.saveEmailConfig(
+                "APPS_SCRIPT", "sender@gmail.com", "NoteLagbe", null, null,
+                validWebhookUrl, "short", false
+        ));
+
+        Map<String, Object> saved = emailService.saveEmailConfig(
+                "APPS_SCRIPT",
+                "fazlerabbicse65@gmail.com",
+                "NoteLagbe SEU",
+                null,
+                null,
+                validWebhookUrl,
+                "NoteLagbeSecret2026",
+                false
+        );
+
+        assertEquals(true, saved.get("smtpConfigured"));
+        assertEquals("APPS_SCRIPT", saved.get("provider"));
+        assertEquals("script.google.com (Gmail HTTPS 443)", saved.get("smtpHost"));
+        assertEquals(validWebhookUrl, saved.get("webhookUrl"));
+        assertEquals("••••2026", saved.get("secretPreview"));
+        assertEquals(validWebhookUrl, inMemorySettings.get(EmailService.SETTING_KEY_WEBHOOK_URL).getSettingValue());
+        assertFalse(saved.toString().contains("NoteLagbeSecret2026"), "Raw webhook secret must never appear in settings summary");
+
+        emailService.nextStatus = 200;
+        emailService.nextBody = "{\"ok\":true}";
+
+        User student = new User();
+        student.setName("Fazle Rabbi");
+        student.setEmail("2023200000686@seu.edu.bd");
+
+        emailService.sendPasswordResetCodeEmail(student, "789012", 10);
+
+        assertEquals(validWebhookUrl, emailService.lastUrl);
+        assertEquals("NoteLagbeSecret2026", emailService.lastPayload.get("secret"));
+        assertEquals("2023200000686@seu.edu.bd", emailService.lastPayload.get("to"));
+        assertEquals("NoteLagbe SEU", emailService.lastPayload.get("senderName"));
+        assertEquals("fazlerabbicse65@gmail.com", emailService.lastPayload.get("replyTo"));
+        assertNotNull(emailService.lastPayload.get("subject"));
+        assertTrue(emailService.lastPayload.get("html").toString().contains("789012"));
+
+        emailService.nextBody = "<!DOCTYPE html><html>Sign in</html>";
+        assertThrows(ApiException.class, () -> emailService.sendPasswordResetCodeEmail(student, "789012", 10));
+
+        emailService.nextBody = "{\"ok\":false,\"error\":\"Unauthorized\"}";
+        assertThrows(ApiException.class, () -> emailService.sendPasswordResetCodeEmail(student, "789012", 10));
+
+        Map<String, Object> cleared = emailService.saveEmailConfig("APPS_SCRIPT", "", "", "", 587, "", "", true);
+        assertEquals(false, cleared.get("smtpConfigured"));
+        assertTrue(inMemorySettings.isEmpty());
+    }
+
+    @Test
     void adminControllerUpdateEmailConfigRequiresSuperAdminAndDoesNotLogSecret() throws Exception {
         Method method = AdminController.class.getMethod("updateEmailConfiguration", Map.class, CustomUserDetails.class);
         PreAuthorize preAuth = method.getAnnotation(PreAuthorize.class);
@@ -206,7 +266,7 @@ class EmailDeliveryConfigurationTest {
         superAdmin.setEmail("superadmin@seu.edu.bd");
         superAdmin.setRole(Role.ROLE_SUPER_ADMIN);
 
-        when(emailServiceMock.saveEmailConfig(anyString(), anyString(), anyString(), anyString(), anyInt(), anyString(), anyBoolean()))
+        when(emailServiceMock.saveEmailConfig(anyString(), anyString(), anyString(), anyString(), anyInt(), anyString(), anyString(), anyBoolean()))
                 .thenReturn(Map.of("provider", "BREVO", "smtpSender", "sender@gmail.com", "smtpConfigured", true));
 
         ResponseEntity<Map<String, Object>> res = controller.updateEmailConfiguration(

@@ -789,11 +789,12 @@ public class AdminController {
             }
         }
         String secret = body != null && body.get("secret") != null ? body.get("secret").toString() : "";
+        String webhookUrl = body != null && body.get("webhookUrl") != null ? body.get("webhookUrl").toString() : "";
         boolean clearSavedConfig = body != null && Boolean.parseBoolean(String.valueOf(body.getOrDefault("clearSavedConfig", false)));
 
         User actor = resolveActor(userDetails);
         Map<String, Object> summary = emailService.saveEmailConfig(
-                provider, senderEmail, senderName, smtpHost, smtpPort, secret, clearSavedConfig
+                provider, senderEmail, senderName, smtpHost, smtpPort, webhookUrl, secret, clearSavedConfig
         );
         String auditDetail = clearSavedConfig
                 ? formatActorPrefix(actor) + " reset email delivery configuration to server environment defaults"

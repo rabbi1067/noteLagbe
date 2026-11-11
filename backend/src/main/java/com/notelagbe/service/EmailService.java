@@ -41,19 +41,23 @@ public class EmailService {
     public static final String SETTING_KEY_SMTP_PORT = "EMAIL_SMTP_PORT";
     public static final String SETTING_KEY_SMTP_PASSWORD = "EMAIL_SMTP_PASSWORD";
     public static final String SETTING_KEY_API_KEY = "EMAIL_API_KEY";
+    public static final String SETTING_KEY_WEBHOOK_URL = "EMAIL_WEBHOOK_URL";
 
     public static final String PROVIDER_SMTP = "SMTP";
     public static final String PROVIDER_BREVO = "BREVO";
     public static final String PROVIDER_RESEND = "RESEND";
+    public static final String PROVIDER_APPS_SCRIPT = "APPS_SCRIPT";
 
     private static final String BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
     private static final String RESEND_ENDPOINT = "https://api.resend.com/emails";
+    private static final String APPS_SCRIPT_PREFIX = "https://script.google.com/macros/s/";
 
     private final SystemSettingRepository systemSettingRepository;
     private final JavaMailSender injectedMailSender;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
+            .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
     @Value("${email.provider:}")
@@ -70,6 +74,12 @@ public class EmailService {
 
     @Value("${email.resend.api-key:}")
     private String envResendApiKey = "";
+
+    @Value("${email.apps-script.url:}")
+    private String envAppsScriptUrl = "";
+
+    @Value("${email.apps-script.secret:}")
+    private String envAppsScriptSecret = "";
 
     @Value("${spring.mail.username:}")
     private String envMailUsername = "";
@@ -98,6 +108,7 @@ public class EmailService {
             String senderName,
             String smtpHost,
             int smtpPort,
+            String webhookUrl,
             String secret,
             boolean fromAdminPanel,
             boolean ready
@@ -126,10 +137,21 @@ public class EmailService {
             return PROVIDER_SMTP;
         }
         String upper = raw.trim().toUpperCase(Locale.ROOT);
-        if (PROVIDER_BREVO.equals(upper) || PROVIDER_RESEND.equals(upper) || PROVIDER_SMTP.equals(upper)) {
+        if (PROVIDER_BREVO.equals(upper)
+                || PROVIDER_RESEND.equals(upper)
+                || PROVIDER_APPS_SCRIPT.equals(upper)
+                || PROVIDER_SMTP.equals(upper)) {
             return upper;
         }
-        throw new ApiException("Unsupported email provider: " + raw + ". Choose SMTP, BREVO, or RESEND.");
+        throw new ApiException("Unsupported email provider: " + raw + ". Choose APPS_SCRIPT, BREVO, RESEND, or SMTP.");
+    }
+
+    private static boolean isValidAppsScriptUrl(String url) {
+        if (!hasText(url)) {
+            return false;
+        }
+        String trimmed = url.trim();
+        return trimmed.startsWith(APPS_SCRIPT_PREFIX) && !trimmed.contains("..") && trimmed.length() <= 500;
     }
 
     private static boolean hasText(String s) {
@@ -155,12 +177,15 @@ public class EmailService {
         Optional<String> dbPort = getDbSetting(SETTING_KEY_SMTP_PORT);
         Optional<String> dbSmtpPass = getDbSetting(SETTING_KEY_SMTP_PASSWORD);
         Optional<String> dbApiKey = getDbSetting(SETTING_KEY_API_KEY);
+        Optional<String> dbWebhookUrl = getDbSetting(SETTING_KEY_WEBHOOK_URL);
 
         String provider;
         if (dbProvider.isPresent()) {
             provider = normalizeProvider(dbProvider.get());
         } else if (hasText(envProvider)) {
             provider = normalizeProvider(envProvider);
+        } else if (hasText(envAppsScriptUrl)) {
+            provider = PROVIDER_APPS_SCRIPT;
         } else if (hasText(envBrevoApiKey)) {
             provider = PROVIDER_BREVO;
         } else if (hasText(envResendApiKey)) {
@@ -176,6 +201,7 @@ public class EmailService {
                 hasText(envFromName) ? envFromName.trim() : "NoteLagbe • Southeast University"
         );
         String smtpHost = dbHost.orElseGet(() -> hasText(envMailHost) ? envMailHost.trim() : "smtp.gmail.com");
+        String webhookUrl = dbWebhookUrl.orElseGet(() -> hasText(envAppsScriptUrl) ? envAppsScriptUrl.trim() : "");
 
         int smtpPort = envMailPort > 0 ? envMailPort : 587;
         if (dbPort.isPresent()) {
@@ -188,11 +214,18 @@ public class EmailService {
             }
         }
 
-        boolean usingDbOverride = dbProvider.isPresent() || dbSender.isPresent() || dbSmtpPass.isPresent() || dbApiKey.isPresent();
+        boolean usingDbOverride = dbProvider.isPresent()
+                || dbSender.isPresent()
+                || dbSmtpPass.isPresent()
+                || dbApiKey.isPresent()
+                || dbWebhookUrl.isPresent();
 
         String secret;
         boolean ready;
-        if (PROVIDER_BREVO.equals(provider)) {
+        if (PROVIDER_APPS_SCRIPT.equals(provider)) {
+            secret = dbApiKey.orElse(hasText(envAppsScriptSecret) ? envAppsScriptSecret.trim() : "");
+            ready = isValidAppsScriptUrl(webhookUrl) && hasText(senderEmail) && hasText(secret);
+        } else if (PROVIDER_BREVO.equals(provider)) {
             secret = dbApiKey.orElse(hasText(envBrevoApiKey) ? envBrevoApiKey.trim() : "");
             ready = hasText(secret) && hasText(senderEmail);
         } else if (PROVIDER_RESEND.equals(provider)) {
@@ -204,7 +237,7 @@ public class EmailService {
             ready = hasText(smtpHost) && smtpPort > 0 && hasText(senderEmail) && hasText(secret);
         }
 
-        return new EffectiveEmailConfig(provider, senderEmail, senderName, smtpHost, smtpPort, secret, usingDbOverride, ready);
+        return new EffectiveEmailConfig(provider, senderEmail, senderName, smtpHost, smtpPort, webhookUrl, secret, usingDbOverride, ready);
     }
 
     public boolean isSmtpConfigured() {
@@ -221,6 +254,9 @@ public class EmailService {
 
     public String getSmtpHost() {
         EffectiveEmailConfig cfg = resolveConfig();
+        if (PROVIDER_APPS_SCRIPT.equals(cfg.provider())) {
+            return "script.google.com (Gmail HTTPS 443)";
+        }
         if (PROVIDER_BREVO.equals(cfg.provider())) {
             return "api.brevo.com (HTTPS 443)";
         }
@@ -240,15 +276,15 @@ public class EmailService {
             maskedHint = s.length() > 4 ? "••••" + s.substring(s.length() - 4) : "••••";
         }
 
-        String source = !cfg.ready() && !hasSecret && !hasText(cfg.senderEmail())
+        String source = !cfg.ready() && !hasSecret && !hasText(cfg.senderEmail()) && !hasText(cfg.webhookUrl())
                 ? "NOT_CONFIGURED"
                 : (cfg.fromAdminPanel() ? "ADMIN_PANEL" : "ENVIRONMENT");
 
         String statusMessage;
         if (!cfg.ready()) {
             statusMessage = PROVIDER_SMTP.equals(cfg.provider())
-                    ? "Email delivery not configured (enter SMTP or Brevo/Resend API credentials)"
-                    : cfg.provider() + " HTTPS API selected, but sender email or API key is missing";
+                    ? "Email delivery not configured (enter Apps Script, Brevo, Resend, or SMTP credentials)"
+                    : cfg.provider() + " HTTPS gateway selected, but required URL, sender email, or secret is missing";
         } else if (PROVIDER_SMTP.equals(cfg.provider())) {
             statusMessage = "SMTP Authenticated (" + cfg.smtpHost() + ":" + cfg.smtpPort() + ")";
         } else {
@@ -265,6 +301,7 @@ public class EmailService {
         map.put("smtpHost", getSmtpHost());
         map.put("rawSmtpHost", cfg.smtpHost());
         map.put("smtpPort", cfg.smtpPort());
+        map.put("webhookUrl", cfg.webhookUrl());
         map.put("hasSecret", hasSecret);
         map.put("secretPreview", maskedHint);
         map.put("credentialSource", source);
@@ -281,6 +318,19 @@ public class EmailService {
             String secret,
             boolean clearSavedConfig
     ) {
+        return saveEmailConfig(rawProvider, senderEmail, senderName, smtpHost, smtpPort, null, secret, clearSavedConfig);
+    }
+
+    public Map<String, Object> saveEmailConfig(
+            String rawProvider,
+            String senderEmail,
+            String senderName,
+            String smtpHost,
+            Integer smtpPort,
+            String webhookUrl,
+            String secret,
+            boolean clearSavedConfig
+    ) {
         if (clearSavedConfig) {
             for (String key : List.of(
                     SETTING_KEY_PROVIDER,
@@ -289,7 +339,8 @@ public class EmailService {
                     SETTING_KEY_SMTP_HOST,
                     SETTING_KEY_SMTP_PORT,
                     SETTING_KEY_SMTP_PASSWORD,
-                    SETTING_KEY_API_KEY
+                    SETTING_KEY_API_KEY,
+                    SETTING_KEY_WEBHOOK_URL
             )) {
                 saveOrDeleteDbSetting(key, null);
             }
@@ -337,6 +388,25 @@ public class EmailService {
             saveOrDeleteDbSetting(SETTING_KEY_SMTP_PORT, String.valueOf(cleanPort));
             saveOrDeleteDbSetting(SETTING_KEY_SMTP_PASSWORD, effectivePass);
             saveOrDeleteDbSetting(SETTING_KEY_API_KEY, null);
+            saveOrDeleteDbSetting(SETTING_KEY_WEBHOOK_URL, null);
+        } else if (PROVIDER_APPS_SCRIPT.equals(provider)) {
+            String cleanUrl = webhookUrl != null ? webhookUrl.trim() : "";
+            if (!isValidAppsScriptUrl(cleanUrl)) {
+                throw new ApiException("Please enter a valid Google Apps Script Web App URL starting with https://script.google.com/macros/s/");
+            }
+            String effectiveSecret = hasText(incomingSecret)
+                    ? incomingSecret
+                    : (PROVIDER_APPS_SCRIPT.equals(current.provider()) ? current.secret() : "");
+            if (!hasText(effectiveSecret) || effectiveSecret.length() < 8) {
+                throw new ApiException("A shared Apps Script secret token (at least 8 characters) is required to protect your Gmail relay.");
+            }
+
+            saveOrDeleteDbSetting(SETTING_KEY_PROVIDER, PROVIDER_APPS_SCRIPT);
+            saveOrDeleteDbSetting(SETTING_KEY_SENDER_EMAIL, cleanEmail);
+            saveOrDeleteDbSetting(SETTING_KEY_SENDER_NAME, cleanName);
+            saveOrDeleteDbSetting(SETTING_KEY_WEBHOOK_URL, cleanUrl);
+            saveOrDeleteDbSetting(SETTING_KEY_API_KEY, effectiveSecret);
+            saveOrDeleteDbSetting(SETTING_KEY_SMTP_PASSWORD, null);
         } else {
             String effectiveApiKey = hasText(incomingSecret)
                     ? incomingSecret
@@ -350,6 +420,7 @@ public class EmailService {
             saveOrDeleteDbSetting(SETTING_KEY_SENDER_NAME, cleanName);
             saveOrDeleteDbSetting(SETTING_KEY_API_KEY, effectiveApiKey);
             saveOrDeleteDbSetting(SETTING_KEY_SMTP_PASSWORD, null);
+            saveOrDeleteDbSetting(SETTING_KEY_WEBHOOK_URL, null);
         }
 
         log.info("Email delivery configuration updated in Admin Settings: provider={}, sender={}", provider, cleanEmail);
@@ -751,6 +822,10 @@ public class EmailService {
         if (!cfg.ready()) {
             throw new ApiException("Email delivery service is not configured right now.");
         }
+        if (PROVIDER_APPS_SCRIPT.equals(cfg.provider())) {
+            sendViaAppsScript(cfg, toEmail, subject, html);
+            return;
+        }
         if (PROVIDER_BREVO.equals(cfg.provider())) {
             sendViaBrevoApi(cfg, toEmail, subject, html);
             return;
@@ -838,6 +913,34 @@ public class EmailService {
         );
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new ApiException("Resend API rejected email dispatch (HTTP " + response.statusCode() + "): " + summarizeHttpError(response.body()));
+        }
+    }
+
+    private void sendViaAppsScript(EffectiveEmailConfig cfg, String toEmail, String subject, String html) throws Exception {
+        if (!isValidAppsScriptUrl(cfg.webhookUrl())) {
+            throw new ApiException("Invalid Google Apps Script Web App URL.");
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("secret", cfg.secret());
+        body.put("to", toEmail);
+        body.put("senderName", cfg.senderName());
+        body.put("replyTo", cfg.senderEmail());
+        body.put("subject", subject);
+        body.put("html", html);
+
+        HttpResponse<String> response = postJson(cfg.webhookUrl().trim(), Map.of(), body);
+        String respBody = response.body() != null ? response.body().trim() : "";
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new ApiException("Google Apps Script bridge returned HTTP " + response.statusCode() + ": " + summarizeHttpError(respBody));
+        }
+        if (!respBody.startsWith("{")) {
+            throw new ApiException("Google Apps Script returned non-JSON output. Set 'Who has access' to 'Anyone' and create a New deployment.");
+        }
+        Map<?, ?> parsed = objectMapper.readValue(respBody, Map.class);
+        Object okVal = parsed.get("ok");
+        if (!(okVal instanceof Boolean b && b)) {
+            Object errObj = parsed.get("error");
+            throw new ApiException("Google Apps Script email failed: " + (errObj != null ? errObj.toString() : summarizeHttpError(respBody)));
         }
     }
 
