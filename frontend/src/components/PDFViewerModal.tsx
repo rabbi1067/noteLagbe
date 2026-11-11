@@ -27,7 +27,15 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { api, API_BASE_URL, getToken } from "@/lib/api";
-import { normalizeAndRotatePdfBytes, normalizeRotationDegrees } from "@/lib/pdfMerger";
+import {
+  convertImageToJpegBytes,
+  inspectImageFile,
+  mergeFilesToSinglePdf,
+  normalizeAndRotatePdfBytes,
+  normalizeRotationDegrees,
+} from "@/lib/pdfMerger";
+import { toast } from "sonner";
+import confetti from "canvas-confetti";
 
 type ViewerDocKind = "pdf" | "image" | "drive-embed" | "unsupported";
 
@@ -100,8 +108,6 @@ async function inspectBlobFormat(
 
   return { kind: "unsupported", normalizedBlob: blob };
 }
-import { toast } from "sonner";
-import confetti from "canvas-confetti";
 
 interface PDFViewerModalProps {
   isOpen: boolean;
@@ -140,7 +146,13 @@ export default function PDFViewerModal({
   const [autoAlignMixedPdf, setAutoAlignMixedPdf] = useState(true);
   const [autoAlignedPagesList, setAutoAlignedPagesList] = useState<number[]>([]);
   const [pdfChangedFromRaw, setPdfChangedFromRaw] = useState(false);
-  const [savingFixedPdf, setSavingFixedPdf] = useState(false);
+
+  // Standalone image orientation & physical save state
+  const [rawImageBlob, setRawImageBlob] = useState<Blob | null>(null);
+  const [activeImageBytes, setActiveImageBytes] = useState<Uint8Array | null>(null);
+  const [imageIsLandscape, setImageIsLandscape] = useState(false);
+  const [imageCssFallback, setImageCssFallback] = useState(false);
+  const [savingFixedFile, setSavingFixedFile] = useState(false);
 
   // Download and external new-tab privileges are ONLY enabled in Admin mode (inside /admin console).
   // On student course pages (/courses/[code]), all users (students & staff) experience the pure in-website reader!
@@ -176,6 +188,10 @@ export default function PDFViewerModal({
       setAutoAlignMixedPdf(true);
       setAutoAlignedPagesList([]);
       setPdfChangedFromRaw(false);
+      setRawImageBlob(null);
+      setActiveImageBytes(null);
+      setImageIsLandscape(false);
+      setImageCssFallback(false);
     }
   }, [isOpen, resource?.id]);
 
@@ -186,6 +202,10 @@ export default function PDFViewerModal({
       setRawPdfBytes(null);
       setActivePdfBytes(null);
       setPdfPageCount(0);
+      setRawImageBlob(null);
+      setActiveImageBytes(null);
+      setImageIsLandscape(false);
+      setImageCssFallback(false);
       setDocError(null);
       setDocLoading(false);
       return;
@@ -196,6 +216,10 @@ export default function PDFViewerModal({
       setRawPdfBytes(null);
       setActivePdfBytes(null);
       setPdfPageCount(0);
+      setRawImageBlob(null);
+      setActiveImageBytes(null);
+      setImageIsLandscape(false);
+      setImageCssFallback(false);
       setDetectedKind("drive-embed");
       setDocError(null);
       setDocLoading(false);
@@ -212,6 +236,10 @@ export default function PDFViewerModal({
       setRawPdfBytes(null);
       setActivePdfBytes(null);
       setPdfPageCount(0);
+      setRawImageBlob(null);
+      setActiveImageBytes(null);
+      setImageIsLandscape(false);
+      setImageCssFallback(false);
 
       try {
         const token = getToken();
@@ -318,7 +346,26 @@ export default function PDFViewerModal({
             replaceBlobUrl(URL.createObjectURL(normalizedBlob));
           }
         } else {
-          replaceBlobUrl(URL.createObjectURL(normalizedBlob));
+          if (kind === "image") {
+            setRawImageBlob(normalizedBlob);
+            try {
+              const info = await inspectImageFile(
+                new File([normalizedBlob], "preview.jpg", {
+                  type: normalizedBlob.type || "image/jpeg",
+                })
+              );
+              if (!cancelled) {
+                setImageIsLandscape(info.isLandscape);
+              }
+            } catch {
+              if (!cancelled) {
+                setImageIsLandscape(false);
+              }
+            }
+          }
+          if (!cancelled) {
+            replaceBlobUrl(URL.createObjectURL(normalizedBlob));
+          }
         }
       } catch (err: unknown) {
         if (cancelled || (err instanceof DOMException && err.name === "AbortError")) return;
@@ -400,38 +447,167 @@ export default function PDFViewerModal({
     await rebuildPdfWithRotations({}, nextAuto);
   }, [autoAlignMixedPdf, rebuildPdfWithRotations]);
 
+  const handleRotateAllPdfPages = useCallback(
+    async (deltaDeg: number) => {
+      if (!rawPdfBytes || pdfPageCount === 0) return;
+      const nextMap: Record<number, number> = {};
+      for (let p = 1; p <= pdfPageCount; p++) {
+        const currentEffective =
+          pageExtraRotations[p] !== undefined
+            ? pageExtraRotations[p]
+            : autoAlignedPagesList.includes(p)
+            ? 90
+            : 0;
+        nextMap[p] = normalizeRotationDegrees(currentEffective + deltaDeg);
+      }
+      setPageExtraRotations(nextMap);
+      await rebuildPdfWithRotations(nextMap, autoAlignMixedPdf);
+    },
+    [rawPdfBytes, pdfPageCount, pageExtraRotations, autoAlignedPagesList, autoAlignMixedPdf, rebuildPdfWithRotations]
+  );
+
+  const applyImageRotation = useCallback(
+    async (targetDeg: number) => {
+      const next = normalizeRotationDegrees(targetDeg);
+      setRotation(next);
+      if (detectedKind !== "image" || !rawImageBlob) return;
+
+      if (next === 0) {
+        setActiveImageBytes(null);
+        setImageCssFallback(false);
+        replaceBlobUrl(URL.createObjectURL(rawImageBlob));
+        return;
+      }
+
+      try {
+        const srcFile = new File([rawImageBlob], "material_image.jpg", {
+          type: rawImageBlob.type || "image/jpeg",
+        });
+        const converted = await convertImageToJpegBytes(srcFile, next);
+        setActiveImageBytes(converted.bytes);
+        setImageIsLandscape(converted.width > converted.height);
+        setImageCssFallback(false);
+        replaceBlobUrl(URL.createObjectURL(new Blob([converted.bytes as any], { type: "image/jpeg" })));
+      } catch {
+        setImageCssFallback(true);
+      }
+    },
+    [detectedKind, rawImageBlob, replaceBlobUrl]
+  );
+
+  const persistFixedFileToResource = useCallback(
+    async (fixedFile: File, successMessage: string) => {
+      if (!canDownloadAndOpen || !resource?.id) return null;
+      setSavingFixedFile(true);
+      try {
+        const uploadRes = await api.admin.uploadMaterialFile(fixedFile);
+        await api.admin.updateResourceFile(resource.id, uploadRes.url);
+        toast.success(successMessage);
+        if (onFileUpdated) {
+          onFileUpdated(uploadRes.url);
+        }
+        return uploadRes.url;
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to save fixed file");
+        return null;
+      } finally {
+        setSavingFixedFile(false);
+      }
+    },
+    [canDownloadAndOpen, resource?.id, onFileUpdated]
+  );
+
   const handleSaveFixedPdfToServer = useCallback(async () => {
     if (!canDownloadAndOpen || !resource?.id || !activePdfBytes) return;
-    setSavingFixedPdf(true);
-    try {
-      const safeTitle = (resource.title || courseCode || "normalized_document")
-        .replace(/[^a-z0-9._-]+/gi, "_")
-        .replace(/\.pdf$/i, "");
-      const fixedFile = new File([activePdfBytes as any], `${safeTitle}.pdf`, {
-        type: "application/pdf",
-      });
-      const uploadRes = await api.admin.uploadMaterialFile(fixedFile);
-      await api.admin.updateResourceFile(resource.id, uploadRes.url);
-
+    const safeTitle = (resource.title || courseCode || "normalized_document")
+      .replace(/[^a-z0-9._-]+/gi, "_")
+      .replace(/\.pdf$/i, "");
+    const fixedFile = new File([activePdfBytes as any], `${safeTitle}.pdf`, {
+      type: "application/pdf",
+    });
+    const savedUrl = await persistFixedFileToResource(
+      fixedFile,
+      "Fixed uniform PDF saved permanently!"
+    );
+    if (savedUrl) {
       setRawPdfBytes(activePdfBytes);
       setPageExtraRotations({});
       setAutoAlignedPagesList([]);
       setPdfChangedFromRaw(false);
-      toast.success("Fixed uniform PDF saved permanently!");
-      if (onFileUpdated) {
-        onFileUpdated(uploadRes.url);
-      }
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to save normalized PDF");
-    } finally {
-      setSavingFixedPdf(false);
     }
-  }, [canDownloadAndOpen, resource?.id, resource?.title, courseCode, activePdfBytes, onFileUpdated]);
+  }, [canDownloadAndOpen, resource?.id, resource?.title, courseCode, activePdfBytes, persistFixedFileToResource]);
+
+  const handleSaveFixedImageToServer = useCallback(
+    async (convertToPortraitPdf: boolean) => {
+      if (!canDownloadAndOpen || !resource?.id || !rawImageBlob) return;
+      const safeTitle = (resource.title || courseCode || "material")
+        .replace(/[^a-z0-9._-]+/gi, "_")
+        .replace(/\.(jpe?g|png|webp|gif|pdf)$/i, "");
+      const srcFile = new File([rawImageBlob], `${safeTitle}.jpg`, {
+        type: rawImageBlob.type || "image/jpeg",
+      });
+
+      if (convertToPortraitPdf) {
+        setSavingFixedFile(true);
+        try {
+          const pdfFile = await mergeFilesToSinglePdf([srcFile], safeTitle, undefined, {
+            pageRotations: { 0: rotation },
+            forcePortraitA4: true,
+          });
+          setSavingFixedFile(false);
+          const savedUrl = await persistFixedFileToResource(
+            pdfFile,
+            "Image converted to Portrait A4 PDF and saved!"
+          );
+          if (savedUrl) {
+            setRotation(0);
+            setActiveImageBytes(null);
+            setRetryTick((t) => t + 1);
+          }
+        } catch (err: any) {
+          setSavingFixedFile(false);
+          toast.error(err?.message || "Failed to convert image to Portrait A4 PDF");
+        }
+        return;
+      }
+
+      const bytesToUpload =
+        activeImageBytes || (await convertImageToJpegBytes(srcFile, rotation)).bytes;
+      const fixedImgFile = new File([bytesToUpload as any], `${safeTitle}.jpg`, {
+        type: "image/jpeg",
+      });
+      const savedUrl = await persistFixedFileToResource(
+        fixedImgFile,
+        "Upright image saved permanently!"
+      );
+      if (savedUrl) {
+        const nextRawBlob = new Blob([bytesToUpload as any], { type: "image/jpeg" });
+        setRawImageBlob(nextRawBlob);
+        setActiveImageBytes(null);
+        setImageCssFallback(false);
+        setRotation(0);
+        replaceBlobUrl(URL.createObjectURL(nextRawBlob));
+      }
+    },
+    [
+      canDownloadAndOpen,
+      resource?.id,
+      resource?.title,
+      courseCode,
+      rawImageBlob,
+      rotation,
+      activeImageBytes,
+      persistFixedFileToResource,
+      replaceBlobUrl,
+    ]
+  );
 
   const rotateShortcutRef = useRef<() => void>(() => {});
   rotateShortcutRef.current = () => {
     if (detectedKind === "pdf" && rawPdfBytes && pdfPageCount > 0) {
       void handleRotateActivePdfPage(90);
+    } else if (detectedKind === "image" && rawImageBlob) {
+      void applyImageRotation(rotation + 90);
     } else {
       setRotation((prev) => (prev + 90) % 360);
     }
@@ -491,8 +667,20 @@ export default function PDFViewerModal({
   const handleZoomIn = () => setZoom((prev) => Math.min(prev + 20, 300));
   const handleZoomOut = () => setZoom((prev) => Math.max(prev - 20, 50));
   const handleResetZoom = () => setZoom(100);
-  const handleRotateClockwise = () => setRotation((prev) => (prev + 90) % 360);
-  const handleResetRotation = () => setRotation(0);
+  const handleRotateStep = (deltaDeg: number) => {
+    if (detectedKind === "image" && rawImageBlob) {
+      void applyImageRotation(rotation + deltaDeg);
+    } else {
+      setRotation((prev) => normalizeRotationDegrees(prev + deltaDeg));
+    }
+  };
+  const handleResetRotation = () => {
+    if (detectedKind === "image" && rawImageBlob) {
+      void applyImageRotation(0);
+    } else {
+      setRotation(0);
+    }
+  };
   const toggleFullscreen = () => setIsFullscreen((prev) => !prev);
 
   const openableTabUrl =
@@ -515,7 +703,7 @@ export default function PDFViewerModal({
     };
 
     if (blobUrl) {
-      const ext = detectedKind === "image" ? "" : ".pdf";
+      const ext = detectedKind === "image" ? (activeImageBytes ? ".jpg" : "") : ".pdf";
       const filename = safeTitle.includes(".") ? safeTitle : `${safeTitle}${ext}`;
       triggerSave(blobUrl, filename);
       return;
@@ -548,10 +736,13 @@ export default function PDFViewerModal({
   };
 
   const displayTitle = resource.title || `${courseCode} Academic Document`;
-  const isRotated = rotation % 180 !== 0;
+  const applyCssTransformRotation =
+    rotation !== 0 && (detectedKind !== "image" || imageCssFallback);
+  const cssRotationDeg = applyCssTransformRotation ? rotation : 0;
+  const isRotated = applyCssTransformRotation && rotation % 180 !== 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
       <div
         className={`w-full transition-all duration-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden relative ${
           isFullscreen
@@ -779,6 +970,18 @@ export default function PDFViewerModal({
                     )}
                   </div>
 
+                  {pdfPageCount > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRotateAllPdfPages(90)}
+                      className="px-2 py-1 rounded-xl text-[10px] font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-1 cursor-pointer shadow-sm"
+                      title="Rotate all pages 90° clockwise together"
+                    >
+                      <RotateCw className="w-3 h-3 text-blue-500" />
+                      <span>All +90°</span>
+                    </button>
+                  )}
+
                   {autoAlignedPagesList.length > 0 && (
                     <button
                       type="button"
@@ -800,36 +1003,75 @@ export default function PDFViewerModal({
                     <button
                       type="button"
                       onClick={handleSaveFixedPdfToServer}
-                      disabled={savingFixedPdf}
+                      disabled={savingFixedFile}
                       className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
                       title="Persist uniform normalized PDF to database & storage"
                     >
                       <Save className="w-3.5 h-3.5" />
-                      <span>{savingFixedPdf ? "Saving..." : "Save Fixed PDF"}</span>
+                      <span>{savingFixedFile ? "Saving..." : "Save Fixed PDF"}</span>
                     </button>
                   )}
                 </div>
               ) : (
-                <div className="flex items-center bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={handleRotateClockwise}
-                    className="px-2.5 py-1 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 font-bold text-[11px] cursor-pointer"
-                    title="Rotate document 90° clockwise (Side korao) [Key: R]"
-                  >
-                    <RotateCw className="w-3.5 h-3.5 text-blue-500" />
-                    <span>{rotation === 0 ? "Rotate 90°" : `${rotation}°`}</span>
-                  </button>
-
-                  {rotation !== 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-center bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                     <button
                       type="button"
-                      onClick={handleResetRotation}
-                      className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border-l border-slate-200 dark:border-slate-700 ml-0.5"
-                      title="Reset rotation to 0°"
+                      onClick={() => handleRotateStep(-90)}
+                      className="p-1 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                      title="Rotate 90° Counter-Clockwise"
                     >
-                      <X className="w-3 h-3" />
+                      <RotateCcw className="w-3.5 h-3.5 text-blue-500" />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRotateStep(90)}
+                      className="px-2 py-1 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-1 font-bold text-[11px] cursor-pointer"
+                      title="Rotate document 90° clockwise (Side korao) [Key: R]"
+                    >
+                      <RotateCw className="w-3.5 h-3.5 text-blue-500" />
+                      <span>{rotation === 0 ? "Rotate 90°" : `${rotation}°`}</span>
+                    </button>
+
+                    {rotation !== 0 && (
+                      <button
+                        type="button"
+                        onClick={handleResetRotation}
+                        className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border-l border-slate-200 dark:border-slate-700 ml-0.5 cursor-pointer"
+                        title="Reset rotation to 0°"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {canDownloadAndOpen && resource.id && detectedKind === "image" && rawImageBlob && (
+                    <>
+                      {rotation !== 0 && (
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveFixedImageToServer(false)}
+                          disabled={savingFixedFile}
+                          className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                          title="Permanently overwrite material with this upright image"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          <span>{savingFixedFile ? "Saving..." : "Save Fixed Image"}</span>
+                        </button>
+                      )}
+                      {(rotation !== 0 || imageIsLandscape) && (
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveFixedImageToServer(true)}
+                          disabled={savingFixedFile}
+                          className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                          title="Convert and permanently save as uniform Portrait A4 PDF"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>{savingFixedFile ? "Saving..." : "Save as A4 PDF"}</span>
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -865,7 +1107,7 @@ export default function PDFViewerModal({
             <div
               className="relative flex items-center justify-center transition-all duration-200 ease-out origin-center"
               style={{
-                transform: `rotate(${rotation}deg) scale(${zoom / 100})`,
+                transform: `rotate(${cssRotationDeg}deg) scale(${zoom / 100})`,
                 transformOrigin: "center center",
                 width: isRotated ? "80vh" : "100%",
                 height: isRotated ? "80vw" : "100%",

@@ -4792,17 +4792,23 @@ export default function AdminDashboardPage() {
                                   <div className="flex items-center gap-2 text-[10px] text-slate-400">
                                     <span className="flex items-center gap-1 font-mono">
                                       <FileText className="w-3 h-3 text-slate-400" />
-                                      <span>PDF Document</span>
+                                      <span>
+                                        {isImageFile(r.fileUrl)
+                                          ? "Image Asset"
+                                          : r.fileUrl?.includes("drive.google.com")
+                                          ? "Google Drive"
+                                          : "PDF Document"}
+                                      </span>
                                     </span>
                                     {(r.fileUrl || r.id) && (
                                       <button
                                         type="button"
                                         onClick={() => setViewingResource(r)}
-                                        className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-0.5 font-semibold cursor-pointer"
-                                        title="Open interactive viewer with zoom and download"
+                                        className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 font-semibold cursor-pointer"
+                                        title="View document, align/rotate sideways pages, or save fixed file"
                                       >
-                                        <span>Direct Link</span>
-                                        <ExternalLink className="w-2.5 h-2.5" />
+                                        <Eye className="w-3 h-3" />
+                                        <span>View & Fix</span>
                                       </button>
                                     )}
                                   </div>
@@ -4848,6 +4854,16 @@ export default function AdminDashboardPage() {
 
                               <td className="px-6 py-4 text-right">
                                 <div className="flex items-center justify-end gap-1.5">
+                                  {(r.fileUrl || r.id) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewingResource(r)}
+                                      className="p-2 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-blue-400 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                      title="View, Rotate & Fix Orientation"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => openEditResourceModal(r)}
                                     className="p-2 rounded-xl text-slate-500 hover:text-amber-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-amber-400 dark:hover:bg-slate-800 transition-colors"
@@ -6202,18 +6218,19 @@ export default function AdminDashboardPage() {
                               {isImageFile(c.uploadedResource.fileUrl) ? (
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setImageZoom(1);
-                                    setImageRotate(0);
-                                    setAdminPreviewImage(c.uploadedResource.fileUrl);
-                                  }}
-                                  className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 shrink-0 group cursor-pointer"
-                                  title="Click to view image"
+                                  onClick={() =>
+                                    setViewingResource({
+                                      ...c.uploadedResource,
+                                      courseCode: c.courseCode || c.uploadedResource?.course?.code || "SUBMISSION",
+                                    })
+                                  }
+                                  className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 shrink-0 group cursor-pointer p-0.5"
+                                  title="Inspect, rotate & fix orientation"
                                 >
                                   <img
                                     src={c.uploadedResource.fileUrl}
                                     alt={c.uploadedResource.title}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                    className="w-full h-full object-contain group-hover:scale-105 transition-transform"
                                   />
                                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
                                     <Eye className="w-5 h-5" />
@@ -6230,34 +6247,19 @@ export default function AdminDashboardPage() {
                                   {c.uploadedResource.fileUrl}
                                 </p>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  {isImageFile(c.uploadedResource.fileUrl) ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setImageZoom(1);
-                                        setImageRotate(0);
-                                        setAdminPreviewImage(c.uploadedResource.fileUrl);
-                                      }}
-                                      className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
-                                    >
-                                      <Eye className="w-3.5 h-3.5" />
-                                      <span>View Document</span>
-                                    </button>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setViewingResource({
-                                          ...c.uploadedResource,
-                                          courseCode: c.courseCode || c.uploadedResource?.course?.code || "SUBMISSION",
-                                        })
-                                      }
-                                      className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
-                                    >
-                                      <Eye className="w-3.5 h-3.5" />
-                                      <span>View Document</span>
-                                    </button>
-                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setViewingResource({
+                                        ...c.uploadedResource,
+                                        courseCode: c.courseCode || c.uploadedResource?.course?.code || "SUBMISSION",
+                                      })
+                                    }
+                                    className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                    <span>View Document</span>
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -9179,6 +9181,7 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
 
                   return (
                     <MultiPageUploader
+                      key={editingResource?.id ? `edit-res-${editingResource.id}` : "new-res"}
                       uploadFn={api.admin.uploadMaterialFile}
                       onUploadSuccess={(res, originalFiles) => {
                         setResFileUrl(res.url);
@@ -9201,6 +9204,19 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                         setResFileName("");
                         setResFileSize("");
                       }}
+                      onInspectExisting={
+                        editingResource && resFileUrl
+                          ? () =>
+                              setViewingResource({
+                                ...editingResource,
+                                fileUrl: resFileUrl,
+                                title: resTitle || editingResource.title,
+                                type: resType,
+                                semesterName: resSemester,
+                                courseCode: resCourseCode || editingResource.course?.code,
+                              })
+                          : undefined
+                      }
                       initialUrl={resFileUrl}
                       initialFileName={resFileName}
                       initialFileSize={resFileSize}
@@ -10806,49 +10822,38 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
                     <span>Uploaded Academic File:</span>
                   </span>
                   <div className="flex items-center gap-2">
-                    {isImageFile(editingContribution.uploadedResource.fileUrl) ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setImageZoom(1);
-                          setImageRotate(0);
-                          setAdminPreviewImage(editingContribution.uploadedResource.fileUrl);
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer"
-                      >
-                        <Eye className="w-3 h-3" />
-                        <span>View Full Image</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setViewingResource({
-                            ...editingContribution.uploadedResource,
-                            courseCode:
-                              editingContribution.courseCode ||
-                              editingContribution.uploadedResource?.course?.code ||
-                              "SUBMISSION",
-                          });
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>View Document</span>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setViewingResource({
+                          ...editingContribution.uploadedResource,
+                          courseCode:
+                            editingContribution.courseCode ||
+                            editingContribution.uploadedResource?.course?.code ||
+                            "SUBMISSION",
+                        });
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>View & Fix Document</span>
+                    </button>
                   </div>
                 </div>
 
                 {isImageFile(editingContribution.uploadedResource.fileUrl) && (
-                  <div 
+                  <div
                     onClick={() => {
-                      setImageZoom(1);
-                      setImageRotate(0);
-                      setAdminPreviewImage(editingContribution.uploadedResource.fileUrl);
+                      setViewingResource({
+                        ...editingContribution.uploadedResource,
+                        courseCode:
+                          editingContribution.courseCode ||
+                          editingContribution.uploadedResource?.course?.code ||
+                          "SUBMISSION",
+                      });
                     }}
                     className="relative max-h-48 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-950 flex items-center justify-center cursor-pointer group"
-                    title="Click to enlarge image"
+                    title="Click to inspect, rotate & fix orientation"
                   >
                     <img
                       src={editingContribution.uploadedResource.fileUrl}
@@ -11166,6 +11171,13 @@ SPRING_MAIL_PASSWORD=xxxx xxxx xxxx xxxx`}
             const targetId = viewingResource?.id;
             setViewingResource((prev: any) => (prev ? { ...prev, fileUrl: newUrl } : null));
             if (targetId) {
+              setEditingResource((prev: any) =>
+                prev?.id === targetId ? { ...prev, fileUrl: newUrl } : prev
+              );
+              if (editingResource?.id === targetId) {
+                setResFileUrl(newUrl);
+                setResFileName(newUrl.split("/").pop() || "Fixed File");
+              }
               setEditingContribution((prev: any) =>
                 prev?.uploadedResource?.id === targetId
                   ? { ...prev, uploadedResource: { ...prev.uploadedResource, fileUrl: newUrl } }

@@ -16,6 +16,7 @@ import {
   AlertCircle,
   RotateCw,
   RotateCcw,
+  Eye,
 } from "lucide-react";
 import {
   mergeFilesToSinglePdf,
@@ -37,6 +38,7 @@ interface MultiPageUploaderProps {
   uploadFn: (file: File) => Promise<UploadResult>;
   onUploadSuccess: (result: UploadResult, originalFiles: File[]) => void;
   onClear?: () => void;
+  onInspectExisting?: () => void;
   initialUrl?: string;
   initialFileName?: string;
   initialFileSize?: string;
@@ -50,6 +52,7 @@ export default function MultiPageUploader({
   uploadFn,
   onUploadSuccess,
   onClear,
+  onInspectExisting,
   initialUrl = "",
   initialFileName = "",
   initialFileSize = "",
@@ -89,6 +92,14 @@ export default function MultiPageUploader({
         fileName: initialFileName,
         fileSize: initialFileSize,
       });
+      setPageFiles([]);
+      setPageRotations([]);
+      setPageIsLandscapeRaw([]);
+      setAutoAlignedCount(0);
+      if (localMergedBlobUrl) {
+        URL.revokeObjectURL(localMergedBlobUrl);
+        setLocalMergedBlobUrl(null);
+      }
     } else if (!initialUrl) {
       setUploadedResult(null);
       setPageFiles([]);
@@ -601,7 +612,7 @@ export default function MultiPageUploader({
                       ? `নির্বাচিত পৃষ্ঠা (${pageFiles.length}টি)`
                       : `Selected Document Pages (${pageFiles.length})`}
                   </span>
-                  {pageFiles.length > 1 && (
+                  {(pageFiles.length > 1 || pageFiles.some(isImageFileObject)) && (
                     <span
                       className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${badgeClass}`}
                     >
@@ -830,16 +841,28 @@ export default function MultiPageUploader({
               </div>
               <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
                 {uploadedResult.fileSize && <span>{uploadedResult.fileSize} • </span>}
-                <a
-                  href={localMergedBlobUrl || uploadedResult.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 font-bold"
-                  title="Open merged multi-page PDF"
-                >
-                  <span>{language === "bn" ? "প্রিভিউ দেখুন" : "Preview PDF"}</span>
-                  <ExternalLink className="w-2.5 h-2.5" />
-                </a>
+                {pageFiles.length === 0 && onInspectExisting ? (
+                  <button
+                    type="button"
+                    onClick={onInspectExisting}
+                    className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-bold cursor-pointer"
+                    title="Inspect document and fix rotated pages or images"
+                  >
+                    <Eye className="w-3 h-3" />
+                    <span>{language === "bn" ? "দেখুন ও সোজা করুন" : "View & Fix Orientation"}</span>
+                  </button>
+                ) : (
+                  <a
+                    href={localMergedBlobUrl || uploadedResult.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 font-bold"
+                    title="Open merged multi-page PDF"
+                  >
+                    <span>{language === "bn" ? "প্রিভিউ দেখুন" : "Preview PDF"}</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                )}
               </div>
             </div>
           </div>
