@@ -539,13 +539,13 @@ export default function TeacherDetailPage() {
           </div>
 
           {/* Student Reviews & Evaluation Header */}
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white flex items-center gap-2 leading-tight">
+                <Star className="w-5 h-5 text-amber-500 fill-amber-500 shrink-0" />
                 <span>{language === "bn" ? "শিক্ষার্থীদের রিভিউ ও মূল্যায়ন" : "Student Reviews & Evaluation"}</span>
               </h2>
-              <span className="text-xs font-semibold text-slate-500">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1 block">
                 {reviewCount > 0 
                   ? `${reviewCount} ${language === "bn" ? "টি রিভিউ" : (reviewCount === 1 ? "Review" : "Reviews")} • ${language === "bn" ? "গড়" : "Average"} ${avgRating} ⭐`
                   : (language === "bn" ? "কোনো রিভিউ দেওয়া হয়নি" : "No reviews yet")}
@@ -559,7 +559,7 @@ export default function TeacherDetailPage() {
                 }
                 setShowReviewModal(true);
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/20 hover:scale-105 transition-all"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-md shadow-blue-500/20 hover:scale-[1.03] transition-all shrink-0 cursor-pointer"
             >
               <MessageSquarePlus className="w-3.5 h-3.5" />
               <span>{language === "bn" ? "রিভিউ দিন" : "Write Review"}</span>
@@ -598,88 +598,14 @@ export default function TeacherDetailPage() {
                 </button>
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {reviews.slice(0, 2).map((rev) => (
-                  <div key={rev.id} className="space-y-2">
-                    {/* Trait badges with full text visibility and vivid coloring */}
-                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 px-0.5">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                        <span className="text-[10px] uppercase font-bold text-slate-400">Course:</span>
-                        <span>{rev.courseCode || rev.courseTitle || rev.course?.code || "Course"}</span>
-                      </span>
-
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black bg-purple-500/10 text-purple-300 border border-purple-500/20">
-                        <span className="text-[10px] uppercase font-bold text-slate-400">Personality:</span>
-                        <span>{rev.personality || "Friendly"}</span>
-                      </span>
-
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black border ${
-                        rev.marking?.toLowerCase().includes("strict")
-                          ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
-                          : rev.marking?.toLowerCase().includes("fair") || rev.marking?.toLowerCase().includes("generous") || rev.marking?.toLowerCase().includes("lenient")
-                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                          : "bg-sky-500/10 text-sky-400 border-sky-500/30"
-                      }`}>
-                        <span className="text-[10px] uppercase font-bold text-slate-400">Marking:</span>
-                        <span className="whitespace-nowrap">{rev.marking || "Fair & Generous"}</span>
-                      </span>
-
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black border ${
-                        rev.difficulty?.toLowerCase().includes("hard")
-                          ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
-                          : rev.difficulty?.toLowerCase().includes("easy")
-                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                          : "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                      }`}>
-                        <span className="text-[10px] uppercase font-bold text-slate-400">Difficulty:</span>
-                        <span>{rev.difficulty || "Medium"}</span>
-                      </span>
-                    </div>
-
-                    {/* Review Card Box */}
-                    <div className="p-5 sm:p-6 rounded-2xl bg-[#0d131f] border border-slate-800 text-white shadow-xl space-y-3.5">
-                      {/* Author Row with circular avatar, Name, Date, green Smiley face + star badge */}
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 text-blue-400">
-                            <User className="w-4 h-4" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-xs sm:text-sm font-bold text-white truncate">
-                              {rev.anonymous
-                                ? (language === "bn" ? "অজ্ঞাতনামা শিক্ষার্থী" : "Anonymous Student")
-                                : (rev.authorName || rev.studentName || "Student")}
-                            </div>
-                            <p className="text-[11px] text-slate-400 font-mono">
-                              {formatReviewDate(rev.createdAt)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Green Smiley Icon matching demo screenshot + star rating */}
-                        <div className="flex items-center gap-2.5 shrink-0">
-                          <div className="flex items-center text-amber-400">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                className={`w-3 h-3 ${
-                                  star <= (rev.rating || 5)
-                                    ? "fill-amber-400 text-amber-400"
-                                    : "text-slate-700"
-                                }`}
-                              />
-                            ))}
-                          </div>
-                          <Smile className="w-5 h-5 text-emerald-400 shrink-0" />
-                        </div>
-                      </div>
-
-                      {/* Quoted Feedback with Blue Left Border Accent */}
-                      <div className="border-l-2 border-blue-500 pl-3.5 sm:pl-4 py-0.5 text-xs sm:text-sm text-slate-200 leading-relaxed font-normal">
-                        &quot;{rev.comment}&quot;
-                      </div>
-                    </div>
-                  </div>
+                  <FacultyReviewCard
+                    key={rev.id}
+                    review={rev}
+                    formattedDate={formatReviewDate(rev.createdAt)}
+                    language={language}
+                  />
                 ))}
 
                 {reviewCount > 2 && (
@@ -1367,89 +1293,15 @@ export default function TeacherDetailPage() {
               </button>
             </div>
 
-            {/* Scrollable Reviews List matching media_1793343309179_a0fafd75.png */}
-            <div className="overflow-y-auto space-y-6 pr-1 flex-1">
+            {/* Unified Scrollable Reviews List */}
+            <div className="overflow-y-auto space-y-4 pr-1 flex-1">
               {reviews.map((rev) => (
-                <div key={rev.id} className="space-y-2">
-                  {/* Trait badges with full text visibility and vivid coloring */}
-                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 px-0.5">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                      <span className="text-[10px] uppercase font-bold text-slate-400">Course:</span>
-                      <span>{rev.courseCode || rev.courseTitle || rev.course?.code || "Course"}</span>
-                    </span>
-
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black bg-purple-500/10 text-purple-300 border border-purple-500/20">
-                      <span className="text-[10px] uppercase font-bold text-slate-400">Personality:</span>
-                      <span>{rev.personality || "Friendly"}</span>
-                    </span>
-
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black border ${
-                      rev.marking?.toLowerCase().includes("strict")
-                        ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
-                        : rev.marking?.toLowerCase().includes("fair") || rev.marking?.toLowerCase().includes("generous") || rev.marking?.toLowerCase().includes("lenient")
-                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                        : "bg-sky-500/10 text-sky-400 border-sky-500/30"
-                    }`}>
-                      <span className="text-[10px] uppercase font-bold text-slate-400">Marking:</span>
-                      <span className="whitespace-nowrap">{rev.marking || "Fair & Generous"}</span>
-                    </span>
-
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-black border ${
-                      rev.difficulty?.toLowerCase().includes("hard")
-                        ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
-                        : rev.difficulty?.toLowerCase().includes("easy")
-                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                        : "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                    }`}>
-                      <span className="text-[10px] uppercase font-bold text-slate-400">Difficulty:</span>
-                      <span>{rev.difficulty || "Medium"}</span>
-                    </span>
-                  </div>
-
-                  {/* Review Card Box */}
-                  <div className="p-5 rounded-2xl bg-[#0d131f] border border-slate-800 text-white shadow-lg space-y-3.5">
-                    {/* Author Row with circular avatar, Name, Date, green Smiley face + star badge */}
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 text-blue-400">
-                          <User className="w-4 h-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs sm:text-sm font-bold text-white truncate">
-                            {rev.anonymous
-                              ? (language === "bn" ? "অজ্ঞাতনামা শিক্ষার্থী" : "Anonymous Student")
-                              : (rev.authorName || rev.studentName || "Student")}
-                          </div>
-                          <p className="text-[11px] text-slate-400 font-mono">
-                            {formatReviewDate(rev.createdAt)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Green Smiley Icon matching demo screenshot + star rating */}
-                      <div className="flex items-center gap-2.5 shrink-0">
-                        <div className="flex items-center text-amber-400">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`w-3 h-3 ${
-                                star <= (rev.rating || 5)
-                                  ? "fill-amber-400 text-amber-400"
-                                  : "text-slate-700"
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <Smile className="w-5 h-5 text-emerald-400 shrink-0" />
-                      </div>
-                    </div>
-
-                    {/* Quoted Feedback with Blue Left Border Accent */}
-                    <div className="border-l-2 border-blue-500 pl-3.5 sm:pl-4 py-0.5 text-xs sm:text-sm text-slate-200 leading-relaxed font-normal">
-                      &quot;{rev.comment}&quot;
-                    </div>
-                  </div>
-                </div>
+                <FacultyReviewCard
+                  key={rev.id}
+                  review={rev}
+                  formattedDate={formatReviewDate(rev.createdAt)}
+                  language={language}
+                />
               ))}
             </div>
 
@@ -1468,6 +1320,125 @@ export default function TeacherDetailPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Single unified card housing author identity, rating, 4 faculty evaluation attributes
+ * (Course, Personality, Marking, Difficulty), and student comment in one cohesive box.
+ */
+function FacultyReviewCard({
+  review,
+  formattedDate,
+  language,
+}: {
+  review: any;
+  formattedDate: string;
+  language: string;
+}) {
+  const markingLower = (review.marking || "").toLowerCase();
+  const markingStyle = markingLower.includes("strict")
+    ? "bg-rose-500/10 border-rose-500/25 text-rose-300"
+    : markingLower.includes("fair") || markingLower.includes("generous") || markingLower.includes("lenient")
+    ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"
+    : "bg-sky-500/10 border-sky-500/25 text-sky-300";
+
+  const diffLower = (review.difficulty || "").toLowerCase();
+  const diffStyle = diffLower.includes("hard")
+    ? "bg-rose-500/10 border-rose-500/25 text-rose-300"
+    : diffLower.includes("easy")
+    ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"
+    : "bg-amber-500/10 border-amber-500/25 text-amber-300";
+
+  const authorDisplay = review.anonymous
+    ? language === "bn"
+      ? "অজ্ঞাতনামা শিক্ষার্থী"
+      : "Anonymous Student"
+    : review.authorName || review.studentName || "Student";
+
+  const metrics = [
+    {
+      label: language === "bn" ? "কোর্স" : "Course",
+      value: review.courseCode || review.courseTitle || review.course?.code || "Course",
+      style: "bg-blue-500/10 border-blue-500/25 text-blue-300",
+    },
+    {
+      label: language === "bn" ? "ব্যক্তিত্ব" : "Personality",
+      value: review.personality || "Friendly",
+      style: "bg-purple-500/10 border-purple-500/25 text-purple-300",
+    },
+    {
+      label: language === "bn" ? "মার্কিং" : "Marking",
+      value: review.marking || "Fair & Generous",
+      style: markingStyle,
+    },
+    {
+      label: language === "bn" ? "কঠিনতা" : "Difficulty",
+      value: review.difficulty || "Medium",
+      style: diffStyle,
+    },
+  ];
+
+  const stars = review.rating || 5;
+
+  return (
+    <div className="p-4 sm:p-5 rounded-2xl bg-[#0d1424]/95 backdrop-blur-md border border-slate-800/90 hover:border-blue-500/40 text-white shadow-lg transition-all duration-200 space-y-3.5">
+      {/* Top Row: Student Identity + Date & Rating */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-full bg-slate-800/90 border border-slate-700/80 flex items-center justify-center shrink-0 text-blue-400">
+            <User className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xs sm:text-sm font-bold text-white truncate">{authorDisplay}</span>
+              {!review.anonymous && (
+                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-300 border border-blue-500/25 shrink-0">
+                  {language === "bn" ? "শিক্ষার্থী" : "Student"}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-400 font-mono mt-0.5">{formattedDate}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800">
+          <div className="flex items-center gap-0.5 text-amber-400">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Star
+                key={star}
+                className={`w-3 h-3 ${
+                  star <= stars ? "fill-amber-400 text-amber-400" : "text-slate-700"
+                }`}
+              />
+            ))}
+          </div>
+          <Smile className={`w-4 h-4 shrink-0 ${stars >= 4 ? "text-emerald-400" : stars === 3 ? "text-amber-400" : "text-rose-400"}`} />
+        </div>
+      </div>
+
+      {/* Inside-the-Box 2x2 Evaluation Attributes Grid */}
+      <div className="grid grid-cols-2 gap-2">
+        {metrics.map((m) => (
+          <div
+            key={m.label}
+            className={`px-3 py-2 rounded-xl border ${m.style} flex flex-col justify-center min-w-0`}
+          >
+            <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 leading-none">
+              {m.label}
+            </span>
+            <span className="text-xs font-extrabold truncate mt-1" title={m.value}>
+              {m.value}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Student Feedback Comment */}
+      <div className="border-l-2 border-blue-500 pl-3.5 py-1 bg-slate-950/35 rounded-r-xl text-xs sm:text-sm text-slate-200 leading-relaxed">
+        &quot;{review.comment}&quot;
+      </div>
     </div>
   );
 }
