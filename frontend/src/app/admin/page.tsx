@@ -4085,19 +4085,27 @@ export default function AdminDashboardPage() {
                       onClick={() => setActiveTab("reviews")}
                       className="text-xs font-bold text-amber-500 dark:text-amber-400 hover:underline"
                     >
-                      Moderate ({adminReviews.length})
+                      {pendingReviewsCount > 0 ? `Review Pending (${pendingReviewsCount})` : `Moderate (${adminReviews.length})`}
                     </button>
                   </div>
 
                   <div className="space-y-2.5">
-                    {adminReviews.slice(0, 5).map((rev) => (
+                    {[...adminReviews]
+                      .sort((a, b) => (a.status === "PENDING" ? 0 : 1) - (b.status === "PENDING" ? 0 : 1))
+                      .slice(0, 5)
+                      .map((rev) => (
                       <div
                         key={rev.id}
                         className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs hover:bg-slate-100/80 dark:hover:bg-slate-800/50 transition-colors shadow-xs"
                       >
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{rev.courseCode || "CSE"}</span>
+                            {(rev.teacherName || rev.teacher?.name) && (
+                              <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 truncate max-w-[140px]">
+                                • {rev.teacherName || rev.teacher?.name}
+                              </span>
+                            )}
                             <span
                               className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
                                 rev.status === "PENDING"
@@ -6630,13 +6638,35 @@ export default function AdminDashboardPage() {
                           &quot;{rev.comment}&quot;
                         </p>
 
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-3">
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-x-3 gap-y-1.5">
                           <span>
-                            Reviewer: <strong className="text-slate-900 dark:text-white">{rev.anonymous ? "Anonymous Student" : rev.authorName || "Student"}</strong>
+                            Reviewer:{" "}
+                            <strong className="text-slate-900 dark:text-white">
+                              {rev.anonymous ? "Anonymous Student" : rev.authorName || rev.studentName || "Student"}
+                            </strong>
                           </span>
-                          {rev.teacher && (
-                            <span>
-                              Faculty: <strong className="text-purple-600 dark:text-purple-400">{rev.teacher.name}</strong>
+                          {(rev.teacherName || rev.teacher?.name) ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 font-semibold">
+                              Faculty: <strong>{rev.teacherName || rev.teacher?.name}</strong>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 font-semibold">
+                              Course Feedback
+                            </span>
+                          )}
+                          {rev.personality && (
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              {rev.personality}
+                            </span>
+                          )}
+                          {rev.marking && (
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              {rev.marking}
+                            </span>
+                          )}
+                          {rev.difficulty && (
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              Difficulty: {rev.difficulty}
                             </span>
                           )}
                         </div>

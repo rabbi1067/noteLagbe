@@ -45,6 +45,9 @@ if (typeof window !== "undefined") {
 }
 
 function dispatchToSubscribers(payload: SyncPayload) {
+  if (typeof window !== "undefined" && payload.action !== "connected") {
+    window.dispatchEvent(new Event("notelagbe:sync-data"));
+  }
   subscribers.forEach((cb) => {
     try {
       cb(payload);

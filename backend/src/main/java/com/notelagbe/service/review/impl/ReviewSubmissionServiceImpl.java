@@ -14,6 +14,7 @@ import com.notelagbe.repository.ReviewRepository;
 import com.notelagbe.repository.TeacherRepository;
 import com.notelagbe.repository.UserCourseReviewRepository;
 import com.notelagbe.service.InputSanitizationService;
+import com.notelagbe.service.LiveSyncService;
 import com.notelagbe.service.review.ReviewAnonymityHandler;
 import com.notelagbe.service.review.ReviewEligibilityValidator;
 import com.notelagbe.service.review.ReviewMapper;
@@ -37,6 +38,7 @@ public class ReviewSubmissionServiceImpl implements ReviewSubmissionService {
     private final ReviewAnonymityHandler anonymityHandler;
     private final ReviewMapper reviewMapper;
     private final InputSanitizationService inputSanitizationService;
+    private final LiveSyncService liveSyncService;
 
     public ReviewSubmissionServiceImpl(ReviewRepository reviewRepository,
                                        CourseRepository courseRepository,
@@ -45,7 +47,8 @@ public class ReviewSubmissionServiceImpl implements ReviewSubmissionService {
                                        ReviewEligibilityValidator eligibilityValidator,
                                        ReviewAnonymityHandler anonymityHandler,
                                        ReviewMapper reviewMapper,
-                                       InputSanitizationService inputSanitizationService) {
+                                       InputSanitizationService inputSanitizationService,
+                                       LiveSyncService liveSyncService) {
         this.reviewRepository = reviewRepository;
         this.courseRepository = courseRepository;
         this.teacherRepository = teacherRepository;
@@ -54,6 +57,7 @@ public class ReviewSubmissionServiceImpl implements ReviewSubmissionService {
         this.anonymityHandler = anonymityHandler;
         this.reviewMapper = reviewMapper;
         this.inputSanitizationService = inputSanitizationService;
+        this.liveSyncService = liveSyncService;
     }
 
     @Override
@@ -88,13 +92,14 @@ public class ReviewSubmissionServiceImpl implements ReviewSubmissionService {
         review.setPersonality(inputSanitizationService.sanitizePlainText(sanitizeTrait(request.getPersonality(), defaultPersonality)));
         review.setMarking(inputSanitizationService.sanitizePlainText(sanitizeTrait(request.getMarking(), defaultMarking)));
         review.setDifficulty(inputSanitizationService.sanitizePlainText(sanitizeTrait(request.getDifficulty(), "Medium")));
-        // Course feedback publishes directly for peer guidance; 1 review per student per course enforced
-        review.setStatus(ReviewStatus.APPROVED);
+        // All student reviews enter PENDING moderation queue until approved by an admin
+        review.setStatus(ReviewStatus.PENDING);
 
         // 5. Single Responsibility: Apply privacy & architectural anonymity policy
         anonymityHandler.applyAnonymityPolicy(review, user, request.isAnonymous());
 
         Review saved = reviewRepository.save(review);
+        liveSyncService.broadcast("review", "submitted", saved.getId());
         return reviewMapper.toDto(saved);
     }
 

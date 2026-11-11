@@ -322,8 +322,8 @@ export default function CourseDetailPage() {
       });
       toast.success(
         language === "bn"
-          ? "কোর্স ফিডব্যাক সফলভাবে যুক্ত হয়েছে! জুনিয়রদের সাহায্য করার জন্য ধন্যবাদ।"
-          : "Course feedback published successfully! Thank you for helping juniors."
+          ? "রিভিউ সাবমিট হয়েছে! অ্যাডমিন যাচাই ও অনুমোদন করার পর এটি কোর্স পেজে প্রদর্শিত হবে।"
+          : "Review submitted! It will appear publicly once approved by an admin."
       );
       setComment("");
       setRating(5);

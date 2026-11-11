@@ -524,17 +524,25 @@ public class AdminController {
 
     @PostMapping("/reviews/{id}/approve")
     public ResponseEntity<ReviewResponseDto> approveReview(@PathVariable Long id) {
-        return ResponseEntity.ok(reviewModerationService.approveReview(id));
+        ReviewResponseDto dto = reviewModerationService.approveReview(id);
+        logAdminAction("REVIEW_APPROVE", "ACADEMIC", "Admin approved & published review ID #" + id);
+        evictAnalyticsCache();
+        return ResponseEntity.ok(dto);
     }
 
     @PostMapping("/reviews/{id}/reject")
     public ResponseEntity<ReviewResponseDto> rejectReview(@PathVariable Long id) {
-        return ResponseEntity.ok(reviewModerationService.rejectReview(id));
+        ReviewResponseDto dto = reviewModerationService.rejectReview(id);
+        logAdminAction("REVIEW_REJECT", "ACADEMIC", "Admin rejected/unpublished review ID #" + id);
+        evictAnalyticsCache();
+        return ResponseEntity.ok(dto);
     }
 
     @DeleteMapping("/reviews/{id}")
     public ResponseEntity<Void> deleteReview(@PathVariable Long id) {
         reviewModerationService.deleteReview(id);
+        logAdminAction("REVIEW_DELETE", "ACADEMIC", "Admin permanently deleted review ID #" + id);
+        evictAnalyticsCache();
         return ResponseEntity.ok().build();
     }
 
