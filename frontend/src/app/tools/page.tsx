@@ -486,7 +486,7 @@ export const SEU_ROUTINE_COLUMNS = [
 
 
 // =========================================================================
-// 16 OFFICIAL & HANDCRAFTED UNIQUE SEU COVER TEMPLATES
+// 20 OFFICIAL & HANDCRAFTED UNIQUE SEU COVER TEMPLATES
 // =========================================================================
 export interface SEUCoverTemplate {
   id: string;
@@ -499,7 +499,7 @@ export interface SEUCoverTemplate {
   category: "assignment" | "lab" | "project" | "termpaper" | "thesis" | "proposal" | "casestudy" | "seminar" | "internship" | "capstone";
   file: string;
   desc: string;
-  layoutStyle: "classic_table" | "asymmetric_spine" | "bold_editorial" | "floating_pill_cards" | "hex_spec_badge" | "executive_wave" | "prestige_honors" | "swiss_minimal" | "cyber_terminal" | "classical_column" | "geometric_tech_layout" | "casestudy_analytical" | "seminar_keynote" | "internship_tripartite" | "team_capstone" | "monochrome_laser";
+  layoutStyle: "classic_table" | "imperial_ledger" | "nordic_split" | "oxford_registry" | "bento_slate" | "asymmetric_spine" | "bold_editorial" | "floating_pill_cards" | "hex_spec_badge" | "executive_wave" | "prestige_honors" | "swiss_minimal" | "cyber_terminal" | "classical_column" | "geometric_tech_layout" | "casestudy_analytical" | "seminar_keynote" | "internship_tripartite" | "team_capstone" | "monochrome_laser";
 }
 
 export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
@@ -517,10 +517,66 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
     layoutStyle: "classic_table",
     desc: "Official SEU double navy border, formal course table & structured dual rectangular credential boxes."
   },
-  // 02. Modern Asymmetric Polygon (Southern Univ inspired - Image 1)
+  // 02. Imperial Ledger Monograph (NEW Minimal Formal Serif)
   {
-    id: "02_Asymmetric_Polygon_Spine",
+    id: "02_Imperial_Ledger_Monograph",
     num: "02",
+    name: "Imperial Ledger Monograph",
+    nameBn: "ইম্পেরিয়াল লেজার মনোগ্রাফ",
+    style: "Color",
+    theme: "executive_crest",
+    defaultType: "ASSIGNMENT",
+    category: "assignment",
+    file: "Color/01_Assignment_Color.docx",
+    layoutStyle: "imperial_ledger",
+    desc: "Clean Ivy-League navy & gold ledger rules, centered serif title, crisp 4-cell course strip & split attribution matrix."
+  },
+  // 03. Nordic Split Editorial Folio (NEW Asymmetric Architectural Rail)
+  {
+    id: "03_Nordic_Split_Folio",
+    num: "03",
+    name: "Nordic Split Editorial Folio",
+    nameBn: "নর্ডিক স্প্লিট এডিটোরিয়াল",
+    style: "Color",
+    theme: "minimal_sidebar",
+    defaultType: "LAB REPORT",
+    category: "lab",
+    file: "Color/02_Lab_Report_Color.docx",
+    layoutStyle: "nordic_split",
+    desc: "Deep obsidian slate sidebar holding university crest & course specs beside an ultra-clean spacious white editorial canvas."
+  },
+  // 04. Oxford Double-Rule Prestige (NEW Formal Corner-Bracket Registry)
+  {
+    id: "04_Oxford_Registry_Prestige",
+    num: "04",
+    name: "Oxford Double-Rule Prestige",
+    nameBn: "অক্সফোর্ড ডাবল-রুল প্রেস্টিজ",
+    style: "Color",
+    theme: "prestige_arch",
+    defaultType: "TERM PAPER",
+    category: "termpaper",
+    file: "Color/04_Research_Term_Paper_Color.docx",
+    layoutStyle: "oxford_registry",
+    desc: "Warm ivory finish with mitered navy & burgundy corner brackets, crimson side-rule title & clean hairline registry rows."
+  },
+  // 05. Bento Executive Slate (NEW Precision Grid)
+  {
+    id: "05_Bento_Executive_Slate",
+    num: "05",
+    name: "Bento Executive Slate",
+    nameBn: "বেন্টো এক্সিকিউটিভ স্লেট",
+    style: "Color",
+    theme: "modern_wave",
+    defaultType: "PROJECT REPORT",
+    category: "project",
+    file: "Color/03_Project_Report_Color.docx",
+    layoutStyle: "bento_slate",
+    desc: "Modern Swiss bento grid cards, capsule masthead bar, crisp dot-accent title & printer-friendly clean typography."
+  },
+  // 06. Modern Asymmetric Polygon (Southern Univ inspired)
+  {
+    id: "06_Asymmetric_Polygon_Spine",
+    num: "06",
     name: "Modern Asymmetric Spine",
     nameBn: "সাউদার্ন ও আধুনিক পলিগন স্পাইন",
     style: "Color",
@@ -531,10 +587,10 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
     layoutStyle: "asymmetric_spine",
     desc: "Angled emerald & cyan polygon shards down left spine, clean left-aligned typography, underlined sections & teacher signature line (No boxes)."
   },
-  // 03. Bold Editorial Poster (Franklin inspired - Image 2)
+  // 07. Bold Editorial Poster (Franklin inspired)
   {
-    id: "03_Bold_Editorial_Poster",
-    num: "03",
+    id: "07_Bold_Editorial_Poster",
+    num: "07",
     name: "Bold Editorial Poster",
     nameBn: "ফ্র্যাঙ্কলিন বোল্ড পোস্টার",
     style: "Color",
@@ -545,10 +601,10 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
     layoutStyle: "bold_editorial",
     desc: "Warm gold & amber diagonal planes with giant bold uppercase typography, floating minimal meta & corner submission date."
   },
-  // 04. Honeycomb Floating 3D Cards (BUBT inspired - Image 3)
+  // 08. Honeycomb Floating 3D Cards (BUBT inspired)
   {
-    id: "04_Honeycomb_Floating_Cards",
-    num: "04",
+    id: "08_Honeycomb_Floating_Cards",
+    num: "08",
     name: "Honeycomb Floating 3D Cards",
     nameBn: "বিইউবিটি থ্রিডি ফ্লোটিং হেক্স",
     style: "Color",
@@ -559,10 +615,10 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
     layoutStyle: "floating_pill_cards",
     desc: "3D isometric honeycomb hexagons, floating rounded pill cards with drop shadows, center dark ribbon banner and teacher signature line."
   },
-  // 05. Hexagonal Mesh & Spec Checklist (Peripheral Interface inspired - Image 4)
+  // 09. Hexagonal Mesh & Spec Checklist (Peripheral Interface inspired)
   {
-    id: "05_Hexagonal_Mesh_Spec",
-    num: "05",
+    id: "09_Hexagonal_Mesh_Spec",
+    num: "09",
     name: "Hexagonal Mesh & Spec Checklist",
     nameBn: "পেরিফেরাল ইন্টারফেস ও হেক্স মেশ",
     style: "Color",
@@ -573,10 +629,10 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
     layoutStyle: "hex_spec_badge",
     desc: "Full-page honeycomb mesh watermark, layered cyan/green hexagon badges, bulleted module checklist and golden engineering badge."
   },
-  // 06. Modern Executive Wave
+  // 10. Modern Executive Wave
   {
-    id: "06_Modern_Wave_Executive",
-    num: "06",
+    id: "10_Modern_Wave_Executive",
+    num: "10",
     name: "Modern Executive Wave",
     nameBn: "মডার্ন এক্সিকিউটিভ ওয়েভ",
     style: "Color",
@@ -587,10 +643,10 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
     layoutStyle: "executive_wave",
     desc: "Dynamic flowing navy & cyan gradient ribbons down right margin with clean left-weighted modern corporate typography."
   },
-  // 07. Prestige Arch Honors
+  // 11. Prestige Arch Honors
   {
-    id: "07_Prestige_Arch_Honors",
-    num: "07",
+    id: "11_Prestige_Arch_Honors",
+    num: "11",
     name: "Prestige Arch Honors",
     nameBn: "প্রেস্টিজ আর্চ ও রিবন অনার্স",
     style: "Color",
@@ -601,10 +657,10 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
     layoutStyle: "prestige_honors",
     desc: "Arched wave ribbons at top and bottom with gold accent strokes, formal serif degree invocation and elegant ornamental rules."
   },
-  // 08. Minimalist Swiss Stripe
+  // 12. Minimalist Swiss Stripe
   {
-    id: "08_Minimalist_Swiss_Sidebar",
-    num: "08",
+    id: "12_Minimalist_Swiss_Sidebar",
+    num: "12",
     name: "Minimalist Swiss Stripe",
     nameBn: "সুইস মিনিমালিস্ট স্ট্রাইপ",
     style: "Color",
@@ -615,10 +671,10 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
     layoutStyle: "swiss_minimal",
     desc: "Left vertical gradient accent stripe with rotated university title, zero framed boxes, pure clean sans-serif typography."
   },
-  // 09. Cyber Circuit Developer Terminal
+  // 13. Cyber Circuit Developer Terminal
   {
-    id: "09_Cyber_Circuit_Tech",
-    num: "09",
+    id: "13_Cyber_Circuit_Tech",
+    num: "13",
     name: "Cyber Circuit Developer",
     nameBn: "সাইবার সার্কিট ডেভেলপার টার্মিনাল",
     style: "Color",
@@ -629,10 +685,10 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
     layoutStyle: "cyber_terminal",
     desc: "High-tech PCB circuit traces, terminal code syntax block with monospace typography and developer bracket tags [SUBMITTED_BY]."
   },
-  // 10. Fluted Classical Column
+  // 14. Fluted Classical Column
   {
-    id: "10_Fluted_Architectural_Column",
-    num: "10",
+    id: "14_Fluted_Architectural_Column",
+    num: "14",
     name: "Fluted Classical Column",
     nameBn: "ফ্লুটেড আর্কিটেকচারাল মোনোগ্রাফ",
     style: "Color",
@@ -643,10 +699,10 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
     layoutStyle: "classical_column",
     desc: "Classical ionic fluted columns on margins, formal Roman small-caps typography, ornamental academic research paper formatting."
   },
-  // 11. Geometric Angular Tech
+  // 15. Geometric Angular Tech
   {
-    id: "11_Geometric_Angular_Tech",
-    num: "11",
+    id: "15_Geometric_Angular_Tech",
+    num: "15",
     name: "Geometric Angular Tech",
     nameBn: "জিওমেট্রিক অ্যাঙ্গুলার টেক",
     style: "Color",
@@ -657,10 +713,10 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
     layoutStyle: "geometric_tech_layout",
     desc: "Sharp geometric polygon corners in navy & cyan with structured engineering proposal approval blocks."
   },
-  // 12. Case Study Dual-Column Grid
+  // 16. Case Study Dual-Column Grid
   {
-    id: "12_Case_Study_Grid",
-    num: "12",
+    id: "16_Case_Study_Grid",
+    num: "16",
     name: "Case Study Dual-Column Grid",
     nameBn: "কেস স্টাডি অ্যানালিটিক্যাল গ্রিড",
     style: "Color",
@@ -671,10 +727,10 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
     layoutStyle: "casestudy_analytical",
     desc: "Analytical corporate report layout with executive summary banner and dual-column problem & methodology blocks."
   },
-  // 13. Seminar Presentation Keynote
+  // 17. Seminar Presentation Keynote
   {
-    id: "13_Seminar_Presentation",
-    num: "13",
+    id: "17_Seminar_Presentation",
+    num: "17",
     name: "Seminar Presentation Keynote",
     nameBn: "সেমিনার কি-নোট ফরম্যাট",
     style: "Color",
@@ -685,10 +741,10 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
     layoutStyle: "seminar_keynote",
     desc: "Speaker presentation title banner with faculty evaluation panel and audience attendee accreditation."
   },
-  // 14. Internship Tripartite Supervisor
+  // 18. Internship Tripartite Supervisor
   {
-    id: "14_Internship_Report",
-    num: "14",
+    id: "18_Internship_Report",
+    num: "18",
     name: "Internship Tripartite Supervisor",
     nameBn: "ইন্টার্নশিপ ট্রাইপার্টাইট ফরম্যাট",
     style: "Color",
@@ -699,10 +755,10 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
     layoutStyle: "internship_tripartite",
     desc: "Tripartite industrial attachment layout with student trainee, academic supervisor, and industry manager verification blocks."
   },
-  // 15. Capstone Multi-Member Team
+  // 19. Capstone Multi-Member Team
   {
-    id: "15_Capstone_Project_Team",
-    num: "15",
+    id: "19_Capstone_Project_Team",
+    num: "19",
     name: "Capstone Multi-Member Team",
     nameBn: "ক্যাপস্টোন মাল্টি-মেম্বার টিম টেবিল",
     style: "Color",
@@ -713,10 +769,10 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
     layoutStyle: "team_capstone",
     desc: "4-member multi-student project team table with student IDs & roles, project supervision and defense committee approval block."
   },
-  // 16. Monochrome Clean Laser B&W
+  // 20. Monochrome Clean Laser B&W
   {
-    id: "16_Monochrome_Laser_BW",
-    num: "16",
+    id: "20_Monochrome_Laser_BW",
+    num: "20",
     name: "Monochrome Clean Laser B&W",
     nameBn: "হাই-কনট্রাস্ট লেজার ফটোকপি B&W",
     style: "BW",
@@ -1063,6 +1119,7 @@ export default function StudentToolsPage() {
   const [coverSemester, setCoverSemester] = useState("");
   const [coverDepartment, setCoverDepartment] = useState("Department of Computer Science & Engineering");
   const [coverSubmissionDate, setCoverSubmissionDate] = useState("");
+  const [showSignatureBlock, setShowSignatureBlock] = useState(false);
   const [rememberDetails, setRememberDetails] = useState(true);
 
   // Quick Select Course & Faculty Manual / Autocomplete Inputs
@@ -1172,6 +1229,7 @@ export default function StudentToolsPage() {
           if (d.section) setCoverSection(d.section);
           if (d.semester) setCoverSemester(d.semester);
           if (d.department) setCoverDepartment(d.department);
+          if (typeof d.showSignatureBlock === "boolean") setShowSignatureBlock(d.showSignatureBlock);
         } catch {}
       }
     }
@@ -1185,6 +1243,7 @@ export default function StudentToolsPage() {
         section: coverSection,
         semester: coverSemester,
         department: coverDepartment,
+        showSignatureBlock,
       }));
       toast.success(language === "bn" ? "আপনার তথ্য এই ডিভাইসে সংরক্ষণ করা হয়েছে।" : "Your details remembered on this device.");
     }
@@ -3603,11 +3662,525 @@ export default function StudentToolsPage() {
           }
         };
 
-        // Render Active Cover Content - 16 Distinct Handcrafted Interior Layouts
+        // Render Active Cover Content - 20 Distinct Handcrafted Interior Layouts
         const renderActiveCoverContent = () => {
           const isColor = activeTpl.style === "Color";
+          const fmtCourseCode = coverCourseCode || "CSE241";
+          const fmtCourseTitle = coverCourseTitle || "Data Structures & Algorithms";
+          const fmtSection = coverSection || "02";
+          const fmtSemester = coverSemester || "Fall 2026";
+          const fmtTopic = coverTopic || "[Title / Topic of Submission]";
+          const fmtDept = coverDepartment || "Department of Computer Science & Engineering";
+          const fmtTeacher = coverTeacherName || "Md. Nahid Anam Opu";
+          const fmtTeacherInit = coverTeacherInitial ? ` [${coverTeacherInitial}]` : "";
+          const fmtTeacherDesig = coverTeacherDesignation || "Lecturer";
+          const fmtStudent = coverStudentName || "Md Fazle Rabbi";
+          const fmtStudentId = coverStudentID || "2023200000686";
+          const fmtDate = coverSubmissionDate || "21.09.2026";
+          const fmtType = (coverType || activeTpl.defaultType || "ASSIGNMENT").toUpperCase();
+          const titleFontSize = fmtTopic.length > 110 ? "20px" : fmtTopic.length > 65 ? "23px" : "26px";
 
-          // 02. ASYMMETRIC SPINE (Southern University inspired - Image 1 in feedback / Image 3 in summary)
+          // 02. IMPERIAL LEDGER MONOGRAPH (Clean Ivy-League Navy & Gold Ledger)
+          if (activeTpl.layoutStyle === "imperial_ledger") {
+            return (
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  minHeight: "877px",
+                  backgroundColor: "#ffffff",
+                  color: "#0E1E38",
+                  padding: "68px 56px 64px 56px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  boxSizing: "border-box",
+                  overflow: "hidden",
+                  fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif",
+                }}
+              >
+                {/* Top Navy & Gold Architectural Accent Bar */}
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "6px", backgroundColor: "#0E1E38", display: "flex", justifyContent: "center" }}>
+                  <div style={{ width: "170px", height: "6px", backgroundColor: "#A8843F" }} />
+                </div>
+
+                {/* Soft Watermark Crest */}
+                <img
+                  src="/images/seu-logo.png"
+                  alt=""
+                  style={{ position: "absolute", top: "51%", left: "50%", transform: "translate(-50%, -50%)", width: "290px", height: "290px", opacity: 0.032, pointerEvents: "none", objectFit: "contain" }}
+                />
+
+                {/* Top Masthead (Crest + University + Dept — Once) */}
+                <div style={{ textAlign: "center", position: "relative", zIndex: 2 }}>
+                  <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "6px", borderRadius: "999px", border: "1px solid rgba(168,132,63,0.45)", backgroundColor: "#ffffff", marginBottom: "12px" }}>
+                    <img src="/images/seu-logo.png" alt="SEU Crest" style={{ width: "64px", height: "64px", objectFit: "contain" }} />
+                  </div>
+                  <h1 style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', serif", fontSize: "22px", fontWeight: 700, letterSpacing: "0.12em", color: "#0E1E38", textTransform: "uppercase", margin: "0 0 5px 0" }}>
+                    Southeast University
+                  </h1>
+                  <p style={{ fontSize: "10.5px", fontWeight: 700, letterSpacing: "0.13em", color: "#475569", textTransform: "uppercase", margin: 0 }}>
+                    {fmtDept}
+                  </p>
+                  <div style={{ marginTop: "18px" }}>
+                    <div style={{ height: "1.5px", backgroundColor: "#0E1E38" }} />
+                    <div style={{ height: "1px", backgroundColor: "#A8843F", marginTop: "3px" }} />
+                  </div>
+                </div>
+
+                {/* Balanced Center Optical Group */}
+                <div style={{ position: "relative", zIndex: 2, margin: "auto 0", display: "flex", flexDirection: "column", gap: "28px", padding: "18px 0" }}>
+                  {/* Classification & Topic Title ONLY */}
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ display: "inline-block", padding: "5px 20px", border: "1px solid #A8843F", borderRadius: "999px", backgroundColor: "#FBF8F1", marginBottom: "20px" }}>
+                      <span style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.22em", color: "#0E1E38", textTransform: "uppercase" }}>
+                        {fmtType}
+                      </span>
+                    </div>
+                    <h2 style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', serif", fontSize: titleFontSize, lineHeight: 1.38, fontWeight: 700, color: "#0E1E38", maxWidth: "490px", margin: "0 auto 18px auto", wordBreak: "break-word" }}>
+                      {fmtTopic}
+                    </h2>
+                    <div style={{ width: "64px", height: "2px", backgroundColor: "#A8843F", margin: "0 auto" }} />
+                  </div>
+
+                  {/* Single Course Ledger Strip */}
+                  <div style={{ borderTop: "1.5px solid #0E1E38", borderBottom: "1.5px solid #0E1E38", backgroundColor: "#F8FAFC", display: "grid", gridTemplateColumns: "1.05fr 2.2fr 0.75fr 1fr" }}>
+                    <div style={{ padding: "12px 10px", borderRight: "1px solid #CBD5E1" }}>
+                      <div style={{ fontSize: "8px", fontWeight: 800, letterSpacing: "0.13em", color: "#64748B", textTransform: "uppercase", marginBottom: "3px" }}>Course Code</div>
+                      <div style={{ fontFamily: "ui-monospace, Consolas, monospace", fontSize: "12px", fontWeight: 700, color: "#0E1E38" }}>{fmtCourseCode}</div>
+                    </div>
+                    <div style={{ padding: "12px 10px", borderRight: "1px solid #CBD5E1" }}>
+                      <div style={{ fontSize: "8px", fontWeight: 800, letterSpacing: "0.13em", color: "#64748B", textTransform: "uppercase", marginBottom: "3px" }}>Course Title</div>
+                      <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#0E1E38", lineHeight: 1.3 }}>{fmtCourseTitle}</div>
+                    </div>
+                    <div style={{ padding: "12px 10px", borderRight: "1px solid #CBD5E1", textAlign: "center" }}>
+                      <div style={{ fontSize: "8px", fontWeight: 800, letterSpacing: "0.13em", color: "#64748B", textTransform: "uppercase", marginBottom: "3px" }}>Section</div>
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: "#0E1E38" }}>{fmtSection}</div>
+                    </div>
+                    <div style={{ padding: "12px 10px", textAlign: "right" }}>
+                      <div style={{ fontSize: "8px", fontWeight: 800, letterSpacing: "0.13em", color: "#64748B", textTransform: "uppercase", marginBottom: "3px" }}>Semester</div>
+                      <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#0E1E38" }}>{fmtSemester}</div>
+                    </div>
+                  </div>
+
+                  {/* Submitted To / Submitted By Attribution Matrix (No Duplicates) */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid #CBD5E1", textAlign: "left" }}>
+                    <div style={{ padding: "14px 18px 18px 2px", borderRight: "1px solid #CBD5E1" }}>
+                      <div style={{ fontSize: "8.5px", fontWeight: 800, letterSpacing: "0.15em", color: "#A8843F", textTransform: "uppercase", marginBottom: "8px" }}>
+                        Submitted To
+                      </div>
+                      <div style={{ fontSize: "14.5px", fontWeight: 700, color: "#0E1E38", marginBottom: "4px" }}>
+                        {fmtTeacher}<span style={{ fontFamily: "ui-monospace, Consolas, monospace", fontSize: "10.5px", color: "#A8843F", fontWeight: 700 }}>{fmtTeacherInit}</span>
+                      </div>
+                      <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#475569" }}>{fmtTeacherDesig}</div>
+                    </div>
+
+                    <div style={{ padding: "14px 2px 18px 22px" }}>
+                      <div style={{ fontSize: "8.5px", fontWeight: 800, letterSpacing: "0.15em", color: "#A8843F", textTransform: "uppercase", marginBottom: "8px" }}>
+                        Submitted By
+                      </div>
+                      <div style={{ fontSize: "14.5px", fontWeight: 700, color: "#0E1E38", marginBottom: "6px" }}>
+                        {fmtStudent}
+                      </div>
+                      <div style={{ display: "inline-block", backgroundColor: "#0E1E38", color: "#ffffff", padding: "3px 9px", borderRadius: "4px", fontSize: "10.5px", fontWeight: 700, fontFamily: "ui-monospace, Consolas, monospace" }}>
+                        ID: {fmtStudentId}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Safe Print Footer: Submission Date + Optional Signature/Remarks */}
+                <div style={{ position: "relative", zIndex: 2, display: "flex", alignItems: "flex-end", justifyContent: showSignatureBlock ? "space-between" : "flex-start", paddingTop: "10px" }}>
+                  <div>
+                    <div style={{ fontSize: "8px", fontWeight: 800, letterSpacing: "0.14em", color: "#64748B", textTransform: "uppercase", marginBottom: "2px" }}>Submission Date</div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#0E1E38" }}>{fmtDate}</div>
+                  </div>
+                  {showSignatureBlock && (
+                    <div style={{ textAlign: "right", width: "175px" }}>
+                      <div style={{ borderBottom: "1px dashed #64748B", height: "20px", marginBottom: "4px" }} />
+                      <div style={{ fontSize: "8px", fontWeight: 700, letterSpacing: "0.12em", color: "#64748B", textTransform: "uppercase" }}>Signature &amp; Remarks</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          // 03. NORDIC SPLIT EDITORIAL FOLIO (Deep Obsidian Architectural Rail + Spacious White Canvas)
+          if (activeTpl.layoutStyle === "nordic_split") {
+            const showExpTag = fmtType.includes("LAB") && Boolean(coverExpNo);
+            return (
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  minHeight: "877px",
+                  backgroundColor: "#ffffff",
+                  display: "flex",
+                  flexDirection: "row",
+                  boxSizing: "border-box",
+                  overflow: "hidden",
+                  fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif",
+                }}
+              >
+                {/* Left Obsidian Architectural Sidebar */}
+                <div
+                  style={{
+                    width: "184px",
+                    flexShrink: 0,
+                    backgroundColor: "#0B1426",
+                    color: "#ffffff",
+                    padding: "66px 20px 64px 20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    position: "relative",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <div style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "3.5px", backgroundColor: "#2563EB" }} />
+
+                  <div>
+                    <div style={{ width: "68px", height: "68px", borderRadius: "999px", backgroundColor: "#ffffff", padding: "5px", border: "2px solid rgba(56,189,248,0.55)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "18px" }}>
+                      <img src="/images/seu-logo.png" alt="SEU Crest" style={{ width: "56px", height: "56px", objectFit: "contain" }} />
+                    </div>
+                    <div style={{ width: "28px", height: "2.5px", backgroundColor: "#38BDF8", marginBottom: "12px" }} />
+                    <div style={{ fontSize: "13px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", lineHeight: 1.3, marginBottom: "7px", color: "#F8FAFC" }}>
+                      Southeast University
+                    </div>
+                    <div style={{ fontSize: "9.5px", color: "#94A3B8", lineHeight: 1.45, fontWeight: 500 }}>
+                      {fmtDept}
+                    </div>
+                  </div>
+
+                  {/* Rail Course Card (Appears Once) */}
+                  <div style={{ backgroundColor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", padding: "14px" }}>
+                    <div style={{ marginBottom: "12px" }}>
+                      <div style={{ fontSize: "7.5px", letterSpacing: "0.15em", textTransform: "uppercase", color: "#94A3B8", marginBottom: "2px" }}>Course Code</div>
+                      <div style={{ fontFamily: "ui-monospace, Consolas, monospace", fontSize: "14px", fontWeight: 800, color: "#38BDF8" }}>{fmtCourseCode}</div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "10px" }}>
+                      <div>
+                        <div style={{ fontSize: "7px", letterSpacing: "0.13em", textTransform: "uppercase", color: "#94A3B8", marginBottom: "2px" }}>Section</div>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: "#F8FAFC" }}>{fmtSection}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "7px", letterSpacing: "0.13em", textTransform: "uppercase", color: "#94A3B8", marginBottom: "2px" }}>Semester</div>
+                        <div style={{ fontSize: "10.5px", fontWeight: 700, color: "#F8FAFC" }}>{fmtSemester}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Editorial Canvas */}
+                <div
+                  style={{
+                    flex: 1,
+                    backgroundColor: "#ffffff",
+                    padding: "68px 46px 64px 40px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    boxSizing: "border-box",
+                    textAlign: "left",
+                  }}
+                >
+                  {/* Top Classification Bar */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #E2E8F0", paddingBottom: "14px" }}>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "7px" }}>
+                      <span style={{ display: "inline-block", width: "7px", height: "7px", borderRadius: "2px", backgroundColor: "#2563EB" }} />
+                      <span style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#1E293B" }}>
+                        {fmtType}
+                      </span>
+                    </div>
+                    {showExpTag && (
+                      <span style={{ fontFamily: "ui-monospace, Consolas, monospace", fontSize: "9.5px", fontWeight: 700, color: "#2563EB", backgroundColor: "#EFF6FF", padding: "3px 9px", borderRadius: "4px", border: "1px solid #BFDBFE" }}>
+                        EXP. {coverExpNo}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Balanced Optical Center Hero & Attribution */}
+                  <div style={{ margin: "auto 0", display: "flex", flexDirection: "column", gap: "30px", padding: "16px 0" }}>
+                    <div>
+                      <div style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "#2563EB", marginBottom: "10px" }}>
+                        {fmtCourseTitle}
+                      </div>
+                      <h2 style={{ fontSize: titleFontSize, fontWeight: 800, lineHeight: 1.25, letterSpacing: "-0.02em", color: "#0F172A", margin: "0 0 18px 0", wordBreak: "break-word" }}>
+                        {fmtTopic}
+                      </h2>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ width: "48px", height: "3px", backgroundColor: "#2563EB", borderRadius: "2px" }} />
+                        <div style={{ flex: 1, height: "1px", backgroundColor: "#E2E8F0" }} />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                      <div style={{ backgroundColor: "#F8FAFC", borderLeft: "3.5px solid #2563EB", padding: "14px 18px", borderRadius: "0 8px 8px 0" }}>
+                        <div style={{ fontSize: "8.5px", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: "#2563EB", marginBottom: "5px" }}>
+                          Submitted To
+                        </div>
+                        <div style={{ fontSize: "15px", fontWeight: 800, color: "#0F172A", marginBottom: "2px" }}>
+                          {fmtTeacher}<span style={{ fontSize: "11px", color: "#64748B", fontWeight: 600 }}>{fmtTeacherInit}</span>
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#475569", fontWeight: 600 }}>{fmtTeacherDesig}</div>
+                      </div>
+
+                      <div style={{ backgroundColor: "#ffffff", border: "1px solid #E2E8F0", borderLeft: "3.5px solid #0F172A", padding: "14px 18px", borderRadius: "0 8px 8px 0" }}>
+                        <div style={{ fontSize: "8.5px", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: "#64748B", marginBottom: "5px" }}>
+                          Submitted By
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "15px", fontWeight: 800, color: "#0F172A" }}>{fmtStudent}</span>
+                          <span style={{ fontFamily: "ui-monospace, Consolas, monospace", fontSize: "10.5px", fontWeight: 700, color: "#0F172A", backgroundColor: "#F1F5F9", padding: "3px 8px", borderRadius: "4px" }}>
+                            ID: {fmtStudentId}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Clean Print Footer */}
+                  <div style={{ borderTop: "1px solid #CBD5E1", paddingTop: "14px", display: "flex", alignItems: "flex-end", justifyContent: showSignatureBlock ? "space-between" : "flex-start" }}>
+                    <div>
+                      <div style={{ fontSize: "8px", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "#64748B", marginBottom: "2px" }}>Submission Date</div>
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: "#0F172A" }}>{fmtDate}</div>
+                    </div>
+                    {showSignatureBlock && (
+                      <div style={{ textAlign: "right", width: "160px" }}>
+                        <div style={{ borderBottom: "1px solid #94A3B8", height: "18px", marginBottom: "4px" }} />
+                        <div style={{ fontSize: "8px", fontWeight: 700, letterSpacing: "0.13em", textTransform: "uppercase", color: "#64748B" }}>Signature &amp; Remarks</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          // 04. OXFORD DOUBLE-RULE PRESTIGE (Warm Ivory Corner-Bracket + Horizontal Registry Table)
+          if (activeTpl.layoutStyle === "oxford_registry") {
+            return (
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  minHeight: "877px",
+                  backgroundColor: "#FCFBF8",
+                  padding: "46px",
+                  boxSizing: "border-box",
+                  overflow: "hidden",
+                  fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif",
+                }}
+              >
+                <div
+                  style={{
+                    position: "relative",
+                    width: "100%",
+                    minHeight: "785px",
+                    border: "1px solid rgba(19,36,66,0.22)",
+                    padding: "42px 38px 38px 38px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  {/* 4 Mitered L-Corners in Deep Navy + Burgundy */}
+                  <div style={{ position: "absolute", top: "-2px", left: "-2px", width: "28px", height: "28px", borderTop: "3.5px solid #132442", borderLeft: "3.5px solid #132442" }} />
+                  <div style={{ position: "absolute", top: "5px", left: "5px", width: "14px", height: "14px", borderTop: "1.5px solid #881D2B", borderLeft: "1.5px solid #881D2B" }} />
+                  <div style={{ position: "absolute", top: "-2px", right: "-2px", width: "28px", height: "28px", borderTop: "3.5px solid #132442", borderRight: "3.5px solid #132442" }} />
+                  <div style={{ position: "absolute", top: "5px", right: "5px", width: "14px", height: "14px", borderTop: "1.5px solid #881D2B", borderRight: "1.5px solid #881D2B" }} />
+                  <div style={{ position: "absolute", bottom: "-2px", left: "-2px", width: "28px", height: "28px", borderBottom: "3.5px solid #132442", borderLeft: "3.5px solid #132442" }} />
+                  <div style={{ position: "absolute", bottom: "5px", left: "5px", width: "14px", height: "14px", borderBottom: "1.5px solid #881D2B", borderLeft: "1.5px solid #881D2B" }} />
+                  <div style={{ position: "absolute", bottom: "-2px", right: "-2px", width: "28px", height: "28px", borderBottom: "3.5px solid #132442", borderRight: "3.5px solid #132442" }} />
+                  <div style={{ position: "absolute", bottom: "5px", right: "5px", width: "14px", height: "14px", borderBottom: "1.5px solid #881D2B", borderRight: "1.5px solid #881D2B" }} />
+
+                  {/* Left-Aligned University Masthead Row */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "2px solid #132442", paddingBottom: "16px", gap: "12px", textAlign: "left" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                      <img src="/images/seu-logo.png" alt="SEU Crest" style={{ width: "56px", height: "56px", objectFit: "contain", flexShrink: 0 }} />
+                      <div>
+                        <h1 style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', serif", fontSize: "18.5px", fontWeight: 700, letterSpacing: "0.08em", color: "#132442", textTransform: "uppercase", margin: "0 0 3px 0" }}>
+                          Southeast University
+                        </h1>
+                        <p style={{ fontSize: "9.5px", fontWeight: 700, letterSpacing: "0.10em", color: "#475569", textTransform: "uppercase", margin: 0 }}>
+                          {fmtDept}
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{ backgroundColor: "#881D2B", color: "#ffffff", padding: "6px 14px", letterSpacing: "0.16em", fontSize: "9.5px", fontWeight: 800, textTransform: "uppercase", flexShrink: 0 }}>
+                      {fmtType}
+                    </div>
+                  </div>
+
+                  {/* Balanced Optical Middle Section */}
+                  <div style={{ margin: "auto 0", display: "flex", flexDirection: "column", gap: "30px", padding: "18px 0", textAlign: "left" }}>
+                    {/* Serif Hero Title with Crimson Side Rule */}
+                    <div style={{ borderLeft: "4.5px solid #881D2B", padding: "8px 0 8px 22px" }}>
+                      <h2 style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', serif", fontSize: titleFontSize, lineHeight: 1.34, fontWeight: 700, color: "#132442", margin: 0, wordBreak: "break-word" }}>
+                        {fmtTopic}
+                      </h2>
+                    </div>
+
+                    {/* Oxford Key-Value Hairline Registry Table (Zero Duplicates) */}
+                    <div style={{ borderTop: "2px solid #132442", borderBottom: "2px solid #132442", backgroundColor: "#ffffff" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", borderBottom: "1px solid #E2E8F0", padding: "12px 16px" }}>
+                        <span style={{ fontSize: "8.5px", fontWeight: 800, letterSpacing: "0.14em", color: "#881D2B", textTransform: "uppercase", alignSelf: "center" }}>Course</span>
+                        <span style={{ fontSize: "12.5px", fontWeight: 700, color: "#132442" }}>
+                          <span style={{ fontFamily: "ui-monospace, Consolas, monospace" }}>{fmtCourseCode}</span> &nbsp;—&nbsp; {fmtCourseTitle}
+                        </span>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "140px 1fr 120px", borderBottom: "1px solid #E2E8F0", padding: "12px 16px" }}>
+                        <span style={{ fontSize: "8.5px", fontWeight: 800, letterSpacing: "0.14em", color: "#881D2B", textTransform: "uppercase", alignSelf: "center" }}>Section &amp; Term</span>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: "#132442" }}>Section {fmtSection}</span>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: "#132442", textAlign: "right" }}>{fmtSemester}</span>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", borderBottom: "1px solid #E2E8F0", padding: "13px 16px" }}>
+                        <span style={{ fontSize: "8.5px", fontWeight: 800, letterSpacing: "0.14em", color: "#881D2B", textTransform: "uppercase", paddingTop: "2px" }}>Submitted To</span>
+                        <div>
+                          <div style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', serif", fontSize: "14px", fontWeight: 700, color: "#132442", marginBottom: "2px" }}>
+                            {fmtTeacher}<span style={{ fontFamily: "ui-monospace, Consolas, monospace", fontSize: "10.5px", color: "#881D2B" }}>{fmtTeacherInit}</span>
+                          </div>
+                          <div style={{ fontSize: "11px", color: "#475569" }}>{fmtTeacherDesig}</div>
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", padding: "13px 16px" }}>
+                        <span style={{ fontSize: "8.5px", fontWeight: 800, letterSpacing: "0.14em", color: "#881D2B", textTransform: "uppercase", paddingTop: "2px" }}>Submitted By</span>
+                        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', serif", fontSize: "14px", fontWeight: 700, color: "#132442" }}>{fmtStudent}</span>
+                          <span style={{ fontFamily: "ui-monospace, Consolas, monospace", fontSize: "11px", fontWeight: 700, color: "#132442", backgroundColor: "#F1F5F9", padding: "2px 8px" }}>
+                            ID: {fmtStudentId}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Clean Footer (Submission Date + Optional Signature/Remarks) */}
+                  <div style={{ display: "flex", alignItems: "flex-end", justifyContent: showSignatureBlock ? "space-between" : "flex-start", paddingTop: "10px", textAlign: "left" }}>
+                    <div>
+                      <div style={{ fontSize: "8px", fontWeight: 800, letterSpacing: "0.14em", color: "#64748B", textTransform: "uppercase", marginBottom: "2px" }}>Submission Date</div>
+                      <div style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', serif", fontSize: "12.5px", fontWeight: 700, color: "#132442" }}>{fmtDate}</div>
+                    </div>
+                    {showSignatureBlock && (
+                      <div style={{ textAlign: "right", width: "165px" }}>
+                        <div style={{ borderBottom: "1px solid #132442", height: "20px", marginBottom: "4px" }} />
+                        <div style={{ fontSize: "8px", fontWeight: 700, letterSpacing: "0.12em", color: "#475569", textTransform: "uppercase" }}>Examiner Signature &amp; Remarks</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          // 05. BENTO EXECUTIVE SLATE (Swiss Precision Bento Grid, Zero Duplicates, Print-Safe)
+          if (activeTpl.layoutStyle === "bento_slate") {
+            return (
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  minHeight: "877px",
+                  backgroundColor: "#ffffff",
+                  padding: "66px 54px 62px 54px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  boxSizing: "border-box",
+                  overflow: "hidden",
+                  fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif",
+                  textAlign: "left",
+                }}
+              >
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "5px", backgroundColor: "#0284C7" }} />
+
+                {/* Top Capsule Masthead */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid #CBD5E1", borderLeft: "4px solid #0284C7", borderRadius: "8px", padding: "14px 18px", backgroundColor: "#F8FAFC", gap: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <img src="/images/seu-logo.png" alt="SEU Crest" style={{ width: "46px", height: "46px", objectFit: "contain", flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontSize: "14px", fontWeight: 800, letterSpacing: "0.06em", color: "#0F172A", textTransform: "uppercase" }}>
+                        Southeast University
+                      </div>
+                      <div style={{ fontSize: "10px", fontWeight: 600, color: "#475569" }}>
+                        {fmtDept}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ backgroundColor: "#0F172A", color: "#ffffff", padding: "6px 12px", borderRadius: "6px", fontSize: "9.5px", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", flexShrink: 0 }}>
+                    {fmtType}
+                  </div>
+                </div>
+
+                {/* Balanced Optical Center Stack */}
+                <div style={{ margin: "auto 0", display: "flex", flexDirection: "column", gap: "18px", padding: "18px 0" }}>
+                  {/* Hero Title Card (Title ONLY, zero description paragraph) */}
+                  <div style={{ position: "relative", border: "1px solid #CBD5E1", borderRadius: "10px", padding: "32px 28px", backgroundColor: "#ffffff", overflow: "hidden" }}>
+                    <div style={{ width: "38px", height: "3px", backgroundColor: "#0284C7", borderRadius: "2px", marginBottom: "14px" }} />
+                    <h2 style={{ fontSize: titleFontSize, fontWeight: 800, lineHeight: 1.28, letterSpacing: "-0.015em", color: "#0F172A", margin: 0, wordBreak: "break-word" }}>
+                      {fmtTopic}
+                    </h2>
+                  </div>
+
+                  {/* 2x2 Bento Metadata Grid */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                    <div style={{ border: "1px solid #CBD5E1", borderRadius: "9px", padding: "16px 18px", backgroundColor: "#F8FAFC" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                        <span style={{ fontSize: "8.5px", fontWeight: 800, letterSpacing: "0.14em", color: "#0284C7", textTransform: "uppercase" }}>Course</span>
+                        <span style={{ fontFamily: "ui-monospace, Consolas, monospace", fontSize: "10px", fontWeight: 700, color: "#0F172A", backgroundColor: "#ffffff", border: "1px solid #CBD5E1", padding: "2px 7px", borderRadius: "4px" }}>{fmtCourseCode}</span>
+                      </div>
+                      <div style={{ fontSize: "13px", fontWeight: 800, color: "#0F172A", lineHeight: 1.35 }}>{fmtCourseTitle}</div>
+                    </div>
+
+                    <div style={{ border: "1px solid #CBD5E1", borderRadius: "9px", padding: "16px 18px", backgroundColor: "#F8FAFC" }}>
+                      <div style={{ fontSize: "8.5px", fontWeight: 800, letterSpacing: "0.14em", color: "#0284C7", textTransform: "uppercase", marginBottom: "8px" }}>Academic Term</div>
+                      <div style={{ fontSize: "13px", fontWeight: 800, color: "#0F172A", marginBottom: "3px" }}>{fmtSemester}</div>
+                      <div style={{ fontSize: "11px", color: "#475569", fontWeight: 600 }}>Section: <strong style={{ color: "#0F172A" }}>{fmtSection}</strong></div>
+                    </div>
+
+                    <div style={{ border: "1px solid #CBD5E1", borderTop: "3px solid #0284C7", borderRadius: "9px", padding: "16px 18px", backgroundColor: "#ffffff" }}>
+                      <div style={{ fontSize: "8.5px", fontWeight: 800, letterSpacing: "0.14em", color: "#0284C7", textTransform: "uppercase", marginBottom: "8px" }}>Submitted To</div>
+                      <div style={{ fontSize: "14px", fontWeight: 800, color: "#0F172A", marginBottom: "3px" }}>
+                        {fmtTeacher}<span style={{ fontFamily: "ui-monospace, Consolas, monospace", fontSize: "10.5px", color: "#0284C7" }}>{fmtTeacherInit}</span>
+                      </div>
+                      <div style={{ fontSize: "11px", fontWeight: 600, color: "#475569" }}>{fmtTeacherDesig}</div>
+                    </div>
+
+                    <div style={{ border: "1px solid #CBD5E1", borderTop: "3px solid #0F172A", borderRadius: "9px", padding: "16px 18px", backgroundColor: "#ffffff" }}>
+                      <div style={{ fontSize: "8.5px", fontWeight: 800, letterSpacing: "0.14em", color: "#0F172A", textTransform: "uppercase", marginBottom: "8px" }}>Submitted By</div>
+                      <div style={{ fontSize: "14px", fontWeight: 800, color: "#0F172A", marginBottom: "6px" }}>{fmtStudent}</div>
+                      <div style={{ display: "inline-block", fontFamily: "ui-monospace, Consolas, monospace", fontSize: "10.5px", fontWeight: 700, color: "#0F172A", backgroundColor: "#F1F5F9", border: "1px solid #CBD5E1", padding: "2px 8px", borderRadius: "4px" }}>
+                        ID: {fmtStudentId}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Verification Bar */}
+                <div style={{ border: "1px solid #CBD5E1", borderRadius: "8px", padding: "13px 18px", display: "flex", alignItems: "center", justifyContent: showSignatureBlock ? "space-between" : "flex-start", backgroundColor: "#F8FAFC" }}>
+                  <div>
+                    <div style={{ fontSize: "8px", fontWeight: 800, letterSpacing: "0.14em", color: "#64748B", textTransform: "uppercase", marginBottom: "2px" }}>Submission Date</div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#0F172A" }}>{fmtDate}</div>
+                  </div>
+                  {showSignatureBlock && (
+                    <div style={{ display: "flex", alignItems: "flex-end", gap: "18px" }}>
+                      <div style={{ width: "80px", height: "32px", border: "1px solid #94A3B8", borderRadius: "4px", backgroundColor: "#ffffff", padding: "3px 7px" }}>
+                        <div style={{ fontSize: "7.5px", fontWeight: 700, letterSpacing: "0.12em", color: "#64748B", textTransform: "uppercase" }}>Marks</div>
+                      </div>
+                      <div style={{ width: "145px", textAlign: "right" }}>
+                        <div style={{ borderBottom: "1px solid #64748B", height: "18px", marginBottom: "3px" }} />
+                        <div style={{ fontSize: "7.5px", fontWeight: 700, letterSpacing: "0.12em", color: "#475569", textTransform: "uppercase" }}>Signature &amp; Remarks</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          // 06. ASYMMETRIC SPINE (Southern University inspired)
           if (activeTpl.layoutStyle === "asymmetric_spine") {
             return (
               <div className="relative w-full h-full font-sans overflow-hidden bg-white" style={{ minHeight: "840px" }}>
@@ -4584,6 +5157,136 @@ export default function StudentToolsPage() {
           const accentBg = isColor ? "rgba(30, 58, 138, 0.08)" : "rgba(0, 0, 0, 0.04)";
           const theme = tpl.theme || "classic";
 
+          if (tpl.layoutStyle === "imperial_ledger") {
+            return (
+              <div className="w-full aspect-[210/297] bg-white text-[#0E1E38] rounded-xl p-3.5 shadow-md border border-slate-300 dark:border-slate-700/80 flex flex-col justify-between relative overflow-hidden select-none">
+                <div className="absolute top-0 inset-x-0 h-1 bg-[#0E1E38] flex justify-center">
+                  <div className="w-12 h-full bg-[#A8843F]" />
+                </div>
+                <div className="text-center pt-1">
+                  <img src="/images/seu-logo.png" alt="SEU" className="w-5 h-5 mx-auto mb-1 object-contain" />
+                  <div className="text-[5.5px] font-serif font-bold tracking-widest uppercase">Southeast University</div>
+                  <div className="h-[0.75px] bg-[#0E1E38] mt-1.5" />
+                  <div className="h-[0.5px] bg-[#A8843F] mt-0.5" />
+                </div>
+                <div className="my-auto space-y-2 text-center">
+                  <span className="inline-block px-2 py-0.5 border border-[#A8843F] rounded-full text-[4px] font-black tracking-widest bg-[#FBF8F1] uppercase">
+                    {tpl.defaultType}
+                  </span>
+                  <div className="text-[6.5px] font-serif font-bold leading-tight px-1">
+                    Balanced AVL Tree Rotations &amp; Overhead Analysis
+                  </div>
+                  <div className="w-6 h-[1px] bg-[#A8843F] mx-auto" />
+                  <div className="border-y border-[#0E1E38] bg-slate-50 grid grid-cols-4 text-[3.5px] text-left p-1 gap-0.5">
+                    <div><span className="text-slate-400 block">CODE</span><strong className="font-mono">CSE241</strong></div>
+                    <div className="col-span-2"><span className="text-slate-400 block">COURSE</span><strong>Algorithms</strong></div>
+                    <div><span className="text-slate-400 block">SEC</span><strong>02</strong></div>
+                  </div>
+                  <div className="grid grid-cols-2 border-b border-slate-300 pb-1 text-[3.5px] text-left gap-1.5">
+                    <div><span className="text-[#A8843F] font-bold block">SUBMITTED TO</span><strong>Dr. Ashraful</strong></div>
+                    <div><span className="text-[#A8843F] font-bold block">SUBMITTED BY</span><strong>Fazle Rabbi</strong></div>
+                  </div>
+                </div>
+                <div className="text-[3.5px] text-slate-600 font-semibold">Date: 21.09.2026</div>
+              </div>
+            );
+          }
+
+          if (tpl.layoutStyle === "nordic_split") {
+            return (
+              <div className="w-full aspect-[210/297] bg-white rounded-xl shadow-md border border-slate-300 dark:border-slate-700/80 flex flex-row relative overflow-hidden select-none">
+                <div className="w-[30%] bg-[#0B1426] text-white p-2 py-3 flex flex-col justify-between border-r-2 border-blue-600">
+                  <div>
+                    <div className="w-5 h-5 rounded-full bg-white p-0.5 mb-1.5 flex items-center justify-center">
+                      <img src="/images/seu-logo.png" alt="SEU" className="w-full h-full object-contain" />
+                    </div>
+                    <div className="text-[4.5px] font-black tracking-wider uppercase leading-tight">Southeast University</div>
+                    <div className="text-[3.2px] text-slate-400 mt-0.5">Dept. of CSE</div>
+                  </div>
+                  <div className="bg-white/10 rounded p-1 text-[3.5px]">
+                    <div className="text-sky-400 font-mono font-bold text-[4.5px]">CSE241</div>
+                    <div className="text-slate-300 mt-0.5">Sec 02 • Fall</div>
+                  </div>
+                </div>
+                <div className="flex-1 p-3 flex flex-col justify-between text-left">
+                  <div className="flex justify-between items-center border-b border-slate-200 pb-1 text-[3.8px] font-black">
+                    <span className="text-slate-900 uppercase">{tpl.defaultType}</span>
+                    <span className="text-blue-600 font-mono">EXP 04</span>
+                  </div>
+                  <div className="my-auto space-y-2">
+                    <div className="text-[3.8px] font-bold text-blue-600 uppercase">Data Structures</div>
+                    <div className="text-[7px] font-black text-slate-950 leading-tight">Non-Blocking Hash Maps &amp; Queues</div>
+                    <div className="w-6 h-0.5 bg-blue-600" />
+                    <div className="bg-slate-50 border-l-2 border-blue-600 p-1 text-[3.5px]">
+                      <div className="text-blue-600 font-bold">TO</div>
+                      <strong className="text-slate-900">Dr. Ashraful Islam</strong>
+                    </div>
+                    <div className="border border-slate-200 border-l-2 border-l-slate-900 p-1 text-[3.5px]">
+                      <div className="text-slate-400 font-bold">BY</div>
+                      <strong className="text-slate-900">Md. Fazle Rabbi</strong>
+                    </div>
+                  </div>
+                  <div className="border-t border-slate-200 pt-1 text-[3.5px] text-slate-600 font-semibold">Date: 21.09.2026</div>
+                </div>
+              </div>
+            );
+          }
+
+          if (tpl.layoutStyle === "oxford_registry") {
+            return (
+              <div className="w-full aspect-[210/297] bg-[#FCFBF8] text-[#132442] rounded-xl p-2.5 shadow-md border border-slate-300 dark:border-slate-700/80 flex relative overflow-hidden select-none">
+                <div className="w-full h-full border border-[#132442]/25 p-2.5 flex flex-col justify-between relative text-left">
+                  <div className="flex items-center justify-between border-b border-[#132442] pb-1.5 gap-1">
+                    <div className="flex items-center gap-1">
+                      <img src="/images/seu-logo.png" alt="SEU" className="w-4 h-4 object-contain" />
+                      <div className="text-[4.5px] font-serif font-bold uppercase leading-tight">Southeast University</div>
+                    </div>
+                    <span className="bg-[#881D2B] text-white text-[3.2px] font-bold px-1 py-0.5 uppercase shrink-0">{tpl.defaultType}</span>
+                  </div>
+                  <div className="my-auto space-y-2">
+                    <div className="border-l-2 border-[#881D2B] pl-1.5 text-[6px] font-serif font-bold leading-snug">
+                      Fault Tolerance in Microservice Protocols
+                    </div>
+                    <div className="border-y border-[#132442] bg-white divide-y divide-slate-200 text-[3.4px]">
+                      <div className="p-0.5 flex justify-between"><span className="text-[#881D2B] font-bold">COURSE</span><strong>CSE 341</strong></div>
+                      <div className="p-0.5 flex justify-between"><span className="text-[#881D2B] font-bold">TO</span><strong>Dr. Ashraful Islam</strong></div>
+                      <div className="p-0.5 flex justify-between"><span className="text-[#881D2B] font-bold">BY</span><strong>Md. Fazle Rabbi</strong></div>
+                    </div>
+                  </div>
+                  <div className="text-[3.5px] font-serif font-bold">Date: 21.09.2026</div>
+                </div>
+              </div>
+            );
+          }
+
+          if (tpl.layoutStyle === "bento_slate") {
+            return (
+              <div className="w-full aspect-[210/297] bg-white text-slate-900 rounded-xl p-3 shadow-md border border-slate-300 dark:border-slate-700/80 flex flex-col justify-between relative overflow-hidden select-none text-left">
+                <div className="absolute top-0 inset-x-0 h-1 bg-sky-600" />
+                <div className="border border-slate-300 border-l-2 border-l-sky-600 rounded p-1.5 bg-slate-50 flex items-center justify-between mt-0.5">
+                  <div className="flex items-center gap-1">
+                    <img src="/images/seu-logo.png" alt="SEU" className="w-4 h-4 object-contain" />
+                    <div className="text-[4.5px] font-black uppercase">Southeast Univ</div>
+                  </div>
+                  <span className="bg-slate-900 text-white text-[3px] font-bold px-1 py-0.5 rounded uppercase">{tpl.defaultType}</span>
+                </div>
+                <div className="my-auto space-y-1.5">
+                  <div className="border border-slate-300 rounded-md p-2 bg-white">
+                    <div className="w-4 h-0.5 bg-sky-600 mb-1" />
+                    <div className="text-[6px] font-black leading-tight text-slate-900">Campus Scheduling Using Graph Coloring</div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-[3.3px]">
+                    <div className="border border-slate-300 rounded p-1 bg-slate-50"><span className="text-sky-600 font-bold block">COURSE</span><strong>CSE 241</strong></div>
+                    <div className="border border-slate-300 rounded p-1 bg-slate-50"><span className="text-sky-600 font-bold block">TERM</span><strong>Fall • Sec 02</strong></div>
+                    <div className="border border-slate-300 border-t-2 border-t-sky-600 rounded p-1 bg-white"><span className="text-sky-600 font-bold block">TO</span><strong>Dr. Ashraful</strong></div>
+                    <div className="border border-slate-300 border-t-2 border-t-slate-900 rounded p-1 bg-white"><span className="text-slate-900 font-bold block">BY</span><strong>Fazle Rabbi</strong></div>
+                  </div>
+                </div>
+                <div className="border border-slate-300 rounded px-1.5 py-1 bg-slate-50 text-[3.4px] font-bold">Date: 21.09.2026</div>
+              </div>
+            );
+          }
+
           return (
             <div className="w-full aspect-[210/297] bg-white text-slate-900 rounded-xl p-1 shadow-md border border-slate-300 dark:border-slate-700/80 flex flex-col justify-between relative overflow-hidden select-none">
               
@@ -5123,7 +5826,7 @@ export default function StudentToolsPage() {
                     <div className="space-y-1.5 max-w-2xl">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-[10px] font-black px-2.5 py-1 rounded-xl bg-blue-600 text-white shadow-xs uppercase">
-                          16 Unique Handcrafted Formats
+                          20 Unique Handcrafted Formats
                         </span>
                         <span className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
                           <Sparkles className="w-3.5 h-3.5" />
@@ -5131,7 +5834,7 @@ export default function StudentToolsPage() {
                         </span>
                       </div>
                       <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                        {language === "bn" ? "অফিসিয়াল ও আধুনিক ১৬টি সম্পূর্ণ ইউনিক কভার টেমপ্লেট" : "Choose from 16 Official & Handcrafted Unique Cover Formats"}
+                        {language === "bn" ? "অফিসিয়াল ও আধুনিক ২০টি সম্পূর্ণ ইউনিক কভার টেমপ্লেট" : "Choose from 20 Official & Handcrafted Unique Cover Formats"}
                       </h2>
                       <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
                         {language === "bn"
@@ -5350,7 +6053,7 @@ export default function StudentToolsPage() {
                       className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-blue-950/60 text-xs font-black text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer group"
                     >
                       <ArrowLeft className="w-4 h-4 text-blue-500 group-hover:-translate-x-1 transition-transform" />
-                      <span>{language === "bn" ? "← সকল ১৬টি ইউনিক টেমপ্লেট গ্যালারি" : "← Back to 16 Templates"}</span>
+                      <span>{language === "bn" ? "← সকল ২০টি ইউনিক টেমপ্লেট গ্যালারি" : "← Back to 20 Templates"}</span>
                     </button>
 
                     <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block"></div>
@@ -6031,15 +6734,31 @@ export default function StudentToolsPage() {
                       />
                     </div>
 
-                    <label className="flex items-center gap-2 pt-2 text-[11px] text-slate-600 dark:text-slate-400 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={rememberDetails}
-                        onChange={(e) => setRememberDetails(e.target.checked)}
-                        className="rounded accent-blue-600"
-                      />
-                      <span>Remember my details on this device</span>
-                    </label>
+                    <div className="space-y-2 pt-2">
+                      <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showSignatureBlock}
+                          onChange={(e) => setShowSignatureBlock(e.target.checked)}
+                          className="rounded accent-blue-600"
+                        />
+                        <span>
+                          {language === "bn"
+                            ? "ঐচ্ছিক: নিচে স্বাক্ষর, মার্কস ও রিমার্কস বক্স দেখান"
+                            : "Optional: Show Signature, Marks & Remarks block"}
+                        </span>
+                      </label>
+
+                      <label className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-400 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={rememberDetails}
+                          onChange={(e) => setRememberDetails(e.target.checked)}
+                          className="rounded accent-blue-600"
+                        />
+                        <span>Remember my details on this device</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
 
@@ -6058,37 +6777,47 @@ export default function StudentToolsPage() {
                 </div>
 
                 {/* A4 Paper Container with Multi-Theme Graphics & Official A4 Layout */}
-                <div 
+                {(() => {
+                  const isMinimalModernCover =
+                    activeTpl.layoutStyle === "imperial_ledger" ||
+                    activeTpl.layoutStyle === "nordic_split" ||
+                    activeTpl.layoutStyle === "oxford_registry" ||
+                    activeTpl.layoutStyle === "bento_slate";
+                  const isCustomPaddedLayout =
+                    isMinimalModernCover ||
+                    activeTpl.layoutStyle === "asymmetric_spine" ||
+                    activeTpl.layoutStyle === "bold_editorial" ||
+                    activeTpl.layoutStyle === "floating_pill_cards";
+                  return (
+                <div
                   id="seu-cover-preview"
-                  className={`w-full max-w-[620px] bg-white text-black shadow-2xl p-2 sm:p-2.5 rounded-lg font-serif relative select-none overflow-hidden ${
-                    coverDesignTheme === "classic"
-                      ? (activeTpl.style === "BW" ? "border-2 border-black" : "border-2 border-blue-900 shadow-blue-900/10")
-                      : coverDesignTheme === "executive_crest"
-                      ? "border-2 border-amber-600/60 shadow-amber-900/10"
-                      : coverDesignTheme === "cyber_circuit"
-                      ? "border border-sky-400/60 shadow-sky-900/10"
-                      : coverDesignTheme === "fluted_academic"
-                      ? "border-2 border-blue-950 shadow-blue-950/10"
-                      : coverDesignTheme === "hexagonal_hive"
-                      ? "border-2 border-amber-600/70 shadow-amber-900/10"
-                      : coverDesignTheme === "facet_prism"
-                      ? "border-2 border-teal-700/70 shadow-teal-900/10"
-                      : "border border-slate-300 shadow-slate-900/10"
+                  className={`w-full max-w-[620px] bg-white text-black shadow-2xl rounded-lg font-serif relative select-none overflow-hidden ${
+                    isMinimalModernCover
+                      ? "p-0 border border-slate-300 shadow-slate-900/10"
+                      : `p-2 sm:p-2.5 ${
+                          coverDesignTheme === "classic"
+                            ? (activeTpl.style === "BW" ? "border-2 border-black" : "border-2 border-blue-900 shadow-blue-900/10")
+                            : coverDesignTheme === "executive_crest"
+                            ? "border-2 border-amber-600/60 shadow-amber-900/10"
+                            : coverDesignTheme === "cyber_circuit"
+                            ? "border border-sky-400/60 shadow-sky-900/10"
+                            : coverDesignTheme === "fluted_academic"
+                            ? "border-2 border-blue-950 shadow-blue-950/10"
+                            : coverDesignTheme === "hexagonal_hive"
+                            ? "border-2 border-amber-600/70 shadow-amber-900/10"
+                            : coverDesignTheme === "facet_prism"
+                            ? "border-2 border-teal-700/70 shadow-teal-900/10"
+                            : "border border-slate-300 shadow-slate-900/10"
+                        }`
                   }`}
-                  style={{ minHeight: "840px" }}
+                  style={{ minHeight: isMinimalModernCover ? "877px" : "840px" }}
                 >
                   {/* Outer Frame Container */}
-                  <div 
+                  <div
                     className={`w-full flex-1 flex flex-col justify-between relative ${
-                      activeTpl.layoutStyle === "asymmetric_spine" ||
-                      activeTpl.layoutStyle === "bold_editorial" ||
-                      activeTpl.layoutStyle === "floating_pill_cards"
-                        ? "p-0"
-                        : "p-6 sm:p-10"
+                      isCustomPaddedLayout ? "p-0" : "p-6 sm:p-10"
                     } ${
-                      activeTpl.layoutStyle === "asymmetric_spine" ||
-                      activeTpl.layoutStyle === "bold_editorial" ||
-                      activeTpl.layoutStyle === "floating_pill_cards"
+                      isCustomPaddedLayout
                         ? ""
                         : coverDesignTheme === "classic"
                         ? (activeTpl.style === "BW" ? "border border-black" : "border border-blue-900/40")
@@ -6108,7 +6837,7 @@ export default function StudentToolsPage() {
                         ? "p-6 sm:p-9 pl-12 sm:pl-16"
                         : ""
                     }`}
-                    style={{ minHeight: "840px" }}
+                    style={{ minHeight: isMinimalModernCover ? "877px" : "840px" }}
                   >
                     
                     {/* Generic Theme Background Graphics (Strictly for classic_table so they never conflict with handcrafted layouts) */}
@@ -6475,19 +7204,23 @@ export default function StudentToolsPage() {
                       </>
                     )}
 
-                    {/* Soft Center Watermark */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05] z-0 overflow-hidden">
-                      <img 
-                        src="/images/seu-logo.png" 
-                        alt="" 
-                        className={`w-72 h-72 sm:w-80 sm:h-80 object-contain ${activeTpl.style === "BW" ? "filter grayscale contrast-125" : ""}`}
-                      />
-                    </div>
+                    {/* Soft Center Watermark (omitted on minimal custom layouts that manage their own emblem/watermark) */}
+                    {!isMinimalModernCover && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.05] z-0 overflow-hidden">
+                        <img
+                          src="/images/seu-logo.png"
+                          alt=""
+                          className={`w-72 h-72 sm:w-80 sm:h-80 object-contain ${activeTpl.style === "BW" ? "filter grayscale contrast-125" : ""}`}
+                        />
+                      </div>
+                    )}
 
-                    {/* Content Layer (z-10) - 16 DYNAMIC HANDCRAFTED LAYOUTS */}
+                    {/* Content Layer (z-10) - 20 DYNAMIC HANDCRAFTED LAYOUTS */}
                     {renderActiveCoverContent()}
                   </div>
                 </div>
+                  );
+                })()}
 
                 {/* DOWNLOAD & EXPORT OPTIONS UNDER THE PREVIEW */}
                 <div className="w-full max-w-[620px] mt-4 space-y-2.5 print:hidden">
