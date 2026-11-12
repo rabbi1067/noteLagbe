@@ -8,12 +8,14 @@ import { useLanguage } from "@/context/LanguageContext";
 import EventCertificateMaker from "@/components/EventCertificateMaker";
 import AcademicCalendarTool from "@/components/AcademicCalendarTool";
 import PdfMakerTool from "@/components/PdfMakerTool";
+import ResumeMakerTool from "@/components/ResumeMakerTool";
 import { 
   Calculator,
   Award, 
   DollarSign, 
   FileText, 
   FilePlus2,
+  FileBadge2,
   Calendar,
   CalendarDays, 
   Users, 
@@ -791,8 +793,8 @@ export default function StudentToolsPage() {
   const { user, isAuthenticated } = useAuth();
   const { language, t } = useLanguage();
 
-  // Active Tool Tab: 'cgpa' | 'tuition' | 'cover' | 'certificate' | 'routine' | 'calendar' | 'pdfmaker' | 'sections' | 'advising'
-  const [activeTab, setActiveTab] = useState<"cgpa" | "tuition" | "cover" | "certificate" | "routine" | "calendar" | "pdfmaker" | "sections" | "advising">("cgpa");
+  // Active Tool Tab: 'cgpa' | 'tuition' | 'cover' | 'certificate' | 'routine' | 'calendar' | 'pdfmaker' | 'resume' | 'sections' | 'advising'
+  const [activeTab, setActiveTab] = useState<"cgpa" | "tuition" | "cover" | "certificate" | "routine" | "calendar" | "pdfmaker" | "resume" | "sections" | "advising">("cgpa");
 
   // Courses & Teachers for auto-suggest
   const [coursesList, setCoursesList] = useState<any[]>([]);
@@ -2913,7 +2915,31 @@ export default function StudentToolsPage() {
               </div>
             </button>
 
-            {/* Card 8: 8. Find Section Group */}
+            {/* Card 8: 8. Resume / CV Maker (1-Page A4 Builder) */}
+            <button
+              onClick={() => setActiveTab("resume")}
+              className={`w-full text-left p-5 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between h-[148px] relative group ${
+                activeTab === "resume"
+                  ? "bg-white dark:bg-slate-900 border-2 border-blue-600 dark:border-blue-500 ring-4 ring-blue-600/15 dark:ring-blue-500/20 shadow-xl shadow-blue-600/10 scale-[1.02]"
+                  : "bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:border-blue-300 dark:hover:border-blue-700/60 hover:shadow-md hover:scale-[1.01]"
+              }`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-900/40 flex items-center justify-center shrink-0">
+                  <FileBadge2 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <h3 className={`text-sm sm:text-[15px] font-bold tracking-tight leading-snug transition-colors ${
+                  activeTab === "resume" ? "text-blue-600 dark:text-blue-400" : "text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400"
+                }`}>
+                  {language === "bn" ? "৮. রেজুমে মেকার" : "8. Resume Maker"}
+                </h3>
+              </div>
+            </button>
+
+            {/* Card 9: 9. Find Section Group */}
             <button
               onClick={() => setActiveTab("sections")}
               className={`w-full text-left p-5 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between h-[148px] relative group ${
@@ -2935,12 +2961,12 @@ export default function StudentToolsPage() {
                 <h3 className={`text-sm sm:text-[15px] font-bold tracking-tight leading-snug transition-colors ${
                   activeTab === "sections" ? "text-blue-600 dark:text-blue-400" : "text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400"
                 }`}>
-                  {language === "bn" ? "৮. ফাইন্ড সেকশন গ্রুপ" : "8. Find Section Group"}
+                  {language === "bn" ? "৯. ফাইন্ড সেকশন গ্রুপ" : "9. Find Section Group"}
                 </h3>
               </div>
             </button>
 
-            {/* Card 9: 9. Smart Advising Routine */}
+            {/* Card 10: 10. Smart Advising Routine */}
             <button
               onClick={() => setActiveTab("advising")}
               className={`w-full text-left p-5 rounded-3xl border transition-all duration-200 cursor-pointer flex flex-col justify-between h-[148px] relative group ${
@@ -2962,7 +2988,7 @@ export default function StudentToolsPage() {
                 <h3 className={`text-sm sm:text-[15px] font-bold tracking-tight leading-snug transition-colors ${
                   activeTab === "advising" ? "text-blue-600 dark:text-blue-400" : "text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400"
                 }`}>
-                  {language === "bn" ? "৯. স্মার্ট অ্যাডভাইজিং রুটিন" : "9. Smart Advising Routine"}
+                  {language === "bn" ? "১০. স্মার্ট অ্যাডভাইজিং রুটিন" : "10. Smart Advising Routine"}
                 </h3>
               </div>
             </button>
@@ -7856,7 +7882,12 @@ export default function StudentToolsPage() {
       {activeTab === "pdfmaker" && <PdfMakerTool language={language} />}
 
       {/* ========================================================================= */}
-      {/* 8. FIND SECTION GROUP VIEW (COMING SOON AS REQUESTED) */}
+      {/* 8. ONE-PAGE A4 RESUME / CV MAKER VIEW */}
+      {/* ========================================================================= */}
+      {activeTab === "resume" && <ResumeMakerTool language={language} />}
+
+      {/* ========================================================================= */}
+      {/* 9. FIND SECTION GROUP VIEW (COMING SOON AS REQUESTED) */}
       {/* ========================================================================= */}
       {activeTab === "sections" && (
         <div className="max-w-2xl mx-auto space-y-6">
@@ -7933,7 +7964,7 @@ export default function StudentToolsPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 9. SMART ADVISING ROUTINE VIEW (COMING SOON AS REQUESTED) */}
+      {/* 10. SMART ADVISING ROUTINE VIEW (COMING SOON AS REQUESTED) */}
       {/* ========================================================================= */}
       {activeTab === "advising" && (
         <div className="max-w-2xl mx-auto space-y-6">
