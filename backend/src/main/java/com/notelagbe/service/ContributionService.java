@@ -183,6 +183,7 @@ public class ContributionService {
         cr.setStatus(ResourceStatus.PENDING);
 
         ContributionRequest saved = contributionRequestRepository.save(cr);
+        resourceDuplicateService.evictCourse(uploadCourse.getCode());
         liveSyncService.broadcast("contribution", "created", saved.getId());
         return saved;
     }
@@ -198,19 +199,19 @@ public class ContributionService {
         return contributionRequestRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
-    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "teachers", "teacher_details", "teacher_courses"}, allEntries = true)
+    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "teachers", "teacher_details", "teacher_courses", "duplicate_slots"}, allEntries = true)
     @Transactional
     public ContributionRequest approveContribution(Long contributionId, String feedback) {
         return approveContribution(contributionId, feedback, null, null, null, null, null, null);
     }
 
-    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "teachers", "teacher_details", "teacher_courses"}, allEntries = true)
+    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "teachers", "teacher_details", "teacher_courses", "duplicate_slots"}, allEntries = true)
     @Transactional
     public ContributionRequest approveContribution(Long contributionId, String feedback, String editedTitle, Long teacherId, String resourceType, String semesterName, String courseCode) {
         return approveContribution(contributionId, feedback, editedTitle, teacherId, resourceType, semesterName, courseCode, null);
     }
 
-    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "teachers", "teacher_details", "teacher_courses"}, allEntries = true)
+    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "teachers", "teacher_details", "teacher_courses", "duplicate_slots"}, allEntries = true)
     @Transactional
     public ContributionRequest approveContribution(Long contributionId, String feedback, String editedTitle, Long teacherId, String resourceType, String semesterName, String courseCode, String department) {
         ContributionRequest cr = contributionRequestRepository.findById(contributionId)
@@ -345,7 +346,7 @@ public class ContributionService {
         return saved;
     }
 
-    @CacheEvict(value = {"courses", "course_details", "teachers", "teacher_details", "teacher_courses"}, allEntries = true)
+    @CacheEvict(value = {"courses", "course_details", "teachers", "teacher_details", "teacher_courses", "duplicate_slots"}, allEntries = true)
     @Transactional
     public ContributionRequest rejectContribution(Long contributionId, String feedback) {
         ContributionRequest cr = contributionRequestRepository.findById(contributionId)
@@ -383,6 +384,7 @@ public class ContributionService {
         if (res != null && res.getStatus() != ResourceStatus.APPROVED) {
             resourceRepository.delete(res);
         }
+        resourceDuplicateService.evictCourse(courseCode);
         liveSyncService.broadcast("contribution", "deleted", contributionId);
         return Map.of(
                 "id", contributionId,

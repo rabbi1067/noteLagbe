@@ -1,5 +1,6 @@
 package com.notelagbe.service;
 
+import com.notelagbe.config.CacheConfig;
 import com.notelagbe.dto.ContributionSubmitRequest;
 import com.notelagbe.dto.ResourceCreateRequest;
 import com.notelagbe.entity.*;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.http.HttpStatus;
 
 import java.util.List;
@@ -20,8 +22,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ResourceDuplicateGuardTest {
@@ -36,8 +37,8 @@ class ResourceDuplicateGuardTest {
     @Mock private ContributionRequestRepository contributionRequestRepository;
     @Mock private CloudinaryService cloudinaryService;
     @Mock private TeacherCourseRepository teacherCourseRepository;
-    @Mock private CacheManager cacheManager;
 
+    private CacheManager cacheManager;
     private ResourceDuplicateService duplicateService;
     private ResourceService resourceService;
     private Course cse141;
@@ -45,7 +46,12 @@ class ResourceDuplicateGuardTest {
 
     @BeforeEach
     void setUp() {
-        duplicateService = new ResourceDuplicateService(resourceRepository, courseRepository);
+        cacheManager = new ConcurrentMapCacheManager(
+                CacheConfig.CACHE_DUPLICATE_SLOTS,
+                "courses", "course_details", "teachers", "teacher_details",
+                "teacher_courses", "course_resources", "teacher_resources"
+        );
+        duplicateService = new ResourceDuplicateService(resourceRepository, courseRepository, cacheManager);
         resourceService = new ResourceService(
                 resourceRepository, courseRepository, teacherRepository, unlockedCourseRepository,
                 subscriptionRepository, subscriptionService, liveSyncService, contributionRequestRepository,
@@ -77,12 +83,11 @@ class ResourceDuplicateGuardTest {
     }
 
     @Test
-    void singleSlotExamBlocksDuplicatesAcrossVariantsAndPending() {
-        Resource existingMid = buildResource(10L, "CSE141 Mid Paper", ResourceType.MID_QUESTION, "Summer 2025", sakibSir, ResourceStatus.APPROVED);
-        when(courseRepository.findByCodeIgnoreCase("CSE141")).thenReturn(Optional.of(cse141));
-        when(resourceRepository.findByCourseIdAndStatusIn(eq(101L), any())).thenReturn(List.of(existingMid));
+    void singleSlotExamBlocksDuplicatesAndUsesSingleQueryCache() {
+        Object[] existingMidRow = slotRow(10L, "CSE141 Mid Paper", ResourceType.MID_QUESTION, "Summer 2025", ResourceStatus.APPROVED, "CSE141", 202L, "Md. Sakib Sir");
+        when(resourceRepository.findActiveDuplicateSlotsByCourseCode(eq("CSE141"), any()))
+                .thenReturn(List.<Object[]>of(existingMidRow));
 
-        // Lowercase hyphenated semester + different title STILL blocks single-slot MID_QUESTION
         Map<String, Object> dupCheck = duplicateService.checkDuplicate(
                 "CSE141", 202L, ResourceType.MID_QUESTION, "summer-2025", "Completely Different Title", null
         );
@@ -91,13 +96,12 @@ class ResourceDuplicateGuardTest {
         assertEquals(10L, dupCheck.get("existingResourceId"));
         assertTrue(String.valueOf(dupCheck.get("message")).contains("CSE141"));
 
-        // Different exam type (FINAL_QUESTION) for same course/teacher/semester is allowed
+        // Subsequent checks hit Spring CacheManager instead of re-querying DB
         Map<String, Object> finalAllowed = duplicateService.checkDuplicate(
                 "CSE141", 202L, ResourceType.FINAL_QUESTION, "summer 2025", "CSE141 Final", null
         );
         assertEquals(Boolean.FALSE, finalAllowed.get("duplicate"));
 
-        // Different teacher (303L) or Central (-1 / null) is allowed
         Map<String, Object> otherTeacherAllowed = duplicateService.checkDuplicate(
                 "CSE141", 303L, ResourceType.MID_QUESTION, "summer 2025", "Mid", null
         );
@@ -108,33 +112,37 @@ class ResourceDuplicateGuardTest {
         );
         assertEquals(Boolean.FALSE, centralAllowed.get("duplicate"));
 
-        // Editing self excludes existingResourceId
         Map<String, Object> selfExcluded = duplicateService.checkDuplicate(
                 "CSE141", 202L, ResourceType.MID_QUESTION, "Summer 2025", "Updated Title", 10L
         );
         assertEquals(Boolean.FALSE, selfExcluded.get("duplicate"));
+
+        // Verify only 1 DB call happened across 5 checks, then evictCourse refreshes
+        verify(resourceRepository, times(1)).findActiveDuplicateSlotsByCourseCode(eq("CSE141"), any());
+        duplicateService.evictCourse("CSE141");
+        Map<String, Object> slotsPayload = duplicateService.getDuplicateSlotsResponse("CSE141");
+        assertEquals("CSE141", slotsPayload.get("courseCode"));
+        assertEquals(1, ((List<?>) slotsPayload.get("items")).size());
+        verify(resourceRepository, times(2)).findActiveDuplicateSlotsByCourseCode(eq("CSE141"), any());
     }
 
     @Test
     void multiItemMaterialsAllowDistinctTitlesAndBlockIdenticalTitles() {
-        Resource quiz1 = buildResource(20L, "Quiz 1", ResourceType.QUIZ_CT, "Summer 2025", sakibSir, ResourceStatus.PENDING);
-        when(courseRepository.findByCodeIgnoreCase("CSE141")).thenReturn(Optional.of(cse141));
-        when(resourceRepository.findByCourseIdAndStatusIn(eq(101L), any())).thenReturn(List.of(quiz1));
+        Object[] quiz1Row = slotRow(20L, "Quiz 1", ResourceType.QUIZ_CT, "Summer 2025", ResourceStatus.PENDING, "CSE141", 202L, "Md. Sakib Sir");
+        when(resourceRepository.findActiveDuplicateSlotsByCourseCode(eq("CSE141"), any()))
+                .thenReturn(List.<Object[]>of(quiz1Row));
 
-        // Distinct title Quiz 2 is allowed
         Map<String, Object> quiz2Allowed = duplicateService.checkDuplicate(
                 "CSE141", 202L, ResourceType.QUIZ_CT, "summer 2025", "Quiz 2", null
         );
         assertEquals(Boolean.FALSE, quiz2Allowed.get("duplicate"));
 
-        // Matching normalized title "quiz-1" against PENDING resource blocks with status context
         Map<String, Object> quiz1Blocked = duplicateService.checkDuplicate(
                 "CSE141", 202L, ResourceType.QUIZ_CT, "Sum 25", "quiz-1", null
         );
         assertEquals(Boolean.TRUE, quiz1Blocked.get("duplicate"));
         assertEquals("PENDING", quiz1Blocked.get("existingStatus"));
 
-        // Empty title should not trigger false positive while typing
         Map<String, Object> emptyTitle = duplicateService.checkDuplicate(
                 "CSE141", 202L, ResourceType.QUIZ_CT, "Summer 2025", "", null
         );
@@ -143,9 +151,10 @@ class ResourceDuplicateGuardTest {
 
     @Test
     void createResourceThrowsConflictAndNormalizesSemester() {
-        Resource centralFinal = buildResource(30L, "Central Final", ResourceType.FINAL_QUESTION, "Fall 2026", null, ResourceStatus.APPROVED);
+        Object[] centralFinalRow = slotRow(30L, "Central Final", ResourceType.FINAL_QUESTION, "Fall 2026", ResourceStatus.APPROVED, "CSE141", null, null);
         when(courseRepository.findByCodeIgnoreCase("CSE141")).thenReturn(Optional.of(cse141));
-        when(resourceRepository.findByCourseIdAndStatusIn(eq(101L), any())).thenReturn(List.of(centralFinal));
+        when(resourceRepository.findActiveDuplicateSlotsByCourseCode(eq("CSE141"), any()))
+                .thenReturn(List.<Object[]>of(centralFinalRow));
 
         ResourceCreateRequest req = new ResourceCreateRequest();
         req.setCourseCode("CSE141");
@@ -175,11 +184,10 @@ class ResourceDuplicateGuardTest {
                 duplicateService
         );
 
-        Resource existingApproved = buildResource(40L, "CSE141 Summer Mid", ResourceType.MID_QUESTION, "Summer 2025", sakibSir, ResourceStatus.APPROVED);
-        Resource rejectedOld = buildResource(41L, "Old Rejected Mid", ResourceType.MID_QUESTION, "Fall 2025", sakibSir, ResourceStatus.REJECTED);
-        when(courseRepository.findByCodeIgnoreCase("CSE141")).thenReturn(Optional.of(cse141));
+        Object[] existingApprovedRow = slotRow(40L, "CSE141 Summer Mid", ResourceType.MID_QUESTION, "Summer 2025", ResourceStatus.APPROVED, "CSE141", 202L, "Md. Sakib Sir");
         when(teacherRepository.findById(202L)).thenReturn(Optional.of(sakibSir));
-        when(resourceRepository.findByCourseIdAndStatusIn(eq(101L), any())).thenReturn(List.of(existingApproved));
+        when(resourceRepository.findActiveDuplicateSlotsByCourseCode(eq("CSE141"), any()))
+                .thenReturn(List.<Object[]>of(existingApprovedRow));
 
         ContributionSubmitRequest dupSubmit = new ContributionSubmitRequest();
         dupSubmit.setTitle("Another Mid Paper Copy");
@@ -195,20 +203,29 @@ class ResourceDuplicateGuardTest {
         ApiException submitConflict = assertThrows(ApiException.class, () -> contributionService.submitContribution(dupSubmit, student));
         assertEquals(HttpStatus.CONFLICT, submitConflict.getStatus());
 
-        // Rejected resource should NOT block a fresh check in Fall 2025
-        when(resourceRepository.findByCourseIdAndStatusIn(eq(101L), any())).thenReturn(List.of(existingApproved));
         assertEquals(Boolean.FALSE, duplicateService.checkDuplicate("CSE141", 202L, ResourceType.MID_QUESTION, "Fall 2025", "Fall Mid", null).get("duplicate"));
-        assertEquals(ResourceStatus.REJECTED, rejectedOld.getStatus());
 
-        // Approving a PENDING contribution whose attributes collide with an APPROVED record throws 409 CONFLICT
-        Resource pendingOwn = buildResource(50L, "Pending Mid", ResourceType.MID_QUESTION, "Summer 2025", sakibSir, ResourceStatus.PENDING);
+        Resource pendingOwn = new Resource();
+        pendingOwn.setId(50L);
+        pendingOwn.setTitle("Pending Mid");
+        pendingOwn.setType(ResourceType.MID_QUESTION);
+        pendingOwn.setSemesterName("Summer 2025");
+        pendingOwn.setCourse(cse141);
+        pendingOwn.setTeacher(sakibSir);
+        pendingOwn.setStatus(ResourceStatus.PENDING);
+
+        Object[] pendingOwnRow = slotRow(50L, "Pending Mid", ResourceType.MID_QUESTION, "Summer 2025", ResourceStatus.PENDING, "CSE141", 202L, "Md. Sakib Sir");
+        duplicateService.evictAll();
+        when(courseRepository.findByCodeIgnoreCase("CSE141")).thenReturn(Optional.of(cse141));
+        when(resourceRepository.findActiveDuplicateSlotsByCourseCode(eq("CSE141"), any()))
+                .thenReturn(List.<Object[]>of(existingApprovedRow, pendingOwnRow));
+
         ContributionRequest cr = new ContributionRequest();
         cr.setId(99L);
         cr.setUser(student);
         cr.setStatus(ResourceStatus.PENDING);
         cr.setUploadedResource(pendingOwn);
         when(contributionRequestRepository.findById(99L)).thenReturn(Optional.of(cr));
-        when(resourceRepository.findByCourseIdAndStatusIn(eq(101L), any())).thenReturn(List.of(existingApproved, pendingOwn));
 
         ApiException approveConflict = assertThrows(
                 ApiException.class,
@@ -217,15 +234,16 @@ class ResourceDuplicateGuardTest {
         assertEquals(HttpStatus.CONFLICT, approveConflict.getStatus());
     }
 
-    private Resource buildResource(Long id, String title, ResourceType type, String semester, Teacher teacher, ResourceStatus status) {
-        Resource r = new Resource();
-        r.setId(id);
-        r.setTitle(title);
-        r.setType(type);
-        r.setSemesterName(semester);
-        r.setCourse(cse141);
-        r.setTeacher(teacher);
-        r.setStatus(status);
-        return r;
+    private Object[] slotRow(
+            Long id,
+            String title,
+            ResourceType type,
+            String semesterName,
+            ResourceStatus status,
+            String courseCode,
+            Long teacherId,
+            String teacherName
+    ) {
+        return new Object[] { id, title, type, semesterName, status, courseCode, teacherId, teacherName };
     }
 }

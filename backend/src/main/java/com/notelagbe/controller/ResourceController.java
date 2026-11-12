@@ -68,6 +68,11 @@ public class ResourceController {
         return ResponseEntity.ok(resourceService.checkDuplicate(courseCode, teacherId, type, semesterName, title, excludeId));
     }
 
+    @GetMapping("/duplicate-slots")
+    public ResponseEntity<Map<String, Object>> getDuplicateSlots(@RequestParam String courseCode) {
+        return ResponseEntity.ok(resourceService.getDuplicateSlots(courseCode));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Resource> getResource(
             @PathVariable Long id,

@@ -49,6 +49,7 @@ public class SecurityConfig {
                     "/api/resources/public/**",
                     "/api/resources/check-availability",
                     "/api/resources/check-duplicate",
+                    "/api/resources/duplicate-slots",
                     "/api/reviews/public/**",
                     "/api/plans",
                     "/api/ping",

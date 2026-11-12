@@ -100,6 +100,10 @@ public class ResourceService {
         this.resourceDuplicateService = resourceDuplicateService;
     }
 
+    public Map<String, Object> getDuplicateSlots(String courseCode) {
+        return resourceDuplicateService.getDuplicateSlotsResponse(courseCode);
+    }
+
     public Map<String, Object> checkDuplicate(
             String courseCode,
             Long teacherId,
@@ -121,7 +125,7 @@ public class ResourceService {
 
     private void evictCaches() {
         if (cacheManager != null) {
-            for (String cacheName : List.of("courses", "course_details", "teachers", "teacher_details", "teacher_courses", "course_resources", "teacher_resources")) {
+            for (String cacheName : List.of("courses", "course_details", "teachers", "teacher_details", "teacher_courses", "course_resources", "teacher_resources", "duplicate_slots")) {
                 var c = cacheManager.getCache(cacheName);
                 if (c != null) c.clear();
             }

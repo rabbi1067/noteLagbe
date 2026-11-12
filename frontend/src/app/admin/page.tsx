@@ -97,7 +97,11 @@ import FacultyAvatar from "@/components/FacultyAvatar";
 import { DeleteConfirmationModal, DeleteSuccessModal } from "@/components/DeleteConfirmationModal";
 import MultiPageUploader from "@/components/MultiPageUploader";
 import PDFViewerModal from "@/components/PDFViewerModal";
-import { useDuplicateResourceCheck } from "@/hooks/useDuplicateResourceCheck";
+import {
+  useDuplicateResourceCheck,
+  invalidateDuplicateSlotCache,
+  type DuplicateSlotItem,
+} from "@/hooks/useDuplicateResourceCheck";
 import { DuplicateWarningBanner } from "@/components/DuplicateWarningBanner";
 
 interface PaginationProps {
@@ -687,6 +691,45 @@ export default function AdminDashboardPage() {
   const [resYear, setResYear] = useState(2026);
   const [savingResource, setSavingResource] = useState(false);
 
+  const buildSeedSlotsForCourse = useCallback(
+    (targetCourseCode: string): DuplicateSlotItem[] => {
+      const target = (targetCourseCode || "").trim().toLowerCase();
+      if (!target) return [];
+
+      const map = new Map<number, DuplicateSlotItem>();
+      const pushResource = (r: any, fallbackStatus?: string) => {
+        if (!r?.id) return;
+        const status = String(r.status || fallbackStatus || "APPROVED").toUpperCase();
+        if (status === "REJECTED") return;
+        const code = String(r.course?.code || "").trim();
+        if (code.toLowerCase() !== target) return;
+        map.set(Number(r.id), {
+          id: Number(r.id),
+          title: r.title || "",
+          type: String(r.type || ""),
+          semesterName: r.semesterName || "",
+          status,
+          courseCode: code,
+          teacherId: r.teacher?.id ? Number(r.teacher.id) : null,
+          teacherName: r.teacher?.name || null,
+        });
+      };
+
+      for (const r of resources) pushResource(r);
+      for (const c of contributions) {
+        if (c?.status === "REJECTED") continue;
+        if (c?.uploadedResource) pushResource(c.uploadedResource, c.status);
+      }
+      return Array.from(map.values());
+    },
+    [resources, contributions]
+  );
+
+  const resourceSeedSlots = useMemo(
+    () => buildSeedSlotsForCourse(resCourseCode),
+    [buildSeedSlotsForCourse, resCourseCode]
+  );
+
   const resourceDupCheck = useDuplicateResourceCheck({
     enabled: showResourceModal,
     courseCode: resCourseCode,
@@ -695,6 +738,7 @@ export default function AdminDashboardPage() {
     semesterName: resSemester,
     title: resTitle,
     excludeId: editingResource?.id ?? null,
+    seedSlots: resourceSeedSlots,
     language,
   });
 
@@ -741,6 +785,11 @@ export default function AdminDashboardPage() {
   const [contribEditFeedback, setContribEditFeedback] = useState("");
   const [savingContributionEdit, setSavingContributionEdit] = useState(false);
 
+  const contribEditSeedSlots = useMemo(
+    () => buildSeedSlotsForCourse(contribEditCourseCode),
+    [buildSeedSlotsForCourse, contribEditCourseCode]
+  );
+
   const contribEditDupCheck = useDuplicateResourceCheck({
     enabled: Boolean(editingContribution),
     courseCode: contribEditCourseCode,
@@ -749,6 +798,7 @@ export default function AdminDashboardPage() {
     semesterName: contribEditSemester,
     title: contribEditTitle,
     excludeId: editingContribution?.uploadedResource?.id ?? null,
+    seedSlots: contribEditSeedSlots,
     language,
   });
 
@@ -803,6 +853,7 @@ export default function AdminDashboardPage() {
         );
       }
       markSelfQueueMutation();
+      invalidateDuplicateSlotCache();
       notifyDataChanged("contribution", "approved", targetId);
       notifyDataChanged("subscription", "unlocked", targetId);
       notifyDataChanged("resource", "approved", resourceId);
@@ -1561,10 +1612,12 @@ export default function AdminDashboardPage() {
 
       if (editingResource) {
         await api.admin.updateResource(editingResource.id, payload);
+        invalidateDuplicateSlotCache();
         notifyDataChanged("resource", "updated", editingResource.id);
         toast.success("Resource updated successfully!");
       } else {
         await api.admin.createResource(payload);
+        invalidateDuplicateSlotCache(payload.courseCode);
         notifyDataChanged("resource", "created", payload.title);
         confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
         toast.success("New academic material uploaded successfully!");

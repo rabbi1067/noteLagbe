@@ -723,6 +723,24 @@ export const api = {
         message: string | null;
       }>(`/resources/check-duplicate?${sp.toString()}`);
     },
+    getDuplicateSlots: (courseCode: string) =>
+      request<{
+        courseCode: string;
+        items: Array<{
+          id: number;
+          title: string;
+          titleKey: string;
+          type: string;
+          semesterName: string;
+          normalizedSemester: string;
+          semesterKey: string;
+          status: string;
+          courseCode: string;
+          teacherId: number | null;
+          teacherName: string | null;
+          singleSlotExam: boolean;
+        }>;
+      }>(`/resources/duplicate-slots?courseCode=${encodeURIComponent(courseCode.trim())}`),
   },
 
   // Payments API

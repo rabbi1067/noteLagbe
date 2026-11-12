@@ -31,6 +31,7 @@ public class CacheConfig {
     public static final String CACHE_COURSE_REVIEWS = "course_reviews";
     public static final String CACHE_TEACHER_REVIEWS = "teacher_reviews";
     public static final String CACHE_RECENT_REVIEWS = "recent_reviews";
+    public static final String CACHE_DUPLICATE_SLOTS = "duplicate_slots";
 
     private CacheManager activeCacheManager;
 
@@ -51,7 +52,8 @@ public class CacheConfig {
                 CACHE_TEACHER_RESOURCES,
                 CACHE_COURSE_REVIEWS,
                 CACHE_TEACHER_REVIEWS,
-                CACHE_RECENT_REVIEWS
+                CACHE_RECENT_REVIEWS,
+                CACHE_DUPLICATE_SLOTS
         ));
         this.activeCacheManager = manager;
         log.info("[NoteLagbe Architecture] Enterprise In-Memory Cache Manager initialized for: {}", manager.getCacheNames());

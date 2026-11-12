@@ -42,7 +42,7 @@ import TopContributorsLeaderboard from "@/components/TopContributorsLeaderboard"
 import LiveRemainingCountdown from "@/components/LiveRemainingCountdown";
 import MultiPageUploader from "@/components/MultiPageUploader";
 import { useDataSync, notifyDataChanged } from "@/lib/sync";
-import { useDuplicateResourceCheck } from "@/hooks/useDuplicateResourceCheck";
+import { useDuplicateResourceCheck, invalidateDuplicateSlotCache } from "@/hooks/useDuplicateResourceCheck";
 import { DuplicateWarningBanner } from "@/components/DuplicateWarningBanner";
 
 const DEPARTMENTS = [
@@ -185,6 +185,7 @@ export default function ContributePage() {
 
   const contribDupCheck = useDuplicateResourceCheck({
     enabled: Boolean(selectedTeacherId) && !submissionSuccessData,
+    prefetchEnabled: !submissionSuccessData,
     courseCode,
     teacherId: selectedTeacherId === "CENTRAL" || Number(selectedTeacherId) === -1 ? null : selectedTeacherId,
     type: resourceType,
@@ -653,6 +654,7 @@ export default function ContributePage() {
       setSelectedTeacherId("");
       setUploaderKey((prev) => prev + 1);
 
+      invalidateDuplicateSlotCache(courseCode);
       loadMyContributions();
       notifyDataChanged("contribution", "created");
     } catch (err: any) {
