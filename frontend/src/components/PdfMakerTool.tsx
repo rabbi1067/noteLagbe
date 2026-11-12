@@ -27,12 +27,25 @@ import {
   Loader2,
   Layers,
   Image as ImageIcon,
+  SlidersHorizontal,
+  Gauge,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   CropRect,
   DEFAULT_CROP,
+  DEFAULT_EXPORT_OPTIONS,
+  EncodedPageAsset,
+  MarginOption,
+  PageOrientationOption,
+  PageSizeOption,
+  PdfExportOptions,
   PdfMakerPage,
+  QUALITY_PRESETS,
+  encodePageJpegCached,
+  estimateContainerBytes,
+  formatFileSize,
+  getMatchingQualityPreset,
   isFullCrop,
   loadImageElement,
   renderTransformedCanvas,
@@ -133,12 +146,16 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
-  // Export states
+  // Export settings & live size estimation states
+  const [exportOptions, setExportOptions] = useState<PdfExportOptions>(DEFAULT_EXPORT_OPTIONS);
+  const [estimatedBytes, setEstimatedBytes] = useState<number | null>(null);
+  const [isEstimatingSize, setIsEstimatingSize] = useState(false);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const objectUrlsRef = useRef<Set<string>>(new Set());
+  const encodedAssetCacheRef = useRef<Map<string, EncodedPageAsset>>(new Map());
 
   // Interactive crop drag state ref for smooth pointer tracking
   const cropDragRef = useRef<{
@@ -279,6 +296,7 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
         setSelectedId(null);
         setIsCropping(false);
         setCanvasDisplaySize({ w: 0, h: 0 });
+        setEstimatedBytes(null);
       } else if (selectedId === id) {
         const fallback = next[Math.min(idx, next.length - 1)] || null;
         setSelectedId(fallback ? fallback.id : null);
@@ -295,12 +313,51 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
         objectUrlsRef.current.delete(p.previewUrl);
       }
     });
+    encodedAssetCacheRef.current.clear();
     setPages([]);
     setSelectedId(null);
     setIsCropping(false);
     setCanvasDisplaySize({ w: 0, h: 0 });
+    setEstimatedBytes(null);
     toast.info(bn ? "সব টেম্পোরারি পেজ মুছে ফেলা হয়েছে।" : "Cleared all temporary pages.");
   };
+
+  // Live debounced file size estimation using cached per-page JPEG encoding
+  useEffect(() => {
+    if (pages.length === 0) return;
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      if (cancelled) return;
+      setIsEstimatingSize(true);
+      try {
+        let totalImageBytes = 0;
+        for (let i = 0; i < pages.length; i++) {
+          if (cancelled) return;
+          const asset = await encodePageJpegCached(
+            pages[i],
+            exportOptions.qualityPct,
+            encodedAssetCacheRef.current
+          );
+          totalImageBytes += asset.jpgBytes.byteLength;
+        }
+        if (!cancelled) {
+          setEstimatedBytes(estimateContainerBytes(totalImageBytes, pages.length));
+        }
+      } catch {
+        // Ignore transient decode during rapid updates
+      } finally {
+        if (!cancelled) {
+          setIsEstimatingSize(false);
+        }
+      }
+    }, 180);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [pages, exportOptions.qualityPct]);
 
   // Move page from index `from` to index `to` (used by step buttons, serial dropdown, and drag-and-drop)
   const movePageToIndex = (from: number, to: number) => {
@@ -448,15 +505,22 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
     if (pages.length === 0 || exportStatus) return;
     try {
       setExportStatus(bn ? "PDF তৈরি হচ্ছে..." : "Building PDF...");
-      const blob = await generatePdfBlob(pages, (cur, total) => {
-        setExportStatus(
-          bn ? `PDF প্রসেসিং (${cur}/${total})...` : `Processing PDF (${cur}/${total})...`
-        );
-      });
+      const blob = await generatePdfBlob(
+        pages,
+        exportOptions,
+        (cur, total) => {
+          setExportStatus(
+            bn ? `PDF প্রসেসিং (${cur}/${total})...` : `Processing PDF (${cur}/${total})...`
+          );
+        },
+        encodedAssetCacheRef.current
+      );
       const base = sanitizeBaseFilename(fileName);
       triggerBlobDownload(blob, `${base}.pdf`);
       toast.success(
-        bn ? `${base}.pdf ডাউনলোড শুরু হয়েছে!` : `${base}.pdf downloaded cleanly!`
+        bn
+          ? `${base}.pdf (${formatFileSize(blob.size)}) ডাউনলোড শুরু হয়েছে!`
+          : `${base}.pdf (${formatFileSize(blob.size)}) downloaded cleanly!`
       );
     } catch (err) {
       console.error("PDF generation failed:", err);
@@ -472,17 +536,22 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
     if (pages.length === 0 || exportStatus) return;
     try {
       setExportStatus(bn ? "DOCX তৈরি হচ্ছে..." : "Building Word (.docx)...");
-      const blob = await generateDocxBlob(pages, (cur, total) => {
-        setExportStatus(
-          bn ? `Word ডকুমেন্ট (${cur}/${total})...` : `Building DOCX (${cur}/${total})...`
-        );
-      });
+      const blob = await generateDocxBlob(
+        pages,
+        exportOptions,
+        (cur, total) => {
+          setExportStatus(
+            bn ? `Word ডকুমেন্ট (${cur}/${total})...` : `Building DOCX (${cur}/${total})...`
+          );
+        },
+        encodedAssetCacheRef.current
+      );
       const base = sanitizeBaseFilename(fileName);
       triggerBlobDownload(blob, `${base}.docx`);
       toast.success(
         bn
-          ? `${base}.docx ডাউনলোড শুরু হয়েছে!`
-          : `${base}.docx downloaded cleanly!`
+          ? `${base}.docx (${formatFileSize(blob.size)}) ডাউনলোড শুরু হয়েছে!`
+          : `${base}.docx (${formatFileSize(blob.size)}) downloaded cleanly!`
       );
     } catch (err) {
       console.error("DOCX generation failed:", err);
@@ -1204,8 +1273,224 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                   )}
                 </div>
 
-                {/* Card 3: Output Filename & PDF / DOCX Download */}
+                {/* Card 3: Page Layout (Size, Orientation, Margin) */}
+                <div className="p-5 rounded-3xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                  <h4 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <SlidersHorizontal className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    {bn ? "পেজ সাইজ, মার্জিন ও ওরিয়েন্টেশন" : "Page Size, Margin & Orientation"}
+                  </h4>
+
+                  {/* Page Size */}
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block">
+                      {bn ? "পেজ সাইজ" : "Page Size"}
+                    </span>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(
+                        [
+                          { id: "a4", label: bn ? "A4 (স্ট্যান্ডার্ড)" : "A4 (Standard)" },
+                          { id: "letter", label: "Letter" },
+                          { id: "fit", label: bn ? "ছবি অনুযায়ী (Fit)" : "Fit to Image" },
+                        ] as { id: PageSizeOption; label: string }[]
+                      ).map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() =>
+                            setExportOptions((prev) => ({ ...prev, pageSize: opt.id }))
+                          }
+                          className={`py-2 px-2 rounded-xl border text-[11px] font-bold cursor-pointer transition-all ${
+                            exportOptions.pageSize === opt.id
+                              ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                              : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-blue-400"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Orientation */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                        {bn ? "ওরিয়েন্টেশন" : "Orientation"}
+                      </span>
+                      {exportOptions.pageSize === "fit" && (
+                        <span className="text-[10px] text-slate-400">
+                          {bn ? "Fit মোডে অটো ছবি অনুযায়ী" : "Auto-matched in Fit mode"}
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(
+                        [
+                          { id: "auto", label: bn ? "অটো (স্মার্ট)" : "Auto" },
+                          { id: "portrait", label: bn ? "পোর্ট্রেট" : "Portrait" },
+                          { id: "landscape", label: bn ? "ল্যান্ডস্কেপ" : "Landscape" },
+                        ] as { id: PageOrientationOption; label: string }[]
+                      ).map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          disabled={exportOptions.pageSize === "fit"}
+                          onClick={() =>
+                            setExportOptions((prev) => ({ ...prev, orientation: opt.id }))
+                          }
+                          className={`py-2 px-2 rounded-xl border text-[11px] font-bold transition-all ${
+                            exportOptions.pageSize === "fit"
+                              ? "opacity-45 cursor-not-allowed border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 text-slate-400"
+                              : exportOptions.orientation === opt.id
+                              ? "border-blue-600 bg-blue-600 text-white shadow-sm cursor-pointer"
+                              : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-blue-400 cursor-pointer"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Margin */}
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block">
+                      {bn ? "মার্জিন" : "Page Margin"}
+                    </span>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(
+                        [
+                          { id: "none", label: bn ? "মার্জিন ছাড়া" : "No Margin" },
+                          { id: "small", label: bn ? "ছোট (Small)" : "Small" },
+                          { id: "normal", label: bn ? "নরমাল" : "Normal" },
+                        ] as { id: MarginOption; label: string }[]
+                      ).map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() =>
+                            setExportOptions((prev) => ({ ...prev, margin: opt.id }))
+                          }
+                          className={`py-2 px-2 rounded-xl border text-[11px] font-bold cursor-pointer transition-all ${
+                            exportOptions.margin === opt.id
+                              ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                              : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-blue-400"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 4: Quality / Compression Slider + Live Estimated Size + Download */}
                 <div className="p-5 rounded-3xl bg-gradient-to-br from-blue-600/10 via-indigo-600/5 to-transparent dark:from-blue-950/50 dark:via-slate-900 dark:to-slate-900 border border-blue-200/80 dark:border-blue-800/60 shadow-sm space-y-4">
+                  {/* Quality Presets & Compression Slider */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <Gauge className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        {bn ? "কোয়ালিটি ও কম্প্রেশন" : "Quality & Compression"}
+                      </h4>
+                      <span className="text-[11px] font-mono font-black px-2 py-0.5 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                        {exportOptions.qualityPct}% (
+                        {getMatchingQualityPreset(exportOptions.qualityPct) === "custom"
+                          ? bn
+                            ? "কাস্টম"
+                            : "Custom"
+                          : QUALITY_PRESETS.find(
+                              (q) => q.qualityPct === exportOptions.qualityPct
+                            )?.[bn ? "labelBn" : "labelEn"]}
+                        )
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {QUALITY_PRESETS.map((preset) => {
+                        const active = exportOptions.qualityPct === preset.qualityPct;
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() =>
+                              setExportOptions((prev) => ({
+                                ...prev,
+                                qualityPct: preset.qualityPct,
+                              }))
+                            }
+                            className={`py-1.5 px-1.5 rounded-xl border text-[11px] font-bold cursor-pointer transition-all ${
+                              active
+                                ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                                : "border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 hover:border-blue-400"
+                            }`}
+                          >
+                            {bn ? preset.labelBn : preset.labelEn}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <input
+                      type="range"
+                      aria-label="Compression quality slider"
+                      min={35}
+                      max={98}
+                      step={1}
+                      value={exportOptions.qualityPct}
+                      onChange={(e) =>
+                        setExportOptions((prev) => ({
+                          ...prev,
+                          qualityPct: Number(e.target.value),
+                        }))
+                      }
+                      className="w-full accent-blue-600 cursor-pointer"
+                    />
+
+                    {/* Live Estimated File Size Indicator */}
+                    <div className="px-3.5 py-2.5 rounded-2xl bg-white/80 dark:bg-slate-950/75 border border-slate-200/90 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                        {bn ? "আনুমানিক ফাইল সাইজ:" : "Estimated File Size:"}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {isEstimatingSize ? (
+                          <span className="text-xs font-bold text-blue-600 dark:text-blue-400 inline-flex items-center gap-1">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            {bn ? "হিসাব হচ্ছে..." : "Calculating..."}
+                          </span>
+                        ) : estimatedBytes !== null ? (
+                          <>
+                            <span
+                              data-testid="estimated-file-size"
+                              className="text-xs font-mono font-black text-slate-900 dark:text-white"
+                            >
+                              ~{formatFileSize(estimatedBytes)}
+                            </span>
+                            <span
+                              className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                                estimatedBytes <= 5 * 1024 * 1024
+                                  ? "bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300"
+                                  : estimatedBytes <= 10 * 1024 * 1024
+                                  ? "bg-amber-100 dark:bg-amber-950/70 text-amber-700 dark:text-amber-300"
+                                  : "bg-rose-100 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300"
+                              }`}
+                            >
+                              {estimatedBytes <= 5 * 1024 * 1024
+                                ? "< 5 MB"
+                                : estimatedBytes <= 10 * 1024 * 1024
+                                ? "< 10 MB"
+                                : bn
+                                ? "বড় ফাইল (>10MB)"
+                                : "> 10 MB"}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-400">--</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
                       {bn ? "ফাইলের নাম" : "Output File Name"}

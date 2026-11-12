@@ -24,6 +24,37 @@ export interface PdfMakerPage {
   crop: CropRect;
 }
 
+export type PageSizeOption = "a4" | "letter" | "fit";
+export type PageOrientationOption = "auto" | "portrait" | "landscape";
+export type MarginOption = "none" | "small" | "normal";
+export type QualityPresetId = "original" | "high" | "balanced" | "compact" | "custom";
+
+export interface PdfExportOptions {
+  pageSize: PageSizeOption;
+  orientation: PageOrientationOption;
+  margin: MarginOption;
+  qualityPct: number; // 35..98
+}
+
+export const DEFAULT_EXPORT_OPTIONS: PdfExportOptions = {
+  pageSize: "a4",
+  orientation: "auto",
+  margin: "small",
+  qualityPct: 78,
+};
+
+export const QUALITY_PRESETS: {
+  id: Exclude<QualityPresetId, "custom">;
+  qualityPct: number;
+  labelEn: string;
+  labelBn: string;
+}[] = [
+  { id: "original", qualityPct: 96, labelEn: "Original", labelBn: "অরিজিনাল" },
+  { id: "high", qualityPct: 90, labelEn: "High", labelBn: "হাই" },
+  { id: "balanced", qualityPct: 78, labelEn: "Balanced", labelBn: "ব্যালেন্সড" },
+  { id: "compact", qualityPct: 58, labelEn: "Compact", labelBn: "কম্প্যাক্ট" },
+];
+
 export const DEFAULT_CROP: CropRect = { x: 0, y: 0, w: 1, h: 1 };
 
 export function isFullCrop(crop: CropRect): boolean {
@@ -200,34 +231,170 @@ async function canvasToJpegBytes(
   return new Uint8Array(await blob.arrayBuffer());
 }
 
+function resolveQualityParams(qualityPct: number): {
+  jpegQuality: number;
+  maxDimension: number;
+} {
+  const clamped = Math.max(35, Math.min(98, Math.round(qualityPct)));
+  const jpegQuality = clamped / 100;
+  let maxDimension = 1600;
+  if (clamped >= 94) maxDimension = 2400;
+  else if (clamped >= 85) maxDimension = 2000;
+  else if (clamped >= 70) maxDimension = 1600;
+  else maxDimension = Math.round(1100 + ((clamped - 35) / 35) * 400);
+  return { jpegQuality, maxDimension };
+}
+
+export function getMatchingQualityPreset(qualityPct: number): QualityPresetId {
+  const match = QUALITY_PRESETS.find((p) => p.qualityPct === Math.round(qualityPct));
+  return match ? match.id : "custom";
+}
+
+export function buildPageCacheKey(page: PdfMakerPage, qualityPct: number): string {
+  return [
+    page.id,
+    page.rotation90,
+    page.straightenDeg.toFixed(1),
+    page.flipH ? 1 : 0,
+    page.flipV ? 1 : 0,
+    page.brightness,
+    page.contrast,
+    page.saturation,
+    page.crop.x.toFixed(4),
+    page.crop.y.toFixed(4),
+    page.crop.w.toFixed(4),
+    page.crop.h.toFixed(4),
+    Math.round(qualityPct),
+  ].join("|");
+}
+
+export interface EncodedPageAsset {
+  jpgBytes: Uint8Array;
+  width: number;
+  height: number;
+}
+
+export async function encodePageJpegCached(
+  page: PdfMakerPage,
+  qualityPct: number,
+  cache?: Map<string, EncodedPageAsset>
+): Promise<EncodedPageAsset> {
+  const key = buildPageCacheKey(page, qualityPct);
+  const hit = cache?.get(key);
+  if (hit) return hit;
+
+  const { jpegQuality, maxDimension } = resolveQualityParams(qualityPct);
+  const canvas = await renderFinalPageCanvas(page, maxDimension);
+  const jpgBytes = await canvasToJpegBytes(canvas, jpegQuality);
+  const asset: EncodedPageAsset = {
+    jpgBytes,
+    width: canvas.width,
+    height: canvas.height,
+  };
+
+  if (cache) {
+    if (cache.size >= 80) {
+      const oldestKey = cache.keys().next().value;
+      if (oldestKey) cache.delete(oldestKey);
+    }
+    cache.set(key, asset);
+  }
+  return asset;
+}
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${Math.round(kb)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(mb >= 10 ? 1 : 2)} MB`;
+}
+
+export function estimateContainerBytes(imageByteSum: number, pageCount: number): number {
+  return imageByteSum + 1800 + pageCount * 450;
+}
+
+function resolveMarginPoints(margin: MarginOption): number {
+  if (margin === "none") return 0;
+  if (margin === "small") return 18;
+  return 36;
+}
+
+function resolvePdfLayout(
+  imgW: number,
+  imgH: number,
+  options: PdfExportOptions
+): {
+  pageW: number;
+  pageH: number;
+  drawX: number;
+  drawY: number;
+  drawW: number;
+  drawH: number;
+} {
+  const m = resolveMarginPoints(options.margin);
+
+  if (options.pageSize === "fit") {
+    const pageW = 595.28;
+    const drawW = Math.max(40, pageW - 2 * m);
+    const drawH = Math.max(40, drawW * (imgH / imgW));
+    const pageH = drawH + 2 * m;
+    return { pageW, pageH, drawX: m, drawY: m, drawW, drawH };
+  }
+
+  const baseW = options.pageSize === "letter" ? 612 : 595.28;
+  const baseH = options.pageSize === "letter" ? 792 : 841.89;
+
+  const isLandscape =
+    options.orientation === "landscape"
+      ? true
+      : options.orientation === "portrait"
+      ? false
+      : imgW > imgH;
+
+  const pageW = isLandscape ? baseH : baseW;
+  const pageH = isLandscape ? baseW : baseH;
+  const availW = Math.max(20, pageW - 2 * m);
+  const availH = Math.max(20, pageH - 2 * m);
+  const ratio = Math.min(availW / imgW, availH / imgH);
+  const drawW = imgW * ratio;
+  const drawH = imgH * ratio;
+
+  return {
+    pageW,
+    pageH,
+    drawX: (pageW - drawW) / 2,
+    drawY: (pageH - drawH) / 2,
+    drawW,
+    drawH,
+  };
+}
+
 /**
- * Builds a multi-page PDF entirely in browser memory with pdf-lib.
+ * Builds a multi-page PDF entirely in browser memory with pdf-lib,
+ * respecting page size, orientation, margin, and compression quality.
  */
 export async function generatePdfBlob(
   pages: PdfMakerPage[],
-  onProgress?: (current: number, total: number) => void
+  options: PdfExportOptions = DEFAULT_EXPORT_OPTIONS,
+  onProgress?: (current: number, total: number) => void,
+  cache?: Map<string, EncodedPageAsset>
 ): Promise<Blob> {
   const pdfDoc = await PDFDocument.create();
   pdfDoc.setCreator("NoteLagbe Student Tools — Client PDF Maker");
 
   for (let i = 0; i < pages.length; i++) {
     onProgress?.(i + 1, pages.length);
-    const canvas = await renderFinalPageCanvas(pages[i], 2000);
-    const jpgBytes = await canvasToJpegBytes(canvas, 0.9);
-    const embedded = await pdfDoc.embedJpg(jpgBytes);
+    const asset = await encodePageJpegCached(pages[i], options.qualityPct, cache);
+    const embedded = await pdfDoc.embedJpg(asset.jpgBytes);
+    const layout = resolvePdfLayout(asset.width, asset.height, options);
 
-    // Normalize page width around A4 (595.28pt) while preserving exact cropped aspect ratio
-    const targetWidth = 595.28;
-    const scale = targetWidth / canvas.width;
-    const pageW = targetWidth;
-    const pageH = Math.max(100, canvas.height * scale);
-
-    const pdfPage = pdfDoc.addPage([pageW, pageH]);
+    const pdfPage = pdfDoc.addPage([layout.pageW, layout.pageH]);
     pdfPage.drawImage(embedded, {
-      x: 0,
-      y: 0,
-      width: pageW,
-      height: pageH,
+      x: layout.drawX,
+      y: layout.drawY,
+      width: layout.drawW,
+      height: layout.drawH,
     });
   }
 
@@ -250,39 +417,58 @@ function buildImageDrawingXml(
 
 /**
  * Generates a valid Microsoft Word (.docx) OOXML package client-side using JSZip,
- * placing each edited page fitted cleanly on an A4 Word page.
+ * applying page size, orientation, margin, and compression quality settings.
  */
 export async function generateDocxBlob(
   pages: PdfMakerPage[],
-  onProgress?: (current: number, total: number) => void
+  options: PdfExportOptions = DEFAULT_EXPORT_OPTIONS,
+  onProgress?: (current: number, total: number) => void,
+  cache?: Map<string, EncodedPageAsset>
 ): Promise<Blob> {
   const zip = new JSZip();
 
-  // Usable area on A4 (8.27" x 11.69") with 0.5" margins on all sides (in EMUs: 914400 per inch)
-  const MAX_EMU_W = 6647688; // 7.27 in
-  const MAX_EMU_H = 9774684; // 10.69 in
+  const assets: EncodedPageAsset[] = [];
+  for (let i = 0; i < pages.length; i++) {
+    onProgress?.(i + 1, pages.length);
+    assets.push(await encodePageJpegCached(pages[i], options.qualityPct, cache));
+  }
+
+  const baseWTwips = options.pageSize === "letter" ? 12240 : 11906;
+  const baseHTwips = options.pageSize === "letter" ? 15840 : 16838;
+  const marginTwips =
+    options.margin === "none" ? 0 : options.margin === "small" ? 360 : 720;
+
+  let isLandscape = false;
+  if (options.orientation === "landscape") {
+    isLandscape = true;
+  } else if (options.orientation === "auto") {
+    const landscapeCount = assets.filter((a) => a.width > a.height).length;
+    isLandscape = landscapeCount > assets.length / 2;
+  }
+
+  const pgWTwips = isLandscape ? baseHTwips : baseWTwips;
+  const pgHTwips = isLandscape ? baseWTwips : baseHTwips;
+  const maxEmuW = Math.max(91440, (pgWTwips - 2 * marginTwips) * 635);
+  const maxEmuH = Math.max(91440, (pgHTwips - 2 * marginTwips) * 635);
 
   const relEntries: string[] = [];
   const bodyChunks: string[] = [];
 
-  for (let i = 0; i < pages.length; i++) {
-    onProgress?.(i + 1, pages.length);
-    const canvas = await renderFinalPageCanvas(pages[i], 1800);
-    const jpgBytes = await canvasToJpegBytes(canvas, 0.88);
-
+  for (let i = 0; i < assets.length; i++) {
+    const asset = assets[i];
     const mediaFile = `media/image${i + 1}.jpeg`;
     const relId = `rIdImg${i + 1}`;
-    zip.file(`word/${mediaFile}`, jpgBytes);
+    zip.file(`word/${mediaFile}`, asset.jpgBytes);
     relEntries.push(
       `<Relationship Id="${relId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${mediaFile}"/>`
     );
 
-    const ratio = Math.min(MAX_EMU_W / canvas.width, MAX_EMU_H / canvas.height);
-    const cx = Math.max(91440, Math.round(canvas.width * ratio));
-    const cy = Math.max(91440, Math.round(canvas.height * ratio));
+    const ratio = Math.min(maxEmuW / asset.width, maxEmuH / asset.height);
+    const cx = Math.max(91440, Math.round(asset.width * ratio));
+    const cy = Math.max(91440, Math.round(asset.height * ratio));
 
     bodyChunks.push(buildImageDrawingXml(relId, i + 1, `Page_${i + 1}.jpg`, cx, cy));
-    if (i < pages.length - 1) {
+    if (i < assets.length - 1) {
       bodyChunks.push(`<w:p><w:r><w:br w:type="page"/></w:r></w:p>`);
     }
   }
@@ -314,6 +500,7 @@ export async function generateDocxBlob(
       `</Relationships>`
   );
 
+  const orientAttr = isLandscape ? ` w:orient="landscape"` : "";
   zip.file(
     "word/document.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
@@ -324,7 +511,7 @@ export async function generateDocxBlob(
       `xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
       `<w:body>` +
       bodyChunks.join("") +
-      `<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr>` +
+      `<w:sectPr><w:pgSz w:w="${pgWTwips}" w:h="${pgHTwips}"${orientAttr}/><w:pgMar w:top="${marginTwips}" w:right="${marginTwips}" w:bottom="${marginTwips}" w:left="${marginTwips}" w:header="360" w:footer="360" w:gutter="0"/></w:sectPr>` +
       `</w:body></w:document>`
   );
 
