@@ -44,17 +44,8 @@ import {
   printResumeSheet,
 } from "@/lib/resumeExport";
 
-const DRAFT_STORAGE_KEY = "notelagbe_resume_draft_v2";
-const LEGACY_DRAFT_STORAGE_KEY = "notelagbe_resume_draft_v1";
 const A4_WIDTH_PX = 794;
 const A4_HEIGHT_PX = 1123;
-
-function isSampleDemoResume(d: ResumeData): boolean {
-  return (
-    d.fullName.trim().toLowerCase() === "ariful islam" &&
-    d.email.trim().toLowerCase() === "ariful.cse@seu.edu.bd"
-  );
-}
 
 interface ResumeMakerToolProps {
   language?: "en" | "bn";
@@ -130,7 +121,6 @@ export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProp
   }));
   const [activeEditorTab, setActiveEditorTab] = useState<EditorTabId>("personal");
   const [isExporting, setIsExporting] = useState<"pdf" | "docx" | null>(null);
-  const [draftLoaded, setDraftLoaded] = useState(false);
 
   // Live A4 container fit scale & 1-page overflow measurement
   const previewContainerRef = useRef<HTMLDivElement | null>(null);
@@ -141,61 +131,6 @@ export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProp
 
   const [previewScale, setPreviewScale] = useState(0.62);
   const [contentHeightPx, setContentHeightPx] = useState(900);
-
-  // Load saved localStorage draft safely post-mount (preserve user's own CV across reloads,
-  // while allowing fresh Sample Demo recovery on page refresh)
-  useEffect(() => {
-    const raf = window.requestAnimationFrame(() => {
-      try {
-        const raw =
-          window.localStorage.getItem(DRAFT_STORAGE_KEY) ||
-          window.localStorage.getItem(LEGACY_DRAFT_STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          const normalized = normalizeResumeDraft(parsed);
-          if (
-            parsed?.data?.fullName !== undefined &&
-            normalized.data &&
-            !isSampleDemoResume(normalized.data)
-          ) {
-            setData(normalized.data);
-            if (parsed?.design?.template && normalized.design) {
-              setDesign(normalized.design);
-            }
-          } else {
-            // Discard stale/demo-mode localStorage so refresh restores the complete default Sample CV
-            window.localStorage.removeItem(LEGACY_DRAFT_STORAGE_KEY);
-            window.localStorage.removeItem(DRAFT_STORAGE_KEY);
-          }
-        }
-      } catch {
-        // Ignore corrupt draft
-      } finally {
-        setDraftLoaded(true);
-      }
-    });
-    return () => window.cancelAnimationFrame(raf);
-  }, []);
-
-  // Auto-save personal CV draft to localStorage cleanly (demo CV stays clean across refresh)
-  useEffect(() => {
-    if (!draftLoaded) return;
-    const timer = window.setTimeout(() => {
-      try {
-        if (isSampleDemoResume(data)) {
-          window.localStorage.removeItem(DRAFT_STORAGE_KEY);
-        } else {
-          window.localStorage.setItem(
-            DRAFT_STORAGE_KEY,
-            JSON.stringify({ data, design })
-          );
-        }
-      } catch {
-        // Ignore quota errors
-      }
-    }, 350);
-    return () => window.clearTimeout(timer);
-  }, [data, design, draftLoaded]);
 
   // Observe preview container width to scale A4 cleanly on desktop/mobile
   useEffect(() => {
@@ -422,15 +357,6 @@ export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProp
               <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50">
                 LaTeX ATS • Germany • Europe • Modern
               </span>
-              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                {isSampleDemoResume(data)
-                  ? bn
-                    ? "ডেমো প্রিভিউ (রিফ্রেশে ডিফল্ট ফিরবে)"
-                    : "Demo Mode (Resets on Refresh)"
-                  : bn
-                  ? "অটো-ড্রাফট সেভড"
-                  : "Auto-Saved Locally"}
-              </span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
               {bn ? "প্রফেশনাল ১-পেজ A4 রেজুমে মেকার" : "Professional One-Page A4 Resume / CV Maker"}
@@ -441,8 +367,6 @@ export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProp
             <button
               type="button"
               onClick={() => {
-                window.localStorage.removeItem(DRAFT_STORAGE_KEY);
-                window.localStorage.removeItem(LEGACY_DRAFT_STORAGE_KEY);
                 setData(createSampleStudentResume());
                 toast.success(bn ? "স্যাম্পল স্টুডেন্ট CV লোড হয়েছে!" : "Sample SEU student CV loaded!");
               }}
