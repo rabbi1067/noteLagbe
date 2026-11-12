@@ -3779,11 +3779,11 @@ export default function StudentToolsPage() {
                       <div style={{ fontSize: "8.5px", fontWeight: 800, letterSpacing: "0.15em", color: "#A8843F", textTransform: "uppercase", marginBottom: "8px" }}>
                         Submitted By
                       </div>
-                      <div style={{ fontSize: "14.5px", fontWeight: 700, color: "#0E1E38", marginBottom: "6px" }}>
+                      <div style={{ fontSize: "14.5px", fontWeight: 700, color: "#0E1E38", marginBottom: "4px" }}>
                         {fmtStudent}
                       </div>
-                      <div style={{ display: "inline-block", backgroundColor: "#0E1E38", color: "#ffffff", padding: "3px 9px", borderRadius: "4px", fontSize: "10.5px", fontWeight: 700, fontFamily: "ui-monospace, Consolas, monospace" }}>
-                        ID: {fmtStudentId}
+                      <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#1E293B", fontFamily: "ui-monospace, Consolas, monospace" }}>
+                        <span style={{ color: "#0E1E38", fontWeight: 800 }}>ID:</span> {fmtStudentId}
                       </div>
                     </div>
                   </div>
