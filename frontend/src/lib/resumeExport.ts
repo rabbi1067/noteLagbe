@@ -201,41 +201,13 @@ function drawPdfSingleOrSidebar(
       doc.setFillColor(ar, ag, ab);
       doc.rect(6, 26, sidebarW - 6, A4_HEIGHT_MM - 32, "F");
     } else if (!isSidebar && !dryRun) {
-      // Top dual-tone bar & bottom slate+accent editorial trim
-      doc.setFillColor(ar, ag, ab);
-      doc.rect(0, 0, 68, 3.8, "F");
-      doc.setFillColor(241, 245, 249);
-      doc.rect(68, 0, A4_WIDTH_MM - 68, 3.8, "F");
-      // Editorial footer band
-      doc.setFillColor(248, 250, 252);
-      doc.rect(0, A4_HEIGHT_MM - 10, A4_WIDTH_MM, 6, "F");
-      doc.setDrawColor(226, 232, 240);
-      doc.setLineWidth(0.25);
-      doc.line(0, A4_HEIGHT_MM - 10, A4_WIDTH_MM, A4_HEIGHT_MM - 10);
-      setFont("normal", 7.4);
-      doc.setTextColor(0, 0, 0);
-      doc.text(
-        `Curriculum Vitae • ${data.address || data.email || "Available for Opportunities"}`,
-        12,
-        A4_HEIGHT_MM - 6
-      );
-      doc.text(
-        data.signaturePlaceDate || data.fullName || "Certified Accurate",
-        A4_WIDTH_MM - 12,
-        A4_HEIGHT_MM - 6,
-        { align: "right" }
-      );
-      doc.setFillColor(15, 23, 42);
-      doc.rect(0, A4_HEIGHT_MM - 4, A4_WIDTH_MM - 42, 4, "F");
-      doc.setFillColor(ar, ag, ab);
-      doc.rect(A4_WIDTH_MM - 42, A4_HEIGHT_MM - 4, 42, 4, "F");
       // Vertical hairline separator below header
       doc.setDrawColor(226, 232, 240);
       doc.setLineWidth(0.3);
-      doc.line(sidebarW + 4, 51, sidebarW + 4, A4_HEIGHT_MM - 14);
+      doc.line(sidebarW + 4, 51, sidebarW + 4, A4_HEIGHT_MM - 10);
     }
 
-    let leftY = isSidebar ? 14 : 13;
+    let leftY = isSidebar ? 14 : 15;
     let rightY = 18;
 
     // Photo at top-left
