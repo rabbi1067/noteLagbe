@@ -314,13 +314,13 @@ export function estimateContainerBytes(imageByteSum: number, pageCount: number):
   return imageByteSum + 1800 + pageCount * 450;
 }
 
-function resolveMarginPoints(margin: MarginOption): number {
+export function resolveMarginPoints(margin: MarginOption): number {
   if (margin === "none") return 0;
-  if (margin === "small") return 18;
-  return 36;
+  if (margin === "small") return 36; // 0.5 in (12.7 mm) — print-safe narrow document standard
+  return 72; // 1.0 in (25.4 mm) — official MS Word / ISO standard margin
 }
 
-function resolvePdfLayout(
+export function resolvePdfLayout(
   imgW: number,
   imgH: number,
   options: PdfExportOptions
@@ -331,15 +331,28 @@ function resolvePdfLayout(
   drawY: number;
   drawW: number;
   drawH: number;
+  marginPt: number;
+  isLandscape: boolean;
 } {
   const m = resolveMarginPoints(options.margin);
+  const safeW = Math.max(1, imgW);
+  const safeH = Math.max(1, imgH);
 
   if (options.pageSize === "fit") {
     const pageW = 595.28;
     const drawW = Math.max(40, pageW - 2 * m);
-    const drawH = Math.max(40, drawW * (imgH / imgW));
+    const drawH = Math.max(40, drawW * (safeH / safeW));
     const pageH = drawH + 2 * m;
-    return { pageW, pageH, drawX: m, drawY: m, drawW, drawH };
+    return {
+      pageW,
+      pageH,
+      drawX: m,
+      drawY: m,
+      drawW,
+      drawH,
+      marginPt: m,
+      isLandscape: pageW > pageH,
+    };
   }
 
   const baseW = options.pageSize === "letter" ? 612 : 595.28;
@@ -350,15 +363,15 @@ function resolvePdfLayout(
       ? true
       : options.orientation === "portrait"
       ? false
-      : imgW > imgH;
+      : safeW > safeH;
 
   const pageW = isLandscape ? baseH : baseW;
   const pageH = isLandscape ? baseW : baseH;
   const availW = Math.max(20, pageW - 2 * m);
   const availH = Math.max(20, pageH - 2 * m);
-  const ratio = Math.min(availW / imgW, availH / imgH);
-  const drawW = imgW * ratio;
-  const drawH = imgH * ratio;
+  const ratio = Math.min(availW / safeW, availH / safeH);
+  const drawW = safeW * ratio;
+  const drawH = safeH * ratio;
 
   return {
     pageW,
@@ -367,6 +380,8 @@ function resolvePdfLayout(
     drawY: (pageH - drawH) / 2,
     drawW,
     drawH,
+    marginPt: m,
+    isLandscape,
   };
 }
 
@@ -435,8 +450,7 @@ export async function generateDocxBlob(
 
   const baseWTwips = options.pageSize === "letter" ? 12240 : 11906;
   const baseHTwips = options.pageSize === "letter" ? 15840 : 16838;
-  const marginTwips =
-    options.margin === "none" ? 0 : options.margin === "small" ? 360 : 720;
+  const marginTwips = resolveMarginPoints(options.margin) * 20; // 1 pt = 20 twips (720 small, 1440 normal)
 
   let isLandscape = false;
   if (options.orientation === "landscape") {

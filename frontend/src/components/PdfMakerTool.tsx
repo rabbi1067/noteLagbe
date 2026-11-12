@@ -51,6 +51,8 @@ import {
   renderFinalPageCanvas,
   generatePdfBlob,
   generateDocxBlob,
+  resolveMarginPoints,
+  resolvePdfLayout,
   sanitizeBaseFilename,
   triggerBlobDownload,
 } from "@/lib/pdfMakerExport";
@@ -179,6 +181,35 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
   const activePage = resolvedSelectedIndex >= 0 ? pages[resolvedSelectedIndex] : null;
 
   const bn = language === "bn";
+
+  const liveLayout =
+    canvasDisplaySize.w > 0 && canvasDisplaySize.h > 0
+      ? resolvePdfLayout(canvasDisplaySize.w, canvasDisplaySize.h, exportOptions)
+      : null;
+  const showPaperPreview = Boolean(liveLayout && !isCropping);
+  const paperBoxScale = liveLayout
+    ? Math.min(480 / liveLayout.pageW, 460 / liveLayout.pageH)
+    : 1;
+  const activeMarginPt = resolveMarginPoints(exportOptions.margin);
+  const activeMarginMmLabel =
+    activeMarginPt === 0 ? "0 mm" : activeMarginPt === 36 ? "12.7 mm (0.5\")" : "25.4 mm (1.0\")";
+  const pageFormatBadge = liveLayout
+    ? `${
+        exportOptions.pageSize === "fit"
+          ? bn
+            ? "Fit টু ইমেজ"
+            : "Fit to Image"
+          : `${exportOptions.pageSize === "letter" ? "Letter" : "A4"} ${
+              liveLayout.isLandscape
+                ? bn
+                  ? "ল্যান্ডস্কেপ"
+                  : "Landscape"
+                : bn
+                ? "পোর্ট্রেট"
+                : "Portrait"
+            }`
+      } • ${bn ? "মার্জিন" : "Margin"}: ${activeMarginMmLabel}`
+    : null;
 
   // Load uploaded image files cleanly preserving upload sequence
   const handleAddFiles = useCallback(
@@ -925,16 +956,48 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                 {/* Live Canvas Viewport */}
                 <div className="relative w-full min-h-[360px] sm:min-h-[460px] rounded-2xl bg-slate-950/90 border border-slate-800 flex items-center justify-center p-4 overflow-hidden select-none">
                   <div
-                    ref={cropBoxContainerRef}
-                    onPointerMove={handleCropPointerMove}
-                    onPointerUp={endCropDrag}
-                    onPointerCancel={endCropDrag}
-                    className="relative inline-flex items-center justify-center max-w-full max-h-[520px] touch-none"
+                    style={
+                      showPaperPreview && liveLayout
+                        ? {
+                            width: "100%",
+                            maxWidth: `${Math.round(liveLayout.pageW * paperBoxScale)}px`,
+                            aspectRatio: `${liveLayout.pageW} / ${liveLayout.pageH}`,
+                          }
+                        : undefined
+                    }
+                    className={
+                      showPaperPreview
+                        ? "bg-white rounded-sm shadow-2xl ring-1 ring-slate-300/60 flex items-center justify-center transition-all duration-200"
+                        : "contents"
+                    }
                   >
-                    <canvas
-                      ref={previewCanvasRef}
-                      className="max-w-full max-h-[500px] w-auto h-auto rounded-lg shadow-2xl bg-white block"
-                    />
+                    <div
+                      ref={cropBoxContainerRef}
+                      onPointerMove={handleCropPointerMove}
+                      onPointerUp={endCropDrag}
+                      onPointerCancel={endCropDrag}
+                      style={
+                        showPaperPreview && liveLayout
+                          ? {
+                              width: `${(liveLayout.drawW / liveLayout.pageW) * 100}%`,
+                              height: `${(liveLayout.drawH / liveLayout.pageH) * 100}%`,
+                            }
+                          : undefined
+                      }
+                      className={
+                        showPaperPreview
+                          ? "relative flex items-center justify-center touch-none"
+                          : "relative inline-flex items-center justify-center max-w-full max-h-[520px] touch-none"
+                      }
+                    >
+                      <canvas
+                        ref={previewCanvasRef}
+                        className={
+                          showPaperPreview
+                            ? "w-full h-full block bg-white"
+                            : "max-w-full max-h-[500px] w-auto h-auto rounded-lg shadow-2xl bg-white block"
+                        }
+                      />
 
                     {/* Straighten Alignment Grid Overlay */}
                     {showGrid && (
@@ -1014,24 +1077,32 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                         </div>
                       </div>
                     )}
+                    </div>
                   </div>
                 </div>
 
                 {/* Live dimensions & reset strip */}
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
-                  <span className="inline-flex items-center gap-1.5">
-                    <ImageIcon className="w-3.5 h-3.5" />
-                    {canvasDisplaySize.w > 0
-                      ? `${canvasDisplaySize.w} × ${canvasDisplaySize.h} px`
-                      : bn
-                      ? "লোড হচ্ছে..."
-                      : "Loading..."}
-                    {!isFullCrop(activePage.crop) && (
-                      <span className="ml-1 px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">
-                        {bn ? "ক্রপড" : "Cropped"}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5" />
+                      {canvasDisplaySize.w > 0
+                        ? `${canvasDisplaySize.w} × ${canvasDisplaySize.h} px`
+                        : bn
+                        ? "লোড হচ্ছে..."
+                        : "Loading..."}
+                      {!isFullCrop(activePage.crop) && (
+                        <span className="ml-1 px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">
+                          {bn ? "ক্রপড" : "Cropped"}
+                        </span>
+                      )}
+                    </span>
+                    {pageFormatBadge && (
+                      <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200/70 dark:border-blue-800/50 text-blue-700 dark:text-blue-300 text-[11px] font-semibold">
+                        {pageFormatBadge}
                       </span>
                     )}
-                  </span>
+                  </div>
 
                   <button
                     type="button"
@@ -1347,16 +1418,33 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
 
                   {/* Margin */}
                   <div className="space-y-1.5">
-                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block">
-                      {bn ? "মার্জিন" : "Page Margin"}
-                    </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                        {bn ? "মার্জিন" : "Page Margin"}
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                        {bn ? "ডিফল্ট: প্রিন্ট-সেফ (0.5\")" : "Default: Print-safe 0.5\""}
+                      </span>
+                    </div>
                     <div className="grid grid-cols-3 gap-1.5">
                       {(
                         [
-                          { id: "none", label: bn ? "মার্জিন ছাড়া" : "No Margin" },
-                          { id: "small", label: bn ? "ছোট (Small)" : "Small" },
-                          { id: "normal", label: bn ? "নরমাল" : "Normal" },
-                        ] as { id: MarginOption; label: string }[]
+                          {
+                            id: "none",
+                            label: bn ? "মার্জিন ছাড়া" : "No Margin",
+                            sub: "0 mm",
+                          },
+                          {
+                            id: "small",
+                            label: bn ? "ছোট (Narrow)" : "Small",
+                            sub: "12.7 mm · 0.5\"",
+                          },
+                          {
+                            id: "normal",
+                            label: bn ? "নরমাল (Standard)" : "Normal",
+                            sub: "25.4 mm · 1.0\"",
+                          },
+                        ] as { id: MarginOption; label: string; sub: string }[]
                       ).map((opt) => (
                         <button
                           key={opt.id}
@@ -1364,13 +1452,22 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                           onClick={() =>
                             setExportOptions((prev) => ({ ...prev, margin: opt.id }))
                           }
-                          className={`py-2 px-2 rounded-xl border text-[11px] font-bold cursor-pointer transition-all ${
+                          className={`py-2 px-2 rounded-xl border text-[11px] font-bold cursor-pointer transition-all flex flex-col items-center leading-tight ${
                             exportOptions.margin === opt.id
                               ? "border-blue-600 bg-blue-600 text-white shadow-sm"
                               : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-blue-400"
                           }`}
                         >
-                          {opt.label}
+                          <span>{opt.label}</span>
+                          <span
+                            className={`text-[9px] font-medium mt-0.5 ${
+                              exportOptions.margin === opt.id
+                                ? "text-blue-100"
+                                : "text-slate-400"
+                            }`}
+                          >
+                            {opt.sub}
+                          </span>
                         </button>
                       ))}
                     </div>
