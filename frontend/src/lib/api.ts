@@ -692,6 +692,37 @@ export const api = {
         message: string;
       }>(`/resources/check-availability?${sp.toString()}`);
     },
+    checkDuplicate: (params: {
+      courseCode: string;
+      teacherId?: number | null;
+      type?: string;
+      semesterName?: string;
+      title?: string;
+      excludeId?: number | null;
+    }) => {
+      const sp = new URLSearchParams();
+      sp.set("courseCode", params.courseCode);
+      if (params.teacherId !== undefined && params.teacherId !== null && params.teacherId > 0) {
+        sp.set("teacherId", params.teacherId.toString());
+      }
+      if (params.type) sp.set("type", params.type);
+      if (params.semesterName) sp.set("semesterName", params.semesterName);
+      if (params.title) sp.set("title", params.title);
+      if (params.excludeId) sp.set("excludeId", params.excludeId.toString());
+      return request<{
+        duplicate: boolean;
+        normalizedSemester: string;
+        singleSlotExam: boolean;
+        existingResourceId?: number;
+        existingTitle?: string;
+        existingType?: string;
+        existingSemester?: string;
+        existingStatus?: string;
+        existingCourseCode?: string;
+        existingTeacherName?: string;
+        message: string | null;
+      }>(`/resources/check-duplicate?${sp.toString()}`);
+    },
   },
 
   // Payments API

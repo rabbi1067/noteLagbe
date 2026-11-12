@@ -57,6 +57,17 @@ public class ResourceController {
         return ResponseEntity.ok(resourceService.checkAvailability(courseCode, teacherId));
     }
 
+    @GetMapping("/check-duplicate")
+    public ResponseEntity<Map<String, Object>> checkDuplicate(
+            @RequestParam String courseCode,
+            @RequestParam(required = false) Long teacherId,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String semesterName,
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) Long excludeId) {
+        return ResponseEntity.ok(resourceService.checkDuplicate(courseCode, teacherId, type, semesterName, title, excludeId));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Resource> getResource(
             @PathVariable Long id,

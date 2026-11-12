@@ -42,6 +42,8 @@ import TopContributorsLeaderboard from "@/components/TopContributorsLeaderboard"
 import LiveRemainingCountdown from "@/components/LiveRemainingCountdown";
 import MultiPageUploader from "@/components/MultiPageUploader";
 import { useDataSync, notifyDataChanged } from "@/lib/sync";
+import { useDuplicateResourceCheck } from "@/hooks/useDuplicateResourceCheck";
+import { DuplicateWarningBanner } from "@/components/DuplicateWarningBanner";
 
 const DEPARTMENTS = [
   { id: "CSE", code: "CSE", name: "Computer Science & Engineering", icon: "💻", badge: "Active" },
@@ -180,6 +182,16 @@ export default function ContributePage() {
   const [semester, setSemester] = useState("");
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | number>("");
   const [allTeachers, setAllTeachers] = useState<any[]>([]);
+
+  const contribDupCheck = useDuplicateResourceCheck({
+    enabled: Boolean(selectedTeacherId) && !submissionSuccessData,
+    courseCode,
+    teacherId: selectedTeacherId === "CENTRAL" || Number(selectedTeacherId) === -1 ? null : selectedTeacherId,
+    type: resourceType,
+    semesterName: semester,
+    title,
+    language,
+  });
 
   useEffect(() => {
     api.teachers.getAll().then((data) => setAllTeachers(data || [])).catch(() => {});
@@ -576,6 +588,11 @@ export default function ContributePage() {
 
     const yearMatch = cleanSemester.match(/(20\d\d)/);
     const finalYear = yearMatch ? parseInt(yearMatch[1], 10) : new Date().getFullYear();
+
+    const liveDup = await contribDupCheck.checkNow();
+    if (liveDup?.duplicate) {
+      return;
+    }
 
     setLoading(true);
     try {
@@ -1087,11 +1104,21 @@ export default function ContributePage() {
                     ? "যেমন: Fall 2026, Summer 2026, Spring 2025"
                     : "e.g. Fall 2026, Summer 2026, Spring 2025"
                 }
-                className="w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:border-emerald-500 font-semibold text-slate-900 dark:text-white placeholder:font-normal placeholder:text-slate-400"
+                className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border focus:outline-none font-semibold text-slate-900 dark:text-white placeholder:font-normal placeholder:text-slate-400 ${
+                  contribDupCheck.isDuplicate
+                    ? "border-red-500 ring-2 ring-red-500/20"
+                    : "border-slate-200 dark:border-slate-700 focus:border-emerald-500"
+                }`}
               />
 
             </div>
           </div>
+
+          <DuplicateWarningBanner
+            checking={contribDupCheck.checkingDuplicate}
+            duplicateInfo={contribDupCheck.duplicateInfo}
+            language={language}
+          />
 
           {/* Row 3: Dual Mode (Direct Device Upload [Default] vs Google Drive Link [Alternative]) */}
           <div className="space-y-4 p-5 sm:p-6 rounded-3xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 shadow-xs">
@@ -1365,10 +1392,17 @@ export default function ContributePage() {
             )}
           </div>
 
+          {contribDupCheck.isDuplicate && (
+            <DuplicateWarningBanner
+              duplicateInfo={contribDupCheck.duplicateInfo}
+              language={language}
+            />
+          )}
+
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || linkStatus === "restricted"}
+            disabled={loading || linkStatus === "restricted" || contribDupCheck.isDuplicate}
             className="w-full py-3.5 rounded-2xl text-xs sm:text-sm font-black text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? (

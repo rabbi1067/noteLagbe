@@ -97,6 +97,8 @@ import FacultyAvatar from "@/components/FacultyAvatar";
 import { DeleteConfirmationModal, DeleteSuccessModal } from "@/components/DeleteConfirmationModal";
 import MultiPageUploader from "@/components/MultiPageUploader";
 import PDFViewerModal from "@/components/PDFViewerModal";
+import { useDuplicateResourceCheck } from "@/hooks/useDuplicateResourceCheck";
+import { DuplicateWarningBanner } from "@/components/DuplicateWarningBanner";
 
 interface PaginationProps {
   currentPage: number;
@@ -685,6 +687,17 @@ export default function AdminDashboardPage() {
   const [resYear, setResYear] = useState(2026);
   const [savingResource, setSavingResource] = useState(false);
 
+  const resourceDupCheck = useDuplicateResourceCheck({
+    enabled: showResourceModal,
+    courseCode: resCourseCode,
+    teacherId: resTeacherId,
+    type: resType,
+    semesterName: resSemester,
+    title: resTitle,
+    excludeId: editingResource?.id ?? null,
+    language,
+  });
+
   // Course Modal
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState<any | null>(null);
@@ -728,6 +741,17 @@ export default function AdminDashboardPage() {
   const [contribEditFeedback, setContribEditFeedback] = useState("");
   const [savingContributionEdit, setSavingContributionEdit] = useState(false);
 
+  const contribEditDupCheck = useDuplicateResourceCheck({
+    enabled: Boolean(editingContribution),
+    courseCode: contribEditCourseCode,
+    teacherId: contribEditTeacherId,
+    type: contribEditType,
+    semesterName: contribEditSemester,
+    title: contribEditTitle,
+    excludeId: editingContribution?.uploadedResource?.id ?? null,
+    language,
+  });
+
   const handleOpenEditContributionModal = (c: any) => {
     setEditingContribution(c);
     setContribEditTitle(c.uploadedResource?.title || "");
@@ -745,6 +769,11 @@ export default function AdminDashboardPage() {
 
     if (contribEditTitle.trim().length < 5 || contribEditTitle.trim().length > 80) {
       toast.error("Material title must be between 5 and 80 characters.");
+      return;
+    }
+
+    const liveDup = await contribEditDupCheck.checkNow();
+    if (liveDup?.duplicate) {
       return;
     }
 
@@ -1511,6 +1540,12 @@ export default function AdminDashboardPage() {
       toast.error("Please upload a file or document from your device");
       return;
     }
+
+    const liveDup = await resourceDupCheck.checkNow();
+    if (liveDup?.duplicate) {
+      return;
+    }
+
     setSavingResource(true);
     try {
       const payload: any = {
@@ -10250,10 +10285,20 @@ export default function AdminDashboardPage() {
                       if (m) setResYear(parseInt(m[1], 10));
                     }}
                     placeholder="e.g. Fall 2026"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none font-medium"
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none font-medium ${
+                      resourceDupCheck.isDuplicate
+                        ? "border-red-500 ring-2 ring-red-500/20"
+                        : "border-slate-200 dark:border-slate-800"
+                    }`}
                   />
                 </div>
               </div>
+
+              <DuplicateWarningBanner
+                checking={resourceDupCheck.checkingDuplicate}
+                duplicateInfo={resourceDupCheck.duplicateInfo}
+                language={language}
+              />
 
               {/* Direct Multi-Page / Device File Upload with Auto-Merge to 1 PDF */}
               <div>
@@ -10353,7 +10398,7 @@ export default function AdminDashboardPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={savingResource}
+                  disabled={savingResource || resourceDupCheck.isDuplicate}
                   className="px-5 py-2.5 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/25 disabled:opacity-50 transition-all"
                 >
                   {savingResource ? "Saving..." : editingResource ? "Update Resource" : "Upload Material"}
@@ -12123,10 +12168,20 @@ export default function AdminDashboardPage() {
                     value={contribEditSemester}
                     onChange={(e) => setContribEditSemester(e.target.value)}
                     placeholder="e.g. Fall 2026, Summer 2026"
-                    className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs font-semibold focus:outline-none focus:border-blue-500"
+                    className={`w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border text-slate-900 dark:text-white text-xs font-semibold focus:outline-none ${
+                      contribEditDupCheck.isDuplicate
+                        ? "border-red-500 ring-2 ring-red-500/20"
+                        : "border-slate-200 dark:border-slate-800 focus:border-blue-500"
+                    }`}
                   />
                 </div>
               </div>
+
+              <DuplicateWarningBanner
+                checking={contribEditDupCheck.checkingDuplicate}
+                duplicateInfo={contribEditDupCheck.duplicateInfo}
+                language={language}
+              />
 
               {/* Admin Feedback Message */}
               <div className="space-y-1">
@@ -12164,7 +12219,7 @@ export default function AdminDashboardPage() {
 
                 <button
                   type="submit"
-                  disabled={savingContributionEdit}
+                  disabled={savingContributionEdit || contribEditDupCheck.isDuplicate}
                   className="px-5 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 disabled:opacity-50 transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   {savingContributionEdit ? (

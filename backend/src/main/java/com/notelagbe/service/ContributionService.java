@@ -41,6 +41,7 @@ public class ContributionService {
 
     private final InputSanitizationService inputSanitizationService;
     private final NotificationService notificationService;
+    private final ResourceDuplicateService resourceDuplicateService;
 
     public ContributionService(ContributionRequestRepository contributionRequestRepository,
                                ResourceRepository resourceRepository,
@@ -50,7 +51,8 @@ public class ContributionService {
                                UnlockedCourseRepository unlockedCourseRepository,
                                LiveSyncService liveSyncService,
                                InputSanitizationService inputSanitizationService,
-                               NotificationService notificationService) {
+                               NotificationService notificationService,
+                               ResourceDuplicateService resourceDuplicateService) {
         this.contributionRequestRepository = contributionRequestRepository;
         this.resourceRepository = resourceRepository;
         this.courseRepository = courseRepository;
@@ -60,6 +62,7 @@ public class ContributionService {
         this.liveSyncService = liveSyncService;
         this.inputSanitizationService = inputSanitizationService;
         this.notificationService = notificationService;
+        this.resourceDuplicateService = resourceDuplicateService;
     }
 
     @Transactional
@@ -74,6 +77,10 @@ public class ContributionService {
         }
         if (cleanSemester.matches(".*(.)\\1{3,}.*")) {
             throw new ApiException("Invalid semester: repetitive spam characters are not allowed");
+        }
+        String canonicalSemester = resourceDuplicateService.normalizeSemesterName(cleanSemester);
+        if (!canonicalSemester.isEmpty()) {
+            cleanSemester = canonicalSemester;
         }
 
         // Sanitize and validate file URL
@@ -90,6 +97,18 @@ public class ContributionService {
         request.setFileUrl(cleanUrl);
 
         String uploadCode = request.getCourseCode().trim();
+        Teacher resolvedTeacher = (request.getTeacherId() != null && request.getTeacherId() > 0)
+                ? teacherRepository.findById(request.getTeacherId()).orElse(null)
+                : null;
+        resourceDuplicateService.assertNoDuplicate(
+                uploadCode,
+                resolvedTeacher != null ? resolvedTeacher.getId() : null,
+                request.getResourceType(),
+                cleanSemester,
+                cleanTitle,
+                null
+        );
+
         String targetDept = (request.getDepartment() != null && !request.getDepartment().trim().isEmpty())
                 ? request.getDepartment().trim().toUpperCase()
                 : "CSE";
@@ -147,7 +166,7 @@ public class ContributionService {
         resource.setFileUrl(request.getFileUrl());
         resource.setPreviewUrl(request.getPreviewUrl());
         resource.setSemesterName(request.getSemesterName());
-        resource.setAcademicYear(request.getYear());
+        resource.setAcademicYear(resourceDuplicateService.resolveAcademicYear(request.getSemesterName(), request.getYear()));
         resource.setCourse(uploadCourse);
         resource.setTeacher(teacher);
         resource.setDepartment(targetDept);
@@ -219,8 +238,14 @@ public class ContributionService {
             } catch (Exception ignored) {}
         }
         if (semesterName != null && !semesterName.trim().isEmpty()) {
-            res.setSemesterName(semesterName.trim());
+            res.setSemesterName(resourceDuplicateService.normalizeSemesterName(semesterName));
+        } else {
+            String normalizedExisting = resourceDuplicateService.normalizeSemesterName(res.getSemesterName());
+            if (!normalizedExisting.isEmpty()) {
+                res.setSemesterName(normalizedExisting);
+            }
         }
+        res.setAcademicYear(resourceDuplicateService.resolveAcademicYear(res.getSemesterName(), res.getAcademicYear()));
         if (courseCode != null && !courseCode.trim().isEmpty()) {
             courseRepository.findByCodeIgnoreCase(courseCode.trim()).ifPresent(res::setCourse);
         }
@@ -236,6 +261,15 @@ public class ContributionService {
         } else if (res.getCourse() != null && (res.getDepartment() == null || res.getDepartment().trim().isEmpty())) {
             res.setDepartment(res.getCourse().getDepartment() != null ? res.getCourse().getDepartment() : "CSE");
         }
+
+        resourceDuplicateService.assertNoDuplicate(
+                res.getCourse() != null ? res.getCourse().getCode() : null,
+                res.getTeacher() != null ? res.getTeacher().getId() : null,
+                res.getType(),
+                res.getSemesterName(),
+                res.getTitle(),
+                res.getId()
+        );
 
         res.setStatus(ResourceStatus.APPROVED);
         resourceRepository.save(res);

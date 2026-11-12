@@ -10,6 +10,7 @@ import java.util.List;
 public interface ResourceRepository extends JpaRepository<Resource, Long> {
     long countByStatusAndTypeIn(ResourceStatus status, Collection<ResourceType> types);
     List<Resource> findByCourseIdAndStatus(Long courseId, ResourceStatus status);
+    List<Resource> findByCourseIdAndStatusIn(Long courseId, Collection<ResourceStatus> statuses);
     List<Resource> findByCourseId(Long courseId);
     List<Resource> findByTeacherId(Long teacherId);
     List<Resource> findByCourseCodeIgnoreCaseAndStatus(String code, ResourceStatus status);

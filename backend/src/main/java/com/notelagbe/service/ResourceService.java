@@ -17,6 +17,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -53,6 +54,7 @@ public class ResourceService {
     private final CloudinaryService cloudinaryService;
     private final TeacherCourseRepository teacherCourseRepository;
     private final CacheManager cacheManager;
+    private final ResourceDuplicateService resourceDuplicateService;
 
     public ResourceService(ResourceRepository resourceRepository,
                            CourseRepository courseRepository,
@@ -65,6 +67,25 @@ public class ResourceService {
                            CloudinaryService cloudinaryService,
                            TeacherCourseRepository teacherCourseRepository,
                            CacheManager cacheManager) {
+        this(resourceRepository, courseRepository, teacherRepository, unlockedCourseRepository,
+                subscriptionRepository, subscriptionService, liveSyncService, contributionRequestRepository,
+                cloudinaryService, teacherCourseRepository, cacheManager,
+                new ResourceDuplicateService(resourceRepository, courseRepository));
+    }
+
+    @Autowired
+    public ResourceService(ResourceRepository resourceRepository,
+                           CourseRepository courseRepository,
+                           TeacherRepository teacherRepository,
+                           UnlockedCourseRepository unlockedCourseRepository,
+                           SubscriptionRepository subscriptionRepository,
+                           SubscriptionService subscriptionService,
+                           LiveSyncService liveSyncService,
+                           ContributionRequestRepository contributionRequestRepository,
+                           CloudinaryService cloudinaryService,
+                           TeacherCourseRepository teacherCourseRepository,
+                           CacheManager cacheManager,
+                           ResourceDuplicateService resourceDuplicateService) {
         this.resourceRepository = resourceRepository;
         this.courseRepository = courseRepository;
         this.teacherRepository = teacherRepository;
@@ -76,6 +97,26 @@ public class ResourceService {
         this.cloudinaryService = cloudinaryService;
         this.teacherCourseRepository = teacherCourseRepository;
         this.cacheManager = cacheManager;
+        this.resourceDuplicateService = resourceDuplicateService;
+    }
+
+    public Map<String, Object> checkDuplicate(
+            String courseCode,
+            Long teacherId,
+            String rawType,
+            String semesterName,
+            String title,
+            Long excludeId
+    ) {
+        ResourceType parsedType = null;
+        if (rawType != null && !rawType.trim().isEmpty()) {
+            try {
+                parsedType = ResourceType.valueOf(rawType.trim().toUpperCase(java.util.Locale.ROOT));
+            } catch (IllegalArgumentException ignored) {
+                parsedType = null;
+            }
+        }
+        return resourceDuplicateService.checkDuplicate(courseCode, teacherId, parsedType, semesterName, title, excludeId);
     }
 
     private void evictCaches() {
@@ -211,13 +252,29 @@ public class ResourceService {
             teacher = teacherRepository.findById(req.getTeacherId()).orElse(null);
         }
 
+        ResourceType type = req.getType() != null ? req.getType() : ResourceType.NOTE;
+        String canonicalSemester = resourceDuplicateService.normalizeSemesterName(req.getSemesterName());
+        if (canonicalSemester.isEmpty()) {
+            canonicalSemester = "Fall 2026";
+        }
+        String cleanTitle = req.getTitle().trim();
+
+        resourceDuplicateService.assertNoDuplicate(
+                course.getCode(),
+                teacher != null ? teacher.getId() : null,
+                type,
+                canonicalSemester,
+                cleanTitle,
+                null
+        );
+
         Resource r = new Resource();
-        r.setTitle(req.getTitle().trim());
-        r.setType(req.getType() != null ? req.getType() : ResourceType.NOTE);
+        r.setTitle(cleanTitle);
+        r.setType(type);
         r.setFileUrl(req.getFileUrl().trim());
         r.setPreviewUrl(req.getPreviewUrl());
-        r.setSemesterName(req.getSemesterName() != null ? req.getSemesterName().trim() : "Fall 2026");
-        r.setAcademicYear(req.getAcademicYear() > 0 ? req.getAcademicYear() : 2026);
+        r.setSemesterName(canonicalSemester);
+        r.setAcademicYear(resourceDuplicateService.resolveAcademicYear(canonicalSemester, req.getAcademicYear()));
         r.setCourse(course);
         r.setTeacher(teacher);
         r.setUploader(uploader);
@@ -257,9 +314,10 @@ public class ResourceService {
             r.setPreviewUrl(req.getPreviewUrl().trim());
         }
         if (req.getSemesterName() != null && !req.getSemesterName().trim().isEmpty()) {
-            r.setSemesterName(req.getSemesterName().trim());
-        }
-        if (req.getAcademicYear() > 0) {
+            String canonicalSemester = resourceDuplicateService.normalizeSemesterName(req.getSemesterName());
+            r.setSemesterName(canonicalSemester);
+            r.setAcademicYear(resourceDuplicateService.resolveAcademicYear(canonicalSemester, req.getAcademicYear() > 0 ? req.getAcademicYear() : r.getAcademicYear()));
+        } else if (req.getAcademicYear() > 0) {
             r.setAcademicYear(req.getAcademicYear());
         }
 
@@ -274,6 +332,20 @@ public class ResourceService {
                 r.setTeacher(null);
             }
         }
+
+        String normalizedExistingSem = resourceDuplicateService.normalizeSemesterName(r.getSemesterName());
+        if (!normalizedExistingSem.isEmpty()) {
+            r.setSemesterName(normalizedExistingSem);
+        }
+
+        resourceDuplicateService.assertNoDuplicate(
+                r.getCourse() != null ? r.getCourse().getCode() : null,
+                r.getTeacher() != null ? r.getTeacher().getId() : null,
+                r.getType(),
+                r.getSemesterName(),
+                r.getTitle(),
+                id
+        );
 
         Resource updated = resourceRepository.save(r);
 
