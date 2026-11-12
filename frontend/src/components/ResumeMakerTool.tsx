@@ -44,9 +44,17 @@ import {
   printResumeSheet,
 } from "@/lib/resumeExport";
 
-const DRAFT_STORAGE_KEY = "notelagbe_resume_draft_v1";
+const DRAFT_STORAGE_KEY = "notelagbe_resume_draft_v2";
+const LEGACY_DRAFT_STORAGE_KEY = "notelagbe_resume_draft_v1";
 const A4_WIDTH_PX = 794;
 const A4_HEIGHT_PX = 1123;
+
+function isSampleDemoResume(d: ResumeData): boolean {
+  return (
+    d.fullName.trim().toLowerCase() === "ariful islam" &&
+    d.email.trim().toLowerCase() === "ariful.cse@seu.edu.bd"
+  );
+}
 
 interface ResumeMakerToolProps {
   language?: "en" | "bn";
@@ -134,19 +142,30 @@ export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProp
   const [previewScale, setPreviewScale] = useState(0.62);
   const [contentHeightPx, setContentHeightPx] = useState(900);
 
-  // Load saved localStorage draft safely post-mount
+  // Load saved localStorage draft safely post-mount (preserve user's own CV across reloads,
+  // while allowing fresh Sample Demo recovery on page refresh)
   useEffect(() => {
     const raf = window.requestAnimationFrame(() => {
       try {
-        const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+        const raw =
+          window.localStorage.getItem(DRAFT_STORAGE_KEY) ||
+          window.localStorage.getItem(LEGACY_DRAFT_STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
           const normalized = normalizeResumeDraft(parsed);
-          if (parsed?.data?.fullName !== undefined && normalized.data) {
+          if (
+            parsed?.data?.fullName !== undefined &&
+            normalized.data &&
+            !isSampleDemoResume(normalized.data)
+          ) {
             setData(normalized.data);
-          }
-          if (parsed?.design?.template && normalized.design) {
-            setDesign(normalized.design);
+            if (parsed?.design?.template && normalized.design) {
+              setDesign(normalized.design);
+            }
+          } else {
+            // Discard stale/demo-mode localStorage so refresh restores the complete default Sample CV
+            window.localStorage.removeItem(LEGACY_DRAFT_STORAGE_KEY);
+            window.localStorage.removeItem(DRAFT_STORAGE_KEY);
           }
         }
       } catch {
@@ -158,15 +177,19 @@ export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProp
     return () => window.cancelAnimationFrame(raf);
   }, []);
 
-  // Auto-save draft to localStorage cleanly
+  // Auto-save personal CV draft to localStorage cleanly (demo CV stays clean across refresh)
   useEffect(() => {
     if (!draftLoaded) return;
     const timer = window.setTimeout(() => {
       try {
-        window.localStorage.setItem(
-          DRAFT_STORAGE_KEY,
-          JSON.stringify({ data, design })
-        );
+        if (isSampleDemoResume(data)) {
+          window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+        } else {
+          window.localStorage.setItem(
+            DRAFT_STORAGE_KEY,
+            JSON.stringify({ data, design })
+          );
+        }
       } catch {
         // Ignore quota errors
       }
@@ -399,6 +422,15 @@ export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProp
               <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50">
                 LaTeX ATS • Germany • Europe • Modern
               </span>
+              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                {isSampleDemoResume(data)
+                  ? bn
+                    ? "ডেমো প্রিভিউ (রিফ্রেশে ডিফল্ট ফিরবে)"
+                    : "Demo Mode (Resets on Refresh)"
+                  : bn
+                  ? "অটো-ড্রাফট সেভড"
+                  : "Auto-Saved Locally"}
+              </span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
               {bn ? "প্রফেশনাল ১-পেজ A4 রেজুমে মেকার" : "Professional One-Page A4 Resume / CV Maker"}
@@ -409,6 +441,8 @@ export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProp
             <button
               type="button"
               onClick={() => {
+                window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+                window.localStorage.removeItem(LEGACY_DRAFT_STORAGE_KEY);
                 setData(createSampleStudentResume());
                 toast.success(bn ? "স্যাম্পল স্টুডেন্ট CV লোড হয়েছে!" : "Sample SEU student CV loaded!");
               }}
@@ -1336,6 +1370,40 @@ export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProp
 
                 {!data.referencesOnRequest && (
                   <>
+                    {data.references.length === 0 && (
+                      <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/40 space-y-2.5 text-center">
+                        <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">
+                          {bn
+                            ? "কোনো রেফারেন্স নেই — নতুন রেফারেন্স যোগ করুন অথবা 'Available upon request' চালু করুন।"
+                            : "No references added yet. Add a reference or turn on \"Available upon request\" to display this section."}
+                        </p>
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setData((p) => ({
+                                ...p,
+                                references: [...createSampleStudentResume().references],
+                              }))
+                            }
+                            className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition-all"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            {bn ? "ডিফল্ট রেফারেন্স ফেরান" : "Restore Sample References"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setData((p) => ({ ...p, referencesOnRequest: true }))
+                            }
+                            className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-bold cursor-pointer transition-all"
+                          >
+                            {bn ? `"Available upon request" চালু করুন` : `Use "Available upon request"`}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {data.references.map((ref, idx) => (
                       <div key={ref.id} className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2">
                         <div className="flex items-center justify-between">
@@ -1344,13 +1412,33 @@ export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProp
                           </span>
                           <button
                             type="button"
-                            onClick={() =>
+                            title={bn ? "রেফারেন্স মুছুন" : "Delete reference"}
+                            onClick={() => {
+                              const removed = ref;
+                              const removedIndex = idx;
                               setData((p) => ({
                                 ...p,
                                 references: p.references.filter((x) => x.id !== ref.id),
-                              }))
-                            }
-                            className="p-1 text-rose-500 rounded-lg cursor-pointer"
+                              }));
+                              toast.info(
+                                bn
+                                  ? `রেফারেন্স "${removed.name || `#${removedIndex + 1}`}" মুছে ফেলা হয়েছে`
+                                  : `Removed reference "${removed.name || `#${removedIndex + 1}`}"`,
+                                {
+                                  action: {
+                                    label: bn ? "ফিরিয়ে আনুন" : "Undo",
+                                    onClick: () =>
+                                      setData((p) => {
+                                        if (p.references.some((x) => x.id === removed.id)) return p;
+                                        const next = [...p.references];
+                                        next.splice(Math.min(removedIndex, next.length), 0, removed);
+                                        return { ...p, references: next };
+                                      }),
+                                  },
+                                }
+                              );
+                            }}
+                            className="p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg cursor-pointer transition-colors"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1429,29 +1517,47 @@ export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProp
                         </div>
                       </div>
                     ))}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setData((p) => ({
-                          ...p,
-                          references: [
-                            ...p.references,
-                            {
-                              id: `ref-${Date.now()}`,
-                              name: "",
-                              title: "",
-                              organization: "",
-                              phone: "",
-                              email: "",
-                            },
-                          ],
-                        }))
-                      }
-                      className="w-full py-2.5 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 text-xs font-bold text-blue-600 dark:text-blue-400 inline-flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4" />
-                      {bn ? "নতুন রেফারেন্স যোগ করুন" : "Add Reference"}
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setData((p) => ({
+                            ...p,
+                            references: [
+                              ...p.references,
+                              {
+                                id: `ref-${Date.now()}`,
+                                name: "",
+                                title: "",
+                                organization: "",
+                                phone: "",
+                                email: "",
+                              },
+                            ],
+                          }))
+                        }
+                        className="flex-1 py-2.5 px-3 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 text-xs font-bold text-blue-600 dark:text-blue-400 inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        {bn ? "নতুন রেফারেন্স যোগ করুন" : "Add Reference"}
+                      </button>
+
+                      {data.references.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setData((p) => ({
+                              ...p,
+                              references: [...createSampleStudentResume().references],
+                            }))
+                          }
+                          className="py-2.5 px-3 rounded-xl border border-slate-300 dark:border-slate-700 hover:border-blue-500 text-[11px] font-bold text-slate-600 dark:text-slate-300 inline-flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          {bn ? "ডিফল্ট ২টি রেফারেন্স" : "Restore 2 Samples"}
+                        </button>
+                      )}
+                    </div>
                   </>
                 )}
               </div>
