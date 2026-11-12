@@ -170,7 +170,12 @@ function drawPdfSingleOrSidebar(
     const clean = text.trim();
     if (!clean) return y;
     setFont(style, pt);
-    doc.setTextColor(color[0], color[1], color[2]);
+    // Keep text pure black on light backgrounds; allow pure white only on dark accent panels
+    if (color[0] >= 240 && color[1] >= 240 && color[2] >= 240) {
+      doc.setTextColor(255, 255, 255);
+    } else {
+      doc.setTextColor(0, 0, 0);
+    }
     const lines = doc.splitTextToSize(clean, maxW) as string[];
     const step = lineH(pt);
     for (const line of lines) {
@@ -196,14 +201,38 @@ function drawPdfSingleOrSidebar(
       doc.setFillColor(ar, ag, ab);
       doc.rect(6, 26, sidebarW - 6, A4_HEIGHT_MM - 32, "F");
     } else if (!isSidebar && !dryRun) {
-      // Top & Bottom thin European minimal bars
+      // Top dual-tone bar & bottom slate+accent editorial trim
       doc.setFillColor(ar, ag, ab);
-      doc.rect(0, 0, A4_WIDTH_MM, 4.5, "F");
-      doc.rect(0, A4_HEIGHT_MM - 4.5, A4_WIDTH_MM, 4.5, "F");
+      doc.rect(0, 0, 68, 3.8, "F");
+      doc.setFillColor(241, 245, 249);
+      doc.rect(68, 0, A4_WIDTH_MM - 68, 3.8, "F");
+      // Editorial footer band
+      doc.setFillColor(248, 250, 252);
+      doc.rect(0, A4_HEIGHT_MM - 10, A4_WIDTH_MM, 6, "F");
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.25);
+      doc.line(0, A4_HEIGHT_MM - 10, A4_WIDTH_MM, A4_HEIGHT_MM - 10);
+      setFont("normal", 7.4);
+      doc.setTextColor(0, 0, 0);
+      doc.text(
+        `Curriculum Vitae • ${data.address || data.email || "Available for Opportunities"}`,
+        12,
+        A4_HEIGHT_MM - 6
+      );
+      doc.text(
+        data.signaturePlaceDate || data.fullName || "Certified Accurate",
+        A4_WIDTH_MM - 12,
+        A4_HEIGHT_MM - 6,
+        { align: "right" }
+      );
+      doc.setFillColor(15, 23, 42);
+      doc.rect(0, A4_HEIGHT_MM - 4, A4_WIDTH_MM - 42, 4, "F");
+      doc.setFillColor(ar, ag, ab);
+      doc.rect(A4_WIDTH_MM - 42, A4_HEIGHT_MM - 4, 42, 4, "F");
       // Vertical hairline separator below header
-      doc.setDrawColor(215, 221, 230);
+      doc.setDrawColor(226, 232, 240);
       doc.setLineWidth(0.3);
-      doc.line(sidebarW + 4, 48, sidebarW + 4, A4_HEIGHT_MM - 14);
+      doc.line(sidebarW + 4, 51, sidebarW + 4, A4_HEIGHT_MM - 14);
     }
 
     let leftY = isSidebar ? 14 : 13;
@@ -265,8 +294,13 @@ function drawPdfSingleOrSidebar(
       if (topLinks) {
         rightY = drawWrapped(topLinks, rightX, rightY, rightMaxW, 7.6, "normal", [ar, ag, ab]);
       }
-      rightY = Math.max(rightY + 4, 48);
-      leftY = Math.max(leftY + 2, 48);
+      rightY = Math.max(rightY + 4, 50);
+      leftY = Math.max(leftY + 2, 50);
+      if (!dryRun) {
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.3);
+        doc.line(12, 47.5, A4_WIDTH_MM - 12, 47.5);
+      }
     } else {
       rightY = Math.max(rightY + 5, 42);
     }
@@ -281,12 +315,12 @@ function drawPdfSingleOrSidebar(
         doc.setFillColor(255, 255, 255);
         doc.roundedRect(leftX, leftY - 3.8, leftMaxW, 5.2, 2.5, 2.5, "F");
         setFont("bold", 8.2);
-        doc.setTextColor(ar, ag, ab);
+        doc.setTextColor(0, 0, 0);
         doc.text(title.toUpperCase(), leftX + leftMaxW / 2, leftY - 0.3, { align: "center" });
         leftY += 3.8;
       } else {
         setFont("bold", 9);
-        doc.setTextColor(ar, ag, ab);
+        doc.setTextColor(0, 0, 0);
         if (!dryRun) {
           doc.text(title.toUpperCase(), leftX, leftY);
           doc.setDrawColor(ar, ag, ab);
@@ -308,7 +342,7 @@ function drawPdfSingleOrSidebar(
         rightY += 4.2;
       } else {
         setFont("bold", 9.5);
-        doc.setTextColor(ar, ag, ab);
+        doc.setTextColor(0, 0, 0);
         if (!dryRun) {
           doc.text(title.toUpperCase(), rightX, rightY);
           doc.setDrawColor(148, 163, 184);
@@ -377,6 +411,19 @@ function drawPdfSingleOrSidebar(
       }
     }
 
+    if (!isSidebar && (data.dateOfBirth.trim() || data.nationality.trim() || data.competitiveProfile.trim())) {
+      drawLeftHeading("Personal Info");
+      if (data.dateOfBirth.trim()) {
+        leftY = drawWrapped(`DOB: ${data.dateOfBirth}`, leftX, leftY, leftMaxW, 7.7, "normal", leftTextColor);
+      }
+      if (data.nationality.trim()) {
+        leftY = drawWrapped(`Nationality: ${data.nationality}`, leftX, leftY, leftMaxW, 7.7, "normal", leftTextColor);
+      }
+      if (data.competitiveProfile.trim()) {
+        leftY = drawWrapped(`Profile: ${data.competitiveProfile}`, leftX, leftY, leftMaxW, 7.5, "normal", leftTextColor);
+      }
+    }
+
     if (isSidebar && sections.includes("references")) {
       drawLeftHeading("References");
       if (data.referencesOnRequest || data.references.length === 0) {
@@ -412,20 +459,20 @@ function drawPdfSingleOrSidebar(
         for (const exp of data.experience) {
           if (!exp.role && !exp.organization) continue;
           setFont("bold", 8.8);
-          doc.setTextColor(15, 23, 42);
+          doc.setTextColor(0, 0, 0);
           if (!dryRun) doc.text(exp.role || exp.organization, rightX, rightY);
           if (exp.period && !dryRun) {
             setFont("normal", 8);
-            doc.setTextColor(100, 116, 139);
+            doc.setTextColor(0, 0, 0);
             doc.text(exp.period, A4_WIDTH_MM - 12, rightY, { align: "right" });
           }
           rightY += lineH(8.8);
           if (exp.role && exp.organization) {
-            rightY = drawWrapped(exp.organization, rightX, rightY, rightMaxW, 8, "italic", [ar, ag, ab]);
+            rightY = drawWrapped(exp.organization, rightX, rightY, rightMaxW, 8, "italic", [0, 0, 0]);
           }
           for (const b of exp.bullets) {
             if (!b.trim()) continue;
-            rightY = drawWrapped(`• ${b}`, rightX + 2, rightY, rightMaxW - 2, 7.9, "normal", [51, 65, 85]);
+            rightY = drawWrapped(`• ${b}`, rightX + 2, rightY, rightMaxW - 2, 7.9, "normal", [0, 0, 0]);
           }
           rightY += 1.5;
         }
@@ -434,9 +481,12 @@ function drawPdfSingleOrSidebar(
         for (const pr of data.projects) {
           if (!pr.name) continue;
           const header = pr.techStack ? `${pr.name} — ${pr.techStack}` : pr.name;
-          rightY = drawWrapped(header, rightX, rightY, rightMaxW, 8.5, "bold", [15, 23, 42]);
+          rightY = drawWrapped(header, rightX, rightY, rightMaxW, 8.5, "bold", [0, 0, 0]);
           if (pr.description) {
-            rightY = drawWrapped(`• ${pr.description}`, rightX + 2, rightY, rightMaxW - 2, 7.9, "normal", [51, 65, 85]);
+            rightY = drawWrapped(`• ${pr.description}`, rightX + 2, rightY, rightMaxW - 2, 7.9, "normal", [0, 0, 0]);
+          }
+          if (!isSidebar && pr.link.trim()) {
+            rightY = drawWrapped(pr.link, rightX + 2, rightY, rightMaxW - 2, 7.4, "normal", [0, 0, 0]);
           }
           rightY += 1.2;
         }
@@ -445,11 +495,11 @@ function drawPdfSingleOrSidebar(
         for (const edu of data.education) {
           if (!edu.institution && !edu.degree) continue;
           setFont("bold", 8.6);
-          doc.setTextColor(15, 23, 42);
+          doc.setTextColor(0, 0, 0);
           if (!dryRun) doc.text(edu.institution, rightX, rightY);
           if (edu.period && !dryRun) {
             setFont("normal", 7.8);
-            doc.setTextColor(100, 116, 139);
+            doc.setTextColor(0, 0, 0);
             doc.text(edu.period, A4_WIDTH_MM - 12, rightY, { align: "right" });
           }
           rightY += lineH(8.6);
@@ -473,6 +523,25 @@ function drawPdfSingleOrSidebar(
         drawRightHeading("References");
         if (data.referencesOnRequest || data.references.length === 0) {
           rightY = drawWrapped("Available upon request.", rightX, rightY, rightMaxW, 8, "normal", [51, 65, 85]);
+        } else if (!isSidebar && data.references.filter((r) => r.name.trim()).length >= 2) {
+          const validRefs = data.references.filter((r) => r.name.trim());
+          const colW = (rightMaxW - 5) / 2;
+          for (let idx = 0; idx < validRefs.length; idx += 2) {
+            const pair = validRefs.slice(idx, idx + 2);
+            const rowStartY = rightY;
+            let maxPairY = rightY;
+            pair.forEach((ref, colIdx) => {
+              const rx = rightX + colIdx * (colW + 5);
+              let ry = rowStartY;
+              ry = drawWrapped(ref.name, rx, ry, colW, 8.3, "bold", [15, 23, 42]);
+              const roleOrg = [ref.title, ref.organization].filter((x) => x.trim()).join(", ");
+              if (roleOrg) ry = drawWrapped(roleOrg, rx, ry, colW, 7.6, "normal", [71, 85, 105]);
+              if (ref.phone) ry = drawWrapped(`Phone: ${ref.phone}`, rx, ry, colW, 7.5, "normal", [71, 85, 105]);
+              if (ref.email) ry = drawWrapped(`Email: ${ref.email}`, rx, ry, colW, 7.5, "normal", [71, 85, 105]);
+              if (ry > maxPairY) maxPairY = ry;
+            });
+            rightY = maxPairY + 1.5;
+          }
         } else {
           for (const ref of data.references) {
             if (!ref.name.trim()) continue;
@@ -504,7 +573,7 @@ function drawPdfSingleOrSidebar(
     let headY = y;
     if (!dryRun) {
       setFont("bold", 9);
-      doc.setTextColor(ar, ag, ab);
+      doc.setTextColor(0, 0, 0);
       doc.text("LEBENSLAUF  •  CURRICULUM VITAE", marginX, headY);
     }
     headY += 5.5;
@@ -543,10 +612,10 @@ function drawPdfSingleOrSidebar(
     const drawGermanHeading = (title: string) => {
       y += 2;
       setFont("bold", 9.5);
-      doc.setTextColor(ar, ag, ab);
+      doc.setTextColor(0, 0, 0);
       if (!dryRun) {
         doc.text(title.toUpperCase(), marginX, y);
-        doc.setDrawColor(203, 213, 225);
+        doc.setDrawColor(ar, ag, ab);
         doc.setLineWidth(0.35);
         doc.line(marginX, y + 1.2, A4_WIDTH_MM - marginX, y + 1.2);
       }
@@ -645,7 +714,7 @@ function drawPdfSingleOrSidebar(
       y += 4;
       if (!dryRun) {
         setFont("italic", 8);
-        doc.setTextColor(71, 85, 105);
+        doc.setTextColor(0, 0, 0);
         doc.text(data.signaturePlaceDate || "Dhaka, Bangladesh", marginX, y);
         doc.setDrawColor(148, 163, 184);
         doc.line(A4_WIDTH_MM - marginX - 48, y - 0.5, A4_WIDTH_MM - marginX, y - 0.5);
@@ -711,7 +780,7 @@ function drawPdfSingleOrSidebar(
   const drawClassicHeading = (title: string) => {
     y += 1.6;
     setFont("bold", 9.6);
-    doc.setTextColor(ar, ag, ab);
+    doc.setTextColor(0, 0, 0);
     if (!dryRun) {
       doc.text(title.toUpperCase(), marginX, y);
       doc.setDrawColor(ar, ag, ab);
@@ -724,18 +793,18 @@ function drawPdfSingleOrSidebar(
   for (const sec of sections) {
     if (sec === "summary") {
       drawClassicHeading("Summary");
-      y = drawWrapped(data.summary, marginX, y, maxW, 8.5, "normal", [30, 41, 59]);
+      y = drawWrapped(data.summary, marginX, y, maxW, 8.5, "normal", [0, 0, 0]);
       y += 0.8;
     } else if (sec === "education") {
       drawClassicHeading("Education");
       for (const edu of data.education) {
         if (!edu.institution && !edu.degree) continue;
         setFont("bold", 8.8);
-        doc.setTextColor(15, 23, 42);
+        doc.setTextColor(0, 0, 0);
         if (!dryRun) doc.text(edu.institution, marginX, y);
         if (edu.period && !dryRun) {
           setFont("italic", 8.3);
-          doc.setTextColor(71, 85, 105);
+          doc.setTextColor(0, 0, 0);
           doc.text(edu.period, A4_WIDTH_MM - marginX, y, { align: "right" });
         }
         y += lineH(8.8);
@@ -772,11 +841,11 @@ function drawPdfSingleOrSidebar(
       for (const exp of data.experience) {
         if (!exp.role && !exp.organization) continue;
         setFont("bold", 8.8);
-        doc.setTextColor(15, 23, 42);
+        doc.setTextColor(0, 0, 0);
         if (!dryRun) doc.text(exp.role || exp.organization, marginX, y);
         if (exp.period && !dryRun) {
           setFont("italic", 8.3);
-          doc.setTextColor(71, 85, 105);
+          doc.setTextColor(0, 0, 0);
           doc.text(exp.period, A4_WIDTH_MM - marginX, y, { align: "right" });
         }
         y += lineH(8.8);
@@ -935,7 +1004,7 @@ export async function generateResumeDocxBlob(
     const b = opts?.bold ? "<w:b/>" : "";
     const it = opts?.italic ? "<w:i/>" : "";
     const sz = opts?.sizeHalfPt ? `<w:sz w:val="${opts.sizeHalfPt}"/><w:szCs w:val="${opts.sizeHalfPt}"/>` : "<w:sz w:val=\"20\"/><w:szCs w:val=\"20\"/>";
-    const col = opts?.color ? `<w:color w:val="${opts.color}"/>` : `<w:color w:val="1E293B"/>`;
+    const col = opts?.color ? `<w:color w:val="${opts.color}"/>` : `<w:color w:val="000000"/>`;
     return `<w:r><w:rPr><w:rFonts w:ascii="${fontFace}" w:hAnsi="${fontFace}"/>${b}${it}${sz}${col}</w:rPr><w:t xml:space="preserve">${xmlEscape(text)}</w:t></w:r>`;
   };
 
@@ -964,7 +1033,7 @@ export async function generateResumeDocxBlob(
       makeRun(title.toUpperCase(), {
         bold: true,
         sizeHalfPt: 20,
-        color: lightOnDark ? "FFFFFF" : colorHex,
+        color: lightOnDark ? "FFFFFF" : "000000",
       }),
       {
         spaceBefore: 90,
@@ -977,7 +1046,7 @@ export async function generateResumeDocxBlob(
     ? `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="60"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="914400" cy="914400"/><wp:docPr id="1" name="ProfilePhoto"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="1" name="ProfilePhoto"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdPhoto"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`
     : "";
 
-  const renderSectionParagraphs = (sec: ResumeSectionKey, textColor = "1E293B", subColor = "475569", lightMode = false): string[] => {
+  const renderSectionParagraphs = (sec: ResumeSectionKey, textColor = "000000", subColor = "000000", lightMode = false): string[] => {
     const out: string[] = [];
     const labelMap: Record<ResumeSectionKey, string> = {
       summary: "Summary",
@@ -1096,25 +1165,38 @@ export async function generateResumeDocxBlob(
 
     leftParas.push(makeHeading("Contact", accentHex, isSidebar));
     for (const c of [data.phone, data.email, data.address, data.linkedin, data.github, data.portfolio].filter((x) => x.trim())) {
-      leftParas.push(makePara(makeRun(c, { sizeHalfPt: 17, color: isSidebar ? "F1F5F9" : "334155" }), { spaceAfter: 20 }));
+      leftParas.push(makePara(makeRun(c, { sizeHalfPt: 17, color: isSidebar ? "F1F5F9" : "000000" }), { spaceAfter: 20 }));
     }
 
     for (const sec of sections) {
       if (leftKeys.includes(sec)) {
         leftParas.push(
-          ...renderSectionParagraphs(sec, isSidebar ? "F1F5F9" : "1E293B", isSidebar ? "E2E8F0" : "475569", isSidebar)
+          ...renderSectionParagraphs(sec, isSidebar ? "F1F5F9" : "000000", isSidebar ? "E2E8F0" : "000000", isSidebar)
         );
+      }
+    }
+
+    if (!isSidebar && (data.dateOfBirth.trim() || data.nationality.trim() || data.competitiveProfile.trim())) {
+      leftParas.push(makeHeading("Personal Info", accentHex, false));
+      if (data.dateOfBirth.trim()) {
+        leftParas.push(makePara(makeRun(`DOB: ${data.dateOfBirth}`, { sizeHalfPt: 17, color: "000000" }), { spaceAfter: 15 }));
+      }
+      if (data.nationality.trim()) {
+        leftParas.push(makePara(makeRun(`Nationality: ${data.nationality}`, { sizeHalfPt: 17, color: "000000" }), { spaceAfter: 15 }));
+      }
+      if (data.competitiveProfile.trim()) {
+        leftParas.push(makePara(makeRun(`Profile: ${data.competitiveProfile}`, { sizeHalfPt: 16, color: "000000" }), { spaceAfter: 15 }));
       }
     }
 
     const rightParas: string[] = [];
     rightParas.push(
-      makePara(makeRun((data.fullName || "YOUR NAME").toUpperCase(), { bold: true, sizeHalfPt: 34, color: accentHex }), {
+      makePara(makeRun((data.fullName || "YOUR NAME").toUpperCase(), { bold: true, sizeHalfPt: 34, color: "000000" }), {
         spaceAfter: 25,
       })
     );
     if (data.headline.trim()) {
-      rightParas.push(makePara(makeRun(data.headline, { sizeHalfPt: 20, color: "475569" }), { spaceAfter: 60 }));
+      rightParas.push(makePara(makeRun(data.headline, { sizeHalfPt: 20, color: "000000" }), { spaceAfter: 60 }));
     }
     for (const sec of sections) {
       if (!leftKeys.includes(sec)) {
@@ -1122,7 +1204,9 @@ export async function generateResumeDocxBlob(
       }
     }
 
-    const leftShading = isSidebar ? `<w:shd w:val="clear" w:color="auto" w:fill="${accentHex}"/>` : "";
+    const leftShading = isSidebar
+      ? `<w:shd w:val="clear" w:color="auto" w:fill="${accentHex}"/>`
+      : `<w:tcBorders><w:right w:val="single" w:sz="6" w:space="0" w:color="E2E8F0"/></w:tcBorders>`;
     bodyXml =
       `<w:tbl>` +
       `<w:tblPr><w:tblW w:w="10700" w:type="dxa"/><w:tblBorders><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="none"/><w:right w:val="none"/><w:insideH w:val="none"/><w:insideV w:val="none"/></w:tblBorders></w:tblPr>` +
@@ -1134,14 +1218,14 @@ export async function generateResumeDocxBlob(
     const paras: string[] = [];
     if (imageXml && design.template !== "latex-ats") paras.push(imageXml);
     paras.push(
-      makePara(makeRun(data.fullName || "YOUR NAME", { bold: true, sizeHalfPt: 34, color: accentHex }), {
+      makePara(makeRun(data.fullName || "YOUR NAME", { bold: true, sizeHalfPt: 34, color: "000000" }), {
         align: design.template === "latex-ats" ? "center" : "left",
         spaceAfter: 20,
       })
     );
     if (data.headline.trim()) {
       paras.push(
-        makePara(makeRun(data.headline, { sizeHalfPt: 19, color: "475569" }), {
+        makePara(makeRun(data.headline, { sizeHalfPt: 19, color: "000000" }), {
           align: design.template === "latex-ats" ? "center" : "left",
           spaceAfter: 20,
         })
@@ -1150,7 +1234,7 @@ export async function generateResumeDocxBlob(
     const cLine = [data.address, data.phone, data.email].filter((x) => x.trim()).join("  •  ");
     if (cLine) {
       paras.push(
-        makePara(makeRun(cLine, { sizeHalfPt: 18, color: "334155" }), {
+        makePara(makeRun(cLine, { sizeHalfPt: 18, color: "000000" }), {
           align: design.template === "latex-ats" ? "center" : "left",
           spaceAfter: 15,
         })
@@ -1161,7 +1245,7 @@ export async function generateResumeDocxBlob(
       .join("  |  ");
     if (lLine) {
       paras.push(
-        makePara(makeRun(lLine, { sizeHalfPt: 18, color: accentHex }), {
+        makePara(makeRun(lLine, { sizeHalfPt: 18, color: "000000" }), {
           align: design.template === "latex-ats" ? "center" : "left",
           spaceAfter: 45,
         })
@@ -1186,8 +1270,8 @@ export async function generateResumeDocxBlob(
     if (design.template === "german-lebenslauf" && design.showGermanSignature) {
       paras.push(
         makePara(
-          makeRun(data.signaturePlaceDate || "Dhaka, Bangladesh", { italic: true, sizeHalfPt: 18, color: "475569" }) +
-            makeRun(`\t${data.fullName || "Signature"}`, { bold: true, sizeHalfPt: 18, color: "1E293B" }),
+          makeRun(data.signaturePlaceDate || "Dhaka, Bangladesh", { italic: true, sizeHalfPt: 18, color: "000000" }) +
+            makeRun(`\t${data.fullName || "Signature"}`, { bold: true, sizeHalfPt: 18, color: "000000" }),
           { rightTabPos: 10600, spaceBefore: 140 }
         )
       );

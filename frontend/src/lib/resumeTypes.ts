@@ -163,7 +163,7 @@ export const RESUME_TEMPLATE_META: {
 ];
 
 export const RESUME_ACCENT_COLORS = [
-  { name: "Slate Navy", hex: "#334e68" },
+  { name: "Classic Slate Navy", hex: "#4f637d" },
   { name: "Royal Blue", hex: "#1d4ed8" },
   { name: "Midnight Charcoal", hex: "#1e293b" },
   { name: "Emerald", hex: "#065f46" },
@@ -214,7 +214,7 @@ export const SUMMARY_PRESETS: { labelEn: string; labelBn: string; text: string }
 
 export const DEFAULT_DESIGN_CONFIG: ResumeDesignConfig = {
   template: "latex-ats",
-  accentColor: "#1d4ed8",
+  accentColor: "#4f637d",
   density: "compact",
   font: "serif",
   showPhoto: true,
@@ -274,7 +274,12 @@ export function createSampleStudentResume(): ResumeData {
       {
         id: "sk-3",
         category: "Tools & Core",
-        items: "Git, GitHub, LaTeX, PostgreSQL, Data Structures & Algorithms",
+        items: "Git, GitHub, LaTeX, PostgreSQL, Docker, Linux",
+      },
+      {
+        id: "sk-4",
+        category: "CS Fundamentals",
+        items: "Data Structures, Algorithms, OOP, DBMS, REST APIs, Problem Solving",
       },
     ],
     projects: [
@@ -319,6 +324,7 @@ export function createSampleStudentResume(): ResumeData {
     achievements: [
       "Honorable Mention — ICPC Asia Dhaka Preliminary Contest 2024",
       "Dean's Honor List Scholar — Spring 2024 & Summer 2024, Southeast University",
+      "Finalist — Southeast University Intra-Department Software Hackathon 2024",
     ],
     certifications: [
       "CS50x Introduction to Computer Science — HarvardX (2024)",
@@ -338,6 +344,14 @@ export function createSampleStudentResume(): ResumeData {
         organization: "Southeast University",
         phone: "+880 1700-000000",
         email: "mijanur.rahman@seu.edu.bd",
+      },
+      {
+        id: "ref-2",
+        name: "Dr. Farhana Akter",
+        title: "Associate Professor",
+        organization: "Dept. of CSE, SEU",
+        phone: "+880 1711-000000",
+        email: "farhana.akter@seu.edu.bd",
       },
     ],
   };
