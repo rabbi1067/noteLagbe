@@ -34,21 +34,32 @@ import FacultyAvatar from "@/components/FacultyAvatar";
 import HeroNoticeBoard from "@/components/HeroNoticeBoard";
 import { CourseGridSkeleton } from "@/components/skeletons/CardSkeletons";
 import { useSeuDepartments } from "@/lib/seuDepartments";
+import coursesCatalogData from "@/data/courses_catalog.json";
+import teachersDirectoryData from "@/data/teachers_directory.json";
+
+const INITIAL_CSE_COURSES = ((coursesCatalogData as any[]) || []).filter(
+  (c) => (c.department || "CSE").toUpperCase() === "CSE"
+);
+const INITIAL_TEACHERS = (teachersDirectoryData as any[]) || [];
 
 export default function HomePage() {
   const router = useRouter();
   const { setShowAuthModal, isAuthenticated } = useAuth();
   const { language, t } = useLanguage();
   const { departments: officialSeuDepts } = useSeuDepartments();
-  const [courses, setCourses] = useState<any[]>([]);
-  const [allCourses, setAllCourses] = useState<any[]>([]);
-  const [teachers, setTeachers] = useState<any[]>([]);
+  const [allCourses, setAllCourses] = useState<any[]>(INITIAL_CSE_COURSES);
+  const [teachers, setTeachers] = useState<any[]>(INITIAL_TEACHERS);
   const [activeDepartment, setActiveDepartment] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "notes" | "questions">("all");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [syncTick, setSyncTick] = useState(0);
   const [activeVisitorCount, setActiveVisitorCount] = useState<number>(0);
+
+  const courses = useMemo(() => {
+    if (activeDepartment !== "ALL" && activeDepartment !== "CSE") return [];
+    return allCourses;
+  }, [allCourses, activeDepartment]);
 
   // Instant cache load on client mount without causing SSR hydration mismatch
   useEffect(() => {
@@ -57,7 +68,6 @@ export default function HomePage() {
       if (cachedCourses) {
         const parsed = JSON.parse(cachedCourses);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setCourses(parsed);
           setAllCourses(parsed);
         }
       }
@@ -107,77 +117,53 @@ export default function HomePage() {
     };
   }, []);
 
-  const loadAllData = useCallback(async () => {
+  // Single unified loader (avoids duplicate CSE course fetches on mount and sync)
+  const loadHomeData = useCallback(async () => {
     try {
       const [allC, teachersData] = await Promise.all([
-        api.courses.getAll({ department: "CSE" }),
+        api.courses.getAll({ department: "CSE" }).catch(() => []),
         api.teachers.getAll().catch(() => []),
       ]);
-      const validAll = allC || [];
-      const validTeachers = teachersData || [];
-      setAllCourses(validAll);
-      setTeachers(validTeachers);
-      if (typeof window !== "undefined") {
-        try {
-          if (validAll.length > 0) localStorage.setItem("notelagbe_cached_courses_v5", JSON.stringify(validAll));
-          if (validTeachers.length > 0) localStorage.setItem("notelagbe_cached_teachers_v5", JSON.stringify(validTeachers));
-        } catch {}
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
+      const validAll = Array.isArray(allC) && allC.length > 0 ? allC : null;
+      const validTeachers = Array.isArray(teachersData) && teachersData.length > 0 ? teachersData : null;
 
-  const loadCourses = useCallback(async () => {
-    // Non-CSE departments are strictly Coming Soon
-    if (activeDepartment !== "ALL" && activeDepartment !== "CSE") {
-      setCourses([]);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const res = await api.courses.getAll({
-        department: "CSE",
-      });
-      const validCourses = res || [];
-      setCourses(validCourses);
-      if (typeof window !== "undefined" && validCourses.length > 0) {
-        try {
-          localStorage.setItem("notelagbe_cached_courses_v5", JSON.stringify(validCourses));
-        } catch {}
+      if (validAll) {
+        setAllCourses(validAll);
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem("notelagbe_cached_courses_v5", JSON.stringify(validAll));
+          } catch {}
+        }
+      }
+      if (validTeachers) {
+        setTeachers(validTeachers);
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem("notelagbe_cached_teachers_v5", JSON.stringify(validTeachers));
+          } catch {}
+        }
       }
     } catch {
-      // Ignore
+      // Preserve pre-seeded catalog during cold starts
     } finally {
       setIsLoading(false);
     }
-  }, [activeDepartment]);
+  }, []);
 
   useEffect(() => {
     let active = true;
     queueMicrotask(() => {
-      if (active) void loadAllData();
+      if (active) void loadHomeData();
     });
     return () => {
       active = false;
     };
-  }, [loadAllData]);
+  }, [loadHomeData]);
 
-  useEffect(() => {
-    let active = true;
-    queueMicrotask(() => {
-      if (active) void loadCourses();
-    });
-    return () => {
-      active = false;
-    };
-  }, [loadCourses]);
-
-  // Enterprise Real-Time Sync: Instantly re-fetches when admin modifies any data
+  // Enterprise Real-Time Sync: Instantly re-fetches when admin modifies any data or backend wakes up
   useDataSync(() => {
     setSyncTick((v) => v + 1);
-    loadAllData();
-    loadCourses();
+    void loadHomeData();
   });
 
   // Dynamic Departments strictly from official SEU programs (https://seu.edu.bd/programs)
@@ -264,8 +250,8 @@ export default function HomePage() {
       
       {/* 1. HERO SECTION */}
       <section className="relative overflow-visible pt-3 sm:pt-4 lg:pt-5 pb-16 lg:pb-24">
-        {/* Radial gradients */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[380px] bg-gradient-to-tr from-blue-600/15 via-indigo-500/15 to-purple-500/10 blur-[130px] rounded-full pointer-events-none -z-10" />
+        {/* Radial gradients (lighter blur on mobile GPUs for smooth scrolling) */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] sm:w-[700px] h-[200px] sm:h-[380px] bg-gradient-to-tr from-blue-600/15 via-indigo-500/15 to-purple-500/10 blur-3xl sm:blur-[110px] rounded-full pointer-events-none -z-10" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-7">
           

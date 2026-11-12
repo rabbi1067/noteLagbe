@@ -74,6 +74,19 @@ const SAFE_COLD_START_RETRY_ENDPOINTS = new Set([
 const WARMUP_COOLDOWN_MS = 45_000;
 let lastWarmupAt = 0;
 let inFlightWarmup: Promise<boolean> | null = null;
+let sawColdBackend = false;
+
+function markBackendCold() {
+  sawColdBackend = true;
+}
+
+function notifyBackendAwakeIfRecovered() {
+  if (!sawColdBackend) return;
+  sawColdBackend = false;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("notelagbe:backend-awake"));
+  }
+}
 
 /**
  * Pre-warms the backend with a non-blocking `/ping` call so Render Free Tier cold starts
@@ -105,6 +118,7 @@ export function warmupBackend(force = false): Promise<boolean> {
       });
       if (res.ok) {
         lastWarmupAt = Date.now();
+        notifyBackendAwakeIfRecovered();
         return true;
       }
       if (directBase && pingUrl !== `${primaryBase}/ping`) {
@@ -114,11 +128,14 @@ export function warmupBackend(force = false): Promise<boolean> {
         });
         if (proxyRes.ok) {
           lastWarmupAt = Date.now();
+          notifyBackendAwakeIfRecovered();
           return true;
         }
       }
+      markBackendCold();
       return false;
     } catch {
+      markBackendCold();
       return false;
     } finally {
       clearTimeout(timer);
@@ -256,9 +273,15 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
 
   const primaryBase = API_BASE_URL.replace(/\/+$/, "");
   const directBase = resolveDirectBackendApiUrl();
+  // Public unauthenticated catalog endpoints (/courses, /teachers) have edge-cached Next.js
+  // Route Handlers with a 2.5s bundled fallback, so avoid waiting 16s on a sleeping backend.
+  const hasFastNextFallbackRoute =
+    !token &&
+    method === "GET" &&
+    (endpointPath === "/courses" || endpointPath === "/teachers");
   // On deployed origins using "/api" rewrites, target the direct CORS backend origin first
-  // so login/admin requests bypass serverless proxy hops and reuse the warmed connection.
-  const useDirectFirst = Boolean(directBase && primaryBase === "/api");
+  // so login/admin/authenticated requests bypass serverless proxy hops and reuse the warmed connection.
+  const useDirectFirst = Boolean(directBase && primaryBase === "/api" && !hasFastNextFallbackRoute);
   const requestPrimaryBase = useDirectFirst ? directBase! : primaryBase;
   const requestFallbackBase = useDirectFirst
     ? primaryBase
@@ -273,6 +296,7 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
   };
 
   const emitWakingNotice = (attempt: number) => {
+    markBackendCold();
     if (typeof window !== "undefined") {
       window.dispatchEvent(
         new CustomEvent("notelagbe:backend-waking", {
@@ -313,6 +337,15 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
         lastNetworkErr = retryErr;
         response = null;
       }
+    } else {
+      markBackendCold();
+    }
+  }
+
+  if (response && response.status < 500) {
+    const dataSource = response.headers.get("X-Data-Source");
+    if (dataSource !== "catalog-bundled" && dataSource !== "directory-bundled") {
+      notifyBackendAwakeIfRecovered();
     }
   }
 

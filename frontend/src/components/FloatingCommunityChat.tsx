@@ -579,23 +579,34 @@ export default function FloatingCommunityChat() {
 
   useEffect(() => {
     if (!mounted) return;
-    fetchChatData();
+
+    // Defer background chat hydration while closed so initial page requests (Hero, Courses, Auth) finish faster on mobile
+    const initialTimer = isOpen
+      ? null
+      : setTimeout(() => {
+          void fetchChatData();
+        }, 1800);
+
+    if (isOpen) {
+      void fetchChatData();
+    }
 
     // Event-driven SSE listener: instant sync with ZERO database load
     const unsubscribe = subscribeToSync((payload) => {
       if (payload.entity === "chat" || payload.entity === "all") {
-        fetchChatData();
+        void fetchChatData();
       }
     });
 
     // Relaxed background heartbeat (30s when open, 60s when closed, paused if background tab)
     const interval = setInterval(() => {
       if (typeof document !== "undefined" && !document.hidden) {
-        fetchChatData();
+        void fetchChatData();
       }
     }, isOpen ? 30000 : 60000);
 
     return () => {
+      if (initialTimer) clearTimeout(initialTimer);
       clearInterval(interval);
       unsubscribe();
     };
@@ -1234,7 +1245,7 @@ export default function FloatingCommunityChat() {
         <div className="relative flex items-center justify-center animate-float-3d group-hover:[animation-play-state:paused]">
           
           {/* Layer 1: Ambient Multi-Spectrum Cosmic Underglow */}
-          <div className="absolute -inset-3 rounded-full bg-gradient-to-tr from-cyan-500 via-indigo-600 to-fuchsia-500 blur-xl opacity-60 group-hover:opacity-100 group-hover:scale-125 transition-all duration-500 animate-pulse-glow-3d" />
+          <div className="absolute -inset-3 rounded-full bg-gradient-to-tr from-cyan-500 via-indigo-600 to-fuchsia-500 blur-md sm:blur-xl opacity-60 group-hover:opacity-100 group-hover:scale-125 transition-all duration-500 animate-pulse-glow-3d" />
 
           {/* Layer 2: 3D Outer Gyro Orbit Ring 1 (Tilted in 3D perspective) */}
           <div className="absolute -inset-2 rounded-full border border-cyan-400/50 border-dashed pointer-events-none animate-orbit-spin" />
@@ -1253,7 +1264,7 @@ export default function FloatingCommunityChat() {
           >
             {/* Sphere Body with Realistic 3D Curvature & Deep Radial Lighting */}
             <div 
-              className="relative w-full h-full rounded-full overflow-hidden flex items-center justify-center backdrop-blur-2xl"
+              className="relative w-full h-full rounded-full overflow-hidden flex items-center justify-center backdrop-blur-md sm:backdrop-blur-2xl"
               style={{
                 background: "radial-gradient(circle at 35% 28%, #1e3a8a 0%, #172554 35%, #0f172a 70%, #030712 100%)",
                 boxShadow: "inset 0 2px 6px rgba(255, 255, 255, 0.5), inset 0 -6px 14px rgba(168, 85, 247, 0.4), inset 0 -12px 24px rgba(0, 0, 0, 0.7)"
@@ -1372,7 +1383,7 @@ export default function FloatingCommunityChat() {
               ? "none"
               : "transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
-          className={`w-[380px] h-[600px] max-h-[calc(100vh-32px)] flex flex-col rounded-3xl backdrop-blur-2xl transition-colors duration-200 overflow-hidden animate-in fade-in zoom-in-95 select-none ${
+          className={`w-[380px] h-[600px] max-h-[calc(100vh-32px)] flex flex-col rounded-3xl backdrop-blur-md sm:backdrop-blur-2xl transition-colors duration-200 overflow-hidden animate-in fade-in zoom-in-95 select-none ${
             isDark
               ? "bg-[#090d16]/98 border border-white/15 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.85),0_0_35px_rgba(34,211,238,0.12)] text-slate-100"
               : "bg-white/98 border border-slate-200/90 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.18),0_0_25px_rgba(59,130,246,0.12)] text-slate-800"

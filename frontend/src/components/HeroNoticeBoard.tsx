@@ -112,12 +112,14 @@ export default function HeroNoticeBoard() {
       }
     } catch {}
     loadNotices();
-    const interval = setInterval(loadNotices, 30000);
-    const handleFocus = () => loadNotices();
-    window.addEventListener("focus", handleFocus);
+    // Relaxed 60s fallback poll (realtime updates & focus sync handled by useDataSync)
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        loadNotices();
+      }
+    }, 60000);
     return () => {
       clearInterval(interval);
-      window.removeEventListener("focus", handleFocus);
     };
   }, []);
 

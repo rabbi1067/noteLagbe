@@ -93,10 +93,33 @@ export function notifyDataChanged(entity: string, action: string, data?: any) {
 // Persistent SSE connection singleton
 let eventSource: EventSource | null = null;
 let reconnectTimer: any = null;
+let initialConnectTimer: any = null;
 let reconnectAttempt = 0;
+
+function triggerImmediateReconnect() {
+  if (typeof window === "undefined" || eventSource) return;
+  if (typeof document !== "undefined" && document.hidden) return;
+  clearTimeout(reconnectTimer);
+  reconnectTimer = null;
+  clearTimeout(initialConnectTimer);
+  initialConnectTimer = null;
+  reconnectAttempt = 0;
+  initServerEvents();
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("notelagbe:backend-awake", triggerImmediateReconnect);
+  window.addEventListener("online", triggerImmediateReconnect);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && subscribers.size > 0 && !eventSource) {
+      triggerImmediateReconnect();
+    }
+  });
+}
 
 function initServerEvents() {
   if (typeof window === "undefined" || eventSource) return;
+  if (typeof document !== "undefined" && document.hidden) return;
 
   try {
     const directBase = resolveDirectBackendApiUrl();
@@ -141,12 +164,17 @@ function initServerEvents() {
         eventSource.close();
         eventSource = null;
       }
-      // Exponential backoff reconnect to avoid hammering a cold-starting backend
-      const delays = [4000, 8000, 15000, 30000, 60000];
+      // Pause background SSE retries while tab is hidden to save mobile battery/bandwidth
+      if (typeof document !== "undefined" && document.hidden) {
+        return;
+      }
+      // Bounded backoff reconnect so once Render wakes up, live sync recovers within <=15s instead of 60s+
+      const delays = [4000, 6000, 8000, 12000, 15000];
       const delay = delays[Math.min(reconnectAttempt, delays.length - 1)];
       reconnectAttempt += 1;
       clearTimeout(reconnectTimer);
       reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
         initServerEvents();
       }, delay);
     };
@@ -160,7 +188,13 @@ function initServerEvents() {
  */
 export function subscribeToSync(callback: SyncCallback): () => void {
   subscribers.add(callback);
-  initServerEvents();
+  if (!eventSource && !reconnectTimer && !initialConnectTimer) {
+    // Slight defer lets critical above-the-fold HTTP requests connect first on mobile cold boots
+    initialConnectTimer = setTimeout(() => {
+      initialConnectTimer = null;
+      initServerEvents();
+    }, 600);
+  }
 
   return () => {
     subscribers.delete(callback);

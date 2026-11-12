@@ -44,7 +44,7 @@ export default function Navbar() {
 
   const getDesktopNavLinkClass = (path: string) => {
     const active = isActive(path);
-    return `px-2 xl:px-2.5 py-1.5 rounded-xl text-xs transition-all whitespace-nowrap shrink-0 ${
+    return `px-1.5 xl:px-2.5 py-1.5 rounded-xl text-[11px] xl:text-xs transition-all whitespace-nowrap shrink-0 ${
       active
         ? "bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-black border border-blue-200/70 dark:border-blue-800/70 shadow-sm"
         : "text-slate-700 dark:text-slate-300 font-semibold hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-blue-600 dark:hover:text-blue-400 border border-transparent"
@@ -70,8 +70,8 @@ export default function Navbar() {
             <BrandLogo variant="public" size="md" />
           </div>
 
-          {/* Desktop Nav Links */}
-          <nav className="hidden xl:flex items-center gap-1 2xl:gap-1.5 shrink-0 ml-auto mr-3">
+          {/* Desktop & Tablet Landscape Nav Links */}
+          <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1 2xl:gap-1.5 shrink-0 ml-auto mr-2 xl:mr-3">
             <Link href="/courses" className={getDesktopNavLinkClass("/courses")}>
               <span>{t("nav.courses", "Courses & Notes")}</span>
             </Link>
@@ -89,7 +89,7 @@ export default function Navbar() {
             </Link>
             <Link 
               href="/contribute" 
-              className={`relative px-2.5 py-1.5 rounded-xl border transition-all font-bold text-xs flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+              className={`relative px-2 xl:px-2.5 py-1.5 rounded-xl border transition-all font-bold text-[11px] xl:text-xs flex items-center gap-1 xl:gap-1.5 whitespace-nowrap shrink-0 ${
                 isActive("/contribute")
                   ? "bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-400 shadow-sm"
                   : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border-emerald-200 dark:border-emerald-800/60"
@@ -97,7 +97,7 @@ export default function Navbar() {
             >
               <Upload className="w-3.5 h-3.5 shrink-0" />
               <span>{t("nav.contribute", "Contribute")}</span>
-              <span className="inline-block text-[9px] bg-emerald-600 text-white font-extrabold px-1.5 py-0.5 rounded-full shrink-0 leading-none">
+              <span className="hidden xl:inline-block text-[9px] bg-emerald-600 text-white font-extrabold px-1.5 py-0.5 rounded-full shrink-0 leading-none">
                 {t("nav.contributeFree", "+2 Free")}
               </span>
             </Link>
@@ -234,10 +234,10 @@ export default function Navbar() {
               )}
             </div>
 
-            {/* Mobile Menu Hamburger */}
+            {/* Mobile & Portrait Tablet Menu Hamburger */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="xl:hidden p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
+              className="lg:hidden p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
               aria-label="Toggle menu"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -248,7 +248,7 @@ export default function Navbar() {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="xl:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 pt-3 pb-6 space-y-1.5 text-sm font-semibold animate-in slide-in-from-top-2 duration-150">
+        <div className="lg:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 pt-3 pb-6 space-y-1.5 text-sm font-semibold animate-in slide-in-from-top-2 duration-150">
           <Link 
             href="/courses" 
             onClick={() => setMobileMenuOpen(false)}

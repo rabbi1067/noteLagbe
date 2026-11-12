@@ -131,7 +131,12 @@ export default function NotificationBell() {
     } catch {}
 
     fetchCampusNotices();
-    const noticeInterval = setInterval(fetchCampusNotices, 25000);
+    // Relaxed 60s fallback poll (paused when hidden; SSE & focus sync handled by useDataSync)
+    const noticeInterval = setInterval(() => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        fetchCampusNotices();
+      }
+    }, 60000);
     return () => clearInterval(noticeInterval);
   }, []);
 
@@ -139,15 +144,13 @@ export default function NotificationBell() {
   useEffect(() => {
     if (isAuthenticated) {
       fetchUnreadCount();
-      const interval = setInterval(fetchUnreadCount, 20000); // 20s polling
-      const handleFocus = () => {
-        fetchUnreadCount();
-        fetchCampusNotices();
-      };
-      window.addEventListener("focus", handleFocus);
+      const interval = setInterval(() => {
+        if (typeof document !== "undefined" && !document.hidden) {
+          fetchUnreadCount();
+        }
+      }, 45000);
       return () => {
         clearInterval(interval);
-        window.removeEventListener("focus", handleFocus);
       };
     } else {
       setNotifications([]);

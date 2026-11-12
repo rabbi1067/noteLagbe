@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import LiveRemainingCountdown from "@/components/LiveRemainingCountdown";
 import { api } from "@/lib/api";
+import { useDataSync } from "@/lib/sync";
+import coursesCatalogData from "@/data/courses_catalog.json";
 import {
   User,
   BookOpen,
@@ -324,15 +326,7 @@ export default function StudentDashboardPage() {
     }
   };
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadDashboard();
-    } else {
-      setLoading(false);
-    }
-  }, [isAuthenticated, user?.unlockedCourseCodes, user?.unlimited]);
-
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async () => {
     setLoading(true);
     try {
       const [allCourses, pData, cData] = await Promise.all([
@@ -341,10 +335,15 @@ export default function StudentDashboardPage() {
         api.contributions.getMy().catch(() => []),
       ]);
 
+      const safeCourses =
+        Array.isArray(allCourses) && allCourses.length > 0
+          ? allCourses
+          : ((coursesCatalogData as any[]) || []);
+
       const isUnlimited = Boolean(user?.unlimited || isAdmin);
       const myCourses = isUnlimited
-        ? (allCourses || [])
-        : (allCourses || [])
+        ? safeCourses
+        : safeCourses
             .map((c: any) => {
               const matchingDetails = (user?.unlockedCourseDetails || []).filter(
                 (d: any) => !d.isExpired && d.courseCode?.toLowerCase() === c.code?.toLowerCase()
@@ -371,7 +370,21 @@ export default function StudentDashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.unlimited, user?.unlockedCourseDetails, user?.unlockedCourseCodes, isAdmin]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      void loadDashboard();
+    } else {
+      setLoading(false);
+    }
+  }, [isAuthenticated, loadDashboard]);
+
+  useDataSync(() => {
+    if (isAuthenticated) {
+      void loadDashboard();
+    }
+  });
 
   const isUnlimitedAccess = Boolean(user?.unlimited || isAdmin);
 

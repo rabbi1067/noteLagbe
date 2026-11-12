@@ -119,37 +119,71 @@ export const isOfficialSeuDept = (code: string): boolean => {
   return OFFICIAL_SEU_DEPARTMENTS.some((d) => d.code === norm);
 };
 
-// Dynamic hook that auto-syncs with /api/departments (which fetches live from seu.edu.bd/programs)
+const DEPT_CACHE_TTL_MS = 60_000;
+let cachedDeptState: { list: DepartmentItem[]; source: string; timestamp: number } | null = null;
+let inFlightDeptPromise: Promise<{ list: DepartmentItem[]; source: string } | null> | null = null;
+
+async function fetchDepartmentsShared(): Promise<{ list: DepartmentItem[]; source: string } | null> {
+  if (cachedDeptState && Date.now() - cachedDeptState.timestamp < DEPT_CACHE_TTL_MS) {
+    return { list: cachedDeptState.list, source: cachedDeptState.source };
+  }
+  if (inFlightDeptPromise) {
+    return inFlightDeptPromise;
+  }
+  inFlightDeptPromise = (async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    try {
+      const res = await fetch("/api/departments", { signal: controller.signal });
+      if (!res.ok) return null;
+      const json = await res.json();
+      if (json.departments && Array.isArray(json.departments)) {
+        const liveList: DepartmentItem[] = json.departments.map((d: any) => ({
+          id: d.code,
+          code: d.code,
+          name: d.name,
+          nameBn: d.nameBn || d.name,
+          degreeName: d.degreeName,
+          faculty: d.faculty,
+          status: d.code === "CSE" ? ("active" as const) : ("coming_soon" as const),
+          isLive: d.code === "CSE",
+        }));
+        const src = json.source || "api";
+        cachedDeptState = { list: liveList, source: src, timestamp: Date.now() };
+        return { list: liveList, source: src };
+      }
+      return null;
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+      inFlightDeptPromise = null;
+    }
+  })();
+  return inFlightDeptPromise;
+}
+
+// Dynamic hook that auto-syncs with /api/departments (with shared memory cache & deduplication)
 export function useSeuDepartments() {
-  const [departments, setDepartments] = useState<DepartmentItem[]>(OFFICIAL_SEU_DEPARTMENTS);
+  const [departments, setDepartments] = useState<DepartmentItem[]>(
+    () => cachedDeptState?.list || OFFICIAL_SEU_DEPARTMENTS
+  );
   const [loading, setLoading] = useState(false);
-  const [source, setSource] = useState<string>("static");
+  const [source, setSource] = useState<string>(() => cachedDeptState?.source || "static");
 
   useEffect(() => {
+    if (cachedDeptState && Date.now() - cachedDeptState.timestamp < DEPT_CACHE_TTL_MS) {
+      return;
+    }
     let isMounted = true;
     async function syncDepartments() {
       try {
         setLoading(true);
-        const res = await fetch("/api/departments");
-        if (!res.ok) throw new Error("Failed to fetch departments API");
-        const json = await res.json();
-        if (json.departments && Array.isArray(json.departments) && isMounted) {
-          // Map to uniform DepartmentItem ensuring CSE is the only active live dept
-          const liveList: DepartmentItem[] = json.departments.map((d: any) => ({
-            id: d.code,
-            code: d.code,
-            name: d.name,
-            nameBn: d.nameBn || d.name,
-            degreeName: d.degreeName,
-            faculty: d.faculty,
-            status: d.code === "CSE" ? ("active" as const) : ("coming_soon" as const),
-            isLive: d.code === "CSE",
-          }));
-          setDepartments(liveList);
-          setSource(json.source || "api");
+        const result = await fetchDepartmentsShared();
+        if (result && isMounted) {
+          setDepartments(result.list);
+          setSource(result.source);
         }
-      } catch {
-        // Fallback already active, keep calm
       } finally {
         if (isMounted) setLoading(false);
       }

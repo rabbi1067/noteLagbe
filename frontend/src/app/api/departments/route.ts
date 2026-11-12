@@ -4,10 +4,22 @@ import { resolveBackendBaseUrl } from "@/lib/backendUrl";
 
 export const dynamic = "force-dynamic";
 
+let cachedDepartmentsResponse: { payload: any; timestamp: number } | null = null;
+const CACHE_TTL_MS = 60 * 1000;
+
 export async function GET() {
-  // 1. Try to fetch from the NoteLagbe Spring Boot backend (which live-syncs with seu.edu.bd/programs)
+  if (cachedDepartmentsResponse && Date.now() - cachedDepartmentsResponse.timestamp < CACHE_TTL_MS) {
+    return NextResponse.json(cachedDepartmentsResponse.payload, {
+      headers: {
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+        "X-Data-Source": "edge-memory",
+      },
+    });
+  }
+
+  // 1. Try to fetch from the NoteLagbe Spring Boot backend with fast 2.5s timeout
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const timeoutId = setTimeout(() => controller.abort(), 2500);
   try {
     const backendUrl = resolveBackendBaseUrl();
     const backendRes = await fetch(`${backendUrl}/api/departments`, {
@@ -19,7 +31,7 @@ export async function GET() {
     if (backendRes.ok) {
       const data = await backendRes.json();
       if (data && Array.isArray(data.departments) && data.departments.length > 0) {
-        return NextResponse.json({
+        const normalized = {
           ...data,
           departments: data.departments.map((d: any) => ({
             ...d,
@@ -27,6 +39,13 @@ export async function GET() {
             live: d.code === "CSE",
             status: d.code === "CSE" ? "active" : "coming_soon",
           })),
+        };
+        cachedDepartmentsResponse = { payload: normalized, timestamp: Date.now() };
+        return NextResponse.json(normalized, {
+          headers: {
+            "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+            "X-Data-Source": "backend-live",
+          },
         });
       }
     }
