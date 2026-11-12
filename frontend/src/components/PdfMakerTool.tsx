@@ -22,7 +22,6 @@ import {
   Grid3X3,
   RefreshCw,
   Check,
-  ShieldCheck,
   Sparkles,
   Loader2,
   Layers,
@@ -580,18 +579,12 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
         }}
       />
 
-      {/* Header + Temporary / Zero-DB Privacy Banner */}
+      {/* Header */}
       <div className="p-5 sm:p-6 rounded-3xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[11px] font-mono font-black px-2.5 py-0.5 rounded-full bg-blue-600 text-white uppercase tracking-wider">
               PDF & DOCX MAKER
-            </span>
-            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50 inline-flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              {bn
-                ? "১০০% ব্রাউজার ভিত্তিক • ডাটাবেসে সেভ হয় না"
-                : "100% Temporary Browser Tool • Zero Database Save"}
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
