@@ -40,7 +40,7 @@ export const DEFAULT_EXPORT_OPTIONS: PdfExportOptions = {
   pageSize: "a4",
   orientation: "auto",
   margin: "small",
-  qualityPct: 78,
+  qualityPct: 96,
 };
 
 export const QUALITY_PRESETS: {
