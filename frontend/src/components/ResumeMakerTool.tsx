@@ -291,7 +291,7 @@ export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProp
     if (isExporting) return;
     setIsExporting("pdf");
     try {
-      const blob = await generateResumePdfBlob(data, design);
+      const blob = await generateResumePdfBlob(data, design, sheetRef.current);
       const safeName = (data.fullName || "Resume").trim().replace(/[^\w-]+/g, "_");
       triggerDownload(blob, `${safeName}_CV_A4.pdf`);
       toast.success(

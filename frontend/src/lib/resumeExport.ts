@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import { toPng } from "html-to-image";
 import JSZip from "jszip";
 import {
   ResumeData,
@@ -879,15 +880,155 @@ function drawPdfSingleOrSidebar(
   return { overflow: y > A4_HEIGHT_MM - 8, finalY: y };
 }
 
+interface CapturedTextRun {
+  text: string;
+  xMm: number;
+  baselineYMm: number;
+  fontPt: number;
+  maxWidthMm: number;
+  bold: boolean;
+}
+
+function collectVisibleTextRuns(root: HTMLElement): CapturedTextRun[] {
+  const rootRect = root.getBoundingClientRect();
+  if (!rootRect.width || !rootRect.height) return [];
+
+  const pxToMmX = A4_WIDTH_MM / rootRect.width;
+  const pxToMmY = A4_HEIGHT_MM / rootRect.height;
+  const runs: CapturedTextRun[] = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const raw = node.textContent || "";
+    const trimmed = raw.replace(/\s+/g, " ").trim();
+    if (!trimmed) continue;
+
+    const parent = node.parentElement;
+    if (!parent) continue;
+    const style = window.getComputedStyle(parent);
+    if (
+      style.display === "none" ||
+      style.visibility === "hidden" ||
+      parseFloat(style.opacity || "1") === 0
+    ) {
+      continue;
+    }
+
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const rects = range.getClientRects();
+    if (!rects.length) continue;
+
+    const firstRect = rects[0];
+    if (!firstRect.width && !firstRect.height) continue;
+
+    const parentRect = parent.getBoundingClientRect();
+    const fontPx = parseFloat(style.fontSize) || 11;
+    const fontPt = Math.max(4, fontPx * 0.75);
+    const weight = parseInt(style.fontWeight || "400", 10);
+
+    runs.push({
+      text: trimmed,
+      xMm: Math.max(0, (firstRect.left - rootRect.left) * pxToMmX),
+      baselineYMm: Math.max(
+        fontPt * 0.35,
+        (firstRect.top - rootRect.top + fontPx * 0.82) * pxToMmY
+      ),
+      fontPt,
+      maxWidthMm: Math.max(
+        10,
+        (Math.max(parentRect.right, firstRect.right) - firstRect.left) * pxToMmX + 1.5
+      ),
+      bold: Number.isNaN(weight) ? style.fontWeight === "bold" : weight >= 600,
+    });
+  }
+
+  return runs;
+}
+
+async function exportDomSheetToPdfBlob(sheetElement: HTMLElement): Promise<Blob> {
+  if (typeof document === "undefined") {
+    throw new Error("Document unavailable");
+  }
+  if ("fonts" in document && document.fonts?.ready) {
+    await document.fonts.ready;
+  }
+
+  const host = document.createElement("div");
+  host.style.cssText =
+    "position:fixed;left:0;top:0;width:0;height:0;overflow:hidden;pointer-events:none;z-index:-10;";
+
+  const clone = sheetElement.cloneNode(true) as HTMLElement;
+  clone.style.boxShadow = "none";
+  clone.style.transform = "none";
+  clone.style.margin = "0";
+  clone.classList.remove("shadow-xl");
+
+  host.appendChild(clone);
+  document.body.appendChild(host);
+
+  try {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    );
+
+    const textRuns = collectVisibleTextRuns(clone);
+    const pngDataUrl = await toPng(clone, {
+      pixelRatio: 3,
+      width: 794,
+      height: 1123,
+      backgroundColor: "#ffffff",
+      style: {
+        boxShadow: "none",
+        transform: "none",
+        margin: "0",
+      },
+    });
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+      compress: true,
+    });
+
+    doc.addImage(pngDataUrl, "PNG", 0, 0, A4_WIDTH_MM, A4_HEIGHT_MM, undefined, "FAST");
+
+    // Invisible selectable text layer so ATS & text copy work 1:1 on top of exact visual match
+    for (const run of textRuns) {
+      doc.setFont("helvetica", run.bold ? "bold" : "normal");
+      doc.setFontSize(run.fontPt);
+      doc.text(run.text, run.xMm, run.baselineYMm, {
+        maxWidth: run.maxWidthMm,
+        renderingMode: "invisible",
+      });
+    }
+
+    return doc.output("blob");
+  } finally {
+    host.remove();
+  }
+}
+
 /**
- * Generates an ATS-readable, vector-text, single-page A4 PDF using jsPDF.
- * Automatically steps down scale if content exceeds 1 A4 page height so it
- * strictly produces 1 single page.
+ * Generates an ATS-readable, 100% design-faithful single-page A4 PDF.
+ * Captures the exact live A4 preview sheet at high DPI (3x) with an overlaid
+ * invisible selectable text layer, falling back to vector jsPDF if needed.
  */
 export async function generateResumePdfBlob(
   data: ResumeData,
-  design: ResumeDesignConfig
+  design: ResumeDesignConfig,
+  sheetElement?: HTMLElement | null
 ): Promise<Blob> {
+  if (sheetElement) {
+    try {
+      return await exportDomSheetToPdfBlob(sheetElement);
+    } catch (err) {
+      console.warn("Exact DOM-to-PDF capture failed, using vector fallback:", err);
+    }
+  }
+
   const shape = design.template === "german-lebenslauf" ? "rounded" : "circle";
   const photo =
     design.showPhoto && data.photoDataUrl
@@ -987,43 +1128,99 @@ export async function generateResumeDocxBlob(
       spaceAfter?: number;
       spaceBefore?: number;
       bottomBorderHex?: string;
+      bottomBorderSz?: number;
+      leftBorderHex?: string;
+      shadingFillHex?: string;
       rightTabPos?: number;
     }
   ) => {
     const jc = opts?.align ? `<w:jc w:val="${opts.align}"/>` : "";
-    const bdr = opts?.bottomBorderHex
-      ? `<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="2" w:color="${opts.bottomBorderHex}"/></w:pBdr>`
+    const pBdrParts: string[] = [];
+    if (opts?.bottomBorderHex) {
+      pBdrParts.push(
+        `<w:bottom w:val="single" w:sz="${opts.bottomBorderSz ?? 6}" w:space="2" w:color="${opts.bottomBorderHex}"/>`
+      );
+    }
+    if (opts?.leftBorderHex) {
+      pBdrParts.push(
+        `<w:left w:val="single" w:sz="24" w:space="8" w:color="${opts.leftBorderHex}"/>`
+      );
+    }
+    const bdr = pBdrParts.length ? `<w:pBdr>${pBdrParts.join("")}</w:pBdr>` : "";
+    const shd = opts?.shadingFillHex
+      ? `<w:shd w:val="clear" w:color="auto" w:fill="${opts.shadingFillHex}"/>`
       : "";
     const tabs = opts?.rightTabPos
       ? `<w:tabs><w:tab w:val="right" w:pos="${opts.rightTabPos}"/></w:tabs>`
       : "";
-    return `<w:p><w:pPr>${jc}${bdr}${tabs}<w:spacing w:before="${opts?.spaceBefore ?? 20}" w:after="${opts?.spaceAfter ?? 40}" w:line="240" w:lineRule="auto"/></w:pPr>${runs}</w:p>`;
+    return `<w:p><w:pPr>${jc}${bdr}${shd}${tabs}<w:spacing w:before="${opts?.spaceBefore ?? 16}" w:after="${opts?.spaceAfter ?? 32}" w:line="235" w:lineRule="auto"/></w:pPr>${runs}</w:p>`;
   };
 
-  const makeHeading = (title: string, colorHex = accentHex, lightOnDark = false) =>
-    makePara(
+  const makeHeading = (title: string, colorHex = accentHex, lightOnDark = false, isSidebarRightPill = false) => {
+    if (lightOnDark && design.template === "modern-sidebar") {
+      // White pill header bar inside dark accent sidebar
+      return (
+        `<w:tbl><w:tblPr><w:tblW w:w="3280" w:type="dxa"/>` +
+        `<w:tblBorders><w:top w:val="single" w:sz="4" w:color="FFFFFF"/><w:left w:val="single" w:sz="4" w:color="FFFFFF"/><w:bottom w:val="single" w:sz="4" w:color="FFFFFF"/><w:right w:val="single" w:sz="4" w:color="FFFFFF"/></w:tblBorders></w:tblPr>` +
+        `<w:tr><w:tc><w:tcPr><w:tcW w:w="3280" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/><w:tcMar><w:top w:w="45" w:type="dxa"/><w:bottom w:w="45" w:type="dxa"/><w:left w:w="90" w:type="dxa"/><w:right w:w="90" w:type="dxa"/></w:tcMar></w:tcPr>` +
+        makePara(makeRun(title.toUpperCase(), { bold: true, sizeHalfPt: 18, color: "000000" }), {
+          align: "center",
+          spaceBefore: 0,
+          spaceAfter: 0,
+        }) +
+        `</w:tc></w:tr></w:tbl>`
+      );
+    }
+    if (isSidebarRightPill) {
+      return (
+        `<w:tbl><w:tblPr><w:tblW w:w="2700" w:type="dxa"/>` +
+        `<w:tblBorders><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="none"/><w:right w:val="none"/></w:tblBorders></w:tblPr>` +
+        `<w:tr><w:tc><w:tcPr><w:tcW w:w="2700" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="${colorHex}"/><w:tcMar><w:top w:w="40" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/><w:left w:w="130" w:type="dxa"/><w:right w:w="130" w:type="dxa"/></w:tcMar></w:tcPr>` +
+        makePara(makeRun(title.toUpperCase(), { bold: true, sizeHalfPt: 18, color: "FFFFFF" }), {
+          spaceBefore: 0,
+          spaceAfter: 0,
+        }) +
+        `</w:tc></w:tr></w:tbl>`
+      );
+    }
+    return makePara(
       makeRun(title.toUpperCase(), {
         bold: true,
         sizeHalfPt: 20,
         color: lightOnDark ? "FFFFFF" : "000000",
       }),
       {
-        spaceBefore: 90,
+        spaceBefore: 85,
         spaceAfter: 35,
-        bottomBorderHex: lightOnDark ? "CBD5E1" : colorHex,
+        bottomBorderHex: lightOnDark ? "CBD5E1" : design.template === "latex-ats" ? "000000" : colorHex,
       }
     );
+  };
+
+  const wrapCardBox = (innerXml: string, widthTwips = 6780) =>
+    `<w:tbl><w:tblPr><w:tblW w:w="${widthTwips}" w:type="dxa"/>` +
+    `<w:tblBorders><w:top w:val="single" w:sz="4" w:color="E2E8F0"/><w:left w:val="single" w:sz="4" w:color="E2E8F0"/><w:bottom w:val="single" w:sz="4" w:color="E2E8F0"/><w:right w:val="single" w:sz="4" w:color="E2E8F0"/></w:tblBorders></w:tblPr>` +
+    `<w:tr><w:tc><w:tcPr><w:tcW w:w="${widthTwips}" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F4F6FA"/><w:tcMar><w:top w:w="80" w:type="dxa"/><w:bottom w:w="70" w:type="dxa"/><w:left w:w="130" w:type="dxa"/><w:right w:w="130" w:type="dxa"/></w:tcMar></w:tcPr>` +
+    `${innerXml}</w:tc></w:tr></w:tbl>` +
+    makePara("", { spaceBefore: 0, spaceAfter: 30 });
 
   const imageXml = photo
     ? `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="60"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="914400" cy="914400"/><wp:docPr id="1" name="ProfilePhoto"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="1" name="ProfilePhoto"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdPhoto"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`
     : "";
 
-  const renderSectionParagraphs = (sec: ResumeSectionKey, textColor = "000000", subColor = "000000", lightMode = false): string[] => {
+  const renderSectionParagraphs = (
+    sec: ResumeSectionKey,
+    textColor = "000000",
+    subColor = "000000",
+    lightMode = false,
+    rightTab = 10600,
+    sidebarRightCard = false
+  ): string[] => {
     const out: string[] = [];
     const labelMap: Record<ResumeSectionKey, string> = {
-      summary: "Summary",
+      summary: sidebarRightCard ? "About Me" : "Summary",
       education: "Education",
-      skills: "Technical Skills",
+      skills: design.template === "europe-minimal" || design.template === "modern-sidebar" ? "Skills" : "Technical Skills",
       projects: "Projects",
       experience: "Experience",
       achievements: "Achievements",
@@ -1031,175 +1228,411 @@ export async function generateResumeDocxBlob(
       languages: "Languages",
       references: "References",
     };
-    out.push(makeHeading(labelMap[sec], accentHex, lightMode));
+
+    const headingXml = makeHeading(labelMap[sec], accentHex, lightMode, sidebarRightCard);
+    const itemsXml: string[] = [];
 
     if (sec === "summary") {
-      out.push(makePara(makeRun(data.summary, { sizeHalfPt: 19, color: textColor })));
+      itemsXml.push(makePara(makeRun(data.summary, { sizeHalfPt: 18, color: textColor }), { spaceAfter: 15 }));
     } else if (sec === "education") {
       for (const edu of data.education) {
         if (!edu.institution && !edu.degree) continue;
-        out.push(
-          makePara(
-            makeRun(edu.institution, { bold: true, sizeHalfPt: 19, color: textColor }) +
-              (edu.period ? makeRun(`\t${edu.period}`, { italic: true, sizeHalfPt: 18, color: subColor }) : ""),
-            { rightTabPos: 10600, spaceAfter: 15 }
-          )
-        );
-        const sub = [edu.degree, design.showCgpa && edu.cgpa ? `CGPA: ${edu.cgpa}` : ""]
-          .filter(Boolean)
-          .join(" • ");
-        if (sub) {
-          out.push(makePara(makeRun(sub, { italic: true, sizeHalfPt: 18, color: subColor }), { spaceAfter: 35 }));
+        if (design.template === "europe-minimal") {
+          itemsXml.push(makePara(makeRun(edu.degree || edu.institution, { bold: true, sizeHalfPt: 18, color: textColor }), { spaceAfter: 8 }));
+          itemsXml.push(makePara(makeRun(edu.institution, { sizeHalfPt: 17, color: textColor }), { spaceAfter: 8 }));
+          const meta = [edu.period, design.showCgpa && edu.cgpa ? `CGPA: ${edu.cgpa}` : ""].filter(Boolean).join(" • ");
+          if (meta) itemsXml.push(makePara(makeRun(meta, { sizeHalfPt: 16, color: subColor }), { spaceAfter: 25 }));
+        } else {
+          itemsXml.push(
+            makePara(
+              makeRun(edu.institution, { bold: true, sizeHalfPt: 18, color: textColor }) +
+                (edu.period ? makeRun(`\t${edu.period}`, { italic: !sidebarRightCard, sizeHalfPt: 17, color: subColor }) : ""),
+              { rightTabPos: rightTab, spaceAfter: 10 }
+            )
+          );
+          const sub = [edu.degree, design.showCgpa && edu.cgpa ? `CGPA: ${edu.cgpa}` : ""]
+            .filter(Boolean)
+            .join(" • ");
+          if (sub) {
+            itemsXml.push(makePara(makeRun(sub, { italic: !sidebarRightCard, sizeHalfPt: 17, color: subColor }), { spaceAfter: 25 }));
+          }
         }
       }
     } else if (sec === "skills") {
       for (const sk of data.skills) {
         if (!sk.items.trim()) continue;
-        out.push(
+        itemsXml.push(
           makePara(
-            (sk.category.trim() ? makeRun(`• ${sk.category}: `, { bold: true, sizeHalfPt: 19, color: textColor }) : makeRun("• ", { sizeHalfPt: 19, color: textColor })) +
-              makeRun(sk.items, { sizeHalfPt: 19, color: textColor }),
-            { spaceAfter: 20 }
+            (sk.category.trim() ? makeRun(`• ${sk.category}: `, { bold: true, sizeHalfPt: 17, color: textColor }) : makeRun("• ", { sizeHalfPt: 17, color: textColor })) +
+              makeRun(sk.items, { sizeHalfPt: 17, color: textColor }),
+            { spaceAfter: 16 }
           )
         );
       }
     } else if (sec === "projects") {
       for (const pr of data.projects) {
         if (!pr.name) continue;
-        out.push(
-          makePara(
-            makeRun(`• ${pr.name}`, { bold: true, sizeHalfPt: 19, color: textColor }) +
-              (pr.techStack ? makeRun(` (${pr.techStack})`, { italic: true, sizeHalfPt: 18, color: subColor }) : "") +
-              (pr.description ? makeRun(` — ${pr.description}`, { sizeHalfPt: 18, color: textColor }) : ""),
-            { spaceAfter: 25 }
-          )
-        );
+        if (design.template === "europe-minimal" || sidebarRightCard) {
+          itemsXml.push(
+            makePara(
+              makeRun(pr.name, { bold: true, sizeHalfPt: 18, color: textColor }) +
+                (pr.techStack ? makeRun(`\t${pr.techStack}`, { sizeHalfPt: 16, color: subColor }) : ""),
+              { rightTabPos: rightTab, spaceAfter: 8 }
+            )
+          );
+          if (pr.description) {
+            itemsXml.push(makePara(makeRun(`• ${pr.description}`, { sizeHalfPt: 17, color: textColor }), { spaceAfter: 10 }));
+          }
+          if (design.template === "europe-minimal" && pr.link.trim()) {
+            itemsXml.push(makePara(makeRun(pr.link, { sizeHalfPt: 16, color: textColor }), { spaceAfter: 20 }));
+          }
+        } else {
+          itemsXml.push(
+            makePara(
+              makeRun(`• ${pr.name}`, { bold: true, sizeHalfPt: 18, color: textColor }) +
+                (pr.techStack ? makeRun(` (${pr.techStack})`, { italic: true, sizeHalfPt: 17, color: subColor }) : "") +
+                (pr.description ? makeRun(` — ${pr.description}`, { sizeHalfPt: 17, color: textColor }) : ""),
+              { spaceAfter: 22 }
+            )
+          );
+        }
       }
     } else if (sec === "experience") {
       for (const exp of data.experience) {
         if (!exp.role && !exp.organization) continue;
-        out.push(
+        itemsXml.push(
           makePara(
-            makeRun(exp.role || exp.organization, { bold: true, sizeHalfPt: 19, color: textColor }) +
-              (exp.period ? makeRun(`\t${exp.period}`, { italic: true, sizeHalfPt: 18, color: subColor }) : ""),
-            { rightTabPos: 10600, spaceAfter: 15 }
+            makeRun(exp.role || exp.organization, { bold: true, sizeHalfPt: 18, color: textColor }) +
+              (exp.period ? makeRun(`\t${exp.period}`, { italic: !sidebarRightCard, sizeHalfPt: 17, color: subColor }) : ""),
+            { rightTabPos: rightTab, spaceAfter: 8 }
           )
         );
         if (exp.role && exp.organization) {
-          out.push(makePara(makeRun(exp.organization, { italic: true, sizeHalfPt: 18, color: subColor }), { spaceAfter: 20 }));
+          itemsXml.push(makePara(makeRun(exp.organization, { bold: sidebarRightCard, italic: !sidebarRightCard && design.template !== "europe-minimal", sizeHalfPt: 17, color: subColor }), { spaceAfter: 12 }));
         }
         for (const b of exp.bullets) {
           if (b.trim()) {
-            out.push(makePara(makeRun(`• ${b}`, { sizeHalfPt: 18, color: textColor }), { spaceAfter: 15 }));
+            itemsXml.push(makePara(makeRun(`• ${b}`, { sizeHalfPt: 17, color: textColor }), { spaceAfter: 12 }));
           }
         }
       }
     } else if (sec === "achievements") {
       for (const a of data.achievements) {
-        if (a.trim()) out.push(makePara(makeRun(`• ${a}`, { sizeHalfPt: 18, color: textColor }), { spaceAfter: 20 }));
+        if (a.trim()) itemsXml.push(makePara(makeRun(`• ${a}`, { sizeHalfPt: 17, color: textColor }), { spaceAfter: 16 }));
       }
     } else if (sec === "certifications") {
       for (const c of data.certifications) {
-        if (c.trim()) out.push(makePara(makeRun(`• ${c}`, { sizeHalfPt: 18, color: textColor }), { spaceAfter: 20 }));
+        if (c.trim()) itemsXml.push(makePara(makeRun(`• ${c}`, { sizeHalfPt: 17, color: textColor }), { spaceAfter: 16 }));
       }
     } else if (sec === "languages") {
-      const lTxt = data.languages
-        .filter((l) => l.name.trim())
-        .map((l) => (l.proficiency ? `• ${l.name} (${l.proficiency})` : `• ${l.name}`))
-        .join("   ");
-      if (lTxt) out.push(makePara(makeRun(lTxt, { sizeHalfPt: 18, color: textColor })));
+      if (design.template === "europe-minimal" || lightMode) {
+        for (const l of data.languages) {
+          if (!l.name.trim()) continue;
+          const txt = l.proficiency
+            ? design.template === "europe-minimal"
+              ? `• ${l.name} — ${l.proficiency}`
+              : `• ${l.name} (${l.proficiency})`
+            : `• ${l.name}`;
+          itemsXml.push(makePara(makeRun(txt, { sizeHalfPt: 17, color: textColor }), { spaceAfter: 14 }));
+        }
+      } else {
+        const lTxt = data.languages
+          .filter((l) => l.name.trim())
+          .map((l) => (l.proficiency ? `• ${l.name} (${l.proficiency})` : `• ${l.name}`))
+          .join("   ");
+        if (lTxt) itemsXml.push(makePara(makeRun(lTxt, { sizeHalfPt: 18, color: textColor })));
+      }
     } else if (sec === "references") {
       if (data.referencesOnRequest || data.references.length === 0) {
-        out.push(makePara(makeRun("Available upon request.", { sizeHalfPt: 18, color: textColor })));
+        itemsXml.push(makePara(makeRun("Available upon request.", { sizeHalfPt: 17, color: textColor })));
+      } else if (design.template === "europe-minimal") {
+        const validRefs = data.references.filter((r) => r.name.trim());
+        const refCells = validRefs.slice(0, 2).map((ref) => {
+          const lines = [
+            makePara(makeRun(ref.name, { bold: true, sizeHalfPt: 17, color: textColor }), { spaceBefore: 0, spaceAfter: 8 }),
+          ];
+          const org = [ref.title, ref.organization].filter((x) => x.trim()).join(", ");
+          if (org) lines.push(makePara(makeRun(org, { sizeHalfPt: 16, color: textColor }), { spaceBefore: 0, spaceAfter: 8 }));
+          if (ref.phone) lines.push(makePara(makeRun(`Phone: ${ref.phone}`, { sizeHalfPt: 16, color: textColor }), { spaceBefore: 0, spaceAfter: 8 }));
+          if (ref.email) lines.push(makePara(makeRun(`Email: ${ref.email}`, { sizeHalfPt: 16, color: textColor }), { spaceBefore: 0, spaceAfter: 8 }));
+          return `<w:tc><w:tcPr><w:tcW w:w="3300" w:type="dxa"/></w:tcPr>${lines.join("")}</w:tc>`;
+        });
+        itemsXml.push(
+          `<w:tbl><w:tblPr><w:tblW w:w="6600" w:type="dxa"/><w:tblBorders><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="none"/><w:right w:val="none"/><w:insideH w:val="none"/><w:insideV w:val="none"/></w:tblBorders></w:tblPr><w:tr>${refCells.join("")}</w:tr></w:tbl>`
+        );
       } else {
         for (const ref of data.references) {
           if (!ref.name.trim()) continue;
-          out.push(makePara(makeRun(ref.name, { bold: true, sizeHalfPt: 19, color: textColor }), { spaceAfter: 10 }));
-          const det = [ref.title, ref.organization, ref.phone, ref.email].filter((x) => x.trim()).join(" • ");
-          if (det) out.push(makePara(makeRun(det, { sizeHalfPt: 18, color: subColor }), { spaceAfter: 25 }));
+          itemsXml.push(makePara(makeRun(ref.name, { bold: true, sizeHalfPt: 17, color: textColor }), { spaceAfter: 6 }));
+          const roleOrg = [ref.title, ref.organization].filter((x) => x.trim()).join(", ");
+          if (roleOrg) itemsXml.push(makePara(makeRun(roleOrg, { sizeHalfPt: 16, color: subColor }), { spaceAfter: 6 }));
+          if (ref.phone) itemsXml.push(makePara(makeRun(`Phone: ${ref.phone}`, { sizeHalfPt: 16, color: subColor }), { spaceAfter: 6 }));
+          if (ref.email) itemsXml.push(makePara(makeRun(`Email: ${ref.email}`, { sizeHalfPt: 16, color: subColor }), { spaceAfter: 16 }));
         }
       }
+    }
+
+    if (sidebarRightCard) {
+      out.push(headingXml);
+      out.push(makePara("", { spaceBefore: 0, spaceAfter: 10 }));
+      out.push(wrapCardBox(itemsXml.join("")));
+    } else {
+      out.push(headingXml, ...itemsXml);
     }
     return out;
   };
 
   let bodyXml = "";
-  const isTwoCol = design.template === "modern-sidebar" || design.template === "europe-minimal";
 
-  if (isTwoCol) {
-    const isSidebar = design.template === "modern-sidebar";
-    const leftKeys: ResumeSectionKey[] = isSidebar
-      ? ["skills", "languages", "references"]
-      : ["summary", "education", "skills", "languages"];
-
+  if (design.template === "modern-sidebar") {
+    const leftKeys: ResumeSectionKey[] = ["skills", "languages", "references"];
     const leftParas: string[] = [];
     if (imageXml) leftParas.push(imageXml);
 
-    leftParas.push(makeHeading("Contact", accentHex, isSidebar));
+    leftParas.push(makeHeading("Contact Me", accentHex, true, false));
+    leftParas.push(makePara("", { spaceBefore: 0, spaceAfter: 10 }));
     for (const c of [data.phone, data.email, data.address, data.linkedin, data.github, data.portfolio].filter((x) => x.trim())) {
-      leftParas.push(makePara(makeRun(c, { sizeHalfPt: 17, color: isSidebar ? "F1F5F9" : "000000" }), { spaceAfter: 20 }));
+      leftParas.push(makePara(makeRun(c, { sizeHalfPt: 17, color: "FFFFFF" }), { spaceAfter: 16 }));
     }
 
     for (const sec of sections) {
       if (leftKeys.includes(sec)) {
-        leftParas.push(
-          ...renderSectionParagraphs(sec, isSidebar ? "F1F5F9" : "000000", isSidebar ? "E2E8F0" : "000000", isSidebar)
-        );
+        leftParas.push(makePara("", { spaceBefore: 0, spaceAfter: 16 }));
+        leftParas.push(...renderSectionParagraphs(sec, "FFFFFF", "F1F5F9", true, 3200, false));
       }
     }
 
-    if (!isSidebar && (data.dateOfBirth.trim() || data.nationality.trim() || data.competitiveProfile.trim())) {
-      leftParas.push(makeHeading("Personal Info", accentHex, false));
-      if (data.dateOfBirth.trim()) {
-        leftParas.push(makePara(makeRun(`DOB: ${data.dateOfBirth}`, { sizeHalfPt: 17, color: "000000" }), { spaceAfter: 15 }));
-      }
-      if (data.nationality.trim()) {
-        leftParas.push(makePara(makeRun(`Nationality: ${data.nationality}`, { sizeHalfPt: 17, color: "000000" }), { spaceAfter: 15 }));
-      }
-      if (data.competitiveProfile.trim()) {
-        leftParas.push(makePara(makeRun(`Profile: ${data.competitiveProfile}`, { sizeHalfPt: 16, color: "000000" }), { spaceAfter: 15 }));
-      }
-    }
+    const nameParts = (data.fullName || "YOUR NAME").trim().split(/\s+/);
+    const firstName = nameParts.slice(0, Math.max(1, nameParts.length - 1)).join(" ");
+    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
 
     const rightParas: string[] = [];
     rightParas.push(
-      makePara(makeRun((data.fullName || "YOUR NAME").toUpperCase(), { bold: true, sizeHalfPt: 34, color: "000000" }), {
-        spaceAfter: 25,
-      })
+      makePara(
+        makeRun(firstName.toUpperCase(), { bold: false, sizeHalfPt: 40, color: "000000" }) +
+          (lastName ? makeRun(` ${lastName.toUpperCase()}`, { bold: true, sizeHalfPt: 40, color: "000000" }) : ""),
+        { spaceAfter: 15 }
+      )
     );
     if (data.headline.trim()) {
-      rightParas.push(makePara(makeRun(data.headline, { sizeHalfPt: 20, color: "000000" }), { spaceAfter: 60 }));
+      rightParas.push(makePara(makeRun(data.headline, { sizeHalfPt: 19, color: "000000" }), { spaceAfter: 45 }));
     }
     for (const sec of sections) {
       if (!leftKeys.includes(sec)) {
-        rightParas.push(...renderSectionParagraphs(sec));
+        rightParas.push(...renderSectionParagraphs(sec, "000000", "000000", false, 6480, true));
       }
     }
 
-    const leftShading = isSidebar
-      ? `<w:shd w:val="clear" w:color="auto" w:fill="${accentHex}"/>`
-      : `<w:tcBorders><w:right w:val="single" w:sz="6" w:space="0" w:color="E2E8F0"/></w:tcBorders>`;
     bodyXml =
       `<w:tbl>` +
       `<w:tblPr><w:tblW w:w="10700" w:type="dxa"/><w:tblBorders><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="none"/><w:right w:val="none"/><w:insideH w:val="none"/><w:insideV w:val="none"/></w:tblBorders></w:tblPr>` +
       `<w:tr>` +
-      `<w:tc><w:tcPr><w:tcW w:w="3600" w:type="dxa"/>${leftShading}<w:tcMar><w:top w:w="140" w:type="dxa"/><w:left w:w="160" w:type="dxa"/><w:bottom w:w="140" w:type="dxa"/><w:right w:w="160" w:type="dxa"/></w:tcMar></w:tcPr>${leftParas.join("")}</w:tc>` +
-      `<w:tc><w:tcPr><w:tcW w:w="7100" w:type="dxa"/><w:tcMar><w:top w:w="120" w:type="dxa"/><w:left w:w="220" w:type="dxa"/><w:bottom w:w="120" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tcMar></w:tcPr>${rightParas.join("")}</w:tc>` +
+      `<w:tc><w:tcPr><w:tcW w:w="3600" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="${accentHex}"/><w:tcMar><w:top w:w="160" w:type="dxa"/><w:left w:w="160" w:type="dxa"/><w:bottom w:w="160" w:type="dxa"/><w:right w:w="160" w:type="dxa"/></w:tcMar></w:tcPr>${leftParas.join("")}</w:tc>` +
+      `<w:tc><w:tcPr><w:tcW w:w="7100" w:type="dxa"/><w:tcMar><w:top w:w="140" w:type="dxa"/><w:left w:w="220" w:type="dxa"/><w:bottom w:w="120" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tcMar></w:tcPr>${rightParas.join("")}</w:tc>` +
       `</w:tr></w:tbl>`;
+  } else if (design.template === "europe-minimal") {
+    const leftKeys: ResumeSectionKey[] = ["summary", "education", "skills", "languages"];
+    const headerRight: string[] = [
+      makePara(makeRun((data.fullName || "YOUR NAME").toUpperCase(), { bold: true, sizeHalfPt: 38, color: "000000" }), { spaceAfter: 15 }),
+    ];
+    if (data.headline.trim()) {
+      headerRight.push(makePara(makeRun(data.headline, { sizeHalfPt: 19, color: "000000" }), { spaceAfter: 25 }));
+    }
+    const cRow1 = [data.phone, data.email].filter((x) => x.trim()).join("   •   ");
+    const cRow2 = [data.address, data.portfolio].filter((x) => x.trim()).join("   •   ");
+    const cRow3 = [data.linkedin, data.github].filter((x) => x.trim()).join("   •   ");
+    for (const r of [cRow1, cRow2, cRow3]) {
+      if (r) headerRight.push(makePara(makeRun(r, { sizeHalfPt: 17, color: "000000" }), { spaceAfter: 12 }));
+    }
+
+    const headerXml =
+      `<w:tbl><w:tblPr><w:tblW w:w="10700" w:type="dxa"/><w:tblBorders><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="single" w:sz="6" w:color="CBD5E1"/><w:right w:val="none"/><w:insideH w:val="none"/><w:insideV w:val="none"/></w:tblBorders></w:tblPr>` +
+      `<w:tr>` +
+      (imageXml ? `<w:tc><w:tcPr><w:tcW w:w="2100" w:type="dxa"/><w:tcMar><w:bottom w:w="100" w:type="dxa"/></w:tcMar></w:tcPr>${imageXml}</w:tc>` : "") +
+      `<w:tc><w:tcPr><w:tcW w:w="${imageXml ? 8600 : 10700}" w:type="dxa"/><w:tcMar><w:left w:w="120" w:type="dxa"/><w:bottom w:w="100" w:type="dxa"/></w:tcMar></w:tcPr>${headerRight.join("")}</w:tc>` +
+      `</w:tr></w:tbl>`;
+
+    const leftParas: string[] = [];
+    for (const sec of sections) {
+      if (leftKeys.includes(sec)) {
+        leftParas.push(...renderSectionParagraphs(sec, "000000", "000000", false, 3200, false));
+      }
+    }
+    if (data.dateOfBirth.trim() || data.nationality.trim() || data.competitiveProfile.trim()) {
+      leftParas.push(makeHeading("Personal Info", accentHex, false));
+      if (data.dateOfBirth.trim()) leftParas.push(makePara(makeRun(`DOB: ${data.dateOfBirth}`, { sizeHalfPt: 17, color: "000000" }), { spaceAfter: 12 }));
+      if (data.nationality.trim()) leftParas.push(makePara(makeRun(`Nationality: ${data.nationality}`, { sizeHalfPt: 17, color: "000000" }), { spaceAfter: 12 }));
+      if (data.competitiveProfile.trim()) leftParas.push(makePara(makeRun(`Profile: ${data.competitiveProfile}`, { sizeHalfPt: 16, color: "000000" }), { spaceAfter: 12 }));
+    }
+
+    const rightParas: string[] = [];
+    for (const sec of sections) {
+      if (!leftKeys.includes(sec)) {
+        rightParas.push(...renderSectionParagraphs(sec, "000000", "000000", false, 6700, false));
+      }
+    }
+
+    bodyXml =
+      headerXml +
+      `<w:tbl><w:tblPr><w:tblW w:w="10700" w:type="dxa"/><w:tblBorders><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="none"/><w:right w:val="none"/><w:insideH w:val="none"/><w:insideV w:val="none"/></w:tblBorders></w:tblPr>` +
+      `<w:tr>` +
+      `<w:tc><w:tcPr><w:tcW w:w="3600" w:type="dxa"/><w:tcBorders><w:right w:val="single" w:sz="6" w:space="0" w:color="CBD5E1"/></w:tcBorders><w:tcMar><w:top w:w="100" w:type="dxa"/><w:right w:w="180" w:type="dxa"/></w:tcMar></w:tcPr>${leftParas.join("")}</w:tc>` +
+      `<w:tc><w:tcPr><w:tcW w:w="7100" w:type="dxa"/><w:tcMar><w:top w:w="100" w:type="dxa"/><w:left w:w="220" w:type="dxa"/></w:tcMar></w:tcPr>${rightParas.join("")}</w:tc>` +
+      `</w:tr></w:tbl>`;
+  } else if (design.template === "german-lebenslauf") {
+    const headerLeft: string[] = [
+      makePara(makeRun("LEBENSLAUF  •  CURRICULUM VITAE", { bold: true, sizeHalfPt: 16, color: "000000" }), { spaceAfter: 10 }),
+      makePara(makeRun(data.fullName || "YOUR NAME", { bold: true, sizeHalfPt: 36, color: "000000" }), { spaceAfter: 12 }),
+    ];
+    if (data.headline.trim()) headerLeft.push(makePara(makeRun(data.headline, { sizeHalfPt: 19, color: "000000" }), { spaceAfter: 15 }));
+    const gC = [data.address, data.phone, data.email].filter((x) => x.trim()).join("  •  ");
+    const gL = [data.linkedin, data.github, data.portfolio].filter((x) => x.trim()).join("  |  ");
+    if (gC) headerLeft.push(makePara(makeRun(gC, { sizeHalfPt: 17, color: "000000" }), { spaceAfter: 10 }));
+    if (gL) headerLeft.push(makePara(makeRun(gL, { sizeHalfPt: 16, color: "000000" }), { spaceAfter: 20 }));
+
+    const paras: string[] = [
+      `<w:tbl><w:tblPr><w:tblW w:w="10700" w:type="dxa"/><w:tblBorders><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="single" w:sz="12" w:color="${accentHex}"/><w:right w:val="none"/><w:insideH w:val="none"/><w:insideV w:val="none"/></w:tblBorders></w:tblPr><w:tr>` +
+        `<w:tc><w:tcPr><w:tcW w:w="${imageXml ? 8700 : 10700}" w:type="dxa"/></w:tcPr>${headerLeft.join("")}</w:tc>` +
+        (imageXml ? `<w:tc><w:tcPr><w:tcW w:w="2000" w:type="dxa"/></w:tcPr>${imageXml}</w:tc>` : "") +
+        `</w:tr></w:tbl>`,
+    ];
+
+    const makeGermanTable = (rows: Array<{ left: string; rightParas: string[] }>) =>
+      `<w:tbl><w:tblPr><w:tblW w:w="10700" w:type="dxa"/><w:tblBorders><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="none"/><w:right w:val="none"/><w:insideH w:val="none"/><w:insideV w:val="none"/></w:tblBorders></w:tblPr>` +
+      rows
+        .map(
+          (r) =>
+            `<w:tr><w:tc><w:tcPr><w:tcW w:w="2900" w:type="dxa"/><w:tcMar><w:top w:w="30" w:type="dxa"/><w:bottom w:w="30" w:type="dxa"/><w:right w:w="120" w:type="dxa"/></w:tcMar></w:tcPr>` +
+            makePara(makeRun(r.left, { bold: true, sizeHalfPt: 17, color: "000000" }), { spaceBefore: 0, spaceAfter: 12 }) +
+            `</w:tc><w:tc><w:tcPr><w:tcW w:w="7800" w:type="dxa"/><w:tcMar><w:top w:w="30" w:type="dxa"/><w:bottom w:w="30" w:type="dxa"/></w:tcMar></w:tcPr>${r.rightParas.join("")}</w:tc></w:tr>`
+        )
+        .join("") +
+      `</w:tbl>`;
+
+    if (data.dateOfBirth.trim() || data.nationality.trim()) {
+      paras.push(makeHeading("Personal Information / Persönliche Daten"));
+      const rows = [];
+      if (data.dateOfBirth.trim()) rows.push({ left: "Date of Birth", rightParas: [makePara(makeRun(data.dateOfBirth, { sizeHalfPt: 17 }), { spaceBefore: 0, spaceAfter: 10 })] });
+      if (data.nationality.trim()) rows.push({ left: "Nationality", rightParas: [makePara(makeRun(data.nationality, { sizeHalfPt: 17 }), { spaceBefore: 0, spaceAfter: 10 })] });
+      paras.push(makeGermanTable(rows));
+    }
+
+    for (const sec of sections) {
+      if (sec === "education") {
+        paras.push(makeHeading("Education"));
+        paras.push(
+          makeGermanTable(
+            data.education
+              .filter((e) => e.institution || e.degree)
+              .map((e) => ({
+                left: e.period || "—",
+                rightParas: [
+                  makePara(makeRun(e.institution, { bold: true, sizeHalfPt: 18 }), { spaceBefore: 0, spaceAfter: 8 }),
+                  makePara(
+                    makeRun([e.degree, design.showCgpa && e.cgpa ? `CGPA: ${e.cgpa}` : ""].filter(Boolean).join(" • "), { sizeHalfPt: 17 }),
+                    { spaceBefore: 0, spaceAfter: 16 }
+                  ),
+                ],
+              }))
+          )
+        );
+      } else if (sec === "skills") {
+        paras.push(makeHeading("Technical & Core Skills"));
+        paras.push(
+          makeGermanTable(
+            data.skills
+              .filter((s) => s.items.trim())
+              .map((s) => ({
+                left: s.category || "Skills",
+                rightParas: [makePara(makeRun(s.items, { sizeHalfPt: 17 }), { spaceBefore: 0, spaceAfter: 12 })],
+              }))
+          )
+        );
+      } else if (sec === "projects") {
+        paras.push(makeHeading("Projects"));
+        paras.push(
+          makeGermanTable(
+            data.projects
+              .filter((p) => p.name.trim())
+              .map((p) => ({
+                left: p.techStack || "Project",
+                rightParas: [
+                  makePara(
+                    makeRun(p.name, { bold: true, sizeHalfPt: 18 }) +
+                      (p.description ? makeRun(` — ${p.description}`, { sizeHalfPt: 17 }) : ""),
+                    { spaceBefore: 0, spaceAfter: 14 }
+                  ),
+                ],
+              }))
+          )
+        );
+      } else if (sec === "experience") {
+        paras.push(makeHeading("Work & Practical Experience"));
+        paras.push(
+          makeGermanTable(
+            data.experience
+              .filter((e) => e.role || e.organization)
+              .map((e) => ({
+                left: e.period || "—",
+                rightParas: [
+                  makePara(makeRun(e.role || e.organization, { bold: true, sizeHalfPt: 18 }), { spaceBefore: 0, spaceAfter: 6 }),
+                  ...(e.role && e.organization
+                    ? [makePara(makeRun(e.organization, { italic: true, sizeHalfPt: 17 }), { spaceBefore: 0, spaceAfter: 8 })]
+                    : []),
+                  ...e.bullets.filter((b) => b.trim()).map((b) => makePara(makeRun(`• ${b}`, { sizeHalfPt: 17 }), { spaceBefore: 0, spaceAfter: 8 })),
+                ],
+              }))
+          )
+        );
+      } else if (sec === "references" && !data.referencesOnRequest && data.references.some((r) => r.name.trim())) {
+        paras.push(makeHeading("References"));
+        paras.push(
+          makeGermanTable(
+            data.references
+              .filter((r) => r.name.trim())
+              .map((r) => ({
+                left: r.name,
+                rightParas: [
+                  makePara(
+                    makeRun([r.title, r.organization, r.phone, r.email].filter(Boolean).join(" • "), { sizeHalfPt: 17 }),
+                    { spaceBefore: 0, spaceAfter: 12 }
+                  ),
+                ],
+              }))
+          )
+        );
+      } else {
+        paras.push(...renderSectionParagraphs(sec));
+      }
+    }
+
+    if (design.showGermanSignature) {
+      paras.push(
+        makePara(
+          makeRun(data.signaturePlaceDate || "Dhaka, Bangladesh", { italic: true, sizeHalfPt: 18, color: "000000" }) +
+            makeRun(`\t${data.fullName || "Signature"}`, { bold: true, sizeHalfPt: 18, color: "000000" }),
+          { rightTabPos: 10600, spaceBefore: 140 }
+        )
+      );
+    }
+    bodyXml = paras.join("");
   } else {
     const paras: string[] = [];
-    if (imageXml && design.template !== "latex-ats") paras.push(imageXml);
+    const isLatex = design.template === "latex-ats";
+    if (imageXml && !isLatex) paras.push(imageXml);
     paras.push(
       makePara(makeRun(data.fullName || "YOUR NAME", { bold: true, sizeHalfPt: 34, color: "000000" }), {
-        align: design.template === "latex-ats" ? "center" : "left",
-        spaceAfter: 20,
+        align: isLatex ? "center" : "left",
+        leftBorderHex: isLatex ? undefined : accentHex,
+        spaceAfter: 18,
       })
     );
     if (data.headline.trim()) {
       paras.push(
-        makePara(makeRun(data.headline, { sizeHalfPt: 19, color: "000000" }), {
-          align: design.template === "latex-ats" ? "center" : "left",
-          spaceAfter: 20,
+        makePara(makeRun(data.headline, { bold: !isLatex, sizeHalfPt: 19, color: "000000" }), {
+          align: isLatex ? "center" : "left",
+          leftBorderHex: isLatex ? undefined : accentHex,
+          spaceAfter: 18,
         })
       );
     }
@@ -1207,7 +1640,8 @@ export async function generateResumeDocxBlob(
     if (cLine) {
       paras.push(
         makePara(makeRun(cLine, { sizeHalfPt: 18, color: "000000" }), {
-          align: design.template === "latex-ats" ? "center" : "left",
+          align: isLatex ? "center" : "left",
+          leftBorderHex: isLatex ? undefined : accentHex,
           spaceAfter: 15,
         })
       );
@@ -1218,35 +1652,14 @@ export async function generateResumeDocxBlob(
     if (lLine) {
       paras.push(
         makePara(makeRun(lLine, { sizeHalfPt: 18, color: "000000" }), {
-          align: design.template === "latex-ats" ? "center" : "left",
-          spaceAfter: 45,
+          align: isLatex ? "center" : "left",
+          spaceAfter: 40,
         })
       );
     }
 
-    if (design.template === "german-lebenslauf" && (data.dateOfBirth.trim() || data.nationality.trim())) {
-      paras.push(makeHeading("Personal Information / Persönliche Daten"));
-      const pText = [
-        data.dateOfBirth.trim() ? `Date of Birth: ${data.dateOfBirth}` : "",
-        data.nationality.trim() ? `Nationality: ${data.nationality}` : "",
-      ]
-        .filter(Boolean)
-        .join("   •   ");
-      paras.push(makePara(makeRun(pText, { sizeHalfPt: 18 })));
-    }
-
     for (const sec of sections) {
       paras.push(...renderSectionParagraphs(sec));
-    }
-
-    if (design.template === "german-lebenslauf" && design.showGermanSignature) {
-      paras.push(
-        makePara(
-          makeRun(data.signaturePlaceDate || "Dhaka, Bangladesh", { italic: true, sizeHalfPt: 18, color: "000000" }) +
-            makeRun(`\t${data.fullName || "Signature"}`, { bold: true, sizeHalfPt: 18, color: "000000" }),
-          { rightTabPos: 10600, spaceBefore: 140 }
-        )
-      );
     }
     bodyXml = paras.join("");
   }
