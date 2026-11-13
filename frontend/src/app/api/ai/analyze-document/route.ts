@@ -26,9 +26,23 @@ export async function POST(req: NextRequest) {
     } = body;
 
     const lowerName = fileName.toLowerCase();
-    const cleanExt = fileName.split(".").pop()?.toLowerCase() || "";
+    const cleanCourse = (courseCode || "Course").toUpperCase().trim();
 
-    // 1. Semester Detection from filename or calendar
+    // 1. Academic Resource Type Mapping
+    const typeTitleMap: Record<string, string> = {
+      MID_QUESTION: "Midterm Examination Paper",
+      FINAL_QUESTION: "Final Examination Paper",
+      QUIZ_CT: "Class Test & Quiz (CT)",
+      NOTE: "Lecture Hand Notes",
+      LAB_MANUAL: "Lab Manual & Solutions",
+      LAB_REPORT: "Lab Report Sheet",
+      LAB_QUIZ: "Lab Quiz & Viva Questions",
+      LAB_FINAL: "Lab Final Examination Paper",
+      QUESTION_COURSE_IN: "Course-In Material",
+      OTHERS: "Academic Study Material",
+    };
+
+    // 2. Semester Detection from filename or calendar
     let detectedSemester = "";
     const semMatch = fileName.match(/(fall|summer|spring|autumn|winter)[\s_\-.]*(\d{2,4})/i);
     if (semMatch) {
@@ -40,12 +54,14 @@ export async function POST(req: NextRequest) {
       const yearMatch = fileName.match(/202[4-7]/);
       if (yearMatch) {
         detectedSemester = `Fall ${yearMatch[0]}`;
-      } else if (!currentSemester) {
+      } else if (currentSemester?.trim()) {
+        detectedSemester = currentSemester.trim();
+      } else {
         detectedSemester = "Fall 2026";
       }
     }
 
-    // 2. Resource Type & Exam Level Detection
+    // 3. Resource Type Detection from filename (for mismatch checking)
     let detectedType: string | null = null;
     if (lowerName.includes("final") || lowerName.includes("fnl")) {
       detectedType = "FINAL_QUESTION";
@@ -65,7 +81,7 @@ export async function POST(req: NextRequest) {
       detectedType = "NOTE";
     }
 
-    // 3. Mismatch Checking
+    // 4. Mismatch Checking
     let hasMismatch = false;
     let mismatchReason: string | null = null;
 
@@ -76,6 +92,9 @@ export async function POST(req: NextRequest) {
         FINAL_QUESTION: language === "bn" ? "ফাইনাল পরীক্ষার প্রশ্ন" : "Final Exam",
         QUIZ_CT: language === "bn" ? "কুইজ / ক্লাস টেস্ট" : "Quiz / CT",
         LAB_MANUAL: language === "bn" ? "ল্যাব ম্যানুয়াল" : "Lab Manual",
+        LAB_REPORT: language === "bn" ? "ল্যাব রিপোর্ট" : "Lab Report",
+        LAB_QUIZ: language === "bn" ? "ল্যাব কুইজ" : "Lab Quiz",
+        LAB_FINAL: language === "bn" ? "ল্যাব ফাইনাল" : "Lab Final",
       };
 
       const selectedLabel = typeLabels[resourceType] || resourceType;
@@ -84,81 +103,140 @@ export async function POST(req: NextRequest) {
       hasMismatch = true;
       mismatchReason =
         language === "bn"
-          ? `সতর্কতা: আপনি সিলেক্ট করেছেন '${selectedLabel}', কিন্তু ফাইলের নাম ও কনটেন্ট দেখে এটি '${detectedLabel}' মনে হচ্ছে। সঠিক ক্যাটাগরি যাচাই করুন।`
+          ? `সতর্কতা: আপনি সিলেক্ট করেছেন '${selectedLabel}', কিন্তু আপলোডকৃত ফাইলের তথ্য অনুযায়ী এটি '${detectedLabel}' মনে হচ্ছে। সঠিক ক্যাটাগরি নিশ্চিত করুন।`
           : `Notice: You selected '${selectedLabel}', but the uploaded document appears to be '${detectedLabel}'. Please verify your selection.`;
     }
 
-    // 4. Suggested Title Generation
-    const cleanCourse = courseCode.toUpperCase().trim() || "Course";
-    let typePart = "Lecture Hand Notes";
-    if (resourceType === "MID_QUESTION" || detectedType === "MID_QUESTION") typePart = "Midterm Question Paper";
-    else if (resourceType === "FINAL_QUESTION" || detectedType === "FINAL_QUESTION") typePart = "Final Exam Question Paper";
-    else if (resourceType === "QUIZ_CT" || detectedType === "QUIZ_CT") typePart = "Quiz & Class Test (CT)";
-    else if (resourceType === "LAB_MANUAL" || detectedType === "LAB_MANUAL") typePart = "Lab Manual & Code";
-    else if (resourceType === "LAB_REPORT" || detectedType === "LAB_REPORT") typePart = "Lab Report";
-    else if (resourceType === "LAB_FINAL" || detectedType === "LAB_FINAL") typePart = "Lab Final Exam Paper";
-    else if (resourceType === "NOTE" || detectedType === "NOTE") typePart = "Complete Lecture Hand Notes";
+    // 5. Build Default Deterministic Title strictly based on user's selected parameters
+    const effectiveType = resourceType || detectedType || "NOTE";
+    const typePart = typeTitleMap[effectiveType] || "Question Paper";
+    const semPart = detectedSemester || currentSemester || "Fall 2026";
 
-    const semPart = detectedSemester || currentSemester || "Semester";
-    const suggestedTitle = `${cleanCourse} ${typePart} (${semPart})`.slice(0, 80);
+    // Clean course title (e.g. "Programming Language I (C)" -> "Programming Language I")
+    const cleanTitle = (courseTitle || "")
+      .replace(/\s*\([^)]*\)\s*/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
+    let candidateTitle = `${cleanCourse} ${typePart} (${semPart})`;
+    if (cleanTitle && cleanTitle.length > 2) {
+      const withCourse = `${cleanCourse} ${cleanTitle} ${typePart} (${semPart})`;
+      if (withCourse.length <= 80) {
+        candidateTitle = withCourse;
+      }
+    }
 
     const result: AnalysisResult = {
-      suggestedTitle,
-      suggestedSemester: detectedSemester || currentSemester || "Fall 2026",
+      suggestedTitle: candidateTitle.slice(0, 80),
+      suggestedSemester: semPart,
       detectedType,
       hasMismatch,
       mismatchReason,
-      isValidAcademicDoc: !/(meme|selfie|whatsapp|screenshot_game|wallpaper)/i.test(lowerName),
-      confidence: 0.88,
+      isValidAcademicDoc: !/(meme|selfie|whatsapp_image_funny|screenshot_game|wallpaper)/i.test(lowerName),
+      confidence: 0.92,
     };
 
-    // If Gemini API is available and file is an image, attempt multimodal confirmation
+    // 6. Gemini Multimodal Vision API Integration
     const apiKey = process.env.GEMINI_API_KEY;
-    if (apiKey && fileUrl && /\.(jpe?g|png|webp)$/i.test(fileUrl)) {
+    if (apiKey && fileUrl && /^https?:\/\//i.test(fileUrl)) {
       try {
+        let imagePart: any = null;
+        const isImage = /\.(jpe?g|png|webp)$/i.test(fileUrl) || fileUrl.includes("image/upload") || fileUrl.includes("res.cloudinary.com");
+
+        if (isImage) {
+          try {
+            const imgRes = await fetch(fileUrl, { signal: AbortSignal.timeout(4500) });
+            if (imgRes.ok) {
+              const buffer = await imgRes.arrayBuffer();
+              if (buffer.byteLength < 4 * 1024 * 1024) {
+                const base64Data = Buffer.from(buffer).toString("base64");
+                const mime = imgRes.headers.get("content-type") || "image/jpeg";
+                imagePart = {
+                  inlineData: {
+                    mimeType: mime.startsWith("image/") ? mime : "image/jpeg",
+                    data: base64Data,
+                  },
+                };
+              }
+            }
+          } catch {
+            // Proceed to text prompt fallback
+          }
+        }
+
+        const promptText = `You are an academic document analyzer for Southeast University (SEU).
+The student is uploading study material with the following form selection:
+- Course Code: "${cleanCourse}" (${courseTitle || ""})
+- Resource Type: "${resourceType}" (${typePart})
+- Target Semester: "${semPart}"
+- Uploaded File Name: "${fileName}"
+
+Analyze the document image or file metadata.
+Return STRICT JSON ONLY:
+{
+  "detectedCourseCode": string or null,
+  "detectedType": "NOTE" | "MID_QUESTION" | "FINAL_QUESTION" | "QUIZ_CT" | "LAB_MANUAL" | "LAB_REPORT" | "OTHER",
+  "detectedSemester": string or null,
+  "hasMismatch": boolean,
+  "mismatchReason": string or null,
+  "suggestedTitle": string
+}
+
+CRITICAL RULES:
+1. "suggestedTitle" MUST start with "${cleanCourse}" and accurately describe the selected Resource Type "${typePart}". Length must be under 80 characters.
+   Format: "${cleanCourse} [Short Course Name] [Exam/Doc Type] ([Semester])"
+   Example: "${cleanCourse} ${typePart} (${semPart})"
+   NEVER change "${cleanCourse}" to any other course code (e.g. do NOT change ${cleanCourse} to CSE141 or any other code).
+2. If the document content completely contradicts the academic document (e.g. meme, selfie, payment receipt, non-educational photo), set "hasMismatch": true with a clear explanation in Bengali.`;
+
+        const parts: any[] = [];
+        if (imagePart) parts.push(imagePart);
+        parts.push({ text: promptText });
+
         const geminiRes = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `Examine this document URL: ${fileUrl}.
-This is claimed to be a Southeast University academic document: Course: ${courseCode}, Selected Type: ${resourceType}.
-Answer in JSON:
-{
-  "detectedCourseCode": string or null,
-  "detectedSemester": string or null,
-  "detectedType": "NOTE" | "MID_QUESTION" | "FINAL_QUESTION" | "QUIZ_CT" | "OTHER",
-  "isMismatch": boolean,
-  "mismatchExplanation": string or null,
-  "suggestedTitle": string
-}`,
-                    },
-                  ],
-                },
-              ],
-              generationConfig: { responseMimeType: "application/json" },
+              contents: [{ parts }],
+              generationConfig: {
+                responseMimeType: "application/json",
+                temperature: 0.1,
+              },
             }),
-            signal: AbortSignal.timeout(5000),
+            signal: AbortSignal.timeout(6000),
           }
         );
 
         if (geminiRes.ok) {
           const aiJson = await geminiRes.json();
-          const parsed = JSON.parse(aiJson?.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
-          if (parsed.suggestedTitle) result.suggestedTitle = parsed.suggestedTitle.slice(0, 80);
-          if (parsed.detectedSemester) result.suggestedSemester = parsed.detectedSemester;
-          if (parsed.isMismatch && parsed.mismatchExplanation) {
-            result.hasMismatch = true;
-            result.mismatchReason = parsed.mismatchExplanation;
+          const rawText = aiJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            const parsed = JSON.parse(rawText);
+            if (parsed.suggestedTitle && typeof parsed.suggestedTitle === "string") {
+              let cleanAiTitle = parsed.suggestedTitle.trim();
+              // Enforce that title always starts with the user's selected course code
+              if (!cleanAiTitle.toUpperCase().startsWith(cleanCourse)) {
+                cleanAiTitle = `${cleanCourse} ${cleanAiTitle}`;
+              }
+              // Enforce that title does not mistakenly contain wrong default type if user chose MID_QUESTION
+              if (resourceType === "MID_QUESTION" && cleanAiTitle.toLowerCase().includes("hand note")) {
+                cleanAiTitle = cleanAiTitle.replace(/hand\s*notes?/gi, "Midterm Exam Paper");
+              }
+              result.suggestedTitle = cleanAiTitle.slice(0, 80);
+            }
+            if (parsed.detectedSemester && typeof parsed.detectedSemester === "string") {
+              result.suggestedSemester = parsed.detectedSemester.trim().slice(0, 20);
+            }
+            if (parsed.hasMismatch && parsed.mismatchReason) {
+              result.hasMismatch = true;
+              result.mismatchReason = parsed.mismatchReason;
+            }
           }
         }
-      } catch (e) {
-        // Fallback already populated
+      } catch {
+        // Fallback already prepared and deterministic
       }
     }
 
