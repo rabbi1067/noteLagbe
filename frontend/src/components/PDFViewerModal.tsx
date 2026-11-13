@@ -24,6 +24,7 @@ import {
   AlertCircle,
   Loader2,
   RefreshCw,
+  Eye,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { api, API_BASE_URL, getToken } from "@/lib/api";
@@ -37,7 +38,7 @@ import {
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
 
-type ViewerDocKind = "pdf" | "image" | "drive-embed" | "unsupported";
+type ViewerDocKind = "pdf" | "image" | "drive-embed" | "pdf-embed" | "unsupported";
 
 function getGoogleDrivePreviewUrl(rawUrl?: string | null): string | null {
   if (!rawUrl) return null;
@@ -163,6 +164,7 @@ export default function PDFViewerModal({
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const activeBlobUrlRef = useRef<string | null>(null);
   const [detectedKind, setDetectedKind] = useState<ViewerDocKind>("pdf");
+  const [embedUrl, setEmbedUrl] = useState<string>("");
   const [retryTick, setRetryTick] = useState(0);
 
   const replaceBlobUrl = useCallback((nextUrl: string | null) => {
@@ -251,6 +253,7 @@ export default function PDFViewerModal({
       setDocLoading(true);
       setDocError(null);
       replaceBlobUrl(null);
+      setEmbedUrl("");
       setRawPdfBytes(null);
       setActivePdfBytes(null);
       setPdfPageCount(0);
@@ -261,7 +264,7 @@ export default function PDFViewerModal({
 
       try {
         const token = getToken();
-        const targetUrl = resource.id
+        let targetUrl = resource.id
           ? getAuthStreamUrl(resource.id, isAdminMode, false)
           : resource.fileUrl || "";
 
@@ -270,27 +273,70 @@ export default function PDFViewerModal({
           headers.Authorization = `Bearer ${token}`;
         }
 
-        const res = await fetch(targetUrl, {
-          method: "GET",
-          headers,
-          signal: controller.signal,
-        });
+        let res: Response | null = null;
+        try {
+          res = await fetch(targetUrl, {
+            method: "GET",
+            headers,
+            signal: controller.signal,
+          });
+        } catch (fetchErr) {
+          console.warn("Backend stream failed or timed out, trying direct URL:", fetchErr);
+        }
 
-        const contentType = (res.headers.get("content-type") || "").toLowerCase();
+        // Resilient Fallback 1: If backend stream failed or returned error, try direct cloud URL
+        if (!res || !res.ok) {
+          if (resource.fileUrl && resource.fileUrl !== targetUrl && !cancelled) {
+            try {
+              res = await fetch(resource.fileUrl, {
+                method: "GET",
+                signal: controller.signal,
+              });
+            } catch (cloudErr) {
+              console.warn("Direct cloud fetch also failed:", cloudErr);
+              res = null;
+            }
+          }
+        }
 
-        if (!res.ok) {
-          let message = `Unable to load document (HTTP ${res.status}).`;
-          if (contentType.includes("application/json")) {
+        // Resilient Fallback 2: For 50MB+ documents or when blob fetching is blocked by CORS/timeout,
+        // switch directly to embedded PDF/cloud viewer!
+        if (!res || !res.ok) {
+          if (drivePreviewUrl && !cancelled) {
+            setDetectedKind("drive-embed");
+            setDocError(null);
+            return;
+          }
+          if (resource.fileUrl && !cancelled) {
+            setDetectedKind("pdf-embed");
+            setEmbedUrl(resource.fileUrl);
+            setDocError(null);
+            return;
+          }
+          let message = "Unable to load document preview.";
+          if (res && !res.ok) {
+            message = `Unable to load document (HTTP ${res.status}).`;
             try {
               const errData = await res.json();
               if (errData?.message) message = errData.message;
             } catch {}
           }
-          if (drivePreviewUrl) {
-            if (!cancelled) {
-              setDetectedKind("drive-embed");
-              setDocError(null);
-            }
+          throw new Error(message);
+        }
+
+        const contentType = (res.headers.get("content-type") || "").toLowerCase();
+
+        // Check if response body is an error JSON
+        if (contentType.includes("application/json")) {
+          let message = "Document could not be retrieved from server.";
+          try {
+            const errData = await res.json();
+            if (errData?.message) message = errData.message;
+          } catch {}
+          if (resource.fileUrl && !cancelled) {
+            setDetectedKind("pdf-embed");
+            setEmbedUrl(resource.fileUrl);
+            setDocError(null);
             return;
           }
           throw new Error(message);
@@ -298,6 +344,12 @@ export default function PDFViewerModal({
 
         const rawBlob = await res.blob();
         if (rawBlob.size === 0) {
+          if (resource.fileUrl && !cancelled) {
+            setDetectedKind("pdf-embed");
+            setEmbedUrl(resource.fileUrl);
+            setDocError(null);
+            return;
+          }
           throw new Error("The server returned an empty file.");
         }
 
@@ -307,6 +359,12 @@ export default function PDFViewerModal({
           contentType.includes("application/json") ||
           (previewText.startsWith("{") && previewText.includes('"status"'))
         ) {
+          if (resource.fileUrl && !cancelled) {
+            setDetectedKind("pdf-embed");
+            setEmbedUrl(resource.fileUrl);
+            setDocError(null);
+            return;
+          }
           let jsonMsg = "Document could not be retrieved from storage.";
           try {
             const parsed = JSON.parse(await rawBlob.text());
@@ -325,6 +383,12 @@ export default function PDFViewerModal({
               setDetectedKind("drive-embed");
               setDocError(null);
             }
+            return;
+          }
+          if (resource.fileUrl && !cancelled) {
+            setDetectedKind("pdf-embed");
+            setEmbedUrl(resource.fileUrl);
+            setDocError(null);
             return;
           }
           throw new Error("Source returned a webpage instead of a viewable document.");
@@ -389,6 +453,11 @@ export default function PDFViewerModal({
         if (cancelled || (err instanceof DOMException && err.name === "AbortError")) return;
         if (drivePreviewUrl) {
           setDetectedKind("drive-embed");
+          setDocError(null);
+        } else if (resource.fileUrl) {
+          // Automatic seamless fallback to embedded viewer for 50MB+ or external documents!
+          setDetectedKind("pdf-embed");
+          setEmbedUrl(resource.fileUrl);
           setDocError(null);
         } else {
           const msg = err instanceof Error ? err.message : "Failed to load document preview.";
@@ -703,7 +772,11 @@ export default function PDFViewerModal({
   const toggleFullscreen = () => setIsFullscreen((prev) => !prev);
 
   const openableTabUrl =
-    blobUrl || (detectedKind === "drive-embed" ? drivePreviewUrl : "") || resource.fileUrl || "";
+    blobUrl ||
+    (detectedKind === "drive-embed" ? drivePreviewUrl : "") ||
+    (detectedKind === "pdf-embed" ? embedUrl : "") ||
+    resource.fileUrl ||
+    "";
 
   const handleDownload = async () => {
     if (!resource || !canDownloadAndOpen) return;
@@ -1168,6 +1241,20 @@ export default function PDFViewerModal({
                         <RefreshCw className="w-3.5 h-3.5" />
                         Retry Preview
                       </button>
+                      {resource.fileUrl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDetectedKind("pdf-embed");
+                            setEmbedUrl(resource.fileUrl || "");
+                            setDocError(null);
+                          }}
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Force Preview
+                        </button>
+                      )}
                       {canDownloadAndOpen && resource.fileUrl && (
                         <a
                           href={resource.fileUrl}
@@ -1191,6 +1278,14 @@ export default function PDFViewerModal({
                     draggable={false}
                   />
                 </div>
+              ) : detectedKind === "pdf-embed" && embedUrl ? (
+                /* Resilient Embedded Cloud Document Frame for 50MB+ Files */
+                <iframe
+                  key={embedUrl}
+                  src={`${embedUrl}#toolbar=0&navpanes=0`}
+                  className="w-full h-full border-none rounded-xl shadow-lg bg-white"
+                  title={displayTitle}
+                />
               ) : detectedKind === "drive-embed" && drivePreviewUrl ? (
                 <iframe
                   src={drivePreviewUrl}

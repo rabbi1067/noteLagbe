@@ -601,6 +601,12 @@ public class ResourceService {
 
         } catch (Exception e) {
             log.error("Failed to stream resource file ID {}: {}", id, e.getMessage(), e);
+            if (targetUrl != null && (targetUrl.startsWith("http://") || targetUrl.startsWith("https://"))) {
+                log.warn("Streaming proxy failed for external file ID {}. Redirecting client directly to cloud storage: {}", id, targetUrl);
+                return ResponseEntity.status(HttpStatus.FOUND)
+                        .location(URI.create(targetUrl))
+                        .build();
+            }
             throw new ApiException("Unable to download or stream material: " + e.getMessage());
         }
     }
@@ -701,7 +707,7 @@ public class ResourceService {
             if (url == null || url.isBlank()) continue;
             try {
                 HttpResponse<InputStream> res = UrlSecurityValidator.fetchValidatedStream(
-                        url, headers, 3, Duration.ofSeconds(20));
+                        url, headers, 3, Duration.ofSeconds(60));
                 lastStatusCode = res.statusCode();
 
                 if (res.statusCode() >= 200 && res.statusCode() < 300) {
