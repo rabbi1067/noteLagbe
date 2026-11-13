@@ -537,22 +537,27 @@ export async function mergeFilesToSinglePdf(
 
   // If 1 file is already a PDF, still inspect & normalize mixed orientations cleanly if needed
   if (files.length === 1 && isPdfFileObject(files[0])) {
-    const buf = new Uint8Array(await files[0].arrayBuffer());
-    const singleRot = options?.pageRotations?.[0];
-    const normalized = await normalizeAndRotatePdfBytes(buf, {
-      autoAlignMixed,
-      pageExtraRotations: singleRot ? { 1: singleRot } : undefined,
-      targetOrientation: forcePortraitA4 ? "UNIFORM_PORTRAIT" : "AUTO_UNIFORM",
-    });
-    if (!normalized.changed) {
+    try {
+      const buf = new Uint8Array(await files[0].arrayBuffer());
+      const singleRot = options?.pageRotations?.[0];
+      const normalized = await normalizeAndRotatePdfBytes(buf, {
+        autoAlignMixed,
+        pageExtraRotations: singleRot ? { 1: singleRot } : undefined,
+        targetOrientation: forcePortraitA4 ? "UNIFORM_PORTRAIT" : "AUTO_UNIFORM",
+      });
+      if (!normalized.changed) {
+        return files[0];
+      }
+      const cleanPdfName = files[0].name.toLowerCase().endsWith(".pdf")
+        ? files[0].name
+        : `${files[0].name}.pdf`;
+      return new File([normalized.bytes as any], cleanPdfName, {
+        type: "application/pdf",
+      });
+    } catch (pdfErr) {
+      console.warn("Direct PDF upload fallback (normalization skipped):", pdfErr);
       return files[0];
     }
-    const cleanPdfName = files[0].name.toLowerCase().endsWith(".pdf")
-      ? files[0].name
-      : `${files[0].name}.pdf`;
-    return new File([normalized.bytes as any], cleanPdfName, {
-      type: "application/pdf",
-    });
   }
 
   // Resolve image rotations automatically for mixed batches if caller didn't override all indices
@@ -581,7 +586,7 @@ export async function mergeFilesToSinglePdf(
         anyPortraitPage = true;
       }
       prepared.push({ kind: "pdf", bytes: buf });
-    } else {
+    } else if (isImageFileObject(file)) {
       const rot =
         options?.pageRotations?.[i] !== undefined
           ? normalizeRotationDegrees(options.pageRotations[i])
@@ -597,6 +602,8 @@ export async function mergeFilesToSinglePdf(
         width: jpg.width,
         height: jpg.height,
       });
+    } else {
+      throw new Error(`Cannot merge non-image/non-PDF document "${file.name}" into PDF. Please upload it as a standalone document.`);
     }
   }
 

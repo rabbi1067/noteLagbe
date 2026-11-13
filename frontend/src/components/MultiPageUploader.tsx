@@ -23,6 +23,7 @@ import {
   computeAutoPortraitRotations,
   inspectImageFile,
   isImageFileObject,
+  isPdfFileObject,
   normalizeRotationDegrees,
   RotationDegrees,
 } from "@/lib/pdfMerger";
@@ -32,6 +33,29 @@ export interface UploadResult {
   url: string;
   fileName?: string;
   fileSize?: string;
+}
+
+function getDocumentColorClass(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase();
+  switch (ext) {
+    case "pdf":
+      return "text-red-500";
+    case "doc":
+    case "docx":
+      return "text-blue-500";
+    case "ppt":
+    case "pptx":
+      return "text-amber-500";
+    case "xls":
+    case "xlsx":
+      return "text-emerald-500";
+    case "zip":
+    case "rar":
+    case "7z":
+      return "text-purple-500";
+    default:
+      return "text-indigo-500";
+  }
 }
 
 interface MultiPageUploaderProps {
@@ -196,6 +220,18 @@ export default function MultiPageUploader({
         let finalFileToUpload: File;
 
         if (isMultiPage) {
+          // Check if any non-mergeable standalone document is present
+          const nonMergeable = filesToProcess.filter(
+            (f) => !isImageFileObject(f) && !isPdfFileObject(f)
+          );
+          if (nonMergeable.length > 0) {
+            throw new Error(
+              language === "bn"
+                ? "Word, PowerPoint বা Zip ফাইল একাধিক পৃষ্ঠার সাথে মার্জ করা যায় না। অনুগ্রহ করে একক ফাইল হিসেবে আপলোড করুন অথবা একাধিক ছবি/PDF সিলেক্ট করুন।"
+                : "Word, PowerPoint, or Zip documents cannot be merged across multiple pages. Please upload them individually or select images/PDFs."
+            );
+          }
+
           setProcessStatus(
             language === "bn"
               ? `${filesToProcess.length}টি পৃষ্ঠা একই ফরম্যাটে (Portrait A4) PDF ফাইলে মার্জ হচ্ছে...`
@@ -216,9 +252,11 @@ export default function MultiPageUploader({
             { pageRotations: rotationMap, autoAlignMixed: true }
           );
         } else {
-          // Single image or PDF: convert image to normalized A4 PDF, or normalize mixed-page PDF
+          // Single file handling
           const single = filesToProcess[0];
+
           if (isImageFileObject(single)) {
+            // Single image: convert to uniform A4 PDF
             setProcessStatus(
               language === "bn"
                 ? "ছবিটি পরিষ্কার A4 PDF ডকুমেন্টে রূপান্তর হচ্ছে..."
@@ -230,29 +268,54 @@ export default function MultiPageUploader({
               undefined,
               { pageRotations: rotationMap, autoAlignMixed: true }
             );
-          } else {
-            finalFileToUpload = await mergeFilesToSinglePdf(
-              [single],
-              titleHint || single.name.replace(/\.[^/.]+$/, ""),
-              undefined,
-              { pageRotations: rotationMap, autoAlignMixed: true }
+          } else if (isPdfFileObject(single)) {
+            // Single PDF: normalize if possible, with clean fallback if protected/complex
+            setProcessStatus(
+              language === "bn"
+                ? "PDF ফাইলটি প্রস্তুত করা হচ্ছে..."
+                : "Preparing PDF document..."
             );
+            try {
+              finalFileToUpload = await mergeFilesToSinglePdf(
+                [single],
+                titleHint || single.name.replace(/\.[^/.]+$/, ""),
+                undefined,
+                { pageRotations: rotationMap, autoAlignMixed: true }
+              );
+            } catch (pdfErr) {
+              console.warn("Direct PDF upload fallback (normalization skipped):", pdfErr);
+              finalFileToUpload = single;
+            }
+          } else {
+            // Standalone Document (Word doc/docx, PowerPoint ppt/pptx, Excel xls/xlsx, Zip, Text, etc.)
+            const extUpper = single.name.split(".").pop()?.toUpperCase() || "DOCUMENT";
+            setProcessStatus(
+              language === "bn"
+                ? `${extUpper} ফাইলটি সার্ভারে আপলোড হচ্ছে (${single.name})...`
+                : `Uploading ${extUpper} file (${single.name})...`
+            );
+            finalFileToUpload = single;
           }
         }
 
         if (uploadSeqRef.current !== seq) return;
 
-        // Cache local blob URL so client can preview all merged pages instantly
-        const blobUrl = URL.createObjectURL(finalFileToUpload);
-        setLocalMergedBlobUrl((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return blobUrl;
-        });
+        // Cache local blob URL so client can preview/download instantly
+        let blobUrl: string | null = null;
+        try {
+          blobUrl = URL.createObjectURL(finalFileToUpload);
+          setLocalMergedBlobUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return blobUrl;
+          });
+        } catch {
+          // Ignore
+        }
 
         setProcessStatus(
           language === "bn"
             ? "সার্ভারে ফাইল আপলোড হচ্ছে... অনুগ্রহ করে অপেক্ষা করুন"
-            : "Uploading unified document to server... Please wait"
+            : "Uploading file to server... Please wait"
         );
 
         const res = await uploadFn(finalFileToUpload);
@@ -269,14 +332,15 @@ export default function MultiPageUploader({
         setUploadedResult(uploadData);
         onUploadSuccess(uploadData, filesToProcess);
 
+        const ext = finalFileToUpload.name.split(".").pop()?.toUpperCase() || "FILE";
         toast.success(
           isMultiPage
             ? language === "bn"
               ? `সফল! ${filesToProcess.length}টি পৃষ্ঠা একই ফরম্যাটে ১টি PDF এ মার্জ এবং আপলোড হয়েছে!`
               : `Success! ${filesToProcess.length} pages normalized into 1 uniform PDF and uploaded!`
             : language === "bn"
-            ? "ফাইল সফলভাবে আপলোড সম্পন্ন হয়েছে!"
-            : "File uploaded successfully!"
+            ? `${ext} ফাইল সফলভাবে আপলোড সম্পন্ন হয়েছে!`
+            : `${ext} file uploaded successfully!`
         );
       } catch (err: any) {
         if (uploadSeqRef.current !== seq) return;
@@ -301,6 +365,19 @@ export default function MultiPageUploader({
   const resolveOrientationsAndUpload = useCallback(
     async (nextFiles: File[], preserveRotations?: Record<number, number>) => {
       setPendingRotationSync(null);
+
+      // Check for standalone documents mixed with multiple files
+      const nonMergeable = nextFiles.filter(
+        (f) => !isImageFileObject(f) && !isPdfFileObject(f)
+      );
+      if (nonMergeable.length > 0 && nextFiles.length > 1) {
+        toast.error(
+          language === "bn"
+            ? "Word, PowerPoint বা Zip ফাইল একাধিক পৃষ্ঠার সাথে মার্জ করা যায় না। অনুগ্রহ করে একক ফাইল হিসেবে আপলোড করুন অথবা একাধিক ছবি/PDF সিলেক্ট করুন।"
+            : "Word, PowerPoint, or Zip documents cannot be merged across multiple pages. Please upload single files or select images/PDFs."
+        );
+        return;
+      }
 
       const rawFlags = await Promise.all(
         nextFiles.map(async (f) => {
@@ -347,6 +424,23 @@ export default function MultiPageUploader({
   const handleAddMoreFiles = (newFileList: FileList | File[]) => {
     const additional = Array.from(newFileList);
     if (additional.length === 0) return;
+
+    // Disallow adding more files if currently selected or newly selected is a standalone doc (Word, Zip, etc.)
+    const currentHasNonMergeable = pageFiles.some(
+      (f) => !isImageFileObject(f) && !isPdfFileObject(f)
+    );
+    const newHasNonMergeable = additional.some(
+      (f) => !isImageFileObject(f) && !isPdfFileObject(f)
+    );
+
+    if (currentHasNonMergeable || newHasNonMergeable) {
+      toast.error(
+        language === "bn"
+          ? "Word বা Zip ফাইলের সাথে অন্য পৃষ্ঠা জোড়া লাগানো যায় না। নতুন ফাইল দিতে চাইলে আগে 'মুছুন' (Clear) চাপুন।"
+          : "Word or Zip documents cannot be merged with other pages. Please clear the current file first."
+      );
+      return;
+    }
 
     const preserveMap: Record<number, number> = {};
     pageRotations.forEach((rot, idx) => {
@@ -568,6 +662,9 @@ export default function MultiPageUploader({
             <span className="text-[10px] px-2 py-0.5 rounded-md font-mono font-bold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
               PDF
             </span>
+            <span className="text-[10px] px-2 py-0.5 rounded-md font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+              DOC / DOCX
+            </span>
             <span className="text-[10px] px-2 py-0.5 rounded-md font-mono font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
               PNG / JPG / WEBP
             </span>
@@ -604,11 +701,25 @@ export default function MultiPageUploader({
                       ? `নির্বাচিত পৃষ্ঠা (${pageFiles.length}টি)`
                       : `Selected Document Pages (${pageFiles.length})`}
                   </span>
-                  {(pageFiles.length > 1 || pageFiles.some(isImageFileObject)) && (
+                  {(pageFiles.length > 1 || (pageFiles.length === 1 && isImageFileObject(pageFiles[0]))) && (
                     <span
                       className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${badgeClass}`}
                     >
                       ✓ Uniform A4 PDF
+                    </span>
+                  )}
+                  {pageFiles.length === 1 && !isImageFileObject(pageFiles[0]) && isPdfFileObject(pageFiles[0]) && (
+                    <span
+                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${badgeClass}`}
+                    >
+                      ✓ PDF Document
+                    </span>
+                  )}
+                  {pageFiles.length === 1 && !isImageFileObject(pageFiles[0]) && !isPdfFileObject(pageFiles[0]) && (
+                    <span
+                      className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25"
+                    >
+                      ✓ {pageFiles[0].name.split(".").pop()?.toUpperCase() || "DOCUMENT"}
                     </span>
                   )}
                   {autoAlignedCount > 0 && (
@@ -618,9 +729,13 @@ export default function MultiPageUploader({
                   )}
                 </div>
                 <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                  {language === "bn"
-                    ? "ক্রম বদলাতে (← / →) ও বাঁকা ছবি সোজা করতে (↺ / ↻) চাপুন — সবগুলো একই Portrait A4 ফরম্যাটে সেভ হবে।"
-                    : "Use (← / →) to reorder and (↺ / ↻) to fix sideways photos — all pages merge into the same A4 format."}
+                  {pageFiles.length === 1 && !isImageFileObject(pageFiles[0]) && !isPdfFileObject(pageFiles[0])
+                    ? (language === "bn"
+                        ? "একক ডকুমেন্ট ফাইল হিসেবে সরাসরি ক্লাউড সার্ভারে আপলোড ও সংরক্ষিত হচ্ছে।"
+                        : "Uploaded directly as a standalone document without image conversion.")
+                    : (language === "bn"
+                        ? "ক্রম বদলাতে (← / →) ও বাঁকা ছবি সোজা করতে (↺ / ↻) চাপুন — সবগুলো একই Portrait A4 ফরম্যাটে সেভ হবে।"
+                        : "Use (← / →) to reorder and (↺ / ↻) to fix sideways photos — all pages merge into the same A4 format.")}
                 </p>
               </div>
             </div>
@@ -641,15 +756,17 @@ export default function MultiPageUploader({
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={() => addMoreInputRef.current?.click()}
-                disabled={isProcessing}
-                className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-              >
-                <Plus className="w-3 h-3" />
-                <span>{language === "bn" ? "+ পৃষ্ঠা যোগ করুন" : "+ Add Page"}</span>
-              </button>
+              {!pageFiles.some((f) => !isImageFileObject(f) && !isPdfFileObject(f)) && (
+                <button
+                  type="button"
+                  onClick={() => addMoreInputRef.current?.click()}
+                  disabled={isProcessing}
+                  className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>{language === "bn" ? "+ পৃষ্ঠা যোগ করুন" : "+ Add Page"}</span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -713,7 +830,7 @@ export default function MultiPageUploader({
                       />
                     ) : (
                       <div className="flex flex-col items-center justify-center gap-1 text-slate-400">
-                        <FileText className="w-7 h-7 text-red-500" />
+                        <FileText className={`w-7 h-7 ${getDocumentColorClass(file.name)}`} />
                         <span className="text-[9px] font-mono uppercase font-bold">
                           {file.name.split(".").pop()}
                         </span>
@@ -776,20 +893,22 @@ export default function MultiPageUploader({
               );
             })}
 
-            {/* Quick Add Another Page Slot */}
-            <button
-              type="button"
-              onClick={() => addMoreInputRef.current?.click()}
-              disabled={isProcessing}
-              className="shrink-0 w-24 sm:w-28 h-[168px] rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 bg-white/40 dark:bg-slate-800/40 flex flex-col items-center justify-center gap-2 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer group"
-            >
-              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                <Plus className="w-4 h-4" />
-              </div>
-              <span className="text-[11px] font-bold text-center px-1">
-                {language === "bn" ? "+ ২য়/পরের পৃষ্ঠা" : "+ Next Page"}
-              </span>
-            </button>
+            {/* Quick Add Another Page Slot (only when mergeable) */}
+            {!pageFiles.some((f) => !isImageFileObject(f) && !isPdfFileObject(f)) && (
+              <button
+                type="button"
+                onClick={() => addMoreInputRef.current?.click()}
+                disabled={isProcessing}
+                className="shrink-0 w-24 sm:w-28 h-[168px] rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 bg-white/40 dark:bg-slate-800/40 flex flex-col items-center justify-center gap-2 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer group"
+              >
+                <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                  <Plus className="w-4 h-4" />
+                </div>
+                <span className="text-[11px] font-bold text-center px-1">
+                  {language === "bn" ? "+ ২য়/পরের পৃষ্ঠা" : "+ Next Page"}
+                </span>
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -804,8 +923,8 @@ export default function MultiPageUploader({
             </p>
             <p className="text-[10px] text-blue-600/80 dark:text-blue-400/80">
               {language === "bn"
-                ? "পৃষ্ঠাগুলো স্বয়ংক্রিয়ভাবে ১টি পরিচ্ছন্ন PDF এ সাজিয়ে ক্লাউডে আপলোড করা হচ্ছে..."
-                : "Pages are being normalized, merged into a single clean PDF and stored safely."}
+                ? "ফাইলটি প্রসেস করে ক্লাউডে নিরাপদে আপলোড করা হচ্ছে..."
+                : "Processing file and uploading safely to server..."}
             </p>
           </div>
         </div>
@@ -816,12 +935,12 @@ export default function MultiPageUploader({
         <div className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-500/30 dark:border-emerald-500/20 flex items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
-              <FileText className="w-5 h-5 text-red-500" />
+              <FileText className={`w-5 h-5 ${getDocumentColorClass(uploadedResult.fileName || "file.pdf")}`} />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-slate-900 dark:text-white text-xs truncate max-w-[200px] sm:max-w-[280px]">
-                  {uploadedResult.fileName || "Unified_Exam_Document.pdf"}
+                  {uploadedResult.fileName || "Document"}
                 </span>
                 <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
                   <CheckCircle2 className="w-2.5 h-2.5" />
@@ -847,10 +966,15 @@ export default function MultiPageUploader({
                     href={localMergedBlobUrl || uploadedResult.url}
                     target="_blank"
                     rel="noreferrer"
+                    download={uploadedResult.fileName}
                     className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 font-bold"
-                    title="Open merged multi-page PDF"
+                    title="View uploaded document"
                   >
-                    <span>{language === "bn" ? "প্রিভিউ দেখুন" : "Preview PDF"}</span>
+                    <span>
+                      {uploadedResult.fileName?.toLowerCase().endsWith(".pdf") || (pageFiles[0] && isImageFileObject(pageFiles[0]))
+                        ? (language === "bn" ? "প্রিভিউ দেখুন" : "Preview PDF")
+                        : (language === "bn" ? "ফাইল দেখুন" : "Open File")}
+                    </span>
                     <ExternalLink className="w-2.5 h-2.5" />
                   </a>
                 )}
@@ -859,16 +983,18 @@ export default function MultiPageUploader({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => addMoreInputRef.current?.click()}
-              disabled={isProcessing}
-              className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-              title="Add more pages to merge"
-            >
-              <Plus className="w-3 h-3" />
-              <span>{language === "bn" ? "+ পৃষ্ঠা যোগ করুন" : "+ Add Page"}</span>
-            </button>
+            {!pageFiles.some((f) => !isImageFileObject(f) && !isPdfFileObject(f)) && (
+              <button
+                type="button"
+                onClick={() => addMoreInputRef.current?.click()}
+                disabled={isProcessing}
+                className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                title="Add more pages to merge"
+              >
+                <Plus className="w-3 h-3" />
+                <span>{language === "bn" ? "+ পৃষ্ঠা যোগ করুন" : "+ Add Page"}</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
