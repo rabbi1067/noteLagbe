@@ -17,6 +17,7 @@ import {
   RotateCw,
   RotateCcw,
   Eye,
+  Zap,
 } from "lucide-react";
 import {
   mergeFilesToSinglePdf,
@@ -58,8 +59,18 @@ function getDocumentColorClass(filename: string): string {
   }
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(0)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 interface MultiPageUploaderProps {
-  uploadFn: (file: File) => Promise<UploadResult>;
+  uploadFn: (
+    file: File,
+    onProgress?: (percent: number, loadedBytes: number, totalBytes: number) => void
+  ) => Promise<UploadResult>;
   onUploadSuccess: (result: UploadResult, originalFiles: File[]) => void;
   onClear?: () => void;
   onInspectExisting?: () => void;
@@ -91,6 +102,14 @@ export default function MultiPageUploader({
   const [autoAlignedCount, setAutoAlignedCount] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processStatus, setProcessStatus] = useState<string>("");
+  const [uploadPercent, setUploadPercent] = useState<number>(0);
+  const [uploadLoaded, setUploadLoaded] = useState<number>(0);
+  const [uploadTotal, setUploadTotal] = useState<number>(0);
+  const [optimizationSavings, setOptimizationSavings] = useState<{
+    original: number;
+    final: number;
+    percent: number;
+  } | null>(null);
   const [uploadedResult, setUploadedResult] = useState<UploadResult | null>(
     initialUrl
       ? {
@@ -300,6 +319,19 @@ export default function MultiPageUploader({
 
         if (uploadSeqRef.current !== seq) return;
 
+        const originalTotalBytes = filesToProcess.reduce((sum, f) => sum + f.size, 0);
+        const finalBytes = finalFileToUpload.size;
+        if (originalTotalBytes > finalBytes && (originalTotalBytes - finalBytes) > 200 * 1024) {
+          const savedPct = Math.round(((originalTotalBytes - finalBytes) / originalTotalBytes) * 100);
+          setOptimizationSavings({ original: originalTotalBytes, final: finalBytes, percent: savedPct });
+        } else {
+          setOptimizationSavings(null);
+        }
+
+        setUploadPercent(0);
+        setUploadLoaded(0);
+        setUploadTotal(finalBytes);
+
         // Cache local blob URL so client can preview/download instantly
         let blobUrl: string | null = null;
         try {
@@ -318,7 +350,19 @@ export default function MultiPageUploader({
             : "Uploading file to server... Please wait"
         );
 
-        const res = await uploadFn(finalFileToUpload);
+        const res = await uploadFn(finalFileToUpload, (pct, loaded, total) => {
+          if (uploadSeqRef.current !== seq) return;
+          setUploadPercent(pct);
+          setUploadLoaded(loaded);
+          setUploadTotal(total);
+          const loadedMb = (loaded / 1048576).toFixed(1);
+          const totalMb = (total / 1048576).toFixed(1);
+          setProcessStatus(
+            language === "bn"
+              ? `সার্ভারে আপলোড হচ্ছে... ${pct}% (${loadedMb} MB / ${totalMb} MB)`
+              : `Uploading to server... ${pct}% (${loadedMb} MB / ${totalMb} MB)`
+          );
+        });
         if (uploadSeqRef.current !== seq) return;
 
         const uploadData: UploadResult = {
@@ -549,6 +593,10 @@ export default function MultiPageUploader({
     setPageIsLandscapeRaw([]);
     setAutoAlignedCount(0);
     setUploadedResult(null);
+    setUploadPercent(0);
+    setUploadLoaded(0);
+    setUploadTotal(0);
+    setOptimizationSavings(null);
     if (localMergedBlobUrl) {
       URL.revokeObjectURL(localMergedBlobUrl);
       setLocalMergedBlobUrl(null);
@@ -915,103 +963,140 @@ export default function MultiPageUploader({
 
       {/* Case 3: Processing & Uploading Status Bar */}
       {isProcessing && (
-        <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center gap-3 animate-pulse">
-          <RefreshCw className="w-5 h-5 text-blue-500 animate-spin shrink-0" />
-          <div className="min-w-0">
-            <p className="text-xs font-bold text-blue-700 dark:text-blue-300">
-              {processStatus}
-            </p>
-            <p className="text-[10px] text-blue-600/80 dark:text-blue-400/80">
-              {language === "bn"
-                ? "ফাইলটি প্রসেস করে ক্লাউডে নিরাপদে আপলোড করা হচ্ছে..."
-                : "Processing file and uploading safely to server..."}
-            </p>
+        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-emerald-500/10 border border-blue-500/30 dark:border-blue-500/20 shadow-xs space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <RefreshCw className="w-4 h-4 text-blue-500 animate-spin shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-blue-700 dark:text-blue-300 truncate">
+                  {processStatus}
+                </p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                  {uploadPercent !== null && uploadTotal > 0
+                    ? `${(uploadLoaded / (1024 * 1024)).toFixed(1)} MB / ${(uploadTotal / (1024 * 1024)).toFixed(1)} MB`
+                    : (language === "bn"
+                        ? "ফাইলটি অপ্টিমাইজ ও সুরক্ষিতভাবে আপলোড হচ্ছে..."
+                        : "Optimizing & uploading securely to storage...")}
+                </p>
+              </div>
+            </div>
+            {uploadPercent !== null && (
+              <span className="text-xs font-mono font-extrabold text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20">
+                {uploadPercent}%
+              </span>
+            )}
           </div>
+          {uploadPercent !== null && (
+            <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500 h-1.5 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${Math.max(5, uploadPercent)}%` }}
+              />
+            </div>
+          )}
         </div>
       )}
 
       {/* Case 4: Final Merged / Uploaded Ready Status Card */}
       {!isProcessing && uploadedResult?.url && (
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-500/30 dark:border-emerald-500/20 flex items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
-              <FileText className={`w-5 h-5 ${getDocumentColorClass(uploadedResult.fileName || "file.pdf")}`} />
+        <div className="space-y-2">
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-500/30 dark:border-emerald-500/20 flex items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                <FileText className={`w-5 h-5 ${getDocumentColorClass(uploadedResult.fileName || "file.pdf")}`} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-900 dark:text-white text-xs truncate max-w-[200px] sm:max-w-[280px]">
+                    {uploadedResult.fileName || "Document"}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                    <CheckCircle2 className="w-2.5 h-2.5" />
+                    {pageFiles.length > 1
+                      ? `${pageFiles.length} Pages Merged`
+                      : "Ready"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
+                  {uploadedResult.fileSize && <span>{uploadedResult.fileSize} • </span>}
+                  {pageFiles.length === 0 && onInspectExisting ? (
+                    <button
+                      type="button"
+                      onClick={onInspectExisting}
+                      className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-bold cursor-pointer"
+                      title="Inspect document and fix rotated pages or images"
+                    >
+                      <Eye className="w-3 h-3" />
+                      <span>{language === "bn" ? "দেখুন ও সোজা করুন" : "View & Fix Orientation"}</span>
+                    </button>
+                  ) : (
+                    <a
+                      href={localMergedBlobUrl || uploadedResult.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      download={uploadedResult.fileName}
+                      className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 font-bold"
+                      title="View uploaded document"
+                    >
+                      <span>
+                        {uploadedResult.fileName?.toLowerCase().endsWith(".pdf") || (pageFiles[0] && isImageFileObject(pageFiles[0]))
+                          ? (language === "bn" ? "প্রিভিউ দেখুন" : "Preview PDF")
+                          : (language === "bn" ? "ফাইল দেখুন" : "Open File")}
+                      </span>
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-900 dark:text-white text-xs truncate max-w-[200px] sm:max-w-[280px]">
-                  {uploadedResult.fileName || "Document"}
-                </span>
-                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
-                  <CheckCircle2 className="w-2.5 h-2.5" />
-                  {pageFiles.length > 1
-                    ? `${pageFiles.length} Pages Merged`
-                    : "Ready"}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
-                {uploadedResult.fileSize && <span>{uploadedResult.fileSize} • </span>}
-                {pageFiles.length === 0 && onInspectExisting ? (
-                  <button
-                    type="button"
-                    onClick={onInspectExisting}
-                    className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-bold cursor-pointer"
-                    title="Inspect document and fix rotated pages or images"
-                  >
-                    <Eye className="w-3 h-3" />
-                    <span>{language === "bn" ? "দেখুন ও সোজা করুন" : "View & Fix Orientation"}</span>
-                  </button>
-                ) : (
-                  <a
-                    href={localMergedBlobUrl || uploadedResult.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    download={uploadedResult.fileName}
-                    className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 font-bold"
-                    title="View uploaded document"
-                  >
-                    <span>
-                      {uploadedResult.fileName?.toLowerCase().endsWith(".pdf") || (pageFiles[0] && isImageFileObject(pageFiles[0]))
-                        ? (language === "bn" ? "প্রিভিউ দেখুন" : "Preview PDF")
-                        : (language === "bn" ? "ফাইল দেখুন" : "Open File")}
-                    </span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                )}
-              </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {!pageFiles.some((f) => !isImageFileObject(f) && !isPdfFileObject(f)) && (
+                <button
+                  type="button"
+                  onClick={() => addMoreInputRef.current?.click()}
+                  disabled={isProcessing}
+                  className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  title="Add more pages to merge"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>{language === "bn" ? "+ পৃষ্ঠা যোগ করুন" : "+ Add Page"}</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Upload different files"
+              >
+                <Upload className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleFullClear}
+                className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                title="Remove document"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            {!pageFiles.some((f) => !isImageFileObject(f) && !isPdfFileObject(f)) && (
-              <button
-                type="button"
-                onClick={() => addMoreInputRef.current?.click()}
-                disabled={isProcessing}
-                className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                title="Add more pages to merge"
-              >
-                <Plus className="w-3 h-3" />
-                <span>{language === "bn" ? "+ পৃষ্ঠা যোগ করুন" : "+ Add Page"}</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Upload different files"
-            >
-              <Upload className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={handleFullClear}
-              className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-              title="Remove document"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
+          {optimizationSavings && (
+            <div className="px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-blue-500/10 border border-emerald-500/20 flex items-center justify-between text-[11px] text-emerald-800 dark:text-emerald-300">
+              <span className="flex items-center gap-1.5 font-semibold">
+                <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
+                <span>
+                  {language === "bn"
+                    ? `স্মার্ট অপ্টিমাইজড: ${formatBytes(optimizationSavings.original)} ➔ ${formatBytes(optimizationSavings.final)}`
+                    : `Smart Optimized: ${formatBytes(optimizationSavings.original)} ➔ ${formatBytes(optimizationSavings.final)}`}
+                </span>
+              </span>
+              <span className="font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-md font-mono text-[10px]">
+                {optimizationSavings.percent}% {language === "bn" ? "স্টোরেজ সাশ্রয়" : "saved"}
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>

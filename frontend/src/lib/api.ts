@@ -192,6 +192,62 @@ export function removeToken() {
   }
 }
 
+export function uploadWithProgress<T>(
+  endpoint: string,
+  formData: FormData,
+  onProgress?: (percent: number, loadedBytes: number, totalBytes: number) => void
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const token = getToken();
+
+    const primaryBase = API_BASE_URL.replace(/\/+$/, "");
+    const directBase = resolveDirectBackendApiUrl();
+    const useDirectFirst = Boolean(directBase && primaryBase === "/api");
+    const baseUrl = useDirectFirst ? directBase! : primaryBase;
+
+    xhr.open("POST", `${baseUrl}${endpoint}`, true);
+    if (token) {
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    }
+
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.min(100, Math.round((e.loaded / e.total) * 100));
+          onProgress(percent, e.loaded, e.total);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      try {
+        const text = xhr.responseText;
+        const data = text ? JSON.parse(text) : {};
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(data as T);
+        } else {
+          const errMsg = data.bengaliMessage || data.message || data.error || `Upload failed (HTTP ${xhr.status})`;
+          reject(new Error(errMsg));
+        }
+      } catch {
+        reject(new Error(`Upload failed: ${xhr.statusText || xhr.status}`));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error("Network error during file upload. Please check your internet connection."));
+    };
+
+    xhr.ontimeout = () => {
+      reject(new Error("File upload timed out. Please try again."));
+    };
+    xhr.timeout = 180_000;
+
+    xhr.send(formData);
+  });
+}
+
 // Anti-spam & double-click protection maps for mutating requests (POST, PUT, DELETE, PATCH)
 const inFlightMutations = new Map<string, Promise<any>>();
 const lastMutationTimestamps = new Map<string, number>();
@@ -755,13 +811,17 @@ export const api = {
     getMy: () => request<any[]>("/contributions/my"),
     verifyLink: (url: string) => request<any>(`/contributions/verify-link?url=${encodeURIComponent(url)}`),
       getLeaderboard: () => request<any[]>('/contributions/leaderboard'),
-    uploadFile: (file: File) => {
+    uploadFile: (
+      file: File,
+      onProgress?: (percent: number, loaded: number, total: number) => void
+    ) => {
       const formData = new FormData();
       formData.append("file", file);
-      return request<{ success: boolean; url: string; fileName: string; fileSize: string; fileType: string; message: string }>("/contributions/upload", {
-        method: "POST",
-        body: formData,
-      });
+      return uploadWithProgress<{ success: boolean; url: string; fileName: string; fileSize: string; fileType: string; message: string }>(
+        "/contributions/upload",
+        formData,
+        onProgress
+      );
     },
   },
 
@@ -797,13 +857,17 @@ export const api = {
 
     // Resource Management
     getResources: () => request<any[]>("/admin/resources"),
-    uploadMaterialFile: (file: File) => {
+    uploadMaterialFile: (
+      file: File,
+      onProgress?: (percent: number, loaded: number, total: number) => void
+    ) => {
       const formData = new FormData();
       formData.append("file", file);
-      return request<{ success: boolean; url: string; fileName: string; fileSize: string; fileType: string; message: string }>("/admin/resources/upload", {
-        method: "POST",
-        body: formData,
-      });
+      return uploadWithProgress<{ success: boolean; url: string; fileName: string; fileSize: string; fileType: string; message: string }>(
+        "/admin/resources/upload",
+        formData,
+        onProgress
+      );
     },
     createResource: (data: any) => request<any>("/admin/resources", { method: "POST", body: JSON.stringify(data) }),
     updateResource: (id: number, data: any) => request<any>(`/admin/resources/${id}`, { method: "PUT", body: JSON.stringify(data) }),
