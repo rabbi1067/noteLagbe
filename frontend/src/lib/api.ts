@@ -288,7 +288,7 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
     : directBase && directBase !== primaryBase
       ? directBase
       : primaryBase;
-  const firstTimeoutMs = isFormData ? 45_000 : isAuthEndpoint ? 20_000 : 16_000;
+  const firstTimeoutMs = isFormData ? 120_000 : isAuthEndpoint ? 20_000 : 16_000;
   const retryTimeoutMs = isAuthEndpoint ? 30_000 : 24_000;
   const requestInit: RequestInit = {
     ...options,

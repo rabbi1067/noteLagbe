@@ -85,7 +85,7 @@ public class GlobalExceptionHandler {
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.PAYLOAD_TOO_LARGE.value(),
                 "Payload Too Large",
-                "File size exceeds the maximum permitted upload limit of 50MB. Please compress your document or PDF before uploading.",
+                "File size exceeds the maximum permitted upload limit of 100MB. Please compress your document or PDF before uploading.",
                 request.getRequestURI()
         );
         return new ResponseEntity<>(error, HttpStatus.PAYLOAD_TOO_LARGE);

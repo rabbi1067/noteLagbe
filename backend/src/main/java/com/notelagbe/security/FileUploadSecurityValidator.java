@@ -18,7 +18,7 @@ public final class FileUploadSecurityValidator {
 
     public static final long MAX_IMAGE_BYTES = 10L * 1024 * 1024;
     public static final long MAX_AUDIO_BYTES = 15L * 1024 * 1024;
-    public static final long MAX_MATERIAL_BYTES = 50L * 1024 * 1024;
+    public static final long MAX_MATERIAL_BYTES = 100L * 1024 * 1024;
 
     private static final Set<String> IMAGE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp", "gif");
     private static final Set<String> AUDIO_EXTENSIONS = Set.of("webm", "ogg", "oga", "mp3", "wav", "m4a", "mp4", "aac", "opus");

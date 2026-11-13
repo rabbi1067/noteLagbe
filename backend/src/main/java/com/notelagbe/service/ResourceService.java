@@ -52,6 +52,7 @@ public class ResourceService {
     private final LiveSyncService liveSyncService;
     private final ContributionRequestRepository contributionRequestRepository;
     private final CloudinaryService cloudinaryService;
+    private final CloudflareR2Service r2Service;
     private final TeacherCourseRepository teacherCourseRepository;
     private final CacheManager cacheManager;
     private final ResourceDuplicateService resourceDuplicateService;
@@ -73,7 +74,6 @@ public class ResourceService {
                 new ResourceDuplicateService(resourceRepository, courseRepository));
     }
 
-    @Autowired
     public ResourceService(ResourceRepository resourceRepository,
                            CourseRepository courseRepository,
                            TeacherRepository teacherRepository,
@@ -86,6 +86,26 @@ public class ResourceService {
                            TeacherCourseRepository teacherCourseRepository,
                            CacheManager cacheManager,
                            ResourceDuplicateService resourceDuplicateService) {
+        this(resourceRepository, courseRepository, teacherRepository, unlockedCourseRepository,
+                subscriptionRepository, subscriptionService, liveSyncService, contributionRequestRepository,
+                cloudinaryService, new CloudflareR2Service(), teacherCourseRepository, cacheManager,
+                resourceDuplicateService);
+    }
+
+    @Autowired
+    public ResourceService(ResourceRepository resourceRepository,
+                           CourseRepository courseRepository,
+                           TeacherRepository teacherRepository,
+                           UnlockedCourseRepository unlockedCourseRepository,
+                           SubscriptionRepository subscriptionRepository,
+                           SubscriptionService subscriptionService,
+                           LiveSyncService liveSyncService,
+                           ContributionRequestRepository contributionRequestRepository,
+                           CloudinaryService cloudinaryService,
+                           CloudflareR2Service r2Service,
+                           TeacherCourseRepository teacherCourseRepository,
+                           CacheManager cacheManager,
+                           ResourceDuplicateService resourceDuplicateService) {
         this.resourceRepository = resourceRepository;
         this.courseRepository = courseRepository;
         this.teacherRepository = teacherRepository;
@@ -95,6 +115,7 @@ public class ResourceService {
         this.liveSyncService = liveSyncService;
         this.contributionRequestRepository = contributionRequestRepository;
         this.cloudinaryService = cloudinaryService;
+        this.r2Service = r2Service != null ? r2Service : new CloudflareR2Service();
         this.teacherCourseRepository = teacherCourseRepository;
         this.cacheManager = cacheManager;
         this.resourceDuplicateService = resourceDuplicateService;
@@ -398,6 +419,16 @@ public class ResourceService {
 
         resourceRepository.delete(r);
 
+        // Delete remote file from R2 or Cloudinary if applicable
+        if (r.getFileUrl() != null) {
+            String fileUrl = r.getFileUrl().trim();
+            if (r2Service.isConfigured() && (fileUrl.contains("r2_") || fileUrl.contains(".r2."))) {
+                r2Service.deleteFileByKeyOrUrl(fileUrl);
+            } else if (fileUrl.contains("cloudinary.com")) {
+                cloudinaryService.deleteFileByUrl(fileUrl);
+            }
+        }
+
         // If no more approved resources exist for this teacher and course, clean up TeacherCourse mapping
         if (course != null && teacher != null) {
             boolean hasRemaining = resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
@@ -599,6 +630,15 @@ public class ResourceService {
                 }
             }
             throw new FileNotFoundException("Local file not found on disk: " + targetUrl);
+        }
+
+        // Direct Cloudflare R2 fetch via S3 API
+        if (r2Service.isConfigured() && (targetUrl.contains(".r2.") || targetUrl.contains("r2.dev") || targetUrl.contains("r2_"))) {
+            try {
+                return r2Service.fetchBytes(targetUrl);
+            } catch (Exception e) {
+                log.warn("Direct Cloudflare R2 fetch failed for {}, falling back to HTTP download: {}", targetUrl, e.getMessage());
+            }
         }
 
         // Build list of candidate URLs to try in order of highest success probability:
@@ -861,12 +901,50 @@ public class ResourceService {
         String extDot = FileUploadSecurityValidator.validateMaterial(file, FileUploadSecurityValidator.MAX_MATERIAL_BYTES);
         String ext = extDot.startsWith(".") ? extDot.substring(1) : extDot;
         String originalFilename = file.getOriginalFilename();
+        long bytes = file.getSize();
 
-        String fileUrl;
-        if (cloudinaryService.isConfigured()) {
-            boolean isImg = List.of("png", "jpg", "jpeg", "webp").contains(ext);
-            fileUrl = cloudinaryService.uploadFile(file, "notelagbe/materials", isImg);
-        } else {
+        String fileUrl = null;
+        String storageProvider = "LOCAL_DISK";
+        boolean isImg = List.of("png", "jpg", "jpeg", "webp").contains(ext);
+        boolean isLargeFile = bytes > 10L * 1024 * 1024; // > 10MB
+
+        // 1. Primary for Large Files or Documents: Cloudflare R2
+        // Cloudinary Free Plan strictly limits non-image RAW uploads to 10MB.
+        // Cloudflare R2 has zero file size limits, zero egress fees, and handles 50MB-100MB lecture notes effortlessly!
+        if (r2Service.isConfigured() && (isLargeFile || !isImg)) {
+            try {
+                fileUrl = r2Service.uploadFile(file, "notelagbe/materials");
+                storageProvider = "CLOUDFLARE_R2";
+                log.info("Uploaded academic material ({}, {} MB) to Cloudflare R2: {}", ext, String.format(java.util.Locale.US, "%.2f", bytes / (1024.0 * 1024.0)), fileUrl);
+            } catch (Exception e) {
+                log.error("Cloudflare R2 upload failed ({}), falling back to secondary storage providers: {}", e.getMessage(), e);
+            }
+        }
+
+        // 2. Secondary: Cloudinary (best for images and documents <= 10MB)
+        if (fileUrl == null && cloudinaryService.isConfigured()) {
+            try {
+                fileUrl = cloudinaryService.uploadFile(file, "notelagbe/materials", isImg);
+                storageProvider = "CLOUDINARY";
+                log.info("Uploaded academic material to Cloudinary: {}", fileUrl);
+            } catch (Exception e) {
+                log.warn("Cloudinary upload failed ({}). Attempting fallback storage.", e.getMessage());
+            }
+        }
+
+        // 3. Fallback to Cloudflare R2 if not tried yet (e.g. smaller image when Cloudinary is unavailable)
+        if (fileUrl == null && r2Service.isConfigured()) {
+            try {
+                fileUrl = r2Service.uploadFile(file, "notelagbe/materials");
+                storageProvider = "CLOUDFLARE_R2";
+                log.info("Uploaded material to Cloudflare R2 on fallback: {}", fileUrl);
+            } catch (Exception e) {
+                log.error("Cloudflare R2 fallback upload failed: {}", e.getMessage(), e);
+            }
+        }
+
+        // 4. Final Resilient Fallback: Local Server Disk Storage
+        if (fileUrl == null) {
             Path uploadDir = Paths.get("uploads", "materials").toAbsolutePath().normalize();
             if (!Files.exists(uploadDir)) {
                 Files.createDirectories(uploadDir);
@@ -890,18 +968,21 @@ public class ResourceService {
             }
             Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
             fileUrl = "/uploads/materials/" + uniqueFileName;
+            storageProvider = "LOCAL_DISK";
+            log.info("Stored academic material on local server disk: {}", fileUrl);
         }
-        long bytes = file.getSize();
+
         String formattedSize = bytes < 1024 * 1024
-                ? String.format("%.1f KB", bytes / 1024.0)
-                : String.format("%.2f MB", bytes / (1024.0 * 1024.0));
+                ? String.format(java.util.Locale.US, "%.1f KB", bytes / 1024.0)
+                : String.format(java.util.Locale.US, "%.2f MB", bytes / (1024.0 * 1024.0));
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("url", fileUrl);
         response.put("fileName", originalFilename != null ? originalFilename : ("material_" + System.currentTimeMillis() + "." + ext));
         response.put("fileSize", formattedSize);
-        response.put("fileType", ext.toUpperCase());
+        response.put("fileType", ext.toUpperCase(java.util.Locale.ROOT));
+        response.put("storageProvider", storageProvider);
         response.put("message", "File successfully uploaded and stored on server");
         return response;
     }

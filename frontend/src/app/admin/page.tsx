@@ -1518,8 +1518,8 @@ export default function AdminDashboardPage() {
   const handleMaterialFileUpload = async (file: File) => {
     if (!file) return;
 
-    if (file.size > 50 * 1024 * 1024) {
-      toast.error("File is too large. Maximum allowed size is 50 MB.");
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error("File is too large. Maximum allowed size is 100 MB.");
       return;
     }
 
@@ -10435,7 +10435,7 @@ export default function AdminDashboardPage() {
                       }
                       language="en"
                       accentColor="blue"
-                      maxFileSizeMb={50}
+                      maxFileSizeMb={100}
                     />
                   );
                 })()}

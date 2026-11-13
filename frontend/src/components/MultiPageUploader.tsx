@@ -83,7 +83,7 @@ export default function MultiPageUploader({
   titleHint = "",
   language = "en",
   accentColor = "blue",
-  maxFileSizeMb = 50,
+  maxFileSizeMb = 100,
 }: MultiPageUploaderProps) {
   const [pageFiles, setPageFiles] = useState<File[]>([]);
   const [pageRotations, setPageRotations] = useState<RotationDegrees[]>([]);
@@ -669,7 +669,7 @@ export default function MultiPageUploader({
               PNG / JPG / WEBP
             </span>
             <span className="text-[10px] text-slate-400 font-semibold ml-1">
-              (Max {maxFileSizeMb} MB)
+              (Max {maxFileSizeMb} MB • Large Notes & Slides Supported)
             </span>
           </div>
 

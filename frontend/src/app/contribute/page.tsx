@@ -1236,7 +1236,7 @@ export default function ContributePage() {
                       }
                       language={language}
                       accentColor="emerald"
-                      maxFileSizeMb={50}
+                      maxFileSizeMb={100}
                     />
                   );
                 })()}
