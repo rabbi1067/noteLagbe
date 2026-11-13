@@ -360,6 +360,27 @@ public class ContributionService {
         cr.setAdminFeedback(feedback);
         cr.setReviewedAt(LocalDateTime.now());
 
+        // Send in-app notification to contributor with rejection reason
+        try {
+            User contributor = cr.getUser();
+            if (contributor != null) {
+                String resourceTitle = res != null ? res.getTitle() : "Study Material";
+                String courseCode = (res != null && res.getCourse() != null) ? res.getCourse().getCode() : "SEU";
+                String reason = (feedback != null && !feedback.trim().isEmpty())
+                        ? feedback.trim()
+                        : "Submission does not meet curriculum or quality standards.";
+                notificationService.createNotification(
+                        contributor,
+                        "Submission Declined: " + resourceTitle,
+                        "Your contribution for " + courseCode + " was declined. Reason: " + reason,
+                        "CONTRIBUTION_REJECTED",
+                        "/contribute"
+                );
+            }
+        } catch (Exception e) {
+            log.warn("Failed to dispatch contribution rejection notification: {}", e.getMessage());
+        }
+
         ContributionRequest saved = contributionRequestRepository.save(cr);
         liveSyncService.broadcast("contribution", "rejected", saved.getId());
         liveSyncService.broadcast("resource", "rejected", res.getId());

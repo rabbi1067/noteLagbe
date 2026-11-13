@@ -534,9 +534,16 @@ export default function NotificationBell() {
                 ) : filteredNotifications.length > 0 ? (
                   filteredNotifications.map((n) => {
                     const isRead = n.isRead === true || n.read === true;
-                    const isApproved = n.type === "PAYMENT_APPROVED" || n.type === "SUBSCRIPTION_ACTIVATED" || n.type === "WAIVER_APPROVED";
+                    const isApproved =
+                      n.type === "PAYMENT_APPROVED" ||
+                      n.type === "SUBSCRIPTION_ACTIVATED" ||
+                      n.type === "WAIVER_APPROVED" ||
+                      n.type === "CONTRIBUTION_APPROVED";
                     const isGift = n.type === "COURSE_GIFT";
-                    const isRejected = n.type === "PAYMENT_REJECTED" || n.type === "WAIVER_REJECTED";
+                    const isRejected =
+                      n.type === "PAYMENT_REJECTED" ||
+                      n.type === "WAIVER_REJECTED" ||
+                      n.type === "CONTRIBUTION_REJECTED";
                     const isCalendar = n.type === "CALENDAR" || n.type === "EXAM";
                     const isCourse = n.type === "COURSE_UPDATE" || n.type === "RESOURCE_ADDED";
 

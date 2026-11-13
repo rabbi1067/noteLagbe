@@ -118,22 +118,15 @@ export default function ContributePage() {
     setSemester("");
     setSelectedTeacherId("");
     setUploaderKey((prev) => prev + 1);
+    setRequestedCourseCode1("");
+    setRequestedCourseCode2("");
+    setAiAnalysis(null);
 
     const deptCourses = courses.filter(
       (c) => (c.department || "CSE").toUpperCase() === selectedDepartment.toUpperCase()
     );
     if (deptCourses.length > 0) {
       setCourseCode(deptCourses[0].code);
-      if (deptCourses.length >= 3) {
-        setRequestedCourseCode1(deptCourses[1].code);
-        setRequestedCourseCode2(deptCourses[2].code);
-      } else if (deptCourses.length === 2) {
-        setRequestedCourseCode1(deptCourses[0].code);
-        setRequestedCourseCode2(deptCourses[1].code);
-      } else if (deptCourses.length === 1) {
-        setRequestedCourseCode1(deptCourses[0].code);
-        setRequestedCourseCode2(deptCourses[0].code);
-      }
     }
   };
 
@@ -154,27 +147,16 @@ export default function ContributePage() {
 
   const handleDepartmentChange = (deptId: string) => {
     setSelectedDepartment(deptId);
+    setRequestedCourseCode1("");
+    setRequestedCourseCode2("");
+    setAiAnalysis(null);
     const deptCourses = courses.filter(
       (c) => (c.department || "CSE").toUpperCase() === deptId.toUpperCase()
     );
     if (deptCourses.length > 0) {
       setCourseCode(deptCourses[0].code);
-      if (deptCourses.length >= 3) {
-        setRequestedCourseCode1(deptCourses[1].code);
-        setRequestedCourseCode2(deptCourses[2].code);
-      } else if (deptCourses.length === 2) {
-        setRequestedCourseCode1(deptCourses[0].code);
-        setRequestedCourseCode2(deptCourses[1].code);
-      } else if (deptCourses.length === 1) {
-        setRequestedCourseCode1(deptCourses[0].code);
-        setRequestedCourseCode2(deptCourses[0].code);
-      }
     } else {
       setCourseCode("");
-      if (courses.length >= 2) {
-        setRequestedCourseCode1(courses[0].code);
-        setRequestedCourseCode2(courses[1].code);
-      }
     }
   };
 
@@ -316,22 +298,64 @@ export default function ContributePage() {
   const [recheckingLink, setRecheckingLink] = useState(false);
   const verifyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // AI Assistant Analysis State (Title/Semester Auto-Suggest & Content Mismatch)
+  const [aiAnalysis, setAiAnalysis] = useState<{
+    suggestedTitle?: string;
+    suggestedSemester?: string;
+    detectedType?: string | null;
+    hasMismatch?: boolean;
+    mismatchReason?: string | null;
+  } | null>(null);
+  const [isAnalyzingDoc, setIsAnalyzingDoc] = useState(false);
+
+  const analyzeUploadedDocument = async (name: string, url: string) => {
+    if (!name && !url) return;
+    setIsAnalyzingDoc(true);
+    try {
+      const res = await fetch("/api/ai/analyze-document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: name,
+          fileUrl: url,
+          courseCode,
+          resourceType,
+          currentSemester: semester,
+          language,
+        }),
+      });
+      const data = await res.json();
+      if (data?.success) {
+        setAiAnalysis(data);
+        if (!title.trim() && data.suggestedTitle) {
+          setTitle(data.suggestedTitle);
+        }
+        if (!semester.trim() && data.suggestedSemester) {
+          setSemester(data.suggestedSemester);
+        }
+        if (data.hasMismatch && data.mismatchReason) {
+          toast.warning(data.mismatchReason, { duration: 6000 });
+        }
+      }
+    } catch (e) {
+      console.warn("AI doc analysis error:", e);
+    } finally {
+      setIsAnalyzingDoc(false);
+    }
+  };
+
   useEffect(() => {
     api.courses
       .getAll()
       .then((res) => {
         const sorted = sortCoursesNaturally(res || []);
         setCourses(sorted);
-        if (sorted && sorted.length >= 3) {
+        if (sorted && sorted.length > 0) {
           const cseCourses = sorted.filter((c: any) => (c.department || "CSE").toUpperCase() === "CSE");
-          if (cseCourses.length >= 3) {
+          if (cseCourses.length > 0) {
             setCourseCode(cseCourses[0].code);
-            setRequestedCourseCode1(cseCourses[1].code);
-            setRequestedCourseCode2(cseCourses[2].code);
           } else {
             setCourseCode(sorted[0].code);
-            setRequestedCourseCode1(sorted[1].code);
-            setRequestedCourseCode2(sorted[2].code);
           }
         }
       })
@@ -1043,9 +1067,27 @@ export default function ContributePage() {
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                   {language === "bn" ? "ম্যাটেরিয়ালের শিরোনাম" : "Material Title"} <span className="text-red-500">*</span>
                 </label>
-                <span className={`text-[11px] font-mono ${title.length >= 70 ? "text-amber-500 font-bold" : "text-slate-400"}`}>
-                  {title.length}/80
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (aiAnalysis?.suggestedTitle) {
+                        setTitle(aiAnalysis.suggestedTitle);
+                        toast.success(language === "bn" ? "✨ AI সাজেস্টেড টাইটেল যুক্ত হয়েছে!" : "✨ AI suggested title applied!");
+                      } else {
+                        analyzeUploadedDocument(uploadedFileName || `${courseCode}_Document.pdf`, fileUrl);
+                      }
+                    }}
+                    className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    title="Auto-suggest title using AI"
+                  >
+                    <Sparkles className="w-3 h-3 text-emerald-500" />
+                    <span>{language === "bn" ? "AI সাজেস্ট" : "AI Suggest"}</span>
+                  </button>
+                  <span className={`text-[11px] font-mono ${title.length >= 70 ? "text-amber-500 font-bold" : "text-slate-400"}`}>
+                    {title.length}/80
+                  </span>
+                </div>
               </div>
               <input
                 type="text"
@@ -1090,9 +1132,27 @@ export default function ContributePage() {
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                   {language === "bn" ? "সেমিস্টার" : "Semester"} <span className="text-red-500">*</span>
                 </label>
-                <span className={`text-[11px] font-mono ${semester.length >= 18 ? "text-amber-500 font-bold" : "text-slate-400"}`}>
-                  {semester.length}/20
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (aiAnalysis?.suggestedSemester) {
+                        setSemester(aiAnalysis.suggestedSemester);
+                        toast.success(language === "bn" ? "✨ AI সাজেস্টেড সেমিস্টার যুক্ত হয়েছে!" : "✨ AI suggested semester applied!");
+                      } else {
+                        analyzeUploadedDocument(uploadedFileName || `${courseCode}_Document.pdf`, fileUrl);
+                      }
+                    }}
+                    className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    title="Auto-suggest semester using AI"
+                  >
+                    <Sparkles className="w-3 h-3 text-emerald-500" />
+                    <span>{language === "bn" ? "AI সাজেস্ট" : "AI Suggest"}</span>
+                  </button>
+                  <span className={`text-[11px] font-mono ${semester.length >= 18 ? "text-amber-500 font-bold" : "text-slate-400"}`}>
+                    {semester.length}/20
+                  </span>
+                </div>
               </div>
 
               <input
@@ -1215,6 +1275,7 @@ export default function ContributePage() {
                         if (isGenericTitle) {
                           setTitle(smartContributeTitle.substring(0, 100));
                         }
+                        analyzeUploadedDocument(res.fileName || originalFiles[0]?.name || "file", res.url);
                       }}
                       onClear={() => {
                         setFileUrl("");
@@ -1222,6 +1283,7 @@ export default function ContributePage() {
                         setUploadedFileSize("");
                         setLinkStatus("idle");
                         setLinkMessage("");
+                        setAiAnalysis(null);
                       }}
                       initialUrl={fileUrl}
                       initialFileName={uploadedFileName}
@@ -1328,6 +1390,22 @@ export default function ContributePage() {
             )}
           </div>
 
+          {/* AI Content & Mismatch Alert Banner */}
+          {aiAnalysis?.hasMismatch && (
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 text-xs text-amber-800 dark:text-amber-300 animate-in fade-in">
+              <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="space-y-1 min-w-0">
+                <p className="font-bold flex items-center gap-1.5">
+                  <span>{language === "bn" ? "⚠️ AI কনটেন্ট যাচাই সতর্কতা" : "⚠️ AI Content Verification Notice"}</span>
+                  <span className="text-[10px] font-mono font-normal opacity-80">(Smart Reviewer)</span>
+                </p>
+                <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">
+                  {aiAnalysis.mismatchReason}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Row 4: 🎁 2 REWARD COURSES SELECTION BOX (BOTH WITH SEARCHABLE COMBOBOXES) */}
           <div className="p-5 sm:p-6 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border-2 border-dashed border-emerald-500/40 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1384,6 +1462,17 @@ export default function ContributePage() {
               </div>
             </div>
 
+            {(!requestedCourseCode1 || !requestedCourseCode2) && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1.5 pt-1">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                <span>
+                  {language === "bn"
+                    ? "৩ মাসের ফ্রি অ্যাক্সেস পেতে অবশ্যই ২টি পছন্দের কোর্স নির্বাচন করুন (বাধ্যতামূলক)।"
+                    : "You must choose both 2 reward courses to unlock 3 months free access (Required)."}
+                </span>
+              </p>
+            )}
+
             {requestedCourseCode1 && requestedCourseCode2 && requestedCourseCode1.toLowerCase() === requestedCourseCode2.toLowerCase() && (
               <p className="text-xs text-rose-500 font-bold flex items-center gap-1.5 pt-1">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -1404,7 +1493,14 @@ export default function ContributePage() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || linkStatus === "restricted" || contribDupCheck.isDuplicate}
+            disabled={
+              loading ||
+              linkStatus === "restricted" ||
+              contribDupCheck.isDuplicate ||
+              !requestedCourseCode1 ||
+              !requestedCourseCode2 ||
+              requestedCourseCode1.toLowerCase() === requestedCourseCode2.toLowerCase()
+            }
             className="w-full py-3.5 rounded-2xl text-xs sm:text-sm font-black text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? (

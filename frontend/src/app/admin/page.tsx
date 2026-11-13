@@ -785,6 +785,73 @@ export default function AdminDashboardPage() {
   const [contribEditFeedback, setContribEditFeedback] = useState("");
   const [savingContributionEdit, setSavingContributionEdit] = useState(false);
 
+  // Reject Contribution Modal State with AI Assist
+  const [rejectingContribution, setRejectingContribution] = useState<any | null>(null);
+  const [rejectFeedback, setRejectFeedback] = useState("");
+  const [rejectAiSuggestCount, setRejectAiSuggestCount] = useState(0);
+  const [isAiGeneratingReject, setIsAiGeneratingReject] = useState(false);
+
+  const handleOpenRejectModal = (contribution: any) => {
+    setRejectingContribution(contribution);
+    setRejectFeedback("");
+    setRejectAiSuggestCount(0);
+  };
+
+  const handleAiSuggestRejectReason = async () => {
+    if (!rejectingContribution) return;
+    setIsAiGeneratingReject(true);
+    try {
+      const res = await fetch("/api/ai/suggest-reject-note", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: rejectingContribution.uploadedResource?.title || "",
+          resourceType: rejectingContribution.uploadedResource?.type || rejectingContribution.type || "NOTE",
+          courseCode: rejectingContribution.uploadedResource?.course?.code || rejectingContribution.courseCode || "Course",
+          semester: rejectingContribution.uploadedResource?.semesterName || rejectingContribution.semesterName || "",
+          fileName: rejectingContribution.uploadedResource?.fileName || rejectingContribution.uploadedResource?.title || "",
+          fileUrl: rejectingContribution.uploadedResource?.fileUrl || "",
+          cycleIndex: rejectAiSuggestCount,
+          language: "bn",
+        }),
+      });
+      const data = await res.json();
+      if (data?.success && data?.suggestion) {
+        setRejectFeedback(data.suggestion);
+        setRejectAiSuggestCount((prev) => prev + 1);
+        toast.success(`✨ AI সাজেশন #${(rejectAiSuggestCount % 5) + 1} তৈরি হয়েছে! প্রয়োজনমতো এডিট করতে পারেন।`);
+      } else {
+        toast.error("AI সাজেশন তৈরি করা সম্ভব হয়নি");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Failed to generate AI reject note");
+    } finally {
+      setIsAiGeneratingReject(false);
+    }
+  };
+
+  const handleConfirmRejectModal = async () => {
+    if (!rejectingContribution) return;
+    const id = rejectingContribution.id;
+    setProcessingQueueKey(`contribution-${id}`);
+    try {
+      const feedback = rejectFeedback.trim() || "Submission does not meet quality or curriculum standards.";
+      const updated = await api.admin.rejectContribution(id, feedback);
+      applyStatusUpdate(setContributions, id, updated, "REJECTED");
+      markSelfQueueMutation();
+      notifyDataChanged("contribution", "rejected", id);
+      notifyDataChanged("resource", "rejected", id);
+      toast.success("Contribution rejected and student notified!");
+      showDeleteSuccess("Contribution Rejected", "The student submission has been declined and feedback sent to student.", `Submission #${id}`);
+      setRejectingContribution(null);
+      void refreshVerificationQueues({ includeResources: true });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reject contribution");
+    } finally {
+      setProcessingQueueKey(null);
+    }
+  };
+
   const contribEditSeedSlots = useMemo(
     () => buildSeedSlotsForCourse(contribEditCourseCode),
     [buildSeedSlotsForCourse, contribEditCourseCode]
@@ -2642,31 +2709,12 @@ export default function AdminDashboardPage() {
 
   const handleRejectContribution = (id: number) => {
     if (processingQueueKey) return;
-    openDeleteConfirm({
-      title: "Reject Student Submission",
-      itemType: "Contribution",
-      itemName: `Submission #${id}`,
-      warningText: "Are you sure you want to reject this student submission? The material will not be published.",
-      confirmButtonText: "Reject Submission",
-      onConfirm: async () => {
-        setProcessingQueueKey(`contribution-${id}`);
-        try {
-          const updated = await api.admin.rejectContribution(id);
-          applyStatusUpdate(setContributions, id, updated, "REJECTED");
-          markSelfQueueMutation();
-          notifyDataChanged("contribution", "rejected", id);
-          notifyDataChanged("resource", "rejected", id);
-          toast.success("Contribution rejected");
-          showDeleteSuccess("Contribution Rejected", "The student submission has been rejected and archived.", `Submission #${id}`);
-          void refreshVerificationQueues({ includeResources: true });
-        } catch (err: any) {
-          toast.error(err.message || "Failed to reject contribution");
-          throw err;
-        } finally {
-          setProcessingQueueKey(null);
-        }
-      },
-    });
+    const found = contributions.find((c) => c.id === id);
+    if (found) {
+      handleOpenRejectModal(found);
+    } else {
+      handleOpenRejectModal({ id });
+    }
   };
 
   const handleApproveWaiver = async (id: number) => {
@@ -12289,6 +12337,136 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* REJECT CONTRIBUTION MODAL WITH AI ASSIST & MANUAL NOTE */}
+      {rejectingContribution && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-[#0d1527] border border-rose-500/30 p-6 sm:p-7 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold border border-rose-500/20">
+                  <Ban className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Reject Student Submission</span>
+                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                      #{rejectingContribution.id}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Student: <span className="font-bold text-slate-700 dark:text-slate-300">{rejectingContribution.user?.name || "Student"}</span> ({rejectingContribution.user?.email || "SEU"})
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setRejectingContribution(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Submission Quick Summary Card */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5 text-xs">
+              <div className="flex items-center justify-between font-mono text-[11px] text-slate-500">
+                <span className="font-bold text-slate-800 dark:text-slate-200">
+                  {rejectingContribution.uploadedResource?.course?.code || rejectingContribution.courseCode || "Course"} • {rejectingContribution.uploadedResource?.type || rejectingContribution.type || "NOTE"}
+                </span>
+                <span>{rejectingContribution.uploadedResource?.semesterName || rejectingContribution.semesterName || "N/A"}</span>
+              </div>
+              <p className="font-bold text-slate-900 dark:text-white truncate">
+                {rejectingContribution.uploadedResource?.title || "Material"}
+              </p>
+              {rejectingContribution.uploadedResource?.fileUrl && (
+                <a
+                  href={rejectingContribution.uploadedResource.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline pt-0.5"
+                >
+                  <Eye className="w-3 h-3" />
+                  <span>Inspect Document / File</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              )}
+            </div>
+
+            {/* Rejection Note / Feedback Field with AI Suggest */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                  Rejection Reason / Note (প্রত্যাখ্যানের কারণ) <span className="text-rose-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAiSuggestRejectReason}
+                  disabled={isAiGeneratingReject}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[11px] font-black text-amber-500 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+                  title="Click to generate AI rejection note. Click again for different reasons!"
+                >
+                  {isAiGeneratingReject ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Generating Note...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 fill-amber-500" />
+                      <span>{rejectFeedback ? "✨ Change AI Reason" : "✨ AI Suggest Reason"}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <textarea
+                rows={4}
+                value={rejectFeedback}
+                onChange={(e) => setRejectFeedback(e.target.value)}
+                placeholder="Write specific rejection reason or click 'AI Suggest Reason' above. This note will be shown to the student in their notification bell icon..."
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-rose-500 leading-relaxed font-medium"
+              />
+
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                💡 <span className="font-semibold">Note:</span> এই নোটটি সরাসরি স্টুডেন্টের নোটিফিকেশন বারে চলে যাবে যেন সে বুঝতে পারে কেন রিজেক্ট হয়েছে এবং সঠিক ফাইল পুনরায় দিতে পারে। আপনি চাইলে AI সাজেস্ট নিয়ে ইচ্ছামতো এডিটও করতে পারেন।
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setRejectingContribution(null)}
+                className="px-4 py-2.5 rounded-xl font-bold text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmRejectModal}
+                disabled={Boolean(processingQueueKey)}
+                className="px-5 py-2.5 rounded-xl font-black text-xs text-white bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 shadow-md shadow-rose-600/25 disabled:opacity-50 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                {processingQueueKey === `contribution-${rejectingContribution.id}` ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Rejecting & Notifying...</span>
+                  </>
+                ) : (
+                  <>
+                    <Ban className="w-3.5 h-3.5" />
+                    <span>Confirm Reject & Send Note</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
