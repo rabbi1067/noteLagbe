@@ -30,7 +30,7 @@
 
 ## Executive Overview
 
-**NoteLagbe (`নোট লাগবে`)** is a production full-stack academic platform engineered for **Southeast University (SEU)** students and faculty administrators. Built with a decoupled **Next.js 16 (App Router + React 19 + Tailwind CSS v4)** frontend hosted on **Vercel** and a **Spring Boot 3.3.5 (Java 21)** backend containerized with **Docker** on **Render**, backed by **TiDB Cloud Serverless (MySQL 8 SSL)** and **Cloudinary CDN**.
+**NoteLagbe (`নোট লাগবে`)** is a production full-stack academic platform engineered for **Southeast University (SEU)** students and faculty administrators. Built with a decoupled **Next.js 16 (App Router + React 19 + Tailwind CSS v4)** frontend hosted on **Vercel** and a **Spring Boot 3.3.5 (Java 21)** backend containerized with **Docker** on **Render**, backed by **TiDB Cloud Serverless (MySQL 8 SSL)**, **Cloudinary CDN**, and **Cloudflare R2 Object Storage**.
 
 Reading this `README.md` alone gives a complete blueprint of every feature, data pipeline, security control, database table, and REST endpoint in the codebase.
 
@@ -59,7 +59,7 @@ noteLagbe/
 │   ├── notelagbe-architecture-3d.svg
 │   └── notelagbe-workflows-3d.svg
 ├── backend/                                    # Spring Boot 3.3.5 + Java 21 REST API & Business Engine
-│   ├── pom.xml                                 # JPA, Security, JJWT 0.12.6, Bucket4j 8.10.1, Cloudinary 1.38.0, MySQL/H2/Postgres
+│   ├── pom.xml                                 # JPA, Security, JJWT 0.12.6, Bucket4j, Cloudinary 1.38.0, AWS S3 / Cloudflare R2, MySQL/H2/Postgres
 │   └── src/
 │       ├── main/java/com/notelagbe/
 │       │   ├── config/                         # SecurityConfig, RateLimitFilter, CacheConfig, SchemaMigrationRunner, WebMvcConfig
@@ -112,7 +112,7 @@ flowchart TD
     end
 
     Services -->|HikariCP Pool (max 5, minIdle 1, 10s timeout)| TiDB[("TiDB Cloud / MySQL 8 SSL (17 Tables) or Local H2")]
-    Services -->|Multipart Notes, Photos, Chat Audio/Images| CDN["Cloudinary CDN (HTTPS) / Local Disk Fallback"]
+    Services -->|Multipart Notes, Photos, Chat Audio/Images| CDN["Smart Hybrid Storage: Cloudflare R2 (>10MB / PDFs) + Cloudinary (<=10MB / Images) / Local Disk"]
     Services -->|OTP & Admin Notices| Mail["5-Provider Email Relay (Vercel Relay / Brevo / Resend / Apps Script / SMTP)"]
     Services -->|Admin/Content Mutations| SSE["LiveSyncService Daemon Executor (SSE /api/sync/events)"]
     SSE -->|Real-Time UI Invalidation| User
@@ -193,8 +193,11 @@ sequenceDiagram
 
 - **14 Academic Resource Categories (`ResourceType`)**:
   `NOTE`, `QUESTION_COURSE_IN` (Course-in Questions), `MID_QUESTION`, `FINAL_QUESTION`, `QUIZ_CT`, `DOC_NOTE`, `PROJECT_LINK`, `LAB_MANUAL`, `LAB_QUIZ`, `LAB_FINAL`, `LAB_REPORT`, `LAB_HAND_NOTE`, `SYLLABUS`, `OTHERS`.
-- **Dual Media Pipeline (`CloudinaryService` + Local Disk)**: When Cloudinary credentials are configured, PDFs, images, avatars, and chat attachments upload over HTTPS to scoped Cloudinary folders; otherwise files persist safely under local `/uploads/**` served through `WebMvcConfig` and Next.js beforeFiles rewrites.
-- **Multi-Page Camera/Image -> PDF Merger (`pdfMerger.ts` & `MultiPageUploader.tsx`)**: Students can snap multiple pages of handwritten notes and merge them directly in the browser via `pdf-lib` into a single paginated PDF before uploading.
+- **Smart Hybrid Storage Pipeline (`CloudflareR2Service` + `CloudinaryService` + Local Disk)**:
+  - **Files <= 10 MB & Images**: Automatically routed to **Cloudinary** for image optimization, responsive webp transformations, and fast thumbnail generation.
+  - **Files > 10 MB, Handwritten Notes & Large PDFs (Up to 100 MB)**: Automatically routed to **Cloudflare R2 Object Storage** (S3-compatible, zero egress costs, no raw file size cap) to handle massive student lecture notebooks and multi-page exam bundles seamlessly.
+  - **Multi-Tier Fault Tolerance**: If any cloud provider is unconfigured or encounters a transient network timeout, uploads seamlessly fall back to secondary cloud storage and local `/uploads/**` disk with zero user-facing 500 crashes.
+- **Multi-Page Camera/Image -> PDF Merger (`pdfMerger.ts` & `MultiPageUploader.tsx`)**: Students can snap multiple pages of handwritten notes and merge them directly in the browser via `pdf-lib` into a single paginated PDF before uploading, with automatic portrait alignment and 100MB capacity.
 - **Link SSRF Guard (`GET /api/contributions/verify-link`)**: External resource URLs (e.g., public Google Drive folders/files) pass backend validation rejecting localhost, link-local, and RFC1918 private IPs before being attached.
 - **In-Browser Viewing, Batch ZIP & Revision Cheat Sheet**:
   - `PDFViewerModal.tsx` previews uploaded PDFs and slides inline (subject to unlock authorization).
@@ -374,7 +377,7 @@ erDiagram
 | **Media & Email** | `cloudinary-http44` `1.38.0`, `nodemailer` `10.5.0` (Next.js Relay), Brevo & Resend REST APIs, Google Apps Script, JavaMail SMTP |
 | **Frontend Core** | Next.js `16.4.3` (App Router + Turbopack), React `19.3.0`, TypeScript `^5`, Tailwind CSS `^4` |
 | **Frontend Utilities** | `lucide-react` `^1.62.0`, `sonner` `^2.0.8`, `jszip` `^3.10.2`, `jspdf` `^4.2.1`, `pdf-lib` `^1.17.1`, `html2canvas` `^1.4.1`, `html-to-image` `^1.11.13`, `canvas-confetti` `^1.9.4` |
-| **Infrastructure** | Vercel Edge (Frontend & Rewrites), Render Docker (`PORT=10000`), TiDB Cloud Serverless, Cloudinary CDN |
+| **Infrastructure** | Vercel Edge (Frontend & Rewrites), Render Docker (`PORT=10000`), TiDB Cloud Serverless, Cloudinary CDN, Cloudflare R2 Object Storage |
 
 ---
 
@@ -454,7 +457,8 @@ Configure via Render / Vercel environment settings (never commit `.env*` or `*.y
 | **Server & DB** | `PORT`, `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `SPRING_DATASOURCE_DRIVER_CLASS_NAME`, `SPRING_JPA_DATABASE_PLATFORM`, `SPRING_JPA_HIBERNATE_DDL_AUTO`, `HIKARI_MAX_POOL_SIZE` | Defaults to `8888`, H2 in-memory locally, `max-pool-size=5` for TiDB/MySQL SSL |
 | **Security & OAuth** | `JWT_SECRET`, `JWT_EXPIRATION`, `JWT_REFRESH_EXPIRATION`, `GOOGLE_CLIENT_ID`, `CORS_ALLOWED_ORIGINS` | 24h access (`86400000ms`), 7d refresh (`604800000ms`), Google ID token validation |
 | **Admin & Safety** | `INITIAL_ADMIN_EMAIL`, `INITIAL_ADMIN_PASSWORD`, `APP_OWNER_EMAIL`, `APP_DEMO_ENABLED`, `APP_CATALOG_INIT` | `APP_DEMO_ENABLED=false`, `APP_CATALOG_INIT=true` |
-| **Cloudinary CDN** | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Enables HTTPS CDN uploads; falls back to `./uploads` disk when blank |
+| **Cloudinary CDN** | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Enables HTTPS CDN uploads for standard images and files <= 10MB; falls back to `./uploads` disk when blank |
+| **Cloudflare R2** | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL` | High-speed S3 storage for files > 10MB, large handwritten notes & PDFs up to 100MB with zero egress bandwidth charges |
 | **Email Relay** | `EMAIL_ENABLED`, `EMAIL_PROVIDER`, `EMAIL_FROM`, `EMAIL_FROM_NAME`, `EMAIL_FRONTEND_URL`, `EMAIL_VERCEL_RELAY_AUTO_FALLBACK`, `EMAIL_WEBHOOK_URL`, `EMAIL_WEBHOOK_SECRET`, `BREVO_API_KEY`, `RESEND_API_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | Multi-provider OTP delivery & Vercel `/api/mail-relay` fallback |
 | **Frontend Proxy** | `BACKEND_INTERNAL_URL`, `NEXT_PUBLIC_BACKEND_URL`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_APP_URL` | Controls `/api/*` rewrite destination & direct cold-start fallback origin |
 

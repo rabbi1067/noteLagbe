@@ -908,38 +908,50 @@ public class ResourceService {
         boolean isImg = List.of("png", "jpg", "jpeg", "webp").contains(ext);
         boolean isLargeFile = bytes > 10L * 1024 * 1024; // > 10MB
 
-        // 1. Primary for Large Files or Documents: Cloudflare R2
-        // Cloudinary Free Plan strictly limits non-image RAW uploads to 10MB.
-        // Cloudflare R2 has zero file size limits, zero egress fees, and handles 50MB-100MB lecture notes effortlessly!
-        if (r2Service.isConfigured() && (isLargeFile || !isImg)) {
-            try {
-                fileUrl = r2Service.uploadFile(file, "notelagbe/materials");
-                storageProvider = "CLOUDFLARE_R2";
-                log.info("Uploaded academic material ({}, {} MB) to Cloudflare R2: {}", ext, String.format(java.util.Locale.US, "%.2f", bytes / (1024.0 * 1024.0)), fileUrl);
-            } catch (Exception e) {
-                log.error("Cloudflare R2 upload failed ({}), falling back to secondary storage providers: {}", e.getMessage(), e);
-            }
-        }
+        // HYBRID / SMART STORAGE ROUTING:
+        // Rule 1: Files <= 10MB (images, small PDFs, question papers) -> Cloudinary (optimized CDN delivery & fast thumbnails)
+        // Rule 2: Files > 10MB (large handwritten notes, multi-page slide decks, ZIPs) -> Cloudflare R2 (zero limits, zero egress)
+        // Resilient Fallback: If primary fails or is unconfigured, seamlessly fallback to secondary or local disk.
 
-        // 2. Secondary: Cloudinary (best for images and documents <= 10MB)
-        if (fileUrl == null && cloudinaryService.isConfigured()) {
-            try {
-                fileUrl = cloudinaryService.uploadFile(file, "notelagbe/materials", isImg);
-                storageProvider = "CLOUDINARY";
-                log.info("Uploaded academic material to Cloudinary: {}", fileUrl);
-            } catch (Exception e) {
-                log.warn("Cloudinary upload failed ({}). Attempting fallback storage.", e.getMessage());
+        if (isLargeFile) {
+            // > 10MB: Primary is Cloudflare R2
+            if (r2Service.isConfigured()) {
+                try {
+                    fileUrl = r2Service.uploadFile(file, "notelagbe/materials");
+                    storageProvider = "CLOUDFLARE_R2";
+                    log.info("Uploaded large academic material ({}, {} MB) to Cloudflare R2: {}", ext, String.format(java.util.Locale.US, "%.2f", bytes / (1024.0 * 1024.0)), fileUrl);
+                } catch (Exception e) {
+                    log.error("Cloudflare R2 upload failed ({}), attempting Cloudinary fallback: {}", e.getMessage(), e);
+                }
             }
-        }
-
-        // 3. Fallback to Cloudflare R2 if not tried yet (e.g. smaller image when Cloudinary is unavailable)
-        if (fileUrl == null && r2Service.isConfigured()) {
-            try {
-                fileUrl = r2Service.uploadFile(file, "notelagbe/materials");
-                storageProvider = "CLOUDFLARE_R2";
-                log.info("Uploaded material to Cloudflare R2 on fallback: {}", fileUrl);
-            } catch (Exception e) {
-                log.error("Cloudflare R2 fallback upload failed: {}", e.getMessage(), e);
+            if (fileUrl == null && cloudinaryService.isConfigured()) {
+                try {
+                    fileUrl = cloudinaryService.uploadFile(file, "notelagbe/materials", isImg);
+                    storageProvider = "CLOUDINARY";
+                    log.info("Uploaded large material to Cloudinary on fallback: {}", fileUrl);
+                } catch (Exception e) {
+                    log.warn("Cloudinary fallback failed for large file: {}", e.getMessage());
+                }
+            }
+        } else {
+            // <= 10MB: Primary is Cloudinary
+            if (cloudinaryService.isConfigured()) {
+                try {
+                    fileUrl = cloudinaryService.uploadFile(file, "notelagbe/materials", isImg);
+                    storageProvider = "CLOUDINARY";
+                    log.info("Uploaded standard academic material ({}, {} MB) to Cloudinary: {}", ext, String.format(java.util.Locale.US, "%.2f", bytes / (1024.0 * 1024.0)), fileUrl);
+                } catch (Exception e) {
+                    log.warn("Cloudinary upload failed ({}), attempting Cloudflare R2 fallback: {}", e.getMessage(), e);
+                }
+            }
+            if (fileUrl == null && r2Service.isConfigured()) {
+                try {
+                    fileUrl = r2Service.uploadFile(file, "notelagbe/materials");
+                    storageProvider = "CLOUDFLARE_R2";
+                    log.info("Uploaded material to Cloudflare R2 on fallback: {}", fileUrl);
+                } catch (Exception e) {
+                    log.error("Cloudflare R2 fallback failed: {}", e.getMessage(), e);
+                }
             }
         }
 
