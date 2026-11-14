@@ -365,28 +365,36 @@ public class AiExamChatService {
                 + "5. Format cleanly using Markdown with bold headings, clean bullet points, and code snippets.\n"
                 + "6. Language Policy: " + langInstruction;
 
-        // Build conversation contents for Gemini REST API
-        List<Map<String, Object>> contents = new ArrayList<>();
+        // Build conversation contents for Gemini REST API with top-level system_instruction
+        Map<String, Object> requestPayload = new HashMap<>();
+        requestPayload.put("system_instruction", Map.of(
+                "parts", List.of(Map.of("text", systemInstruction))
+        ));
 
-        // Add history (up to last 6 messages)
+        // Build cleanly alternating contents for Gemini multi-turn conversation
+        List<Map<String, Object>> contents = new ArrayList<>();
+        String lastRole = null;
         int historyStart = Math.max(0, history.size() - 6);
         for (int i = historyStart; i < history.size(); i++) {
             AiExamChatMessage msg = history.get(i);
             String role = "user".equalsIgnoreCase(msg.getRole()) ? "user" : "model";
-            contents.add(Map.of(
-                    "role", role,
-                    "parts", List.of(Map.of("text", msg.getContent()))
-            ));
+            if (!role.equals(lastRole)) {
+                contents.add(Map.of(
+                        "role", role,
+                        "parts", List.of(Map.of("text", msg.getContent()))
+                ));
+                lastRole = role;
+            }
         }
-
-        // Add current prompt with system context
-        String fullUserPrompt = "SYSTEM CONTEXT:\n" + systemInstruction + "\n\nSTUDENT QUESTION:\n" + userPrompt;
+        // Ensure final turn is user
+        if ("user".equals(lastRole) && !contents.isEmpty()) {
+            contents.remove(contents.size() - 1);
+        }
         contents.add(Map.of(
                 "role", "user",
-                "parts", List.of(Map.of("text", fullUserPrompt))
+                "parts", List.of(Map.of("text", userPrompt))
         ));
 
-        Map<String, Object> requestPayload = new HashMap<>();
         requestPayload.put("contents", contents);
         requestPayload.put("generationConfig", Map.of(
                 "temperature", 0.65,
@@ -396,15 +404,17 @@ public class AiExamChatService {
 
         String requestJson = objectMapper.writeValueAsString(requestPayload);
 
-        // Try candidate models in order: gemini-2.5-flash, gemini-2.0-flash, gemini-1.5-flash, gemini-1.5-pro
-        String[] candidateModels = {"gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"};
+        // Candidate models in priority order: gemini-2.0-flash, gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash-lite
+        String[] candidateModels = {"gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-lite"};
         for (String model : candidateModels) {
             try {
-                String endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + apiKey;
+                String cleanKey = apiKey.trim();
+                String endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + cleanKey;
 
                 HttpRequest httpRequest = HttpRequest.newBuilder()
                         .uri(URI.create(endpoint))
                         .header("Content-Type", "application/json")
+                        .header("x-goog-api-key", cleanKey)
                         .timeout(Duration.ofSeconds(12))
                         .POST(HttpRequest.BodyPublishers.ofString(requestJson))
                         .build();
@@ -417,14 +427,17 @@ public class AiExamChatService {
                     if (candidates.isArray() && !candidates.isEmpty()) {
                         JsonNode parts = candidates.get(0).path("content").path("parts");
                         if (parts.isArray() && !parts.isEmpty()) {
-                            return parts.get(0).path("text").asText();
+                            String generated = parts.get(0).path("text").asText();
+                            if (generated != null && !generated.isBlank()) {
+                                return generated.trim();
+                            }
                         }
                     }
                 } else {
-                    log.debug("[AI Exam Chat] Model {} returned HTTP {}", model, httpResponse.statusCode());
+                    log.warn("[AI Exam Chat] Gemini model {} returned HTTP {}: {}", model, httpResponse.statusCode(), httpResponse.body());
                 }
             } catch (Exception ex) {
-                log.warn("[AI Exam Chat] Model {} failed: {}", model, ex.getMessage());
+                log.warn("[AI Exam Chat] Gemini model {} request failed: {}", model, ex.getMessage());
             }
         }
 
@@ -717,34 +730,51 @@ public class AiExamChatService {
         }
 
         // -------------------------------------------------------------
-        // PATTERN 4: Specific question asked by student (not a general syllabus request)
+        // PATTERN 4: Comprehensive Universal Academic Problem Solver
         // -------------------------------------------------------------
-        boolean isGeneralSyllabusRequest = p.contains("syllabus") || p.contains("suggestion") || p.contains("সবচেয়ে বেশি আসা") || p.contains("important topic") || p.length() < 10;
+        boolean isGeneralSyllabusRequest = p.contains("syllabus") || p.contains("suggestion") || p.contains("সবচেয়ে বেশি আসা") || p.contains("important topic") || p.length() < 8;
         if (!isGeneralSyllabusRequest) {
-            return isBengali
-                    ? "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
-                    + "**কোর্স:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
-                    + "**ফ্যাকাল্টি ফোকাস:** `" + teacherLabel + "`  \n\n"
-                    + "---\n\n"
-                    + "### 📌 **আপনার প্রশ্নের একাডেমিক সমাধান ও পরীক্ষার মডেল অ্যানসার:**\n\n"
-                    + "আপনার জিজ্ঞাসা: *\"" + userPrompt + "\"*\n\n"
-                    + "1. **মূল কনসেপ্ট ও ডেফিনিশন:** " + course.getCode() + "-এর সিলেবাস ও Southeast University-র পরীক্ষা অনুযায়ী এই বিষয়ের সঠিক তত্ত্ব ও গাণিতিক নিয়মাবলী বিশেষভাবে গুরুত্বপূর্ণ।\n"
-                    + "2. **পরীক্ষায় স্টেপ-বাই-স্টেপ উপস্থাপন:**\n"
-                    + "   * প্রথমে মূল সংজ্ঞা বা সূত্রটি লিখুন।\n"
-                    + "   * প্রয়োজনীয় ডাটা স্ট্রাকচার বা ডায়াগ্রাম স্পষ্ট করে ড্র করুন।\n"
-                    + "   * গাণিতিক সমস্যা হলে প্রতি ধাপে ইন্টারমিডিয়েট ভ্যালু দেখান যাতে ফুল স্টেপ-মার্কিং নিশ্চিত হয়।\n"
-                    + "3. **বিগত পরীক্ষার অভিজ্ঞতা:** এই কোর্সটিতে বিগত সেমিস্টারের প্রশ্নপত্র সমাধান করলে প্রায় ৮০%+ প্রশ্ন কমন পাওয়া যায়।\n\n"
-                    + "> 💬 **টিপ:** আপনি যেকোনো নির্দিষ্ট কোড, অ্যালগরিদম বা বিগত পরীক্ষার প্রশ্ন নম্বর লিখে পাঠালে আমি স্টেপ-বাই-স্টেপ সমাধান প্রদান করব!"
-                    : "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
-                    + "**Course:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
-                    + "**Faculty Focus:** `" + teacherLabel + "`  \n\n"
-                    + "---\n\n"
-                    + "### 📌 **Academic Solution & Exam Strategy:**\n\n"
-                    + "Regarding: *\"" + userPrompt + "\"*\n\n"
-                    + "1. **Core Concept:** Grounded in " + course.getCode() + " curriculum standards and exam question patterns.\n"
-                    + "2. **Step-by-Step Problem Solving:** Always write intermediate steps, state base formulas, and draw labeled diagrams for partial credit.\n"
-                    + "3. **Past Archive Pattern:** Review verified semester archives on NoteLagbe to master recurrent exam styles.\n\n"
-                    + "> 💬 **Tip:** Send any specific program, equation, or past question for an immediate step-by-step model answer!";
+            StringBuilder sb = new StringBuilder();
+            sb.append("### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n");
+            sb.append("**কোর্স:** `").append(course.getCode()).append(" - ").append(course.getTitle()).append("`  \n");
+            sb.append("**শিক্ষক ফোকাস:** `").append(teacherLabel).append("`  \n\n");
+            sb.append("---\n\n");
+            sb.append("### 📝 **একাডেমিক মডেল সলিউশন ও স্টেপ-বাই-স্টেপ বিশ্লেষণ:**\n\n");
+            sb.append("**প্রশ্ন/টপিক:** *\"").append(userPrompt).append("\"*\n\n");
+
+            if (p.contains("tree") || p.contains("bst") || p.contains("traversal") || p.contains("ট্রি")) {
+                sb.append("#### 🔹 **Binary Tree & Traversal Analysis:**\n");
+                sb.append("* **In-order (LNR):** বাম সাবট্রি $\\to$ মূল নোড $\\to$ ডান সাবট্রি (BST-র ক্ষেত্রে এটি সর্টেড অর্ডার দেয়)।\n");
+                sb.append("* **Pre-order (NLR):** মূল নোড $\\to$ বাম সাবট্রি $\\to$ ডান সাবট্রি (ট্রি ক্লোনিং বা এক্সপ্রেশন ট্রি জেনারেশনে ব্যবহৃত)।\n");
+                sb.append("* **Post-order (LRN):** বাম সাবট্রি $\\to$ ডান সাবট্রি $\\to$ মূল নোড (ট্রি ডিলিট বা পোস্টফিক্স মূল্যায়নে ব্যবহৃত)।\n\n");
+            } else if (p.contains("stack") || p.contains("queue") || p.contains("স্ট্যাক")) {
+                sb.append("#### 🔹 **Stack & Queue Principles:**\n");
+                sb.append("* **Stack (LIFO):** `push()`, `pop()`, `peek()` — ফাংশন কল ও রিকার্শনে মেমোরি স্ট্যাক ব্যবহৃত হয়।\n");
+                sb.append("* **Queue (FIFO):** `enqueue()`, `dequeue()` — সিপিইউ টাস্ক শিডিউলিং ও বাফারিংয়ে ব্যবহৃত হয়।\n\n");
+            } else if (p.contains("sql") || p.contains("database") || p.contains("normalization") || p.contains("1nf") || p.contains("2nf") || p.contains("3nf")) {
+                sb.append("#### 🔹 **Database Normalization & Relational Schema:**\n");
+                sb.append("* **1NF:** প্রতিটি কলামে অ্যাটমিক (অবিভাজ্য) মান থাকতে হবে; কোনো রিপিটিং গ্রুপ থাকা যাবে না।\n");
+                sb.append("* **2NF:** 1NF হতে হবে এবং কোনো Partial Functional Dependency থাকা যাবে না (সকল নন-প্রাইম অ্যাট্রিবিউট সম্পূর্ণ কম্পোজিট কি-র উপর নির্ভরশীল হবে)।\n");
+                sb.append("* **3NF:** 2NF হতে হবে এবং কোনো Transitive Dependency ($X \\to Y \\to Z$) থাকা যাবে না।\n");
+                sb.append("* **BCNF:** প্রতিটি ফাংশনাল ডিপেন্ডেন্সি $X \\to Y$-এ $X$ কে অবশ্যই একটি Super Key হতে হবে।\n\n");
+            } else if (p.contains("oop") || p.contains("class") || p.contains("object") || p.contains("polymorphism") || p.contains("inheritance")) {
+                sb.append("#### 🔹 **OOP Core Paradigms:**\n");
+                sb.append("* **Encapsulation:** ডেটা এবং মেথডকে একটি সিঙ্গেল ইউনিটে বাইন্ড করা এবং প্রাইভেট ফিল্ডে গেটার/সেটার দিয়ে এক্সেস নিশ্চিত করা।\n");
+                sb.append("* **Inheritance:** সাবক্লাস দ্বারা প্যারেন্ট ক্লাসের প্রপার্টি ও মেথড রিইউজ করা।\n");
+                sb.append("* **Polymorphism:** Compile-time (Method Overloading) এবং Runtime (Method Overriding using `virtual`/`@Override`)।\n");
+                sb.append("* **Abstraction:** ব্যাকগ্রাউন্ড ইমপ্লিমেন্টেশন লুকিয়ে প্রয়োজনীয় ফিচার ইন্টারফেসের মাধ্যমে দেখানো।\n\n");
+            } else {
+                sb.append("#### 🔹 **কোর একাডেমিক থিওরি ও মেকানিক্স:**\n");
+                sb.append("1. **তাত্ত্বিক সংজ্ঞা:** এই বিষয়ের মূল নীতি হলো কাঠামোগত নিয়ম ও গাণিতিক সূত্রের নির্ভুল প্রয়োগ।\n");
+                sb.append("2. **স্টেপ-বাই-স্টেপ উপস্থাপন:** প্রথমে মূল ডেফিনিশন, এরপর প্রয়োজনীয় গাণিতিক হিসাব বা সিউডোকোড, এবং শেষে বাস্তব উদাহরণ দেওয়া আবশ্যক।\n");
+                sb.append("3. **অ্যালগরিদমিক বা গাণিতিক যাচাই:** যেকেনো ইনপুটের জন্য কর্নার কেস বা বাউন্ডারি কন্ডিশন উল্লেখ করতে হবে।\n\n");
+            }
+
+            sb.append("#### 💡 **Southeast University পরীক্ষার জন্য স্পেশাল টিপস:**\n");
+            sb.append("* **ফুল মার্কস পাওয়ার কৌশল:** খাতায় যেকোনো অ্যালগরিদম লেখার সময় ইনপুট, আউটপুট ও টাইম কমপ্লেক্সিটি স্পষ্টভাবে নিচে লিখবেন।\n");
+            sb.append("* **স্টেপ মার্কিং সুবিধা:** সম্পূর্ণ ফাইনাল উত্তরে ভুল হলেও প্রতিটা স্টেপের জন্য আলাদা মার্কস প্রদান করা হয়, তাই কোনো স্টেপ বাদ দিবেন না।\n\n");
+            sb.append("> 💬 **টিপ:** আপনার কাছে কোনো নির্দিষ্ট প্রশ্নপত্র বা অংক থাকলে তার নির্দিষ্ট কোড বা সমীকরণ এখানে পেস্ট করুন, আমি তাৎক্ষণিক পুঙ্খানুপুঙ্খ সমাধান করে দেব!");
+            return sb.toString();
         }
 
         boolean isOS = codeUpper.contains("CSE361") || titleLower.contains("operating system");
