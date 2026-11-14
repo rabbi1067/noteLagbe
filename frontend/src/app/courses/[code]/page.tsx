@@ -50,6 +50,7 @@ import {
   TrendingUp,
   Users,
   ShieldCheck,
+  ShieldAlert,
   X
 } from "lucide-react";
 import { toast } from "sonner";
@@ -269,42 +270,23 @@ export default function CourseDetailPage() {
     }
   };
 
-  const handleDownloadOfflineZip = async () => {
-    if (!isAuthenticated) {
-      toast.info(language === "bn" ? "অফলাইন স্টাডি প্যাক ডাউনলোড করতে প্রথমে সাইন ইন করুন।" : "Please sign in to download the offline study pack.");
-      setShowAuthModal(true);
-      return;
-    }
+  // Security Maintenance Notice for Offline Study Pack (ZIP)
+  const [showOfflinePackSecurityModal, setShowOfflinePackSecurityModal] = useState(false);
 
-    if (!hasAnyCourseAccess) {
-      toast.error(language === "bn" ? "অফলাইন স্টাডি প্যাক ডাউনলোড করতে প্রথমে কোর্সটি আনলক করুন।" : "Please unlock this course to download the offline study pack.");
-      return;
-    }
-
-    setDownloadingZip(true);
-    const toastId = toast.loading(
+  const handleOfflineStudyPackDisabledNotice = () => {
+    toast.error(
       language === "bn"
-        ? `${code} অফলাইন স্টাডি প্যাক (.ZIP) তৈরি হচ্ছে... সব নোট ও প্রশ্ন একত্রিত করা হচ্ছে`
-        : `Preparing ${code} Offline Study Pack (.ZIP)... Packing all approved notes & exam papers`
+        ? "🛡️ নিরাপত্তাজনিত কারণে অফলাইন স্টাডি প্যাক (ZIP) সেবাটি সাময়িকভাবে বন্ধ রাখা হয়েছে।"
+        : "🛡️ For security purposes, the Offline Study Pack (ZIP) service is temporarily disabled.",
+      {
+        duration: 5000,
+        icon: "🔒",
+      }
     );
-
-    try {
-      await api.courses.downloadZip(code);
-      toast.success(
-        language === "bn"
-          ? `${code} অফলাইন স্টাডি প্যাক ডাউনলোড সম্পন্ন! ইন্টারনেট ছাড়াই এক্সট্র্যাক্ট করে পড়তে পারবেন।`
-          : `${code} Offline Study Pack downloaded! Extract and study anywhere without internet.`,
-        { id: toastId }
-      );
-      try {
-        confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
-      } catch {}
-    } catch (err: any) {
-      toast.error(err.message || (language === "bn" ? "ডাউনলোড করতে ব্যর্থ হয়েছে" : "Failed to download offline pack"), { id: toastId });
-    } finally {
-      setDownloadingZip(false);
-    }
+    setShowOfflinePackSecurityModal(true);
   };
+
+  const handleDownloadOfflineZip = handleOfflineStudyPackDisabledNotice;
 
   const handleOpenViewer = (res: any) => {
     setSelectedResource(res);
@@ -773,61 +755,33 @@ export default function CourseDetailPage() {
               </div>
             )}
 
-            {/* Offline Study Mode (ZIP) CTA */}
-            {hasAnyCourseAccess ? (
-              <button
-                onClick={handleDownloadOfflineZip}
-                disabled={downloadingZip}
-                className="w-full py-3 px-4 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-700 hover:to-teal-700 shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-70 group border border-emerald-500/30"
-              >
-                {downloadingZip ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
-                ) : (
-                  <Download className="w-4 h-4 text-emerald-100 group-hover:scale-110 transition-transform shrink-0" />
-                )}
+            {/* Offline Study Pack (ZIP) CTA - Temporarily Disabled for Security */}
+            <button
+              onClick={handleOfflineStudyPackDisabledNotice}
+              className="w-full py-3 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-between gap-2.5 cursor-pointer group bg-slate-100/90 hover:bg-slate-200/90 dark:bg-[#11192e] dark:hover:bg-[#16213b] border border-amber-500/30 shadow-xs"
+              title={
+                language === "bn"
+                  ? "নিরাপত্তাজনিত কারণে এই সেবাটি সাময়িকভাবে বন্ধ রাখা হয়েছে"
+                  : "For security purposes, this service is temporarily disabled"
+              }
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 group-hover:scale-105 transition-transform shrink-0">
+                  <ShieldAlert className="w-4 h-4" />
+                </div>
                 <div className="flex flex-col text-left">
-                  <span className="leading-tight font-black text-[13px]">
-                    {downloadingZip
-                      ? (language === "bn" ? "প্যাকেজ প্রস্তুত হচ্ছে..." : "Packaging ZIP...")
-                      : (language === "bn" ? "অফলাইন স্টাডি প্যাক (ZIP)" : "Offline Study Pack (ZIP)")}
+                  <span className="leading-tight font-black text-[13px] text-slate-900 dark:text-white">
+                    {language === "bn" ? "অফলাইন স্টাডি প্যাক (ZIP)" : "Offline Study Pack (ZIP)"}
                   </span>
-                  <span className="text-[10px] font-normal text-emerald-100/90 leading-tight">
-                    {!isCourseUnlocked && unlockedTeacherDetails.length > 0
-                      ? (language === "bn" ? "গিফটকৃত ফ্যাকাল্টির ফাইল ডাউনলোড" : "Downloads unlocked faculty materials")
-                      : (language === "bn" ? "১-ক্লিকে সব হ্যান্ডনোট ও প্রশ্ন ডাউনলোড" : "1-Click Download All Approved Notes")}
+                  <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400/90 leading-tight">
+                    {language === "bn" ? "নিরাপত্তার স্বার্থে সেবাটি সাময়িক স্থগিত" : "Temporarily paused for security"}
                   </span>
                 </div>
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  if (!isAuthenticated) {
-                    toast.info(language === "bn" ? "অফলাইন স্টাডি প্যাকের জন্য সাইন ইন করুন" : "Please sign in to unlock offline study pack");
-                    setShowAuthModal(true);
-                  } else {
-                    handleUnlockCourse();
-                  }
-                }}
-                className="w-full p-3 rounded-2xl bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 transition-all flex items-center justify-between gap-2 text-left cursor-pointer group shadow-sm"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 group-hover:text-blue-500 transition-colors">
-                    <Download className="w-4 h-4" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                      {language === "bn" ? "অফলাইন স্টাডি মোড (ZIP)" : "Offline Study Pack (ZIP)"}
-                    </span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                      {language === "bn" ? "কোর্স আনলক করে অফলাইনে পড়ুন" : "Unlock course to download pack"}
-                    </span>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/70 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 shrink-0">
-                  🔒 {language === "bn" ? "লকড" : "Locked"}
-                </span>
-              </button>
-            )}
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                🔒 {language === "bn" ? "স্থগিত" : "Disabled"}
+              </span>
+            </button>
 
             {/* Real Social Proof Card - Only when real unlocks exist */}
             {Boolean(course.unlockCount && course.unlockCount > 0) && (
@@ -1055,24 +1009,21 @@ export default function CourseDetailPage() {
               )}
             </div>
 
-            {/* Quick 1-Click ZIP Download button */}
+            {/* Quick 1-Click ZIP Download button (Temporarily Disabled for Security) */}
             <button
-              onClick={hasAnyCourseAccess ? handleDownloadOfflineZip : handleUnlockCourse}
-              disabled={downloadingZip}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-sm cursor-pointer"
-              title={language === "bn" ? "অফলাইন স্টাডি প্যাক ডাউনলোড (.ZIP)" : "Download Offline Study Pack (.ZIP)"}
+              onClick={handleOfflineStudyPackDisabledNotice}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-amber-500/30 shadow-xs cursor-pointer opacity-90 hover:opacity-100"
+              title={
+                language === "bn"
+                  ? "নিরাপত্তাজনিত কারণে এই সেবাটি সাময়িকভাবে বন্ধ রাখা হয়েছে"
+                  : "For security purposes, this service is temporarily disabled"
+              }
             >
-              {downloadingZip ? (
-                <div className="w-3.5 h-3.5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Download className="w-3.5 h-3.5 text-emerald-500" />
-              )}
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
               <span className="hidden sm:inline font-bold">
                 {language === "bn" ? "অফলাইন ZIP" : "Offline ZIP"}
               </span>
-              {!hasAnyCourseAccess && (
-                <span className="text-[10px] text-amber-500 font-bold">🔒</span>
-              )}
+              <span className="text-[10px] text-amber-500 font-bold">🔒</span>
             </button>
           </div>
 
@@ -2169,6 +2120,70 @@ export default function CourseDetailPage() {
                 className="px-4 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
               >
                 {language === "bn" ? "বন্ধ করুন" : "Close"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OFFLINE STUDY PACK (ZIP) DISABLED SECURITY NOTICE MODAL */}
+      {showOfflinePackSecurityModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-[#0c1427] border border-amber-500/30 p-6 sm:p-7 shadow-2xl space-y-5 text-center relative overflow-hidden">
+            {/* Ambient decorative glow */}
+            <div className="absolute -top-16 -right-16 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute -bottom-16 -left-16 w-36 h-36 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" />
+
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => setShowOfflinePackSecurityModal(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Security Icon */}
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center text-amber-500 shadow-inner">
+              <ShieldAlert className="w-7 h-7" />
+            </div>
+
+            {/* Header & Badges */}
+            <div className="space-y-1.5">
+              <span className="inline-block text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                {language === "bn" ? "নিরাপত্তা নোটিশ • সাময়িক স্থগিত" : "Security Notice • Temporarily Disabled"}
+              </span>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                {language === "bn" ? "অফলাইন স্টাডি প্যাক (ZIP) স্থগিত" : "Offline Study Pack (ZIP) Disabled"}
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                {language === "bn"
+                  ? "শিক্ষার্থীদের ডেটা সুরক্ষা ও সার্ভার নিরাপত্তা নিশ্চিত করতে অফলাইন স্টাডি প্যাক (সব ফাইল এক ক্লিকে জিপ ডাউনলোড) সেবাটি সাময়িকভাবে বন্ধ রাখা হয়েছে।"
+                  : "For security purposes and platform data integrity, the offline study pack (1-click full ZIP archive download) service is temporarily disabled."}
+              </p>
+            </div>
+
+            {/* Reassurance Card */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-left space-y-2 text-xs">
+              <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-200">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>{language === "bn" ? "অনলাইনে সম্পূর্ণ অ্যাক্সেস চালু রয়েছে" : "Online Reading Remains 100% Active"}</span>
+              </div>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed pl-6">
+                {language === "bn"
+                  ? "কোর্সের সমস্ত লেকচার হ্যান্ডনোট, মিডটার্ম ও ফাইনাল পরীক্ষার প্রশ্নপত্র এবং ল্যাব শিট আপনি সরাসরি ওয়েবসাইটে কোনো সীমাবদ্ধতা ছাড়াই পড়তে ও অনুশীলন করতে পারবেন।"
+                  : "You can freely view, read, and study all lecture notes, exam question papers, and lab manuals directly in the NoteLagbe website viewer anytime."}
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowOfflinePackSecurityModal(false)}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+              >
+                {language === "bn" ? "বুঝেছি, ওয়েবসাইটে পড়ব" : "Got it, Browse Online"}
               </button>
             </div>
           </div>
