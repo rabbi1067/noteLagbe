@@ -2458,9 +2458,38 @@ function MaterialCard({
 
       {/* Card Footer Actions */}
       <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-        <span className="text-[10px] text-slate-400 font-mono">
-          {resource.downloadsCount || 0} {language === "bn" ? "ভিউ" : "views"}
-        </span>
+        <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-slate-400 font-mono">
+          <span>
+            {resource.downloadsCount || 0} {language === "bn" ? "ভিউ" : "views"}
+          </span>
+          {(() => {
+            const contributorName =
+              resource.contributorName ||
+              (resource.isStudentContributed && resource.uploader?.name) ||
+              (resource.uploader?.role === "ROLE_STUDENT" && resource.uploader?.name ? resource.uploader.name : null);
+
+            if (contributorName) {
+              return (
+                <>
+                  <span>•</span>
+                  <Link
+                    href="/contribute#leaderboard"
+                    title={
+                      language === "bn"
+                        ? `অ্যাকাডেমিক কন্ট্রিবিউটর: ${contributorName} (শীর্ষ ৫০ তালিকায় দেখুন)`
+                        : `Contributor: ${contributorName} (View in Top 50 Academic Contributors)`
+                    }
+                    className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 hover:underline transition-colors"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                    <span className="truncate max-w-[130px]">By {contributorName}</span>
+                  </Link>
+                </>
+              );
+            }
+            return null;
+          })()}
+        </div>
 
         <div className="flex items-center gap-2">
           {isCourseUnlocked || resource.fileUrl ? (

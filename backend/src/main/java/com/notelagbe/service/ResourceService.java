@@ -202,6 +202,7 @@ public class ResourceService {
         masked.setAcademicYear(r.getAcademicYear());
         masked.setCourse(r.getCourse());
         masked.setTeacher(r.getTeacher());
+        masked.setUploader(r.getUploader());
         masked.setStatus(r.getStatus());
         masked.setDownloadsCount(r.getDownloadsCount());
         masked.setCreatedAt(r.getCreatedAt());

@@ -1,5 +1,6 @@
 package com.notelagbe.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -17,6 +18,7 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @JsonIgnore
     private String password;
 
     private String studentId;
@@ -43,12 +45,22 @@ public class User {
     @Column(nullable = false)
     private boolean chatBlocked = false;
 
+    @JsonIgnore
     private String resetToken;
+
+    @JsonIgnore
     private LocalDateTime resetTokenExpiry;
 
+    @JsonIgnore
     private String resetOtpHash;
+
+    @JsonIgnore
     private LocalDateTime resetOtpExpiry;
+
+    @JsonIgnore
     private Integer resetOtpAttempts = 0;
+
+    @JsonIgnore
     private LocalDateTime resetOtpLastSentAt;
 
     private LocalDateTime createdAt = LocalDateTime.now();

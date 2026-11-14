@@ -1008,9 +1008,45 @@ export default function TeacherDetailPage() {
                                   {res.title}
                                 </span>
                               </div>
-                              <p className="text-[10px] text-slate-400">
-                                {res.semesterName || "Fall 2026"} ({res.academicYear || 2026}) • {language === "bn" ? "ভেরিফাইড আর্কাইভ" : "Verified Archive"}
-                              </p>
+                              <div className="text-[10px] text-slate-400 flex items-center gap-1.5 flex-wrap">
+                                <span>
+                                  {res.semesterName || "Fall 2026"} ({res.academicYear || 2026}) •
+                                </span>
+                                {(() => {
+                                  const contributorName =
+                                    res.contributorName ||
+                                    (res.isStudentContributed && res.uploader?.name) ||
+                                    (res.uploader?.role === "ROLE_STUDENT" && res.uploader?.name ? res.uploader.name : null);
+
+                                  if (contributorName) {
+                                    return (
+                                      <Link
+                                        href="/contribute#leaderboard"
+                                        title={
+                                          language === "bn"
+                                            ? `অ্যাকাডেমিক কন্ট্রিবিউটর: ${contributorName} (শীর্ষ ৫০ কন্ট্রিবিউটর তালিকায় দেখুন)`
+                                            : `Academic Contributor: ${contributorName} (View in Top 50 Academic Contributors)`
+                                        }
+                                        className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 hover:underline transition-all group"
+                                      >
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse"></span>
+                                        <span className="truncate max-w-[140px] sm:max-w-[200px]">
+                                          {language === "bn" ? `By ${contributorName}` : `By ${contributorName}`}
+                                        </span>
+                                        <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950/90 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.2 rounded-full font-bold border border-emerald-300/50 dark:border-emerald-800/60 shadow-xs group-hover:scale-105 transition-transform">
+                                          {language === "bn" ? "কন্ট্রিবিউটর" : "Contributor"}
+                                        </span>
+                                      </Link>
+                                    );
+                                  }
+
+                                  return (
+                                    <span className="text-slate-400 dark:text-slate-500 font-medium">
+                                      {language === "bn" ? "ভেরিফাইড আর্কাইভ" : "Verified Archive"}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
                             </div>
 
                             <button

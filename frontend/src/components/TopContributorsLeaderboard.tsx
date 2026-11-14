@@ -135,7 +135,7 @@ export default function TopContributorsLeaderboard() {
   const departmentsList = ["ALL", "CSE", "EEE", "ARCH", "TEX", "PHR", "BBA", "LAW", "ENG", "BNG", "ECO", "ICT"];
 
   return (
-    <section className="space-y-6 pt-6 border-t border-slate-200 dark:border-slate-800">
+    <section id="leaderboard" className="space-y-6 pt-6 border-t border-slate-200 dark:border-slate-800 scroll-mt-24">
       
       {/* 1. Header & Title Banner */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">

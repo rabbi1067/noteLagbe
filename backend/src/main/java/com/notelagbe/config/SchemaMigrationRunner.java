@@ -41,8 +41,28 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             } else if (product.contains("h2")) {
                 migrateH2UnlockedCoursesConstraints();
             }
+            linkMissingContributionUploaders();
         } catch (Exception e) {
             log.debug("Schema migration check skipped/completed: {}", e.getMessage());
+        }
+    }
+
+    private void linkMissingContributionUploaders() {
+        try {
+            jdbcTemplate.execute(
+                "UPDATE resources r " +
+                "INNER JOIN contribution_requests cr ON cr.resource_id = r.id " +
+                "SET r.uploader_id = cr.user_id " +
+                "WHERE r.uploader_id IS NULL AND cr.user_id IS NOT NULL"
+            );
+        } catch (Exception e) {
+            try {
+                jdbcTemplate.execute(
+                    "UPDATE resources SET uploader_id = " +
+                    "(SELECT user_id FROM contribution_requests WHERE contribution_requests.resource_id = resources.id) " +
+                    "WHERE uploader_id IS NULL AND id IN (SELECT resource_id FROM contribution_requests WHERE resource_id IS NOT NULL)"
+                );
+            } catch (Exception ignored) {}
         }
     }
 

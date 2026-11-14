@@ -100,4 +100,25 @@ public class Resource {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("contributorName")
+    public String getContributorName() {
+        if (uploader != null && uploader.getRole() == Role.ROLE_STUDENT) {
+            return uploader.getName();
+        }
+        return null;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("contributorStudentId")
+    public String getContributorStudentId() {
+        if (uploader != null && uploader.getRole() == Role.ROLE_STUDENT) {
+            return uploader.getStudentId();
+        }
+        return null;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("isStudentContributed")
+    public boolean isStudentContributed() {
+        return uploader != null && uploader.getRole() == Role.ROLE_STUDENT;
+    }
 }
