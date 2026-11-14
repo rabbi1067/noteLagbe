@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import confetti from "canvas-confetti";
 import SearchableCourseSelect, { sortCoursesNaturally } from "@/components/SearchableCourseSelect";
 import SearchableTeacherSelect from "@/components/SearchableTeacherSelect";
+import SearchableSemesterSelect from "@/components/SearchableSemesterSelect";
 import GoogleDrivePublicGuideModal from "@/components/GoogleDrivePublicGuideModal";
 import TopContributorsLeaderboard from "@/components/TopContributorsLeaderboard";
 import LiveRemainingCountdown from "@/components/LiveRemainingCountdown";
@@ -73,6 +74,7 @@ export const RESOURCE_TYPE_LABELS: Record<string, { en: string; bn: string }> = 
 
 import {
   getCurrentAcademicSemester,
+  getTwoQuickSemesters,
   getRecentAcademicSemesters,
   getShortResourceTypeName,
   buildConciseAcademicTitle,
@@ -201,9 +203,9 @@ export default function ContributePage() {
     setAiAnalysis(null);
   };
 
-  // Semester: single user-input field with empty default & dynamic auto-progressing semester list
+  // Semester: searchable combobox with empty default & exactly 2 dynamic auto-progressing quick picks
   const [semester, setSemester] = useState("");
-  const recentSemesters = React.useMemo(() => getRecentAcademicSemesters(), []);
+  const quickSemesters = React.useMemo(() => getTwoQuickSemesters(), []);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | number>("");
   const [allTeachers, setAllTeachers] = useState<any[]>([]);
 
@@ -1320,54 +1322,39 @@ export default function ContributePage() {
                 </div>
               </div>
 
-              <input
-                type="text"
-                required
-                maxLength={20}
+              <SearchableSemesterSelect
                 value={semester}
-                onChange={(e) => handleSemesterChange(e.target.value)}
+                onChange={handleSemesterChange}
+                required
+                language={language}
+                error={contribDupCheck.isDuplicate}
                 placeholder={
                   language === "bn"
-                    ? "যেমন: Fall 2026, Summer 2026, Spring 2025"
-                    : "e.g. Fall 2026, Summer 2026, Spring 2025"
+                    ? "সেমিস্টার খুঁজুন বা নির্বাচন করুন (বাধ্যতামূলক)..."
+                    : "Search or select semester (Required)..."
                 }
-                className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border focus:outline-none font-semibold text-slate-900 dark:text-white placeholder:font-normal placeholder:text-slate-400 ${
-                  contribDupCheck.isDuplicate
-                    ? "border-red-500 ring-2 ring-red-500/20"
-                    : "border-slate-200 dark:border-slate-700 focus:border-emerald-500"
-                }`}
               />
 
-              {/* Quick Pick Semester Chips */}
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1">
-                  {language === "bn" ? "দ্রুত বাছাই:" : "Quick Pick:"}
+              {/* Exactly 2 Dynamic Quick Pick Pills (No Current/Upcoming labels, auto-advancing with academic calendar) */}
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                  {language === "bn" ? "কুইক পিক:" : "Quick Pick:"}
                 </span>
-                {recentSemesters.map((chip) => {
-                  const isSelected = semester.trim().toLowerCase() === chip.name.toLowerCase();
+                {quickSemesters.map((semName) => {
+                  const isSelected = semester.trim().toLowerCase() === semName.toLowerCase();
                   return (
                     <button
-                      key={chip.name}
+                      key={semName}
                       type="button"
-                      onClick={() => handleSemesterChange(chip.name)}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                      onClick={() => handleSemesterChange(semName)}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer flex items-center gap-1.5 ${
                         isSelected
-                          ? "bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-500"
-                          : "bg-slate-200/70 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700"
+                          ? "bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400"
+                          : "bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700"
                       }`}
                     >
-                      <span>{chip.name}</span>
-                      {chip.labelBn && (
-                        <span
-                          className={`text-[9px] px-1 py-0.2 rounded font-medium ${
-                            isSelected
-                              ? "bg-white/20 text-white"
-                              : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                          }`}
-                        >
-                          {language === "bn" ? chip.labelBn : chip.labelEn}
-                        </span>
-                      )}
+                      {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                      <span>{semName}</span>
                     </button>
                   );
                 })}

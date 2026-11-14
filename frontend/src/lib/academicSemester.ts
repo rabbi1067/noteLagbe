@@ -81,6 +81,67 @@ export function getRecentAcademicSemesters(date: Date = new Date()): SemesterChi
 }
 
 /**
+ * Returns exactly 2 dynamic quick-pick semesters based on current academic calendar:
+ * [Previous Semester, Current Semester]
+ * e.g. ["Summer 2026", "Fall 2026"] in Fall 2026
+ * -> automatically transitions to ["Fall 2026", "Spring 2027"] in Spring 2027
+ * -> ["Spring 2027", "Summer 2027"] in Summer 2027
+ * -> ["Fall 2027", "Spring 2028"] in 2028
+ */
+export function getTwoQuickSemesters(date: Date = new Date()): [string, string] {
+  const current = getCurrentAcademicSemester(date);
+  const [currentSeason, currentYearStr] = current.split(" ");
+  const year = parseInt(currentYearStr, 10) || date.getFullYear();
+  const seasons: Season[] = ["Spring", "Summer", "Fall"];
+  let seasonIdx = seasons.indexOf(currentSeason as Season);
+  if (seasonIdx === -1) seasonIdx = 2; // Fall default
+
+  // Previous semester
+  const prevSeasonIdx = (seasonIdx - 1 + 3) % 3;
+  const prevYear = prevSeasonIdx === 2 ? year - 1 : year;
+  const prevName = `${seasons[prevSeasonIdx]} ${prevYear}`;
+
+  // Return chronologically [Previous Semester, Current Semester]
+  return [prevName, current];
+}
+
+/**
+ * Returns a rolling list of academic semesters spanning the past 2 years plus upcoming semester:
+ * Automatically advances year by year (e.g. 2026, 2027, 2028...) without any hardcoded dates.
+ */
+export function getRollingAcademicSemesters(date: Date = new Date(), pastYears: number = 2): string[] {
+  const current = getCurrentAcademicSemester(date);
+  const [currentSeason, currentYearStr] = current.split(" ");
+  const year = parseInt(currentYearStr, 10) || date.getFullYear();
+  const seasons: Season[] = ["Spring", "Summer", "Fall"];
+  let seasonIdx = seasons.indexOf(currentSeason as Season);
+  if (seasonIdx === -1) seasonIdx = 2;
+
+  // 1. Next upcoming semester
+  const nextSeasonIdx = (seasonIdx + 1) % 3;
+  const nextYear = seasonIdx === 2 ? year + 1 : year;
+  const nextName = `${seasons[nextSeasonIdx]} ${nextYear}`;
+
+  const list: string[] = [nextName];
+
+  // 2. From current down through pastYears
+  let sIdx = seasonIdx;
+  let yr = year;
+  const minYear = year - pastYears;
+
+  while (yr >= minYear) {
+    list.push(`${seasons[sIdx]} ${yr}`);
+    sIdx--;
+    if (sIdx < 0) {
+      sIdx = 2;
+      yr--;
+    }
+  }
+
+  return list;
+}
+
+/**
  * Standard concise academic resource type names:
  * e.g. "Midterm Question", "Final Question", "Lecture Handnote"
  */
