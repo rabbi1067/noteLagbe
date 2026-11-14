@@ -960,20 +960,20 @@ export default function AdminDashboardPage() {
         if (data.hasRealFlaw) {
           toast.warning(
             language === "bn"
-              ? "⚠️ AI ভিশন নথিতে অমিল/ত্রুটি শনাক্ত করেছে!"
-              : "⚠️ AI Vision detected a document discrepancy!"
+              ? "⚠️ AI নথিতে অসংগতি বা মানের ত্রুটি শনাক্ত করেছে!"
+              : "⚠️ AI identified a document quality or tag discrepancy!"
           );
         } else if (data.category === "DUPLICATE_ARCHIVE") {
           toast.info(
             language === "bn"
-              ? "ℹ️ AI অডিট: মেটেরিয়ালটি সঠিক কিন্তু আর্কাইভে ইতোমধ্যে সংরক্ষিত"
-              : "ℹ️ AI Audit: Valid material already exists in archive"
+              ? "ℹ️ AI অডিট: মেটেরিয়ালটি আর্কাইভে ইতোমধ্যে সংরক্ষিত"
+              : "ℹ️ AI Audit: Material already archived in repository"
           );
         } else {
           toast.success(
             language === "bn"
-              ? `✨ AI ভিশন: নথিটি সঠিক ও প্রাসঙ্গিক দেখাচ্ছে (কারণ #${(rejectAiSuggestCount % 5) + 1})`
-              : `✨ AI Vision: Document verified valid (Reason #${(rejectAiSuggestCount % 5) + 1})`
+              ? `✨ AI রিজেকশন কারণ প্রস্তাবিত (অপশন #${(rejectAiSuggestCount % 5) + 1} / 5)`
+              : `✨ AI Rejection feedback suggested (Option #${(rejectAiSuggestCount % 5) + 1} of 5)`
           );
         }
       } else {
@@ -12786,7 +12786,7 @@ export default function AdminDashboardPage() {
                       ? "bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300"
                       : rejectAiObservation.category === "DUPLICATE_ARCHIVE"
                       ? "bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300"
-                      : "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300"
+                      : "bg-sky-500/10 border-sky-500/30 text-sky-800 dark:text-sky-300"
                   }`}
                 >
                   <div className="flex items-center gap-1.5 font-bold text-xs">
@@ -12795,8 +12795,8 @@ export default function AdminDashboardPage() {
                         <ShieldAlert className="w-4 h-4 text-rose-500" />
                         <span>
                           {language === "bn"
-                            ? "AI ভিশন পর্যবেক্ষণ: নথিতে অসংগতি শনাক্ত হয়েছে"
-                            : "AI Vision Observation: Discrepancy Detected"}
+                            ? "AI অডিট পর্যবেক্ষণ: মেটেরিয়ালে অসংগতি বা মানের ত্রুটি"
+                            : "AI Quality Audit: Document Discrepancy / Quality Issue"}
                         </span>
                       </>
                     ) : rejectAiObservation.category === "DUPLICATE_ARCHIVE" ? (
@@ -12804,17 +12804,17 @@ export default function AdminDashboardPage() {
                         <Info className="w-4 h-4 text-amber-500" />
                         <span>
                           {language === "bn"
-                            ? "AI অডিট পর্যবেক্ষণ: মেটেরিয়ালটি সঠিক কিন্তু আর্কাইভে ইতোমধ্যে বিদ্যমান"
+                            ? "AI অডিট পর্যবেক্ষণ: মেটেরিয়ালটি আর্কাইভে ইতোমধ্যে বিদ্যমান"
                             : "AI Audit Observation: Material Already Exists in Archive"}
                         </span>
                       </>
                     ) : (
                       <>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        <Sparkles className="w-4 h-4 text-sky-500" />
                         <span>
                           {language === "bn"
-                            ? "AI ভিশন পর্যবেক্ষণ: নথিটি বৈধ ও স্পষ্ট (কোনো কনটেন্ট অমিল নেই)"
-                            : "AI Vision Observation: Document is Valid & Authentic"}
+                            ? "AI রিভিউ অ্যাসিস্ট: রিজেকশন কারণ ও মতামত প্রস্তাবিত"
+                            : "AI Review Assist: Suggested Rejection Feedback"}
                         </span>
                       </>
                     )}
@@ -12822,20 +12822,11 @@ export default function AdminDashboardPage() {
                   <p className="text-[11px] leading-relaxed opacity-90 font-normal">
                     {rejectAiObservation.analysisFindings}
                   </p>
-                  {!rejectAiObservation.hasRealFlaw && rejectAiObservation.category !== "DUPLICATE_ARCHIVE" && (
-                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium italic pt-0.5">
-                      {language === "bn"
-                        ? "💡 নথিতে কোনো ত্রুটি না থাকায় শিক্ষার্থীকে অহেতুক অভিযুক্ত না করে শালীন প্রশাসনিক পর্যালোচনার কারণ প্রস্তাব করা হয়েছে।"
-                        : "💡 No content defects found; an administrative review reason has been suggested instead of a false defect accusation."}
-                    </p>
-                  )}
-                  {rejectAiObservation.category === "DUPLICATE_ARCHIVE" && (
-                    <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium italic pt-0.5">
-                      {language === "bn"
-                        ? "💡 এই শিক্ষকের এই সেমিস্টারের মেটেরিয়াল ইতোমধ্যে নোলাগবে ভেরিফাইড ডাটাবেজে রয়েছে।"
-                        : "💡 This exact faculty material for this semester is already archived in NoteLagbe repository."}
-                    </p>
-                  )}
+                  <p className="text-[10px] text-sky-600 dark:text-sky-400 font-medium italic pt-0.5">
+                    {language === "bn"
+                      ? "💡 অন্য কোনো কারণ প্রয়োজন হলে উপরের 'AI কারণ পরিবর্তন' বাটনে ক্লিক করে ভিন্ন অপশন বাছাই করুন।"
+                      : "💡 Click 'Change AI Reason' above to cycle through different rejection reasons (scan clarity, missing pages, or tag mismatch)."}
+                  </p>
                 </div>
               )}
 

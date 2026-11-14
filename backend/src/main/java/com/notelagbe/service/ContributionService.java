@@ -416,10 +416,10 @@ public class ContributionService {
         // 1. Permanently delete physical file from Cloud Storage (Cloudflare R2, Cloudinary, or Local Disk)
         deletePhysicalFile(fileUrl);
 
-        // 2. Wipe the file URL and preview URL from the database resource record so no storage space is wasted
+        // 2. Safely update status and wipe preview URL (keep placeholder so non-null DB constraint never fails)
         if (res != null) {
             res.setStatus(ResourceStatus.REJECTED);
-            res.setFileUrl(null);
+            res.setFileUrl("[REJECTED]");
             res.setPreviewUrl(null);
             resourceRepository.save(res);
         }

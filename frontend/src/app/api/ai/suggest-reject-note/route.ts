@@ -274,12 +274,12 @@ Return STRICT JSON ONLY matching this schema:
     // 3. Resilient Academic Truth Engine (Zero Blind Assumptions, 100% Truthful)
     if (exactDuplicateFound) {
       const duplicateMsg = isBangla
-        ? `${cleanCourse} কোর্সের ${cleanTeacherName} শিক্ষকের ${cleanSem} সেমিস্টারের ${typeLabel} ইতোমধ্যে আমাদের ভেরিফাইড আর্কাইভে সম্পূর্ণ আকারে সংরক্ষিত রয়েছে। আপনার আন্তরিক অবদানের জন্য ধন্যবাদ, অনুগ্রহ করে অন্য কোনো সেমিস্টার বা নতুন কোর্সের মেটেরিয়াল শেয়ার করুন।`
-        : `Academic material for ${cleanCourse} (${cleanSem}, Faculty: ${cleanTeacherName}) already exists in our verified repository. Thank you for your support, please consider sharing notes or question papers for another term or course.`;
+        ? `${cleanCourse} কোর্সের ${cleanTeacherName ? `${cleanTeacherName} শিক্ষকের ` : ""}${cleanSem} সেমিস্টারের ${typeLabel} ইতোমধ্যে আমাদের ভেরিফাইড আর্কাইভে সম্পূর্ণ আকারে সংরক্ষিত রয়েছে। আপনার আন্তরিক অবদানের জন্য ধন্যবাদ, অনুগ্রহ করে অন্য কোনো সেমিস্টার বা নতুন কোর্সের মেটেরিয়াল শেয়ার করুন।`
+        : `Academic material for ${cleanCourse} (${cleanSem}${cleanTeacherName ? `, Faculty: ${cleanTeacherName}` : ""}) already exists in our verified repository. Thank you for your support, please consider sharing notes or question papers for another term or course.`;
 
       const findings = isBangla
-        ? `ডাটাবেজ আর্কাইভ যাচাই: ${cleanCourse} কোর্সের ${cleanTeacherName} (${cleanSem}) এর জন্য একই মেটেরিয়াল ইতোমধ্যে সংরক্ষিত রয়েছে।`
-        : `Database archive check: A verified copy already exists for ${cleanCourse} (${cleanSem}, Faculty: ${cleanTeacherName}).`;
+        ? `ডাটাবেজ আর্কাইভ যাচাই: ${cleanCourse} কোর্সের ${cleanTeacherName ? `${cleanTeacherName} ` : ""}(${cleanSem}) এর জন্য একই মেটেরিয়াল ইতোমধ্যে সংরক্ষিত রয়েছে।`
+        : `Database archive check: A verified copy already exists for ${cleanCourse} (${cleanSem}${cleanTeacherName ? `, Faculty: ${cleanTeacherName}` : ""}).`;
 
       return NextResponse.json({
         success: true,
@@ -297,28 +297,72 @@ Return STRICT JSON ONLY matching this schema:
       });
     }
 
-    // If NOT duplicate, suggest legitimate document review without false duplicate claims!
-    const adminReviewMsg = isBangla
-      ? `আপলোড করা ডকুমেন্টের পৃষ্ঠাগুলো পর্যাপ্ত আলোতে সোজা ও স্পষ্ট করে (সকল পৃষ্ঠাসহ পূর্ণাঙ্গ ফাইলে) পুনরায় সাবমিট করার অনুরোধ করা হচ্ছে।`
-      : `Please capture a clearer, well-lit, and properly oriented scan including all pages of the document before re-submitting.`;
+    // Dynamic cycling through 5 realistic academic rejection reasons based on cycleIndex
+    const cIdx = Math.abs(Number(cycleIndex) || 0) % 5;
 
-    const findings = isBangla
-      ? `ডাটাবেজ আর্কাইভ যাচাই: ${cleanCourse} কোর্সের ${cleanTeacherName} (${cleanSem}) এর জন্য আর্কাইভে কোনো ডুপ্লিকেট পাওয়া যায়নি। প্রশাসনিক পর্যালোচনার ভিত্তিতে পুনরায় স্ক্যান কপি চাওয়া হয়েছে।`
-      : `Database archive check: No duplicate found for ${cleanCourse} (${cleanSem}, Faculty: ${cleanTeacherName}). Administrative review requested.`;
+    const rejectionOptions = [
+      {
+        category: "POOR_QUALITY",
+        hasRealFlaw: true,
+        flawType: "ILLEGIBLE_OR_BLURRY",
+        msgBn: `আপলোডকৃত ডকুমেন্টের পৃষ্ঠাগুলো অস্পষ্ট, কম আলোতে তোলা বা পড়ার উপযোগী নয়। অনুগ্রহ করে পর্যাপ্ত আলোতে সোজা ও স্পষ্ট রেজ্যুলেশনে সম্পূর্ণ ফাইলের পরিষ্কার স্ক্যান কপি পুনরায় সাবমিট করুন।`,
+        msgEn: `The uploaded document is blurry, poorly lit, or difficult to read. Please capture a clear, well-lit, and properly oriented scan including all pages of the document before re-submitting.`,
+        findingBn: `অ্যাকাডেমিক কোয়ালিটি রিভিউ: পড়ার উপযোগী উচ্চ রেজ্যুলেশনের পরিষ্কার স্ক্যান কপি চাওয়া হয়েছে।`,
+        findingEn: `Quality Audit: Requesting a clearer, higher-resolution and well-lit scan for archive readability.`,
+      },
+      {
+        category: "INCOMPLETE_PAGES",
+        hasRealFlaw: true,
+        flawType: "INCOMPLETE_QUESTIONS",
+        msgBn: `সাবমিশনে পরীক্ষার পূর্ণাঙ্গ প্রশ্নপত্র বা নোটের সব পৃষ্ঠা বিদ্যমান নেই (কিছু অংশ বাদ পড়েছে)। অনুগ্রহ করে প্রথম থেকে শেষ পর্যন্ত সবগুলো পৃষ্ঠাসহ সম্পূর্ণ ফাইলটি আপলোড করুন।`,
+        msgEn: `The submitted document appears incomplete with missing pages or partial questions. Please ensure all pages from start to finish are included in a single complete file before re-submitting.`,
+        findingBn: `অ্যাকাডেমিক কোয়ালিটি রিভিউ: পূর্ণাঙ্গ পৃষ্ঠা ও ধারাবাহিক প্রশ্নপত্রের কপি নিশ্চিত করার অনুরোধ করা হয়েছে।`,
+        findingEn: `Quality Audit: Requesting complete pages covering the entire exam or lecture notes.`,
+      },
+      {
+        category: "CONTENT_MISMATCH",
+        hasRealFlaw: true,
+        flawType: "COURSE_MISMATCH",
+        msgBn: `সাবমিশনে নির্বাচিত কোর্স কোড (${cleanCourse}), শিক্ষক বা সেমিস্টার (${cleanSem}) তথ্যের সাথে ডকুমেন্টের ভেতরের বিষয়ের অসংগতি দেখা যাচ্ছে। অনুগ্রহ করে সঠিক কোর্স ও সেমিস্টার তথ্য যাচাই করে পুনরায় আপলোড করুন।`,
+        msgEn: `There appears to be a discrepancy in the selected course code (${cleanCourse}), faculty, or semester tags (${cleanSem}) compared to the document content. Please verify and re-submit with accurate tags.`,
+        findingBn: `মেটাডাটা যাচাই: কোর্স কোড, শিক্ষক ও সেমিস্টার তথ্য সঠিকভাবে নির্বাচন করে আপলোডের অনুরোধ।`,
+        findingEn: `Metadata Verification: Requesting student to correct course, faculty, or semester tags.`,
+      },
+      {
+        category: "POOR_QUALITY",
+        hasRealFlaw: true,
+        flawType: "ILLEGIBLE_OR_BLURRY",
+        msgBn: `ডকুমেন্টের ছবিগুলো উল্টো/বাকাভাবে স্ক্যান করা হয়েছে অথবা প্রান্তগুলো কেটে গেছে। অনুগ্রহ করে সোজা ও ক্রপ ছাড়া পরিচ্ছন্ন পিডিএফ বা ছবি ফাইল আকারে জমা দিন।`,
+        msgEn: `The document orientation is rotated/skewed, or the page margins are cut off. Please ensure proper orientation and complete margins before re-submitting.`,
+        findingBn: `ফরম্যাট যাচাই: মার্জিন ও অরিয়েন্টেশন সোজা রেখে ডকুমেন্ট আপলোডের নির্দেশনা দেওয়া হয়েছে।`,
+        findingEn: `Format Verification: Ensuring proper page orientation and margins without cutoff edges.`,
+      },
+      {
+        category: "ADMIN_REVIEW",
+        hasRealFlaw: false,
+        flawType: "NONE",
+        msgBn: `জমা দেওয়া মেটেরিয়ালটি Southeast University-র শিক্ষার্থীদের পড়াশোনার উপযুক্ত মান বজায় রাখতে পারেনি। অনুগ্রহ করে যাচাইকৃত ও স্পষ্ট অ্যাকাডেমিক ফাইল পুনরায় শেয়ার করুন।`,
+        msgEn: `The submitted material does not meet the necessary verification and quality standards for Southeast University archives. Please submit verified and readable study materials.`,
+        findingBn: `প্রশাসনিক পর্যালোচনা: স্ট্যান্ডার্ড অ্যাকাডেমিক ফাইল জমাদানের নির্দেশনা দেওয়া হয়েছে।`,
+        findingEn: `Standards Review: Requesting standard verified study material matching university curriculum.`,
+      },
+    ];
 
+    const selectedOption = rejectionOptions[cIdx];
     return NextResponse.json({
       success: true,
-      suggestion: adminReviewMsg,
-      hasRealFlaw: false,
-      flawType: "NONE",
-      analysisFindings: findings,
+      suggestion: isBangla ? selectedOption.msgBn : selectedOption.msgEn,
+      hasRealFlaw: selectedOption.hasRealFlaw,
+      flawType: selectedOption.flawType,
+      analysisFindings: isBangla ? selectedOption.findingBn : selectedOption.findingEn,
       detectedCourseCode: cleanCourse,
       detectedSemester: cleanSem,
       detectedFaculty: cleanTeacherName,
       detectedDocType: resourceType,
       source: "academic_truth_engine",
       language: isBangla ? "bn" : "en",
-      category: "ADMIN_REVIEW",
+      category: selectedOption.category,
+      cycleIndex: cIdx,
     });
   } catch (error: any) {
     return NextResponse.json(

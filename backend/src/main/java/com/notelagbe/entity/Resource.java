@@ -23,7 +23,7 @@ public class Resource {
     @Column(nullable = false, length = 32)
     private ResourceType type = ResourceType.NOTE;
 
-    @Column(nullable = false, length = 1000)
+    @Column(length = 1000)
     private String fileUrl;
 
     @Column(length = 1000)
