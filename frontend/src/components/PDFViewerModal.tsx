@@ -64,7 +64,7 @@ function getAuthStreamUrl(resourceId: number | string, isAdminMode?: boolean, do
 
 export function isRawR2StorageUrl(url?: string | null): boolean {
   if (!url) return false;
-  return url.includes(".r2.cloudflarestorage.com") && !url.includes("X-Amz-Signature");
+  return url.includes(".r2.cloudflarestorage.com");
 }
 
 export function resolveSafeEmbedUrl(

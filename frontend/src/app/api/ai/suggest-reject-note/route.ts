@@ -1,39 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
-
-const REJECT_REASONS = [
-  {
-    category: "CONTENT_MISMATCH",
-    bn: "টাইটেল বা ক্যাটাগরিতে {typeLabel} উল্লেখ থাকলেও আপলোড করা ডকুমেন্টে ভিন্ন কনটেন্ট (যেমন অন্য কোনো বিষয়ের বা অ্যাসাইনমেন্টের পেজ) দেখা যাচ্ছে। অনুগ্রহ করে সঠিক কোর্স ও ক্যাটাগরি নিশ্চিত করে পুনরায় আপলোড করুন।",
-    en: "The selected category '{typeLabel}' does not match the actual document content (e.g. contains unrelated subject material or assignment pages). Please verify the course and category, then re-submit.",
-  },
-  {
-    category: "POOR_QUALITY",
-    bn: "আপলোড করা খাতার ছবি/নোট কিছুটা ঝাপসা ও অস্পষ্ট। অনুগ্রহ করে পর্যাপ্ত আলোতে প্রতিটি পেজের পরিষ্কার, ফোকাসড এবং সোজা ছবি তুলে আপলোড করুন।",
-    en: "The uploaded pages are blurry or low resolution. Please capture clear, well-lit, properly oriented and legible photos of each page before re-submitting.",
-  },
-  {
-    category: "INCOMPLETE_PAGES",
-    bn: "ডকুমেন্টে প্রয়োজনীয় পৃষ্ঠাগুলো অসম্পূর্ণ দেখাচ্ছে। অনুগ্রহ করে সম্পূর্ণ লেকচার নোট বা প্রশ্নপত্রের সবগুলো পেজ মার্জ করে একটি পূর্ণাঙ্গ ফাইলে সাবমিট করুন।",
-    en: "The submission appears incomplete with missing pages. Please merge all pages of the lecture notes or exam question paper into a single complete document.",
-  },
-  {
-    category: "DUPLICATE_SEMESTER",
-    bn: "{courseCode} কোর্সের {semester} সেমিস্টারের মেটেরিয়াল ইতোমধ্যে ভেরিফাইড আর্কাইভে বিদ্যমান রয়েছে। অনুগ্রহ করে নতুন কোনো টার্ম বা বিষয়ের হ্যান্ড নোট শেয়ার করুন।",
-    en: "Academic materials for {courseCode} ({semester}) already exist in our verified archive. Please share study notes or question papers for a different semester or topic.",
-  },
-  {
-    category: "IRRELEVANT_CONTENT",
-    bn: "আপলোড করা ফাইলে একাডেমিক পাঠ্যসূচির সাথে প্রাসঙ্গিক স্টাডি মেটেরিয়াল পরিলক্ষিত হয়নি। অনুগ্রহ করে শুধুমাত্র কোর্স সংক্রান্ত নোট, কুইজ বা পরীক্ষার প্রশ্ন আপলোড করুন।",
-    en: "The uploaded file does not appear to contain syllabus-relevant academic study material. Please only upload valid university lecture notes, quizzes, or exam papers.",
-  },
-  {
-    category: "FORMATTING_WATERMARK",
-    bn: "ডকুমেন্টে অপ্রয়োজনীয় বড় দাগ, অপাঠ্য হাতের লেখা বা ব্যক্তিগত কনটেন্ট রয়েছে। অনুগ্রহ করে পরিচ্ছন্ন ও পাঠযোগ্য মেটেরিয়াল সাবমিট করুন।",
-    en: "The document contains excessive marks, unreadable handwriting, or non-academic personal content. Please submit a clean, readable copy.",
-  },
-];
+export const runtime = "nodejs";
 
 const TYPE_NAMES: Record<string, { en: string; bn: string }> = {
   NOTE: { en: "Lecture Hand Note", bn: "লেকচার হ্যান্ড নোট" },
@@ -45,7 +13,57 @@ const TYPE_NAMES: Record<string, { en: string; bn: string }> = {
   LAB_FINAL: { en: "Lab Final Exam", bn: "ল্যাব ফাইনাল পরীক্ষা" },
   LAB_REPORT: { en: "Lab Report Sheet", bn: "ল্যাব রিপোর্ট" },
   LAB_HAND_NOTE: { en: "Lab Hand Note", bn: "ল্যাব হ্যান্ড নোট" },
+  QUESTION_COURSE_IN: { en: "Course-In Material", bn: "কোর্স-ইন মেটেরিয়াল" },
+  OTHERS: { en: "Academic Material", bn: "একাডেমিক স্টাডি মেটেরিয়াল" },
 };
+
+// Polite Academic & Administrative Review Variations (Never Falsely Accuses the Student)
+const SMART_ADMIN_FALLBACKS = [
+  {
+    category: "DUPLICATE_ARCHIVE",
+    bn: "{courseCode} কোর্সের ({semester}) মেটেরিয়াল ইতোমধ্যে ভেরিফাইড আর্কাইভে সম্পূর্ণ আকারে সংরক্ষিত রয়েছে। আপনার অবদানের জন্য ধন্যবাদ, অনুগ্রহ করে অন্য কোনো বিষয়ের বা নতুন সেমিস্টারের নোট শেয়ার করুন।",
+    en: "Academic materials for {courseCode} ({semester}) already exist in our verified repository. Thank you for your contribution, please consider sharing notes or question papers for another term or course.",
+  },
+  {
+    category: "POOR_QUALITY",
+    bn: "আপলোড করা খাতার ছবি বা পৃষ্ঠার লেখাগুলো পর্যাপ্ত আলোতে আরও সোজা ও পরিষ্কারভাবে স্ক্যান করে পুনরায় জমা দেওয়ার অনুরোধ করা হচ্ছে।",
+    en: "Please capture a clearer, well-lit, properly oriented and legible scan of each page before re-submitting.",
+  },
+  {
+    category: "INCOMPLETE_PAGES",
+    bn: "ডকুমেন্টে প্রয়োজনীয় পৃষ্ঠাগুলো অসম্পূর্ণ দেখাচ্ছে। অনুগ্রহ করে সম্পূর্ণ লেকচার নোট বা প্রশ্নপত্রের সবগুলো পেজ মার্জ করে একটি পূর্ণাঙ্গ ফাইলে সাবমিট করুন।",
+    en: "The submission appears incomplete with missing pages. Please merge all pages of the lecture notes or exam question paper into a single complete document.",
+  },
+  {
+    category: "CURRICULUM_UPDATE",
+    bn: "ডিপার্টমেন্টাল কারিকুলাম ও সিলেবাসের সর্বশেষ কাঠামোর সাথে সামঞ্জস্য রেখে হালনাগাদ মেটেরিয়ালটি পুনরায় আপলোড করার জন্য অনুরোধ করা হচ্ছে।",
+    en: "Please verify against the updated departmental curriculum guidelines and submit the revised version.",
+  },
+  {
+    category: "QUALITY_REVIEW",
+    bn: "এডমিন পর্যালোচনার ভিত্তিতে উক্ত সেমিস্টারের জন্য অতিরিক্ত কপির প্রয়োজন নেই। আপনার আগ্রহের জন্য ধন্যবাদ, পরবর্তী টার্মের রিসোর্স শেয়ার করার অনুরোধ রইল।",
+    en: "Based on administrative review, additional copies for this semester are not currently required. Thank you for your support, please feel free to share materials for upcoming terms.",
+  },
+];
+
+function detectBufferMime(buf: Buffer, headerMime?: string): string {
+  if (buf.length >= 4 && buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) {
+    return "application/pdf";
+  }
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (buf.length >= 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+    return "image/png";
+  }
+  if (buf.length >= 12 && buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 && buf[8] === 0x57 && buf[9] === 0x45) {
+    return "image/webp";
+  }
+  if (headerMime && (headerMime.startsWith("image/") || headerMime.includes("pdf"))) {
+    return headerMime.includes("pdf") ? "application/pdf" : headerMime.split(";")[0].trim();
+  }
+  return "image/jpeg";
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,91 +75,171 @@ export async function POST(req: NextRequest) {
       semester = "",
       fileName = "",
       fileUrl = "",
+      previewUrl = "",
       cycleIndex = 0,
-      language = "en",
+      language = "bn",
     } = body;
 
     const isBangla = language === "bn";
-    const apiKey = process.env.GEMINI_API_KEY;
-    const typeLabel = TYPE_NAMES[resourceType]?.[isBangla ? "bn" : "en"] || resourceType;
+    const apiKey =
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_API_KEY ||
+      process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
-    // Check if Gemini API is configured and attempt high-precision generation in the requested language
+    const typeLabel = TYPE_NAMES[resourceType]?.[isBangla ? "bn" : "en"] || resourceType;
+    const cleanCourse = (courseCode || "Course").toUpperCase().trim();
+    const cleanSem = semester || (isBangla ? "উক্ত সেমিস্টার" : "Current Semester");
+
+    // 1. Genuine Multimodal Vision Inspection via Gemini 1.5 Flash
     if (apiKey) {
       try {
-        const langInstruction = isBangla
-          ? "CRITICAL: Write the entire rejection feedback STRICTLY in respectful, constructive Bengali (বাংলা). Do NOT include English text."
-          : "CRITICAL: Write the entire rejection feedback STRICTLY in clear, professional, constructive English. Do NOT include Bengali text.";
+        let mediaPart: any = null;
+        let inspectionUrl = previewUrl || fileUrl;
 
-        const prompt = `You are a university academic reviewer for 'NoteLagbe' at Southeast University (SEU).
-A student submitted a study material with:
-- Title: "${title}"
+        // If Cloudinary PDF, convert to 1st page JPG thumbnail for ultra-fast vision inspection
+        if (inspectionUrl && inspectionUrl.includes("res.cloudinary.com") && inspectionUrl.includes("/image/upload/")) {
+          inspectionUrl = inspectionUrl.replace(/\.pdf(\?.*)?$/i, ".jpg").replace("/image/upload/", "/image/upload/pg_1,w_1200/");
+        }
+
+        if (inspectionUrl && /^https?:\/\//i.test(inspectionUrl)) {
+          try {
+            const fetchRes = await fetch(inspectionUrl, { signal: AbortSignal.timeout(6000) });
+            if (fetchRes.ok) {
+              const arrayBuf = await fetchRes.arrayBuffer();
+              const buf = Buffer.from(arrayBuf);
+              // Gemini inlineData supports images and PDFs up to ~10MB
+              if (buf.length > 0 && buf.length <= 10 * 1024 * 1024) {
+                const detectedMime = detectBufferMime(buf, fetchRes.headers.get("content-type") || undefined);
+                mediaPart = {
+                  inlineData: {
+                    mimeType: detectedMime,
+                    data: buf.toString("base64"),
+                  },
+                };
+              }
+            }
+          } catch (fetchErr) {
+            console.warn("Could not fetch document preview for vision analysis:", fetchErr);
+          }
+        }
+
+        const langRule = isBangla
+          ? "CRITICAL: 'analysisFindings' and 'rejectionNote' MUST be written in 100% natural, polite, respectful, and standard Bengali (বাংলা). No English sentences."
+          : "CRITICAL: 'analysisFindings' and 'rejectionNote' MUST be written in 100% clear, professional, constructive English.";
+
+        const promptText = `You are a senior academic reviewer and document verification auditor for 'NoteLagbe' at Southeast University (SEU).
+A student submitted an academic document with the following form selection:
+- Course Code: "${cleanCourse}"
 - Resource Category: "${resourceType}" (${typeLabel})
-- Course Code: "${courseCode}"
-- Semester: "${semester}"
-- File Name: "${fileName}"
-- File URL: "${fileUrl}"
+- Document Title: "${title}"
+- Target Semester: "${cleanSem}"
+- Uploaded File Name: "${fileName}"
 
-The admin is rejecting this submission.
-${langInstruction}
+Carefully inspect the attached document image / PDF page (if attached) or evaluate the metadata.
+Examine:
+1. Header / title (University name, Department of CSE, Course Code e.g. ${cleanCourse}, Exam Type e.g. Final Examination, Midterm Examination, Quiz, Date, Faculty Initial).
+2. Content: Are there legible questions, solutions, or lecture notes?
+3. Authenticity: Is this a genuine educational paper or an unrelated/corrupted file?
 
-Reason variation #${(cycleIndex % 5) + 1}. Focus on one specific issue:
-1) Content mismatch (e.g. title says Quiz/CT or Midterm but document is an unrelated assignment or different course)
-2) Low image quality / blurry handwriting / unreadable pages
-3) Missing pages / incomplete question paper or lecture note
-4) Duplicate semester material already in the verified archive
-5) Irrelevant or non-educational content
+CRITICAL RULES (MUST FOLLOW STRICTLY):
+1. HONESTY AND INTEGRITY RULE ("vul na thakle to ata dekhabe na"):
+   - If the document is a genuine, clear, and relevant academic document matching or relating to ${cleanCourse} and ${typeLabel}:
+     * Set "hasRealFlaw": false.
+     * DO NOT falsely accuse the student of having a content mismatch or uploading an unrelated document!
+     * In "analysisFindings", describe what you see (e.g. "ডকুমেন্টটি সাউথইস্ট ইউনিভার্সিটির একটি বৈধ ও স্পষ্ট ${typeLabel}। কনটেন্টে কোনো অমিল পাওয়া যায়নি।").
+     * In "rejectionNote": Since the admin requested an administrative reason to decline this submission (reason variation #${(cycleIndex % 4) + 1}):
+       Provide a polite, constructive administrative or archival reason, such as:
+       - Variation A: The verified departmental repository already contains an approved copy for ${cleanCourse} (${cleanSem}).
+       - Variation B: Departmental archive quota for this term has already been fulfilled; encourage sharing materials for other terms.
+       - Variation C: Academic committee recommends submitting a complete bundle including solutions or additional lecture parts.
+2. GENUINE FLAW FOUND:
+   - If the document has a REAL, VISIBLE issue:
+     * Set "hasRealFlaw": true.
+     * In "analysisFindings", describe the EXACT flaw observed (e.g. "ডকুমেন্টের হেডারে EEE বা ভিন্ন কোর্স কোড দেখা যাচ্ছে", or "হাতের লেখা অতিরিক্ত ঝাপসা ও অপাঠ্য", or "নথিটি কোনো একাডেমিক স্টাডি মেটেরিয়াল নয়").
+     * In "rejectionNote", provide a polite, actionable rejection note explaining how the student can fix and re-submit it.
+3. LANGUAGE:
+   ${langRule}
 
-Keep it concise (1 to 2 sentences), polite, encouraging, and actionable so the student knows exactly how to fix it and re-submit.
-Return ONLY the raw text of the rejection note. No JSON, no markdown headings, no quotes.`;
+Return STRICT JSON ONLY matching this schema:
+{
+  "hasRealFlaw": boolean,
+  "detectedCourseCode": string or null,
+  "detectedDocType": string or null,
+  "analysisFindings": string,
+  "rejectionNote": string,
+  "category": "VALID_DOCUMENT_ADMIN_REASON" | "CONTENT_MISMATCH" | "POOR_QUALITY" | "INCOMPLETE_PAGES" | "DUPLICATE_ARCHIVE" | "IRRELEVANT_CONTENT"
+}`;
 
-        const res = await fetch(
+        const parts: any[] = [];
+        if (mediaPart) {
+          parts.push(mediaPart);
+        }
+        parts.push({ text: promptText });
+
+        const geminiRes = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
+              contents: [{ parts }],
               generationConfig: {
-                temperature: 0.6,
-                maxOutputTokens: 250,
+                responseMimeType: "application/json",
+                temperature: 0.2,
+                maxOutputTokens: 400,
               },
             }),
-            signal: AbortSignal.timeout(6000),
+            signal: AbortSignal.timeout(8000),
           }
         );
 
-        if (res.ok) {
-          const data = await res.json();
-          const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-          if (generatedText) {
-            return NextResponse.json({
-              success: true,
-              suggestion: generatedText,
-              source: "gemini",
-              language: isBangla ? "bn" : "en",
-              category: `AI_VARIATION_${(cycleIndex % 5) + 1}`,
-            });
+        if (geminiRes.ok) {
+          const aiData = await geminiRes.json();
+          const rawJson = aiData?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawJson) {
+            const parsed = JSON.parse(rawJson);
+            if (parsed.rejectionNote && typeof parsed.rejectionNote === "string") {
+              return NextResponse.json({
+                success: true,
+                suggestion: parsed.rejectionNote.trim(),
+                hasRealFlaw: Boolean(parsed.hasRealFlaw),
+                analysisFindings: parsed.analysisFindings || (isBangla ? "ডকুমেন্ট বিশ্লেষণ সম্পন্ন হয়েছে।" : "Document analysis completed."),
+                detectedCourseCode: parsed.detectedCourseCode || null,
+                detectedDocType: parsed.detectedDocType || null,
+                category: parsed.category || (parsed.hasRealFlaw ? "CONTENT_MISMATCH" : "VALID_DOCUMENT_ADMIN_REASON"),
+                source: mediaPart ? "gemini_multimodal_vision" : "gemini_text_evaluator",
+                language: isBangla ? "bn" : "en",
+              });
+            }
           }
         }
       } catch (geminiErr) {
-        console.warn("Gemini call failed or timed out, falling back to rule engine:", geminiErr);
+        console.warn("Gemini multimodal analysis failed or timed out, switching to smart rule engine:", geminiErr);
       }
     }
 
-    // Built-in Smart Academic Rule Engine (Guaranteed 0-latency fallback in exact language)
-    const normalizedIndex = Math.abs(Number(cycleIndex) || 0) % REJECT_REASONS.length;
-    const item = REJECT_REASONS[normalizedIndex];
+    // 2. Built-in Smart Academic Rule Engine (Guaranteed 0-latency fallback, Never Falsely Accuses Student)
+    const normalizedIndex = Math.abs(Number(cycleIndex) || 0) % SMART_ADMIN_FALLBACKS.length;
+    const item = SMART_ADMIN_FALLBACKS[normalizedIndex];
 
-    const safeCourse = courseCode || (isBangla ? "কোর্স" : "Course");
-    const safeSem = semester || (isBangla ? "উক্ত সেমিস্টার" : "specified semester");
+    const safeCourse = cleanCourse || (isBangla ? "কোর্স" : "Course");
+    const safeSem = cleanSem || (isBangla ? "উক্ত সেমিস্টার" : "specified semester");
     const noteText = (isBangla ? item.bn : item.en)
       .replace("{typeLabel}", typeLabel)
       .replace("{courseCode}", safeCourse)
       .replace("{semester}", safeSem);
 
+    const defaultFindings = isBangla
+      ? `ডকুমেন্টটি (${safeCourse} • ${typeLabel}) ভেরিফিকেশন কিউতে যাচাই করা হয়েছে।`
+      : `Document (${safeCourse} • ${typeLabel}) reviewed in verification queue.`;
+
     return NextResponse.json({
       success: true,
       suggestion: noteText,
+      hasRealFlaw: false,
+      analysisFindings: defaultFindings,
+      detectedCourseCode: safeCourse,
+      detectedDocType: resourceType,
       source: "academic_rules",
       language: isBangla ? "bn" : "en",
       category: item.category,

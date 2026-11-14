@@ -262,6 +262,26 @@ public class CloudflareR2Service {
     }
 
     /**
+     * Streams an object directly from Cloudflare R2 without loading all bytes into server memory.
+     * Ideal for 50MB+ documents and video files.
+     */
+    public software.amazon.awssdk.core.ResponseInputStream<software.amazon.awssdk.services.s3.model.GetObjectResponse> getObjectStream(String keyOrUrl) {
+        if (!isConfigured()) {
+            throw new IllegalStateException("Cloudflare R2 is not configured");
+        }
+        String key = extractKey(keyOrUrl);
+        GetObjectRequest getReq = GetObjectRequest.builder()
+                .bucket(bucketName.trim())
+                .key(key)
+                .build();
+        return s3Client.getObject(getReq);
+    }
+
+    public boolean hasPublicCdnUrl() {
+        return publicUrl != null && !publicUrl.trim().isEmpty() && !publicUrl.contains(".r2.cloudflarestorage.com");
+    }
+
+    /**
      * Deletes an object from Cloudflare R2 by key or URL.
      */
     public void deleteFileByKeyOrUrl(String fileUrlOrKey) {

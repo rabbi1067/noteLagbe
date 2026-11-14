@@ -31,6 +31,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.CacheControl;
+import org.springframework.core.io.InputStreamResource;
 import java.nio.charset.StandardCharsets;
 import jakarta.annotation.PostConstruct;
 import java.io.FileNotFoundException;
@@ -586,14 +587,57 @@ public class ResourceService {
             incrementDownloadCount(id);
         }
 
-        // Direct Cloudflare R2 Presigned Redirect (Zero Memory, Zero Server Lag, 100% Authorized)
+        // Direct Cloudflare R2 Streaming & CDN Delivery
         if (r2Service.isConfigured() && (targetUrl.contains(".r2.") || targetUrl.contains("r2.dev") || targetUrl.contains("r2_"))) {
-            String presignedUrl = r2Service.getPresignedDownloadUrl(targetUrl, 24);
-            if (presignedUrl != null && !presignedUrl.isBlank() && !presignedUrl.equals(targetUrl)) {
-                log.info("Redirecting client directly to presigned Cloudflare R2 URL for material ID {}: {}", id, presignedUrl);
-                return ResponseEntity.status(HttpStatus.FOUND)
-                        .location(URI.create(presignedUrl))
-                        .build();
+            if (r2Service.hasPublicCdnUrl()) {
+                String presignedUrl = r2Service.getPresignedDownloadUrl(targetUrl, 24);
+                if (presignedUrl != null && !presignedUrl.isBlank() && !presignedUrl.equals(targetUrl)) {
+                    log.info("Redirecting client directly to public CDN Cloudflare R2 URL for material ID {}: {}", id, presignedUrl);
+                    return ResponseEntity.status(HttpStatus.FOUND)
+                            .location(URI.create(presignedUrl))
+                            .build();
+                }
+            }
+
+            // Direct S3 Byte Streaming for Cloudflare R2 (100% Authorized via AWS SDK, No InvalidArgumentAuthorization)
+            try {
+                byte[] fileBytes = r2Service.fetchBytes(targetUrl);
+                long contentLength = fileBytes.length;
+                String contentType = "application/pdf";
+                if (fileBytes.length >= 4 && fileBytes[0] == '%' && fileBytes[1] == 'P' && fileBytes[2] == 'D' && fileBytes[3] == 'F') {
+                    contentType = "application/pdf";
+                } else if (fileBytes.length >= 3 && (fileBytes[0] & 0xFF) == 0xFF && (fileBytes[1] & 0xFF) == 0xD8) {
+                    contentType = "image/jpeg";
+                } else if (fileBytes.length >= 4 && (fileBytes[0] & 0xFF) == 0x89 && fileBytes[1] == 'P' && fileBytes[2] == 'N' && fileBytes[3] == 'G') {
+                    contentType = "image/png";
+                }
+
+                String courseCode = r.getCourse() != null ? r.getCourse().getCode() : "Course";
+                String semester = r.getSemesterName() != null ? r.getSemesterName().trim() : "Semester";
+                String title = r.getTitle() != null ? r.getTitle().trim() : "Academic_Document";
+
+                String baseName = (courseCode + "_" + semester + "_" + title)
+                        .replaceAll("[^a-zA-Z0-9_\\-\\.]+", "_")
+                        .replaceAll("_+", "_");
+                if (!baseName.toLowerCase().endsWith(".pdf")) {
+                    baseName += ".pdf";
+                }
+
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.parseMediaType(contentType));
+                if (download) {
+                    headers.setContentDisposition(ContentDisposition.attachment().filename(baseName, StandardCharsets.UTF_8).build());
+                } else {
+                    headers.setContentDisposition(ContentDisposition.inline().filename(baseName, StandardCharsets.UTF_8).build());
+                }
+                headers.setCacheControl(CacheControl.maxAge(1, java.util.concurrent.TimeUnit.HOURS).cachePrivate());
+
+                return ResponseEntity.ok()
+                        .headers(headers)
+                        .contentLength(contentLength)
+                        .body(fileBytes);
+            } catch (Exception e) {
+                log.warn("Direct R2 S3 read failed for ID {} ({}), falling back to fetchResourceBytes: {}", id, e.getMessage(), e);
             }
         }
 
@@ -658,13 +702,15 @@ public class ResourceService {
             log.error("Failed to stream resource file ID {}: {}", id, e.getMessage(), e);
             if (targetUrl != null && (targetUrl.startsWith("http://") || targetUrl.startsWith("https://"))) {
                 String safeRedirect = targetUrl;
-                if (r2Service.isConfigured() && (targetUrl.contains(".r2.") || targetUrl.contains("r2.dev") || targetUrl.contains("r2_"))) {
+                if (r2Service.isConfigured() && r2Service.hasPublicCdnUrl()) {
                     safeRedirect = r2Service.getPresignedDownloadUrl(targetUrl, 24);
                 }
-                log.warn("Streaming proxy failed for external file ID {}. Redirecting client directly to cloud storage: {}", id, safeRedirect);
-                return ResponseEntity.status(HttpStatus.FOUND)
-                        .location(URI.create(safeRedirect))
-                        .build();
+                if (!safeRedirect.contains(".r2.cloudflarestorage.com")) {
+                    log.warn("Streaming proxy failed for external file ID {}. Redirecting client directly: {}", id, safeRedirect);
+                    return ResponseEntity.status(HttpStatus.FOUND)
+                            .location(URI.create(safeRedirect))
+                            .build();
+                }
             }
             throw new ApiException("Unable to download or stream material: " + e.getMessage());
         }

@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+function detectBufferMime(buf: Buffer, headerMime?: string): string {
+  if (buf.length >= 4 && buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) {
+    return "application/pdf";
+  }
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (buf.length >= 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+    return "image/png";
+  }
+  if (buf.length >= 12 && buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 && buf[8] === 0x57 && buf[9] === 0x45) {
+    return "image/webp";
+  }
+  if (headerMime && (headerMime.startsWith("image/") || headerMime.includes("pdf"))) {
+    return headerMime.includes("pdf") ? "application/pdf" : headerMime.split(";")[0].trim();
+  }
+  return "image/jpeg";
+}
 
 interface AnalysisResult {
   suggestedTitle: string;
@@ -137,31 +157,38 @@ export async function POST(req: NextRequest) {
     };
 
     // 6. Gemini Multimodal Vision API Integration
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey =
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_API_KEY ||
+      process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+
     if (apiKey && fileUrl && /^https?:\/\//i.test(fileUrl)) {
       try {
         let imagePart: any = null;
-        const isImage = /\.(jpe?g|png|webp)$/i.test(fileUrl) || fileUrl.includes("image/upload") || fileUrl.includes("res.cloudinary.com");
+        let inspectionUrl = fileUrl;
 
-        if (isImage) {
-          try {
-            const imgRes = await fetch(fileUrl, { signal: AbortSignal.timeout(4500) });
-            if (imgRes.ok) {
-              const buffer = await imgRes.arrayBuffer();
-              if (buffer.byteLength < 4 * 1024 * 1024) {
-                const base64Data = Buffer.from(buffer).toString("base64");
-                const mime = imgRes.headers.get("content-type") || "image/jpeg";
-                imagePart = {
-                  inlineData: {
-                    mimeType: mime.startsWith("image/") ? mime : "image/jpeg",
-                    data: base64Data,
-                  },
-                };
-              }
+        // If Cloudinary PDF, convert to 1st page JPG thumbnail for faster multimodal inspection
+        if (inspectionUrl.includes("res.cloudinary.com") && inspectionUrl.includes("/image/upload/")) {
+          inspectionUrl = inspectionUrl.replace(/\.pdf(\?.*)?$/i, ".jpg").replace("/image/upload/", "/image/upload/pg_1,w_1200/");
+        }
+
+        try {
+          const imgRes = await fetch(inspectionUrl, { signal: AbortSignal.timeout(6000) });
+          if (imgRes.ok) {
+            const buffer = await imgRes.arrayBuffer();
+            const nodeBuf = Buffer.from(buffer);
+            if (nodeBuf.length > 0 && nodeBuf.length <= 10 * 1024 * 1024) {
+              const detectedMime = detectBufferMime(nodeBuf, imgRes.headers.get("content-type") || undefined);
+              imagePart = {
+                inlineData: {
+                  mimeType: detectedMime,
+                  data: nodeBuf.toString("base64"),
+                },
+              };
             }
-          } catch {
-            // Proceed to text prompt fallback
           }
+        } catch {
+          // Proceed to text prompt fallback
         }
 
         const promptText = `You are an academic document analyzer for Southeast University (SEU).

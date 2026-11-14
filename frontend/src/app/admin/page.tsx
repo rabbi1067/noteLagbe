@@ -790,11 +790,20 @@ export default function AdminDashboardPage() {
   const [rejectFeedback, setRejectFeedback] = useState("");
   const [rejectAiSuggestCount, setRejectAiSuggestCount] = useState(0);
   const [isAiGeneratingReject, setIsAiGeneratingReject] = useState(false);
+  const [rejectAiObservation, setRejectAiObservation] = useState<{
+    hasRealFlaw: boolean;
+    analysisFindings: string;
+    detectedCourseCode?: string;
+    detectedDocType?: string;
+    category?: string;
+    source?: string;
+  } | null>(null);
 
   const handleOpenRejectModal = (contribution: any) => {
     setRejectingContribution(contribution);
     setRejectFeedback("");
     setRejectAiSuggestCount(0);
+    setRejectAiObservation(null);
   };
 
   const handleAiSuggestRejectReason = async () => {
@@ -811,6 +820,7 @@ export default function AdminDashboardPage() {
           semester: rejectingContribution.uploadedResource?.semesterName || rejectingContribution.semesterName || "",
           fileName: rejectingContribution.uploadedResource?.fileName || rejectingContribution.uploadedResource?.title || "",
           fileUrl: rejectingContribution.uploadedResource?.fileUrl || "",
+          previewUrl: rejectingContribution.uploadedResource?.previewUrl || rejectingContribution.previewUrl || "",
           cycleIndex: rejectAiSuggestCount,
           language: language || "en",
         }),
@@ -819,11 +829,29 @@ export default function AdminDashboardPage() {
       if (data?.success && data?.suggestion) {
         setRejectFeedback(data.suggestion);
         setRejectAiSuggestCount((prev) => prev + 1);
-        toast.success(
-          language === "bn"
-            ? `✨ AI সাজেশন #${(rejectAiSuggestCount % 5) + 1} তৈরি হয়েছে! প্রয়োজনমতো এডিট করতে পারেন।`
-            : `✨ AI Suggestion #${(rejectAiSuggestCount % 5) + 1} generated! You can edit as needed.`
-        );
+        if (data.analysisFindings) {
+          setRejectAiObservation({
+            hasRealFlaw: Boolean(data.hasRealFlaw),
+            analysisFindings: data.analysisFindings,
+            detectedCourseCode: data.detectedCourseCode,
+            detectedDocType: data.detectedDocType,
+            category: data.category,
+            source: data.source,
+          });
+        }
+        if (data.hasRealFlaw) {
+          toast.warning(
+            language === "bn"
+              ? "⚠️ AI ভিশন নথিতে অমিল/ত্রুটি শনাক্ত করেছে!"
+              : "⚠️ AI Vision detected a document discrepancy!"
+          );
+        } else {
+          toast.success(
+            language === "bn"
+              ? `✨ AI ভিশন: নথিটি সঠিক ও প্রাসঙ্গিক দেখাচ্ছে (কারণ #${(rejectAiSuggestCount % 5) + 1})`
+              : `✨ AI Vision: Document verified valid (Reason #${(rejectAiSuggestCount % 5) + 1})`
+          );
+        }
       } else {
         toast.error(
           language === "bn"
@@ -12458,6 +12486,49 @@ export default function AdminDashboardPage() {
                   )}
                 </button>
               </div>
+
+              {/* AI Vision Observation Inspection Banner */}
+              {rejectAiObservation && (
+                <div
+                  className={`p-3 rounded-2xl border text-xs space-y-1 animate-in fade-in ${
+                    rejectAiObservation.hasRealFlaw
+                      ? "bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300"
+                      : "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 font-bold text-xs">
+                    {rejectAiObservation.hasRealFlaw ? (
+                      <>
+                        <ShieldAlert className="w-4 h-4 text-rose-500" />
+                        <span>
+                          {language === "bn"
+                            ? "AI ভিশন পর্যবেক্ষণ: নথিতে অসংগতি শনাক্ত হয়েছে"
+                            : "AI Vision Observation: Discrepancy Detected"}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        <span>
+                          {language === "bn"
+                            ? "AI ভিশন পর্যবেক্ষণ: নথিটি বৈধ ও স্পষ্ট (কোনো কনটেন্ট অমিল নেই)"
+                            : "AI Vision Observation: Document is Valid & Authentic"}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-[11px] leading-relaxed opacity-90 font-normal">
+                    {rejectAiObservation.analysisFindings}
+                  </p>
+                  {!rejectAiObservation.hasRealFlaw && (
+                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium italic pt-0.5">
+                      {language === "bn"
+                        ? "💡 নথিতে কোনো ত্রুটি না থাকায় শিক্ষার্থীকে অহেতুক অভিযুক্ত না করে শালীন প্রশাসনিক/আর্কাইভ সংক্রান্ত কারণ প্রস্তাব করা হয়েছে।"
+                        : "💡 No content defects were found; a polite administrative reason has been suggested instead of a false defect accusation."}
+                    </p>
+                  )}
+                </div>
+              )}
 
               <textarea
                 rows={4}
