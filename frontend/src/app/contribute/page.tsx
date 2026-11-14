@@ -167,6 +167,8 @@ export default function ContributePage() {
     setRequestedCourseCode1("");
     setRequestedCourseCode2("");
     setAiAnalysis(null);
+    setHasAttemptedSubmit(false);
+    setTouchedFields({});
   };
 
   const targetCourses = React.useMemo(() => {
@@ -208,6 +210,10 @@ export default function ContributePage() {
   const quickSemesters = React.useMemo(() => getTwoQuickSemesters(), []);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | number>("");
   const [allTeachers, setAllTeachers] = useState<any[]>([]);
+
+  // Validation state: only display required field warnings after user attempts submission or touches a field
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
 
   const contribDupCheck = useDuplicateResourceCheck({
     enabled: Boolean(selectedTeacherId) && !submissionSuccessData,
@@ -553,6 +559,7 @@ export default function ContributePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setHasAttemptedSubmit(true);
     if (!isAuthenticated) {
       setShowAuthModal(true);
       return;
@@ -783,6 +790,8 @@ export default function ContributePage() {
       setSemester("");
       setSelectedTeacherId("");
       setUploaderKey((prev) => prev + 1);
+      setHasAttemptedSubmit(false);
+      setTouchedFields({});
 
       invalidateDuplicateSlotCache(courseCode);
       loadMyContributions();
@@ -1101,10 +1110,16 @@ export default function ContributePage() {
               </label>
               <select
                 value={resourceType}
-                onChange={(e) => handleResourceTypeChange(e.target.value)}
+                onChange={(e) => {
+                  handleResourceTypeChange(e.target.value);
+                  setTouchedFields((prev) => ({ ...prev, resourceType: true }));
+                }}
+                onBlur={() => setTouchedFields((prev) => ({ ...prev, resourceType: true }))}
                 className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border transition-all focus:outline-none font-semibold ${
-                  !resourceType
-                    ? "border-amber-400/80 dark:border-amber-500/60 text-slate-400 dark:text-slate-500 focus:border-amber-500"
+                  (hasAttemptedSubmit || touchedFields.resourceType) && !resourceType
+                    ? "border-amber-500 dark:border-amber-500 ring-2 ring-amber-500/20 text-slate-400 dark:text-slate-500"
+                    : !resourceType
+                    ? "border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 focus:border-emerald-500"
                     : "border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:border-emerald-500"
                 }`}
               >
@@ -1136,8 +1151,8 @@ export default function ContributePage() {
                   {language === "bn" ? "অন্যান্য অ্যাকাডেমিক ম্যাটেরিয়াল (Others)" : "Other Academic Materials (Others)"}
                 </option>
               </select>
-              {!resourceType && (
-                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium pt-0.5">
+              {(hasAttemptedSubmit || touchedFields.resourceType) && !resourceType && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium pt-0.5 animate-in fade-in">
                   ⚠️ {language === "bn" ? "ম্যাটেরিয়ালের ধরন নির্বাচন করা আবশ্যক" : "Resource type selection is required"}
                 </p>
               )}
@@ -1149,13 +1164,16 @@ export default function ContributePage() {
                 label={language === "bn" ? `${selectedDepartment} টার্গেট কোর্স` : `${selectedDepartment} Target Course`}
                 required
                 value={courseCode}
-                onChange={handleCourseCodeChange}
+                onChange={(code) => {
+                  handleCourseCodeChange(code);
+                  setTouchedFields((prev) => ({ ...prev, courseCode: true }));
+                }}
                 courses={targetCourses.length > 0 ? targetCourses : courses}
                 placeholder={language === "bn" ? `টার্গেট কোর্স খুঁজুন বা নির্বাচন করুন (বাধ্যতামূলক)...` : `Search or select target course (Required)...`}
                 language={language}
               />
-              {!courseCode && (
-                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium pt-1">
+              {(hasAttemptedSubmit || touchedFields.courseCode) && !courseCode && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium pt-1 animate-in fade-in">
                   ⚠️ {language === "bn" ? "টার্গেট কোর্স নির্বাচন করা আবশ্যক" : "Target course selection is required"}
                 </p>
               )}
@@ -1186,7 +1204,10 @@ export default function ContributePage() {
 
             <SearchableTeacherSelect
               value={selectedTeacherId ? Number(selectedTeacherId) : ""}
-              onChange={(val) => setSelectedTeacherId(val)}
+              onChange={(val) => {
+                setSelectedTeacherId(val);
+                setTouchedFields((prev) => ({ ...prev, teacherId: true }));
+              }}
               teachers={selectableFaculty}
               placeholder={
                 language === "bn"
@@ -1196,6 +1217,11 @@ export default function ContributePage() {
               allowGeneral={false}
               language={language}
             />
+            {hasAttemptedSubmit && !selectedTeacherId && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium pt-1 animate-in fade-in">
+                ⚠️ {language === "bn" ? "কোর্স শিক্ষক নির্বাচন করা আবশ্যক" : "Course faculty selection is required"}
+              </p>
+            )}
           </div>
 
           {/* Row 2: Material Title & Semester (2 Columns side by side with validation & limits) */}
@@ -1324,10 +1350,13 @@ export default function ContributePage() {
 
               <SearchableSemesterSelect
                 value={semester}
-                onChange={handleSemesterChange}
+                onChange={(sem) => {
+                  handleSemesterChange(sem);
+                  setTouchedFields((prev) => ({ ...prev, semester: true }));
+                }}
                 required
                 language={language}
-                error={contribDupCheck.isDuplicate}
+                error={contribDupCheck.isDuplicate || (hasAttemptedSubmit && !semester.trim())}
                 placeholder={
                   language === "bn"
                     ? "সেমিস্টার খুঁজুন বা নির্বাচন করুন (বাধ্যতামূলক)..."
@@ -1359,6 +1388,12 @@ export default function ContributePage() {
                   );
                 })}
               </div>
+
+              {hasAttemptedSubmit && !semester.trim() && (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium pt-1 animate-in fade-in">
+                  ⚠️ {language === "bn" ? "সেমিস্টার নির্বাচন করা আবশ্যক" : "Semester selection is required"}
+                </p>
+              )}
 
             </div>
           </div>
@@ -1634,8 +1669,8 @@ export default function ContributePage() {
               </div>
             </div>
 
-            {(!requestedCourseCode1 || !requestedCourseCode2) && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1.5 pt-1">
+            {hasAttemptedSubmit && (!requestedCourseCode1 || !requestedCourseCode2) && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1.5 pt-1 animate-in fade-in">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
                 <span>
                   {language === "bn"
