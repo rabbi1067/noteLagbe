@@ -10,6 +10,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.notelagbe.exception.ApiException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
