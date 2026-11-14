@@ -68,6 +68,45 @@ function sortTeacherCoursesNaturally(teacherCourses: any[]): any[] {
   });
 }
 
+function sortResourcesDescending(list: any[]): any[] {
+  if (!Array.isArray(list)) return [];
+  return [...list].sort((a, b) => {
+    // 1. Creation time (newest upload first)
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    if (timeA !== timeB && timeA > 0 && timeB > 0) {
+      return timeB - timeA;
+    }
+    // 2. Sequential ID (higher ID = uploaded later)
+    const idA = typeof a.id === "number" ? a.id : Number(a.id) || 0;
+    const idB = typeof b.id === "number" ? b.id : Number(b.id) || 0;
+    if (idA !== idB && idA > 0 && idB > 0) {
+      return idB - idA;
+    }
+    // 3. Academic Year descending (e.g. 2026 > 2025 > 2024 > 2023)
+    const yearA = Number(a.academicYear) || 0;
+    const yearB = Number(b.academicYear) || 0;
+    if (yearA !== yearB) {
+      return yearB - yearA;
+    }
+    // 4. Semester season priority: Fall > Summer > Spring
+    const getSemesterWeight = (s?: string) => {
+      if (!s) return 0;
+      const lower = s.toLowerCase();
+      if (lower.includes("fall")) return 3;
+      if (lower.includes("summer")) return 2;
+      if (lower.includes("spring")) return 1;
+      return 0;
+    };
+    const semWeightA = getSemesterWeight(a.semesterName);
+    const semWeightB = getSemesterWeight(b.semesterName);
+    if (semWeightA !== semWeightB) {
+      return semWeightB - semWeightA;
+    }
+    return 0;
+  });
+}
+
 export default function TeacherDetailPage() {
   const params = useParams();
   const id = Number(params?.id);
@@ -104,7 +143,7 @@ export default function TeacherDetailPage() {
     if (!id || typeof window === "undefined") return [];
     try {
       const cached = localStorage.getItem(`notelagbe_tch_res_${id}`);
-      if (cached) return JSON.parse(cached);
+      if (cached) return sortResourcesDescending(JSON.parse(cached));
     } catch {}
     return [];
   });
@@ -138,7 +177,7 @@ export default function TeacherDetailPage() {
 
   // Layout balance controls
   const [showAllCourses, setShowAllCourses] = useState(true);
-  const [courseFilter, setCourseFilter] = useState<"ALL" | "THEORY" | "LAB" | "NOTE" | "QUIZ">("ALL");
+  const [courseFilter, setCourseFilter] = useState<"ALL" | "THEORY" | "LAB" | "NOTE" | "QUIZ" | "EXAM">("ALL");
   const [expandedCourseMap, setExpandedCourseMap] = useState<Record<string, boolean>>({});
 
   // PDF Preview Modal
@@ -185,14 +224,15 @@ export default function TeacherDetailPage() {
         });
 
         const sortedCourses = sortTeacherCoursesNaturally(Array.from(courseMap.values()));
+        const sortedResources = sortResourcesDescending(rData || []);
         setCourses(sortedCourses);
-        setResources(rData || []);
+        setResources(sortedResources);
         setReviews(revData || []);
 
         // Cache for instant 0ms retrieval on next visit
         try {
           localStorage.setItem(`notelagbe_tch_courses_${id}`, JSON.stringify(sortedCourses));
-          if (rData) localStorage.setItem(`notelagbe_tch_res_${id}`, JSON.stringify(rData));
+          if (rData) localStorage.setItem(`notelagbe_tch_res_${id}`, JSON.stringify(sortedResources));
           if (revData) localStorage.setItem(`notelagbe_tch_rev_${id}`, JSON.stringify(revData));
         } catch {}
 
@@ -221,10 +261,15 @@ export default function TeacherDetailPage() {
   });
 
   const toggleCourseExpand = (code: string) => {
-    setExpandedCourseMap((prev) => ({
-      ...prev,
-      [code]: !prev[code],
-    }));
+    setExpandedCourseMap((prev) => {
+      const isCurrentlyExpanded = courseFilter !== "ALL"
+        ? (prev[code] !== false)
+        : Boolean(prev[code]);
+      return {
+        ...prev,
+        [code]: !isCurrentlyExpanded,
+      };
+    });
   };
 
   const getMarkingColor = (marking?: string) => {
@@ -382,21 +427,41 @@ export default function TeacherDetailPage() {
     !teacher.image.includes("avatar_blue") && 
     !imageFailed;
 
-  // Course filtering & slicing
+  // Material category identification predicates
+  const isNoteResource = (type?: string) =>
+    type === "NOTE" || type === "LAB_HAND_NOTE" || type === "DOC_NOTE";
+  const isQuizResource = (type?: string) =>
+    type === "QUIZ_CT" || type === "LAB_QUIZ";
+  const isExamResource = (type?: string) =>
+    type === "MID_QUESTION" || type === "FINAL_QUESTION" || type === "LAB_FINAL";
+
+  // Total material counts across all courses of this teacher
+  const noteMaterialsCount = resources.filter((r) => isNoteResource(r.type)).length;
+  const quizMaterialsCount = resources.filter((r) => isQuizResource(r.type)).length;
+  const examMaterialsCount = resources.filter((r) => isExamResource(r.type)).length;
+
+  // Course filtering & counts
   const theoryCount = courses.filter((c) => !c.course?.lab).length;
   const labCount = courses.filter((c) => c.course?.lab).length;
 
   const noteCoursesCount = courses.filter((tc) => {
     const code = tc.course?.code?.toLowerCase();
     return resources.some(
-      (r) => r.course?.code?.toLowerCase() === code && (r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "DOC_NOTE")
+      (r) => r.course?.code?.toLowerCase() === code && isNoteResource(r.type)
     );
   }).length;
 
   const quizCoursesCount = courses.filter((tc) => {
     const code = tc.course?.code?.toLowerCase();
     return resources.some(
-      (r) => r.course?.code?.toLowerCase() === code && (r.type === "QUIZ_CT" || r.type === "LAB_QUIZ")
+      (r) => r.course?.code?.toLowerCase() === code && isQuizResource(r.type)
+    );
+  }).length;
+
+  const examCoursesCount = courses.filter((tc) => {
+    const code = tc.course?.code?.toLowerCase();
+    return resources.some(
+      (r) => r.course?.code?.toLowerCase() === code && isExamResource(r.type)
     );
   }).length;
 
@@ -406,12 +471,17 @@ export default function TeacherDetailPage() {
     if (courseFilter === "LAB") return tc.course?.lab;
     if (courseFilter === "NOTE") {
       return resources.some(
-        (r) => r.course?.code?.toLowerCase() === code && (r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "DOC_NOTE")
+        (r) => r.course?.code?.toLowerCase() === code && isNoteResource(r.type)
       );
     }
     if (courseFilter === "QUIZ") {
       return resources.some(
-        (r) => r.course?.code?.toLowerCase() === code && (r.type === "QUIZ_CT" || r.type === "LAB_QUIZ")
+        (r) => r.course?.code?.toLowerCase() === code && isQuizResource(r.type)
+      );
+    }
+    if (courseFilter === "EXAM") {
+      return resources.some(
+        (r) => r.course?.code?.toLowerCase() === code && isExamResource(r.type)
       );
     }
     return true;
@@ -651,13 +721,14 @@ export default function TeacherDetailPage() {
             </Link>
           </div>
 
-          {/* Quick Filter Tabs: All, Theory, Lab */}
+          {/* Quick Filter Tabs: All, Theory, Lab, Notes, Quiz, Exams */}
           {courses.length > 0 && (
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="inline-flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 text-xs font-bold border border-slate-200 dark:border-slate-700">
+              <div className="inline-flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 text-xs font-bold border border-slate-200 dark:border-slate-700 flex-wrap">
                 <button
+                  type="button"
                   onClick={() => setCourseFilter("ALL")}
-                  className={`px-3 py-1.5 rounded-xl transition-all ${
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
                     courseFilter === "ALL"
                       ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black"
                       : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -666,8 +737,9 @@ export default function TeacherDetailPage() {
                   {language === "bn" ? `সকল (${courses.length})` : `All (${courses.length})`}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setCourseFilter("THEORY")}
-                  className={`px-3 py-1.5 rounded-xl transition-all ${
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
                     courseFilter === "THEORY"
                       ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black"
                       : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -676,8 +748,9 @@ export default function TeacherDetailPage() {
                   {language === "bn" ? `থিওরি (${theoryCount})` : `Theory (${theoryCount})`}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setCourseFilter("LAB")}
-                  className={`px-3 py-1.5 rounded-xl transition-all ${
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
                     courseFilter === "LAB"
                       ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black"
                       : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
@@ -686,24 +759,37 @@ export default function TeacherDetailPage() {
                   {language === "bn" ? `ল্যাব (${labCount})` : `Lab (${labCount})`}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setCourseFilter("NOTE")}
-                  className={`px-3 py-1.5 rounded-xl transition-all ${
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
                     courseFilter === "NOTE"
                       ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm font-black"
                       : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
-                  {language === "bn" ? `নোট (${noteCoursesCount})` : `Notes (${noteCoursesCount})`}
+                  {language === "bn" ? `হ্যান্ড নোট (${noteMaterialsCount})` : `Notes (${noteMaterialsCount})`}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setCourseFilter("QUIZ")}
-                  className={`px-3 py-1.5 rounded-xl transition-all ${
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
                     courseFilter === "QUIZ"
                       ? "bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-sm font-black"
                       : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
-                  {language === "bn" ? `কুইজ (${quizCoursesCount})` : `Quiz (${quizCoursesCount})`}
+                  {language === "bn" ? `কুইজ (${quizMaterialsCount})` : `Quiz (${quizMaterialsCount})`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCourseFilter("EXAM")}
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                    courseFilter === "EXAM"
+                      ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  {language === "bn" ? `পরীক্ষার প্রশ্ন (${examMaterialsCount})` : `Exams (${examMaterialsCount})`}
                 </button>
               </div>
 
@@ -734,21 +820,29 @@ export default function TeacherDetailPage() {
             {displayedCourses.length > 0 ? (
               displayedCourses.map((tc) => {
                 const courseCode = tc.course?.code;
-                const courseResources = resources.filter(
+                const rawCourseResources = resources.filter(
                   (r) => r.course?.code?.toLowerCase() === courseCode?.toLowerCase()
                 );
 
-                const noteCount = courseResources.filter(
-                  (r) => r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "DOC_NOTE"
-                ).length;
-                const quizCount = courseResources.filter(
-                  (r) => r.type === "QUIZ_CT" || r.type === "LAB_QUIZ"
-                ).length;
-                const examCount = courseResources.filter(
-                  (r) => r.type === "MID_QUESTION" || r.type === "FINAL_QUESTION" || r.type === "LAB_FINAL"
-                ).length;
+                // Sort descending: newest upload first
+                const sortedCourseResources = sortResourcesDescending(rawCourseResources);
 
-                const isExpanded = Boolean(expandedCourseMap[courseCode]);
+                // Filter materials according to active courseFilter
+                const displayedCourseResources = sortedCourseResources.filter((r) => {
+                  if (courseFilter === "NOTE") return isNoteResource(r.type);
+                  if (courseFilter === "QUIZ") return isQuizResource(r.type);
+                  if (courseFilter === "EXAM") return isExamResource(r.type);
+                  return true;
+                });
+
+                const noteCount = rawCourseResources.filter((r) => isNoteResource(r.type)).length;
+                const quizCount = rawCourseResources.filter((r) => isQuizResource(r.type)).length;
+                const examCount = rawCourseResources.filter((r) => isExamResource(r.type)).length;
+
+                // When user clicks a specific filter (NOTE, QUIZ, EXAM), auto-expand so they immediately see the filtered files
+                const isExpanded = courseFilter !== "ALL"
+                  ? (expandedCourseMap[courseCode] !== false)
+                  : Boolean(expandedCourseMap[courseCode]);
 
                 return (
                   <div
@@ -783,14 +877,21 @@ export default function TeacherDetailPage() {
 
                       {/* Action Buttons: Direct Course Link & Materials Accordion */}
                       <div className="flex items-center gap-2 shrink-0">
-                        {courseResources.length > 0 && (
+                        {displayedCourseResources.length > 0 && (
                           <button
+                            type="button"
                             onClick={() => toggleCourseExpand(courseCode)}
-                            className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition-all"
+                            className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition-all cursor-pointer"
                             title={isExpanded ? "Collapse materials" : "Expand materials"}
                           >
                             <span>
-                              {courseResources.length} {language === "bn" ? "টি ফাইল" : "Materials"}
+                              {courseFilter === "NOTE"
+                                ? `${displayedCourseResources.length} ${language === "bn" ? "টি হ্যান্ড নোট" : "Notes"}`
+                                : courseFilter === "QUIZ"
+                                ? `${displayedCourseResources.length} ${language === "bn" ? "টি কুইজ" : "Quizzes"}`
+                                : courseFilter === "EXAM"
+                                ? `${displayedCourseResources.length} ${language === "bn" ? "টি বিগত পরীক্ষা" : "Exams"}`
+                                : `${displayedCourseResources.length} ${language === "bn" ? "টি ফাইল" : "Materials"}`}
                             </span>
                             {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                           </button>
@@ -809,22 +910,55 @@ export default function TeacherDetailPage() {
                     {/* Material Count Summary Badges (Notes, Quiz, Past Exams) */}
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       {noteCount > 0 && (
-                        <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-500/20">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCourseFilter(courseFilter === "NOTE" ? "ALL" : "NOTE");
+                            setExpandedCourseMap((prev) => ({ ...prev, [courseCode]: true }));
+                          }}
+                          className={`inline-flex items-center gap-1 font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                            courseFilter === "NOTE"
+                              ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                              : "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
+                          }`}
+                        >
                           <CheckCircle2 className="w-3 h-3" />
                           <span>{noteCount} {language === "bn" ? "হ্যান্ড নোট" : "Notes"}</span>
-                        </span>
+                        </button>
                       )}
                       {quizCount > 0 && (
-                        <span className="inline-flex items-center gap-1 font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-lg border border-purple-500/20">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCourseFilter(courseFilter === "QUIZ" ? "ALL" : "QUIZ");
+                            setExpandedCourseMap((prev) => ({ ...prev, [courseCode]: true }));
+                          }}
+                          className={`inline-flex items-center gap-1 font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                            courseFilter === "QUIZ"
+                              ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                              : "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 border-purple-500/20 hover:bg-purple-100 dark:hover:bg-purple-900/40"
+                          }`}
+                        >
                           <HelpCircle className="w-3 h-3" />
                           <span>{quizCount} {language === "bn" ? "কুইজ" : "Quiz"}</span>
-                        </span>
+                        </button>
                       )}
                       {examCount > 0 && (
-                        <span className="inline-flex items-center gap-1 font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-lg border border-blue-500/20">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCourseFilter(courseFilter === "EXAM" ? "ALL" : "EXAM");
+                            setExpandedCourseMap((prev) => ({ ...prev, [courseCode]: true }));
+                          }}
+                          className={`inline-flex items-center gap-1 font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                            courseFilter === "EXAM"
+                              ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                              : "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-500/20 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+                          }`}
+                        >
                           <FileQuestion className="w-3 h-3" />
                           <span>{examCount} {language === "bn" ? "বিগত পরীক্ষা" : "Past Exams"}</span>
-                        </span>
+                        </button>
                       )}
                       {noteCount === 0 && quizCount === 0 && examCount === 0 && (
                         <span className="text-[11px] text-slate-400">
@@ -834,9 +968,9 @@ export default function TeacherDetailPage() {
                     </div>
 
                     {/* Expandable Materials Accordion */}
-                    {isExpanded && courseResources.length > 0 && (
+                    {isExpanded && displayedCourseResources.length > 0 && (
                       <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800 animate-in fade-in duration-200">
-                        {courseResources.map((res) => (
+                        {displayedCourseResources.map((res) => (
                           <div
                             key={res.id}
                             className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs hover:border-purple-300 dark:hover:border-purple-800 transition-all"
@@ -893,6 +1027,11 @@ export default function TeacherDetailPage() {
                             </button>
                           </div>
                         ))}
+                      </div>
+                    )}
+                    {isExpanded && displayedCourseResources.length === 0 && (
+                      <div className="py-4 text-center text-xs text-slate-400 border-t border-slate-100 dark:border-slate-800">
+                        {language === "bn" ? "এই কোর্সে নির্বাচিত ফিল্টারের কোনো ফাইল পাওয়া যায়নি" : "No files found for this filter category in this course"}
                       </div>
                     )}
                   </div>
@@ -983,7 +1122,7 @@ export default function TeacherDetailPage() {
           isUnlocked={Boolean(activeResource.fileUrl)}
           onUnlockedSuccess={() => {
             if (id) {
-              api.resources.getByTeacher(id).then((rData) => setResources(rData || []));
+              api.resources.getByTeacher(id).then((rData) => setResources(sortResourcesDescending(rData || [])));
             }
           }}
         />

@@ -31,6 +31,7 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
     List<Resource> findByCourseCodeIgnoreCaseAndStatus(String code, ResourceStatus status);
     List<Resource> findByCourseIdAndTypeAndStatus(Long courseId, ResourceType type, ResourceStatus status);
     List<Resource> findByTeacherIdAndStatus(Long teacherId, ResourceStatus status);
+    List<Resource> findByTeacherIdAndStatusOrderByCreatedAtDesc(Long teacherId, ResourceStatus status);
     List<Resource> findByCourseIdAndTeacherIdAndStatus(Long courseId, Long teacherId, ResourceStatus status);
     List<Resource> findByCourseIdAndTeacherId(Long courseId, Long teacherId);
     List<Resource> findByCourseCodeIgnoreCaseAndTeacherIdAndStatus(String code, Long teacherId, ResourceStatus status);

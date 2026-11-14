@@ -203,17 +203,25 @@ public class ResourceService {
 
     @Cacheable(value = "teacher_resources", key = "(#user != null ? #user.id : 0) + '_' + #teacherId", unless = "#result == null")
     public List<Resource> getResourcesForTeacher(Long teacherId, User user) {
-        List<Resource> resources = resourceRepository.findByTeacherIdAndStatus(teacherId, ResourceStatus.APPROVED);
-        return resources.stream().map(r -> {
-            boolean isUnlocked = subscriptionService.isResourceUnlocked(user, r);
-            if (!isUnlocked) {
-                return maskLockedResource(r);
-            }
-            if (r.getFileUrl() != null && r2Service.isConfigured() && (r.getFileUrl().contains(".r2.") || r.getFileUrl().contains("r2_"))) {
-            r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 24));
-        }
-        return r;
-        }).toList();
+        List<Resource> resources = resourceRepository.findByTeacherIdAndStatusOrderByCreatedAtDesc(teacherId, ResourceStatus.APPROVED);
+        return resources.stream()
+                .sorted((a, b) -> {
+                    if (a.getCreatedAt() != null && b.getCreatedAt() != null) {
+                        int cmp = b.getCreatedAt().compareTo(a.getCreatedAt());
+                        if (cmp != 0) return cmp;
+                    }
+                    return Long.compare(b.getId() != null ? b.getId() : 0, a.getId() != null ? a.getId() : 0);
+                })
+                .map(r -> {
+                    boolean isUnlocked = subscriptionService.isResourceUnlocked(user, r);
+                    if (!isUnlocked) {
+                        return maskLockedResource(r);
+                    }
+                    if (r.getFileUrl() != null && r2Service.isConfigured() && (r.getFileUrl().contains(".r2.") || r.getFileUrl().contains("r2_"))) {
+                        r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 24));
+                    }
+                    return r;
+                }).toList();
     }
 
     public Map<String, Object> checkAvailability(String courseCode, Long teacherId) {
