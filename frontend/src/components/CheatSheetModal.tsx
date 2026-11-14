@@ -227,11 +227,17 @@ export default function CheatSheetModal({
         `💡 How to structure and write answers for maximum step marking and top CGPA?`,
       ];
 
-  // Helper to format timestamps nicely
+  // Helper to format timestamps nicely with timezone resilience
   const formatTime = (iso?: string) => {
     if (!iso) return "";
     try {
-      const d = new Date(iso);
+      let normalized = iso.trim();
+      // If timestamp lacks timezone offset (e.g. from backend LocalDateTime "2026-11-14T17:40:00" without Z),
+      // append 'Z' so it is treated as UTC, allowing local browser timezone (e.g. Asia/Dhaka UTC+6) to display 11:40 PM!
+      if (normalized.includes("T") && !normalized.endsWith("Z") && !/[+-]\d{2}(:\d{2})?$/.test(normalized)) {
+        normalized = `${normalized}Z`;
+      }
+      const d = new Date(normalized);
       return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     } catch {
       return "";
