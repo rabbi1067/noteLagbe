@@ -153,7 +153,8 @@ public class AiExamChatService {
         String academicContext = buildAcademicContext(course, teacher, courseTeachers, approvedResources);
 
         // 4. Generate AI Response via Gemini (or resilient academic fallback)
-        String aiResponseText = callGeminiOrFallback(userPrompt, academicContext, history, course, teacher, approvedResources);
+        String clientLang = request.getLanguage() != null && !request.getLanguage().isBlank() ? request.getLanguage().trim() : "en";
+        String aiResponseText = callGeminiOrFallback(userPrompt, academicContext, history, course, teacher, approvedResources, clientLang);
 
         // 5. Save AI response in database
         AiExamChatMessage aiMsg = new AiExamChatMessage(
@@ -310,12 +311,13 @@ public class AiExamChatService {
                                         List<AiExamChatMessage> history,
                                         Course course,
                                         Teacher teacher,
-                                        List<Resource> resources) {
+                                        List<Resource> resources,
+                                        String clientLang) {
         String apiKey = (geminiApiKey != null && !geminiApiKey.isBlank()) ? geminiApiKey.trim() : System.getenv("GEMINI_API_KEY");
 
         if (apiKey != null && !apiKey.isBlank()) {
             try {
-                String response = requestGeminiApi(apiKey, userPrompt, academicContext, history, course, teacher);
+                String response = requestGeminiApi(apiKey, userPrompt, academicContext, history, course, teacher, clientLang);
                 if (response != null && !response.isBlank()) {
                     return response.trim();
                 }
@@ -325,7 +327,7 @@ public class AiExamChatService {
         }
 
         // Resilient fallback generator using real verified database materials
-        return generateAcademicHeuristicResponse(userPrompt, course, teacher, resources);
+        return generateAcademicHeuristicResponse(userPrompt, course, teacher, resources, clientLang);
     }
 
     private String requestGeminiApi(String apiKey,
@@ -333,7 +335,12 @@ public class AiExamChatService {
                                     String academicContext,
                                     List<AiExamChatMessage> history,
                                     Course course,
-                                    Teacher teacher) throws Exception {
+                                    Teacher teacher,
+                                    String clientLang) throws Exception {
+        String langInstruction = "bn".equalsIgnoreCase(clientLang)
+                ? "The interface is set to Bengali. Provide your response primarily in natural, fluent Bengali (বাংলা). If the student explicitly writes their question in English or asks for technical code/English explanations, answer in that language with high academic quality."
+                : "The interface is set to English. Provide your response in clear, professional English. If the student writes their question in Bengali (বাংলা) or Banglish, answer naturally and fluently in that language to best help the student.";
+
         String systemInstruction = "You are NoteLagbe AI Exam Revision Assistant & Cheat Sheet Coach for Southeast University (SEU).\n"
                 + "Your primary goal is to help Southeast University students excel in course: " + course.getCode() + " - " + course.getTitle() + ".\n\n"
                 + "ACADEMIC ARCHIVE CONTEXT:\n" + academicContext + "\n\n"
@@ -343,7 +350,7 @@ public class AiExamChatService {
                 + "3. Highlight WHICH topics are repeated and WHY (e.g. 'This topic has repeated across Fall 2025 and Summer 2024 past midterm papers').\n"
                 + "4. Give actionable exam scoring tips (time management, common traps, diagram marks, presentation).\n"
                 + "5. Format cleanly using Markdown with bold headings, clean bullet points, and code snippets where appropriate.\n"
-                + "6. Language: Match the student's language naturally (Bengali, English, or Banglish) in an encouraging, professional mentor tone.";
+                + "6. Language Policy: " + langInstruction;
 
         // Build conversation contents for Gemini REST API
         List<Map<String, Object>> contents = new ArrayList<>();
@@ -406,7 +413,8 @@ public class AiExamChatService {
     private String generateAcademicHeuristicResponse(String userPrompt,
                                                      Course course,
                                                      Teacher teacher,
-                                                     List<Resource> resources) {
+                                                     List<Resource> resources,
+                                                     String clientLang) {
         String teacherLabel = teacher != null
                 ? teacher.getName() + " (" + (teacher.getInitial() != null ? teacher.getInitial() : "Faculty") + ")"
                 : "Course Faculty";
@@ -419,26 +427,50 @@ public class AiExamChatService {
         long finalCount = relevant.stream().filter(r -> r.getType() == ResourceType.FINAL_QUESTION).count();
         long noteCount = relevant.stream().filter(r -> r.getType() == ResourceType.NOTE || r.getType() == ResourceType.LAB_HAND_NOTE).count();
 
+        boolean isBengali = "bn".equalsIgnoreCase(clientLang) || userPrompt.matches(".*[\\u0980-\\u09FF].*");
+
         StringBuilder sb = new StringBuilder();
-        sb.append("### 🎯 **NoteLagbe AI Exam Revision & Suggestion**\n\n");
-        sb.append("**কোর্স:** `").append(course.getCode()).append(" - ").append(course.getTitle()).append("`  \n");
-        sb.append("**ফ্যাকাল্টি ফোকাস:** `").append(teacherLabel).append("`  \n");
-        sb.append("**আর্কাইভ ডাটা অ্যানালাইসিস:** ").append(relevant.size()).append("টি ভেরিফাইড ম্যাটেরিয়াল (")
-                .append(midCount).append("টি মিডটার্ম, ").append(finalCount).append("টি ফাইনাল, ").append(noteCount).append("টি হ্যান্ড নোট)\n\n");
+        if (isBengali) {
+            sb.append("### 🎯 **NoteLagbe AI Exam Revision & Suggestion**\n\n");
+            sb.append("**কোর্স:** `").append(course.getCode()).append(" - ").append(course.getTitle()).append("`  \n");
+            sb.append("**ফ্যাকাল্টি ফোকাস:** `").append(teacherLabel).append("`  \n");
+            sb.append("**আর্কাইভ ডাটা অ্যানালাইসিস:** ").append(relevant.size()).append("টি ভেরিফাইড ম্যাটেরিয়াল (")
+                    .append(midCount).append("টি মিডটার্ম, ").append(finalCount).append("টি ফাইনাল, ").append(noteCount).append("টি হ্যান্ড নোট)\n\n");
 
-        sb.append("---\n\n");
-        sb.append("#### 📌 **১. বিগত পরীক্ষার অ্যানালাইসিস অনুযায়ী সবচেয়ে বেশি রিপিটেড টপিকসমূহ:**\n");
-        sb.append("1. **কোর কনসেপ্ট ও বেসিক সিনট্যাক্স/থিওরি:** প্রতি সেমিস্টারের মিডটার্মে প্রথম ১-২টি প্রশ্নে ফাউন্ডেশনাল সংজ্ঞা ও তুলনা ১০০% আসে।\n");
-        sb.append("2. **কোড ড্রাই-রান ও আউটপুট প্রেডিকশন (Dry Run & Tracing):** লুপ, কন্ডিশনাল স্টেটমেন্ট ও পয়েন্টার/অ্যারের ভেতরের ভ্যালু পরিবর্তন ট্রেস করতে বলা হয়।\n");
-        sb.append("3. **সমস্যা সমাধান ও প্রোগ্রামিং অ্যালগরিদম:** বাস্তব সমস্যা সমাধানের ওপর ১০-১৫ মার্কসের পূর্ণাঙ্গ প্রোগ্রাম লিখতে দেওয়া হয়।\n");
-        sb.append("4. **ফাংশন ও প্যারামিটার পাসিং (Call by Value vs Reference):** বিগত সেমিস্টারগুলোতে এই অংশটি কুইজ ও ফাইনাল উভয়ে বারবার এসেছে।\n\n");
+            sb.append("---\n\n");
+            sb.append("#### 📌 **১. বিগত পরীক্ষার অ্যানালাইসিস অনুযায়ী সবচেয়ে বেশি রিপিটেড টপিকসমূহ:**\n");
+            sb.append("1. **কোর কনসেপ্ট ও বেসিক সিনট্যাক্স/থিওরি:** প্রতি সেমিস্টারের মিডটার্মে প্রথম ১-২টি প্রশ্নে ফাউন্ডেশনাল সংজ্ঞা ও তুলনা ১০০% আসে।\n");
+            sb.append("2. **কোড ড্রাই-রান ও আউটপুট প্রেডিকশন (Dry Run & Tracing):** লুপ, কন্ডিশনাল স্টেটমেন্ট ও পয়েন্টার/অ্যারের ভেতরের ভ্যালু পরিবর্তন ট্রেস করতে বলা হয়।\n");
+            sb.append("3. **সমস্যা সমাধান ও প্রোগ্রামিং অ্যালগরিদম:** বাস্তব সমস্যা সমাধানের ওপর ১০-১৫ মার্কসের পূর্ণাঙ্গ প্রোগ্রাম লিখতে দেওয়া হয়।\n");
+            sb.append("4. **ফাংশন ও প্যারামিটার পাসিং (Call by Value vs Reference):** বিগত সেমিস্টারগুলোতে এই অংশটি কুইজ ও ফাইনাল উভয়ে বারবার এসেছে।\n\n");
 
-        sb.append("#### 💡 **২. ").append(teacher != null ? teacher.getName() + " স্যারের " : "").append("পরীক্ষার জন্য বিশেষ টিপস:**\n");
-        sb.append("* **খাতা উপস্থাপনা:** কোড লেখার সময় প্রোপার ইন্ডেন্টেশন এবং কমেন্ট ব্যবহার করলে ফুল মার্কস পাওয়া সহজ হয়।\n");
-        sb.append("* **স্টেপ মার্কিং সুবিধা:** সম্পূর্ণ কোড যদি রান নাও করে, মূল লজিক ও ভ্যারিয়েবল ডিক্লারেশন ঠিক থাকলে আংশিক মার্কস দেওয়া হয়।\n");
-        sb.append("* **আর্কাইভ প্র্যাকটিস:** NoteLagbe-তে আপলোড করা ").append(midCount + finalCount).append("টি বিগত পরীক্ষার প্রশ্ন হুবহু সলভ করে রিভিশন দিন।\n\n");
+            sb.append("#### 💡 **২. ").append(teacher != null ? teacher.getName() + " স্যারের " : "").append("পরীক্ষার জন্য বিশেষ টিপস:**\n");
+            sb.append("* **খাতা উপস্থাপনা:** কোড লেখার সময় প্রোপার ইন্ডেন্টেশন এবং কমেন্ট ব্যবহার করলে ফুল মার্কস পাওয়া সহজ হয়।\n");
+            sb.append("* **স্টেপ মার্কিং সুবিধা:** সম্পূর্ণ কোড যদি রান নাও করে, মূল লজিক ও ভ্যারিয়েবল ডিক্লারেশন ঠিক থাকলে আংশিক মার্কস দেওয়া হয়।\n");
+            sb.append("* **আর্কাইভ প্র্যাকটিস:** NoteLagbe-তে আপলোড করা ").append(midCount + finalCount).append("টি বিগত পরীক্ষার প্রশ্ন হুবহু সলভ করে রিভিশন দিন।\n\n");
 
-        sb.append("> 💬 **টিপ:** আপনি যেকোনো নির্দিষ্ট চ্যাপ্টার (যেমন: Pointers, Loops, Arrays, File I/O) বা স্পেসিফিক প্রশ্ন লিখে পাঠাতে পারেন, আমি সমাধানসহ এক্সাম চিট শিট তৈরি করে দেব!");
+            sb.append("> 💬 **টিপ:** আপনি যেকোনো নির্দিষ্ট চ্যাপ্টার বা স্পেসিফিক প্রশ্ন লিখে পাঠাতে পারেন, আমি সমাধানসহ এক্সাম চিট শিট তৈরি করে দেব!");
+        } else {
+            sb.append("### 🎯 **NoteLagbe AI Exam Revision & Suggestion**\n\n");
+            sb.append("**Course:** `").append(course.getCode()).append(" - ").append(course.getTitle()).append("`  \n");
+            sb.append("**Faculty Focus:** `").append(teacherLabel).append("`  \n");
+            sb.append("**Archive Data Analysis:** ").append(relevant.size()).append(" verified materials (")
+                    .append(midCount).append(" Midterms, ").append(finalCount).append(" Finals, ").append(noteCount).append(" Hand Notes)\n\n");
+
+            sb.append("---\n\n");
+            sb.append("#### 📌 **1. High-Yield & Most Frequently Repeated Topics:**\n");
+            sb.append("1. **Core Architectural Concepts & Foundational Principles:** Definitions, block diagrams, and comparative questions consistently appear in the first 1-2 questions.\n");
+            sb.append("2. **Execution Tracing & Dry Runs:** Algorithm dry running, loops/conditionals, state transitions, and memory/pointer tracing are high-yield questions.\n");
+            sb.append("3. **Problem Solving & Implementation:** Applied design and implementation problems carrying 10-15 marks per section.\n");
+            sb.append("4. **Functions, Parameter Passing & Edge Cases:** Recurrent across past semester quizzes and semester final examination papers.\n\n");
+
+            sb.append("#### 💡 **2. ").append(teacher != null ? teacher.getName() + "'s " : "").append("Exam Scoring Strategy:**\n");
+            sb.append("* **Paper Presentation:** Maintain clear formatting, label all diagrams, and box final numerical answers for maximum marks.\n");
+            sb.append("* **Step Marking Advantage:** Even if a final answer is partial, demonstrating clear intermediate steps and formulas secures partial credit.\n");
+            sb.append("* **Practice Past Archives:** Practice the ").append(midCount + finalCount).append(" verified past question papers uploaded on NoteLagbe for this course.\n\n");
+
+            sb.append("> 💬 **Tip:** You can ask about any specific chapter, code snippet, or topic (e.g. 'Explain memory management in Chapter 4') for instant revision tips!");
+        }
 
         return sb.toString();
     }

@@ -149,6 +149,7 @@ export default function CheatSheetModal({
         courseCode,
         message: text,
         teacherId: selectedTeacherId,
+        language,
       });
 
       if (res && res.assistantMessage) {
@@ -194,19 +195,33 @@ export default function CheatSheetModal({
   const activeTeacher = teachers.find((t) => t.id === selectedTeacherId);
   const teacherInit = activeTeacher?.initial || "FAC";
 
-  // Dynamic suggestion pills based on selected teacher or general
+  // Dynamic suggestion pills based on selected teacher or general and current interface language
   const promptSuggestions = activeTeacher
+    ? language === "bn"
+      ? [
+          `⚡ ${activeTeacher.name} [${teacherInit}] স্যারের পরীক্ষার স্পেশাল সাজেশন ও বারবার আসা টপিক কী কী?`,
+          `🔥 ${teacherInit} স্যারের বিগত মিডটার্ম ও ফাইনাল প্রশ্ন অ্যানালাইসিস করে গুরুত্বপূর্ণ প্রশ্ন দিন`,
+          `📝 ${activeTeacher.name} স্যারের পরীক্ষার জন্য লাস্ট নাইট চিট শিট তৈরি করে দিন`,
+          `💡 ${teacherInit} স্যারের পরীক্ষায় ফুল মার্কস পাওয়ার প্রেজেন্টেশন ও খাতা লেখার টিপস`,
+        ]
+      : [
+          `⚡ What are the repeated questions and special exam suggestions for ${activeTeacher.name} [${teacherInit}]?`,
+          `🔥 Analyze past midterm & final exam papers by ${teacherInit} and highlight critical questions`,
+          `📝 Generate a high-yield last-night exam revision cheat sheet for ${activeTeacher.name}'s course`,
+          `💡 Presentation and step-marking tips to score full marks in ${teacherInit}'s exam`,
+        ]
+    : language === "bn"
     ? [
-        `⚡ ${activeTeacher.name} [${teacherInit}] স্যারের পরীক্ষার স্পেশাল সাজেশন ও বারবার আসা টপিক কী কী?`,
-        `🔥 ${teacherInit} স্যারের বিগত মিডটার্ম ও ফাইনাল প্রশ্ন অ্যানালাইসিস করে গুরুত্বপূর্ণ প্রশ্ন দিন`,
-        `📝 ${activeTeacher.name} স্যারের পরীক্ষার জন্য লাস্ট নাইট চিট শিট তৈরি করে দিন`,
-        `💡 ${teacherInit} স্যারের পরীক্ষায় ফুল মার্কস পাওয়ার প্রেজেন্টেশন ও খাতা লেখার টিপস`,
-      ]
-    : [
         `🔥 বিগত সেমিস্টারগুলোতে সবচেয়ে বেশি রিপিট হওয়া প্রশ্ন ও টপিক কোনগুলো?`,
         `📝 পরীক্ষার আগের রাতের জন্য গুরুত্বপূর্ণ পয়েন্ট ও চিট শিট তৈরি করে দিন`,
         `🎯 মিডটার্ম ও ফাইনাল পরীক্ষার কমন প্রশ্ন প্যাটার্ন এবং চ্যাপ্টার প্রায়োরিটি দিন`,
         `💡 পরীক্ষায় ভালো সিজিপিএ পাওয়ার জন্য খাতা উপস্থাপনা ও স্টেপ মার্কিং কৌশল বলুন`,
+      ]
+    : [
+        `🔥 Which questions and topics appeared most frequently in past semesters?`,
+        `📝 Generate a concise last-night revision cheat sheet and key formulas`,
+        `🎯 Breakdown the common midterm & final question patterns and chapter priorities`,
+        `💡 How to structure and write answers for maximum step marking and top CGPA?`,
       ];
 
   // Helper to format timestamps nicely
@@ -379,17 +394,17 @@ export default function CheatSheetModal({
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-black text-base text-slate-900 dark:text-white truncate">
-                  AI Exam Revision Cheat Sheet & Chatbot
+                  {language === "bn" ? "এআই এক্সাম রিভিশন চিট শিট ও চ্যাটবট" : "AI Exam Revision Cheat Sheet & Chatbot"}
                 </span>
                 <span className="text-xs font-mono font-black px-2.5 py-0.5 rounded-lg bg-blue-600 text-white shrink-0">
                   {courseCode}
                 </span>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-300/40 shrink-0">
-                  ⚡ Gemini AI Powered
+                  {language === "bn" ? "⚡ জেমিনি এআই চালিত" : "⚡ Gemini AI Powered"}
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                {courseTitle || "Academic Course Archive"} • {courseDepartment || "CSE"} • Southeast University
+                {courseTitle || (language === "bn" ? "অ্যাকাডেমিক কোর্স আর্কাইভ" : "Academic Course Archive")} • {courseDepartment || "CSE"} • Southeast University
               </p>
             </div>
           </div>
@@ -734,7 +749,9 @@ export default function CheatSheetModal({
                     ? "চ্যাট কনভার্সেশন সর্বোচ্চ ৭ দিন সংরক্ষিত থাকে এবং ৭ দিন পর স্বয়ংক্রিয়ভাবে মুছে যায়।"
                     : "Conversations are saved for 7 rolling days only and auto-purged daily."}
                 </span>
-                <span>{messages.length} messages</span>
+                <span>
+                  {messages.length} {language === "bn" ? "টি বার্তা" : "messages"}
+                </span>
               </div>
             </div>
           </div>

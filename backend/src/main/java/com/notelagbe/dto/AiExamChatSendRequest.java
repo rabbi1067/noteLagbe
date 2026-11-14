@@ -12,12 +12,21 @@ public class AiExamChatSendRequest {
 
     private Long teacherId;
 
+    private String language = "en";
+
     public AiExamChatSendRequest() {}
 
     public AiExamChatSendRequest(String courseCode, String message, Long teacherId) {
         this.courseCode = courseCode;
         this.message = message;
         this.teacherId = teacherId;
+    }
+
+    public AiExamChatSendRequest(String courseCode, String message, Long teacherId, String language) {
+        this.courseCode = courseCode;
+        this.message = message;
+        this.teacherId = teacherId;
+        this.language = language;
     }
 
     public String getCourseCode() {
@@ -42,5 +51,13 @@ public class AiExamChatSendRequest {
 
     public void setTeacherId(Long teacherId) {
         this.teacherId = teacherId;
+    }
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language;
     }
 }

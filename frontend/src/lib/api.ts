@@ -1168,7 +1168,7 @@ export const api = {
   aiExamChat: {
     getMessages: (courseCode: string) =>
       request<any[]>(`/ai/exam-chat/messages?courseCode=${encodeURIComponent(courseCode)}`),
-    sendMessage: (data: { courseCode: string; message: string; teacherId?: number | null }) =>
+    sendMessage: (data: { courseCode: string; message: string; teacherId?: number | null; language?: string }) =>
       request<any>("/ai/exam-chat/send", {
         method: "POST",
         body: JSON.stringify(data),
