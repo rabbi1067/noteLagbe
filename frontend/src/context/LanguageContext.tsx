@@ -47,7 +47,7 @@ const translations: Record<string, { en: string; bn: string }> = {
   "course.unlockAllFaculty": { en: "Unlock Course (All Faculty)", bn: "কোর্স আনলক করুন (সকল শিক্ষক)" },
   "course.unlocking": { en: "Unlocking...", bn: "আনলক হচ্ছে..." },
   "course.oneQuota": { en: "1 Quota • Unlocks all instructors", bn: "১ কোটা • সকল শিক্ষকের কন্টেন্ট আনলক হবে" },
-  "course.aiCheatSheet": { en: "AI Exam Cheat Sheet", bn: "এআই এক্সাম চিট শিট" },
+  "course.aiCheatSheet": { en: "AI Exam Revision Copilot", bn: "এআই এক্সাম রিভিশন কো-পাইলট" },
   "course.contribute": { en: "+ Contribute Material for this Course", bn: "+ এই কোর্সের ম্যাটেরিয়াল আপলোড করুন" },
 
   // Course Detail - Faculty Section

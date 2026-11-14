@@ -809,8 +809,8 @@ export default function CourseDetailPage() {
                 if (!isCourseUnlocked) {
                   toast.error(
                     language === "bn"
-                      ? "কোর্সটি আনলক করার পর এআই এক্সাম রিভিশন চিট শিট ও চ্যাটবট ব্যবহার করতে পারবেন।"
-                      : "Please unlock this course to access the AI Exam Revision Assistant & Cheat Sheet."
+                      ? "কোর্সটি আনলক করার পর এআই এক্সাম রিভিশন কো-পাইলট ব্যবহার করতে পারবেন।"
+                      : "Please unlock this course to access the AI Exam Revision Copilot."
                   );
                   if (!isAuthenticated) {
                     setShowAuthModal(true);
@@ -822,7 +822,7 @@ export default function CourseDetailPage() {
               title={
                 !isCourseUnlocked
                   ? (language === "bn" ? "কোর্স আনলক করার পর ব্যবহারযোগ্য" : "Unlock course to use")
-                  : (language === "bn" ? "এআই এক্সাম চিট শিট ও চ্যাটবট ওপেন করুন" : "Open AI Exam Cheat Sheet & Chatbot")
+                  : (language === "bn" ? "এআই এক্সাম রিভিশন কো-পাইলট ওপেন করুন" : "Open AI Exam Revision Copilot")
               }
               className={`py-3 px-5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm ${
                 isCourseUnlocked
@@ -835,7 +835,10 @@ export default function CourseDetailPage() {
               ) : (
                 <Lock className="w-4 h-4 text-slate-400" />
               )}
-              <span>{t("course.aiCheatSheet", "AI Exam Cheat Sheet")}</span>
+              <span>{t("course.aiCheatSheet", "AI Exam Revision Copilot")}</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-300/30">
+                ✨ Gemini 3.8
+              </span>
               {!isCourseUnlocked && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-normal">
                   {language === "bn" ? "লকড" : "Locked"}

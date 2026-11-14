@@ -1164,15 +1164,40 @@ export const api = {
     recordVisit: () => request<{ totalViews: number; activeNow: number; status: string }>("/stats/visit", { method: "POST" }),
   },
 
-  // AI Exam Revision Cheat Sheet & Chatbot API (Powered by Gemini)
+  // AI Exam Revision Copilot & Chatbot API (Powered by Gemini 3.8)
   aiExamChat: {
     getMessages: (courseCode: string) =>
       request<any[]>(`/ai/exam-chat/messages?courseCode=${encodeURIComponent(courseCode)}`),
-    sendMessage: (data: { courseCode: string; message: string; teacherId?: number | null; language?: string }) =>
-      request<any>("/ai/exam-chat/send", {
+    sendMessage: async (data: {
+      courseCode: string;
+      courseTitle?: string;
+      courseDepartment?: string;
+      message: string;
+      teacherId?: number | null;
+      teacherName?: string | null;
+      language?: string;
+    }) => {
+      const token = getToken();
+      try {
+        const res = await fetch("/api/ai/exam-chat/send", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(data),
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (err) {
+        console.warn("[aiExamChat] Next.js route failed, falling back to direct backend:", err);
+      }
+      return request<any>("/ai/exam-chat/send", {
         method: "POST",
         body: JSON.stringify(data),
-      }),
+      });
+    },
     clearMessages: (courseCode: string) =>
       request<{ success: boolean; message: string }>(
         `/ai/exam-chat/messages?courseCode=${encodeURIComponent(courseCode)}`,

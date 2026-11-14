@@ -147,6 +147,9 @@ export default function CheatSheetModal({
     try {
       const res = await api.aiExamChat.sendMessage({
         courseCode,
+        courseTitle,
+        courseDepartment,
+        teacherName: activeTeacher?.name || null,
         message: text,
         teacherId: selectedTeacherId,
         language,
@@ -394,13 +397,13 @@ export default function CheatSheetModal({
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-black text-base text-slate-900 dark:text-white truncate">
-                  {language === "bn" ? "এআই এক্সাম রিভিশন চিট শিট ও চ্যাটবট" : "AI Exam Revision Cheat Sheet & Chatbot"}
+                  {language === "bn" ? "এআই এক্সাম রিভিশন কো-পাইলট ও স্টাডি মেন্টর" : "AI Exam Revision Copilot & Study Mentor"}
                 </span>
                 <span className="text-xs font-mono font-black px-2.5 py-0.5 rounded-lg bg-blue-600 text-white shrink-0">
                   {courseCode}
                 </span>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-300/40 shrink-0">
-                  {language === "bn" ? "⚡ জেমিনি এআই চালিত" : "⚡ Gemini AI Powered"}
+                  {language === "bn" ? "⚡ জেমিনি ৩.৮ ফ্ল্যাশ এআই" : "⚡ Gemini 3.8 Flash AI"}
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
@@ -455,7 +458,7 @@ export default function CheatSheetModal({
               }`}
             >
               <MessageSquare className="w-3.5 h-3.5" />
-              <span>{language === "bn" ? "এআই এক্সাম চ্যাটবট" : "AI Exam Chatbot"}</span>
+              <span>{language === "bn" ? "এআই এক্সাম কো-পাইলট" : "AI Exam Copilot"}</span>
             </button>
 
             <button
@@ -467,7 +470,7 @@ export default function CheatSheetModal({
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>{language === "bn" ? "ইনস্ট্যান্ট চিট শিট" : "Instant Cheat Sheet"}</span>
+              <span>{language === "bn" ? "কুইক রিভিশন গাইড" : "Quick Revision Guide"}</span>
             </button>
           </div>
 
@@ -517,8 +520,8 @@ export default function CheatSheetModal({
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                 {language === "bn"
-                  ? "NoteLagbe AI Exam Revision Assistant ও চিট শিট ব্যবহার করতে কোর্সটি আনলক করুন। আনলক করলে আপনি যেকোনো শিক্ষকের বিগত প্রশ্ন বিশ্লেষণ, সাজেশন ও কুইক চিট শিট পেয়ে যাবেন।"
-                  : "Unlock this course to unlock the Gemini AI Exam Revision Assistant, repetitive questions analysis, and faculty-specific cheat sheets."}
+                  ? "NoteLagbe AI Exam Revision Copilot ব্যবহার করতে কোর্সটি আনলক করুন। আনলক করলে আপনি যেকোনো শিক্ষকের বিগত প্রশ্ন বিশ্লেষণ, সমাধান ও কুইক রিভিশন গাইড পেয়ে যাবেন।"
+                  : "Unlock this course to access the Gemini 3.8 AI Exam Revision Copilot, repetitive questions analysis, and faculty-specific revision guides."}
               </p>
             </div>
             <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-xs text-blue-900 dark:text-blue-300 max-w-md">
@@ -560,12 +563,12 @@ export default function CheatSheetModal({
                   <div className="space-y-1">
                     <h3 className="text-base font-black text-slate-900 dark:text-white">
                       {language === "bn"
-                        ? "স্বাগতম! আমি আপনার AI Exam Revision Coach"
-                        : "Welcome to AI Exam Revision Coach"}
+                        ? "স্বাগতম! আমি আপনার AI Exam Revision Copilot"
+                        : "Welcome to AI Exam Revision Copilot"}
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                       {language === "bn"
-                        ? `${courseCode} কোর্সের বিগত সব মিডটার্ম ও ফাইনাল প্রশ্ন, শিক্ষকের প্রশ্নের ধরন এবং নোট বিশ্লেষণ করে যেকোনো সাজেশন ও এক্সাম টিপস দেওয়ার জন্য প্রস্তুত।`
+                        ? `${courseCode} কোর্সের বিগত সব মিডটার্ম ও ফাইনাল প্রশ্ন, শিক্ষকের প্রশ্নের ধরন এবং নোট বিশ্লেষণ করে যেকোনো প্রশ্নের সমাধান ও এক্সাম টিপস দেওয়ার জন্য প্রস্তুত।`
                         : `Ask any question to get customized exam revision suggestions, repeated questions breakdown, and faculty-specific tips for ${courseCode}.`}
                     </p>
                   </div>
@@ -721,10 +724,10 @@ export default function CheatSheetModal({
                       language === "bn"
                         ? activeTeacher
                           ? `${activeTeacher.name} [${teacherInit}] স্যারের পরীক্ষার সাজেশন বা প্রশ্ন লিখুন...`
-                          : "যেকোনো পরীক্ষার প্রশ্ন, সাজেশন বা টপিক জানতে লিখুন..."
+                          : "যেকোনো পরীক্ষার প্রশ্ন, সমাধান বা রিভিশন টিপস জানতে লিখুন..."
                         : activeTeacher
                         ? `Ask exam question or tips for ${activeTeacher.name}...`
-                        : "Ask exam questions, repetitive topics, cheat sheet..."
+                        : "Ask exam questions, past solutions, revision tips..."
                     }
                     disabled={sending}
                     className="w-full pl-4 pr-10 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
