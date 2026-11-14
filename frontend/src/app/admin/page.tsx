@@ -1,6 +1,7 @@
 "use client";
 
 import AdminAnalyticsView from "@/components/AdminAnalyticsView";
+import { getCurrentAcademicSemester, buildConciseAcademicTitle } from "@/lib/academicSemester";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
@@ -689,8 +690,8 @@ export default function AdminDashboardPage() {
   const [uploadingResFile, setUploadingResFile] = useState(false);
   const [isResDragOver, setIsResDragOver] = useState(false);
   const resFileInputRef = useRef<HTMLInputElement>(null);
-  const [resSemester, setResSemester] = useState("Fall 2026");
-  const [resYear, setResYear] = useState(2026);
+  const [resSemester, setResSemester] = useState(() => getCurrentAcademicSemester());
+  const [resYear, setResYear] = useState(() => new Date().getFullYear());
   const [savingResource, setSavingResource] = useState(false);
 
   const buildSeedSlotsForCourse = useCallback(
@@ -1680,8 +1681,8 @@ export default function AdminDashboardPage() {
     setResFileUrl("");
     setResFileName("");
     setResFileSize("");
-    setResSemester("Fall 2026");
-    setResYear(2026);
+    setResSemester(getCurrentAcademicSemester());
+    setResYear(new Date().getFullYear());
     setShowResourceModal(true);
   };
 
@@ -10596,10 +10597,9 @@ export default function AdminDashboardPage() {
                     LAB_REPORT: "Lab Report",
                     LAB_HAND_NOTE: "Lab Hand Note",
                   };
-                  const currentTypeLabel = typeLabelMap[resType] || "Question Paper";
-                  const currentSemester = resSemester?.trim() || "Fall 2026";
-                  const smartBaseTitle = `${resCourseCode ? resCourseCode + " " : ""}${currentSemester} ${currentTypeLabel}`.trim();
-                  const smartFileName = `${resCourseCode ? resCourseCode + "_" : ""}${currentSemester.replace(/\s+/g, "_")}_${currentTypeLabel.replace(/\s+/g, "_")}`;
+                  const currentSemester = resSemester?.trim() || getCurrentAcademicSemester();
+                  const smartBaseTitle = buildConciseAcademicTitle(resCourseCode, resType);
+                  const smartFileName = `${resCourseCode ? resCourseCode + "_" : ""}${currentSemester.replace(/\s+/g, "_")}_${resType}`;
 
                   return (
                     <MultiPageUploader

@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  getCurrentAcademicSemester,
+  getShortResourceTypeName,
+  buildConciseAcademicTitle,
+} from "@/lib/academicSemester";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -62,22 +67,25 @@ export async function POST(req: NextRequest) {
       OTHERS: "Academic Study Material",
     };
 
-    // 2. Semester Detection from filename or calendar
+    // 2. Dynamic Semester Detection from filename, user input, or Southeast University tri-semester cycle
     let detectedSemester = "";
     const semMatch = fileName.match(/(fall|summer|spring|autumn|winter)[\s_\-.]*(\d{2,4})/i);
     if (semMatch) {
-      const season = semMatch[1].charAt(0).toUpperCase() + semMatch[1].slice(1).toLowerCase();
+      let season = semMatch[1].charAt(0).toUpperCase() + semMatch[1].slice(1).toLowerCase();
+      if (season === "Autumn" || season === "Winter") season = "Fall";
       let year = semMatch[2];
       if (year.length === 2) year = `20${year}`;
       detectedSemester = `${season} ${year}`;
     } else {
-      const yearMatch = fileName.match(/202[4-7]/);
+      const yearMatch = fileName.match(/\b(20\d\d)\b/);
       if (yearMatch) {
-        detectedSemester = `Fall ${yearMatch[0]}`;
+        const currentSem = getCurrentAcademicSemester();
+        const currentSeason = currentSem.split(" ")[0];
+        detectedSemester = `${currentSeason} ${yearMatch[1]}`;
       } else if (currentSemester?.trim()) {
         detectedSemester = currentSemester.trim();
       } else {
-        detectedSemester = "Fall 2026";
+        detectedSemester = getCurrentAcademicSemester();
       }
     }
 
@@ -127,24 +135,10 @@ export async function POST(req: NextRequest) {
           : `Notice: You selected '${selectedLabel}', but the uploaded document appears to be '${detectedLabel}'. Please verify your selection.`;
     }
 
-    // 5. Build Default Deterministic Title strictly based on user's selected parameters
+    // 5. Build Default Deterministic Concise Title based on user's selected parameters (e.g. "CSE141 Midterm Question")
     const effectiveType = resourceType || detectedType || "NOTE";
-    const typePart = typeTitleMap[effectiveType] || "Question Paper";
-    const semPart = detectedSemester || currentSemester || "Fall 2026";
-
-    // Clean course title (e.g. "Programming Language I (C)" -> "Programming Language I")
-    const cleanTitle = (courseTitle || "")
-      .replace(/\s*\([^)]*\)\s*/g, " ")
-      .replace(/\s{2,}/g, " ")
-      .trim();
-
-    let candidateTitle = `${cleanCourse} ${typePart} (${semPart})`;
-    if (cleanTitle && cleanTitle.length > 2) {
-      const withCourse = `${cleanCourse} ${cleanTitle} ${typePart} (${semPart})`;
-      if (withCourse.length <= 80) {
-        candidateTitle = withCourse;
-      }
-    }
+    const semPart = detectedSemester || currentSemester || getCurrentAcademicSemester();
+    const candidateTitle = buildConciseAcademicTitle(cleanCourse, effectiveType);
 
     const result: AnalysisResult = {
       suggestedTitle: candidateTitle.slice(0, 80),
@@ -191,10 +185,11 @@ export async function POST(req: NextRequest) {
           // Proceed to text prompt fallback
         }
 
+        const shortTypeName = getShortResourceTypeName(resourceType);
         const promptText = `You are an academic document analyzer for Southeast University (SEU).
 The student is uploading study material with the following form selection:
 - Course Code: "${cleanCourse}" (${courseTitle || ""})
-- Resource Type: "${resourceType}" (${typePart})
+- Resource Type: "${resourceType}" (${shortTypeName})
 - Target Semester: "${semPart}"
 - Uploaded File Name: "${fileName}"
 
@@ -210,11 +205,10 @@ Return STRICT JSON ONLY:
 }
 
 CRITICAL RULES:
-1. "suggestedTitle" MUST start with "${cleanCourse}" and accurately describe the selected Resource Type "${typePart}". Length must be under 80 characters.
-   Format: "${cleanCourse} [Short Course Name] [Exam/Doc Type] ([Semester])"
-   Example: "${cleanCourse} ${typePart} (${semPart})"
-   NEVER change "${cleanCourse}" to any other course code (e.g. do NOT change ${cleanCourse} to CSE141 or any other code).
-2. If the document content completely contradicts the academic document (e.g. meme, selfie, payment receipt, non-educational photo), set "hasMismatch": true with a clear explanation in Bengali.`;
+1. "suggestedTitle" MUST be concise and strictly follow the format: "${cleanCourse} [Short Resource Type]" (e.g. "${cleanCourse} Midterm Question", "${cleanCourse} Final Question", "${cleanCourse} Lecture Handnote", "${cleanCourse} Lab Manual", "${cleanCourse} Quiz & CT Question").
+   Keep it concise under 40 characters. Do NOT add full course names (e.g. do NOT write Computer Fundamentals) and do NOT add semester in parenthesis.
+2. "detectedSemester" MUST accurately extract the semester and year from the paper if present (e.g. "Spring 2027", "Summer 2027", "Fall 2026", "Spring 2026").
+3. If the document content completely contradicts the academic document (e.g. meme, selfie, payment receipt, non-educational photo), set "hasMismatch": true with a clear explanation in Bengali.`;
 
         const parts: any[] = [];
         if (imagePart) parts.push(imagePart);
@@ -241,19 +235,10 @@ CRITICAL RULES:
           const rawText = aiJson?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (rawText) {
             const parsed = JSON.parse(rawText);
-            if (parsed.suggestedTitle && typeof parsed.suggestedTitle === "string") {
-              let cleanAiTitle = parsed.suggestedTitle.trim();
-              // Enforce that title always starts with the user's selected course code
-              if (!cleanAiTitle.toUpperCase().startsWith(cleanCourse)) {
-                cleanAiTitle = `${cleanCourse} ${cleanAiTitle}`;
-              }
-              // Enforce that title does not mistakenly contain wrong default type if user chose MID_QUESTION
-              if (resourceType === "MID_QUESTION" && cleanAiTitle.toLowerCase().includes("hand note")) {
-                cleanAiTitle = cleanAiTitle.replace(/hand\s*notes?/gi, "Midterm Exam Paper");
-              }
-              result.suggestedTitle = cleanAiTitle.slice(0, 80);
-            }
-            if (parsed.detectedSemester && typeof parsed.detectedSemester === "string") {
+            const recognizedType = parsed.detectedType || resourceType;
+            result.suggestedTitle = buildConciseAcademicTitle(cleanCourse, recognizedType);
+
+            if (parsed.detectedSemester && typeof parsed.detectedSemester === "string" && parsed.detectedSemester.trim()) {
               result.suggestedSemester = parsed.detectedSemester.trim().slice(0, 20);
             }
             if (parsed.hasMismatch && parsed.mismatchReason) {
