@@ -31,6 +31,7 @@ public class WaiverRequest {
 
     private int grantedCoursesCount = 6;
 
+    @Column(columnDefinition = "TEXT")
     private String adminNotes;
 
     private LocalDateTime createdAt = LocalDateTime.now();

@@ -954,8 +954,11 @@ export const api = {
       const body = typeof data === "string" ? { feedback: data } : (data || {});
       return request<any>(`/admin/contributions/${id}/approve`, { method: "POST", body: JSON.stringify(body) });
     },
-    rejectContribution: (id: number, feedback?: string) =>
-      request<any>(`/admin/contributions/${id}/reject`, { method: "POST", body: JSON.stringify({ feedback }) }),
+    rejectContribution: (id: number, feedback?: string) => {
+      const cleanFeedback = feedback ? feedback.trim() : "";
+      const safeFeedback = cleanFeedback.length > 240 ? cleanFeedback.substring(0, 237) + "..." : cleanFeedback;
+      return request<any>(`/admin/contributions/${id}/reject`, { method: "POST", body: JSON.stringify({ feedback: safeFeedback }) });
+    },
     deleteContribution: (id: number) =>
       request<any>(`/admin/contributions/${id}`, { method: "DELETE" }),
 

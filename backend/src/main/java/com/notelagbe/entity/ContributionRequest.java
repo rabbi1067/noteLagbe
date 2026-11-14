@@ -31,6 +31,7 @@ public class ContributionRequest {
     @Column(nullable = false, length = 32)
     private ResourceStatus status = ResourceStatus.PENDING;
 
+    @Column(columnDefinition = "TEXT")
     private String adminFeedback;
 
     private LocalDateTime createdAt = LocalDateTime.now();

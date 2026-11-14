@@ -42,6 +42,7 @@ public class SchemaMigrationRunner implements ApplicationRunner {
                 migrateH2UnlockedCoursesConstraints();
             }
             linkMissingContributionUploaders();
+            migrateFeedbackAndNotesColumns();
         } catch (Exception e) {
             log.debug("Schema migration check skipped/completed: {}", e.getMessage());
         }
@@ -63,6 +64,33 @@ public class SchemaMigrationRunner implements ApplicationRunner {
                     "WHERE uploader_id IS NULL AND id IN (SELECT resource_id FROM contribution_requests WHERE resource_id IS NOT NULL)"
                 );
             } catch (Exception ignored) {}
+        }
+    }
+
+    private void migrateFeedbackAndNotesColumns() {
+        try {
+            jdbcTemplate.execute("ALTER TABLE contribution_requests MODIFY COLUMN admin_feedback TEXT");
+            log.info("Migrated contribution_requests.admin_feedback to TEXT");
+        } catch (Exception e) {
+            log.debug("admin_feedback TEXT migration skipped/completed: {}", e.getMessage());
+        }
+        try {
+            jdbcTemplate.execute("ALTER TABLE waiver_requests MODIFY COLUMN admin_notes TEXT");
+            log.info("Migrated waiver_requests.admin_notes to TEXT");
+        } catch (Exception e) {
+            log.debug("admin_notes TEXT migration skipped/completed: {}", e.getMessage());
+        }
+        try {
+            jdbcTemplate.execute("ALTER TABLE payment_requests MODIFY COLUMN admin_notes TEXT");
+            log.info("Migrated payment_requests.admin_notes to TEXT");
+        } catch (Exception e) {
+            log.debug("payment admin_notes TEXT migration skipped/completed: {}", e.getMessage());
+        }
+        try {
+            jdbcTemplate.execute("ALTER TABLE resources MODIFY COLUMN file_url VARCHAR(1000) NULL");
+            log.info("Migrated resources.file_url to NULLABLE");
+        } catch (Exception e) {
+            log.debug("file_url NULL migration skipped/completed: {}", e.getMessage());
         }
     }
 

@@ -41,6 +41,7 @@ public class PaymentRequest {
     @Column(nullable = false, length = 32)
     private PaymentStatus status = PaymentStatus.PENDING;
 
+    @Column(columnDefinition = "TEXT")
     private String adminNotes;
 
     private LocalDateTime createdAt = LocalDateTime.now();

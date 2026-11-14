@@ -425,15 +425,17 @@ public class ContributionService {
         }
 
         cr.setStatus(ResourceStatus.REJECTED);
-        cr.setAdminFeedback(feedback);
+        String safeFeedback = feedback != null ? feedback.trim() : "";
+        // Defensive guard: if MySQL/TiDB column is still legacy VARCHAR(255), never exceed 240 chars
+        cr.setAdminFeedback(safeFeedback.length() > 240 ? safeFeedback.substring(0, 237) + "..." : safeFeedback);
         cr.setReviewedAt(LocalDateTime.now());
 
-        // 3. Send in-app notification to contributor with rejection reason
+        // 3. Send in-app notification to contributor with full rejection reason
         try {
             User contributor = cr.getUser();
             if (contributor != null) {
-                String reason = (feedback != null && !feedback.trim().isEmpty())
-                        ? feedback.trim()
+                String reason = !safeFeedback.isEmpty()
+                        ? safeFeedback
                         : "Submission does not meet curriculum or quality standards.";
                 notificationService.createNotification(
                         contributor,
