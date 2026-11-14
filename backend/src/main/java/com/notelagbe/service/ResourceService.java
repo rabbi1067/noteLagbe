@@ -60,6 +60,13 @@ public class ResourceService {
     private final CacheManager cacheManager;
     private final ResourceDuplicateService resourceDuplicateService;
 
+    @Autowired(required = false)
+    private FileOptimizationService fileOptimizationService;
+
+    public void setFileOptimizationService(FileOptimizationService fileOptimizationService) {
+        this.fileOptimizationService = fileOptimizationService;
+    }
+
     public ResourceService(ResourceRepository resourceRepository,
                            CourseRepository courseRepository,
                            TeacherRepository teacherRepository,
@@ -1015,10 +1022,19 @@ public class ResourceService {
     }
 
     public Map<String, Object> uploadMaterialFile(MultipartFile file) throws IOException {
-        String extDot = FileUploadSecurityValidator.validateMaterial(file, FileUploadSecurityValidator.MAX_MATERIAL_BYTES);
+        MultipartFile effectiveFile = file;
+        int savingsPercent = 0;
+        long originalBytes = file != null ? file.getSize() : 0;
+        if (fileOptimizationService != null && file != null) {
+            FileOptimizationService.OptimizedFileResult opt = fileOptimizationService.optimizeMaterialFile(file);
+            effectiveFile = opt.getFile();
+            savingsPercent = opt.getPercentSaved();
+        }
+
+        String extDot = FileUploadSecurityValidator.validateMaterial(effectiveFile, FileUploadSecurityValidator.MAX_MATERIAL_BYTES);
         String ext = extDot.startsWith(".") ? extDot.substring(1) : extDot;
-        String originalFilename = file.getOriginalFilename();
-        long bytes = file.getSize();
+        String originalFilename = effectiveFile.getOriginalFilename();
+        long bytes = effectiveFile.getSize();
 
         String fileUrl = null;
         String storageProvider = "LOCAL_DISK";
@@ -1034,7 +1050,7 @@ public class ResourceService {
             // > 10MB: Primary is Cloudflare R2
             if (r2Service.isConfigured()) {
                 try {
-                    fileUrl = r2Service.uploadFile(file, "notelagbe/materials");
+                    fileUrl = r2Service.uploadFile(effectiveFile, "notelagbe/materials");
                     storageProvider = "CLOUDFLARE_R2";
                     log.info("Uploaded large academic material ({}, {} MB) to Cloudflare R2: {}", ext, String.format(java.util.Locale.US, "%.2f", bytes / (1024.0 * 1024.0)), fileUrl);
                 } catch (Exception e) {
@@ -1043,7 +1059,7 @@ public class ResourceService {
             }
             if (fileUrl == null && cloudinaryService.isConfigured()) {
                 try {
-                    fileUrl = cloudinaryService.uploadFile(file, "notelagbe/materials", isImg);
+                    fileUrl = cloudinaryService.uploadFile(effectiveFile, "notelagbe/materials", isImg);
                     storageProvider = "CLOUDINARY";
                     log.info("Uploaded large material to Cloudinary on fallback: {}", fileUrl);
                 } catch (Exception e) {
@@ -1054,7 +1070,7 @@ public class ResourceService {
             // <= 10MB: Primary is Cloudinary
             if (cloudinaryService.isConfigured()) {
                 try {
-                    fileUrl = cloudinaryService.uploadFile(file, "notelagbe/materials", isImg);
+                    fileUrl = cloudinaryService.uploadFile(effectiveFile, "notelagbe/materials", isImg);
                     storageProvider = "CLOUDINARY";
                     log.info("Uploaded standard academic material ({}, {} MB) to Cloudinary: {}", ext, String.format(java.util.Locale.US, "%.2f", bytes / (1024.0 * 1024.0)), fileUrl);
                 } catch (Exception e) {
@@ -1063,7 +1079,7 @@ public class ResourceService {
             }
             if (fileUrl == null && r2Service.isConfigured()) {
                 try {
-                    fileUrl = r2Service.uploadFile(file, "notelagbe/materials");
+                    fileUrl = r2Service.uploadFile(effectiveFile, "notelagbe/materials");
                     storageProvider = "CLOUDFLARE_R2";
                     log.info("Uploaded material to Cloudflare R2 on fallback: {}", fileUrl);
                 } catch (Exception e) {
@@ -1095,7 +1111,7 @@ public class ResourceService {
             if (!targetPath.startsWith(uploadDir)) {
                 throw new ApiException("Invalid material target path.", HttpStatus.BAD_REQUEST);
             }
-            Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(effectiveFile.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
             fileUrl = "/uploads/materials/" + uniqueFileName;
             storageProvider = "LOCAL_DISK";
             log.info("Stored academic material on local server disk: {}", fileUrl);
@@ -1112,7 +1128,12 @@ public class ResourceService {
         response.put("fileSize", formattedSize);
         response.put("fileType", ext.toUpperCase(java.util.Locale.ROOT));
         response.put("storageProvider", storageProvider);
-        response.put("message", "File successfully uploaded and stored on server");
+        response.put("savingsPercent", savingsPercent);
+        response.put("originalSize", originalBytes);
+        response.put("optimizedSize", bytes);
+        response.put("message", savingsPercent > 0
+                ? "File optimized & uploaded (" + savingsPercent + "% space saved)"
+                : "File successfully uploaded and stored on server");
         return response;
     }
 }

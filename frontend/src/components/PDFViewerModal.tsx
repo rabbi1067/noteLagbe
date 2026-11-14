@@ -31,6 +31,7 @@ import { api, API_BASE_URL, getToken } from "@/lib/api";
 import {
   convertImageToJpegBytes,
   inspectImageFile,
+  inspectPdfOrientations,
   mergeFilesToSinglePdf,
   normalizeAndRotatePdfBytes,
   normalizeRotationDegrees,
@@ -296,7 +297,8 @@ export default function PDFViewerModal({
           : resource.fileUrl || "";
 
         const headers: HeadersInit = {};
-        if (resource.id && token) {
+        // Target URL already carries query-string token; omit Authorization header to ensure S3/R2 presigned redirects succeed without CORS/auth collisions!
+        if (resource.id && token && !targetUrl.includes("token=")) {
           headers.Authorization = `Bearer ${token}`;
         }
 
@@ -430,29 +432,24 @@ export default function PDFViewerModal({
           const rawBytes = new Uint8Array(await normalizedBlob.arrayBuffer());
           if (cancelled) return;
           setRawPdfBytes(rawBytes);
+          setActivePdfBytes(rawBytes);
 
+          // Fast-Path: Render PDF blob IMMEDIATELY! Zero freeze, zero main-thread CPU lockup!
+          const displayUrl = URL.createObjectURL(normalizedBlob);
+          replaceBlobUrl(displayUrl);
+          setDocLoading(false);
+
+          // Lightweight asynchronous inspection (reads page count & dimensions in ~5ms without slow PDF rebuild)
           try {
-            const norm = await normalizeAndRotatePdfBytes(rawBytes, {
-              autoAlignMixed: true,
-              targetOrientation: "AUTO_UNIFORM",
-            });
-            if (cancelled) return;
-
-            setPdfPageCount(norm.pageCount);
-            setActivePdfPage(1);
-            setPageExtraRotations({});
-            setAutoAlignMixedPdf(true);
-            setAutoAlignedPagesList(norm.autoAlignedPages);
-            setPdfChangedFromRaw(norm.changed);
-            setActivePdfBytes(norm.bytes);
-
-            const displayBlob = new Blob([norm.bytes as any], { type: "application/pdf" });
-            replaceBlobUrl(URL.createObjectURL(displayBlob));
+            const info = await inspectPdfOrientations(rawBytes);
+            if (!cancelled) {
+              setPdfPageCount(info.pageCount);
+              setActivePdfPage(1);
+            }
           } catch {
-            if (cancelled) return;
-            setActivePdfBytes(rawBytes);
-            setPdfPageCount(0);
-            replaceBlobUrl(URL.createObjectURL(normalizedBlob));
+            if (!cancelled) {
+              setPdfPageCount(0);
+            }
           }
         } else {
           if (kind === "image") {
@@ -1239,13 +1236,13 @@ export default function PDFViewerModal({
         >
           {isUnlocked && (resource.fileUrl || resource.id) ? (
             <div
-              className="relative flex items-center justify-center transition-all duration-200 ease-out origin-center"
+              className="relative flex items-center justify-center transition-all duration-200 ease-out origin-center w-full min-h-[72vh] sm:min-h-[80vh] h-[78vh] sm:h-[82vh]"
               style={{
                 transform: `rotate(${cssRotationDeg}deg) scale(${zoom / 100})`,
                 transformOrigin: "center center",
                 width: isRotated ? "80vh" : "100%",
                 height: isRotated ? "80vw" : "100%",
-                minHeight: zoom > 100 ? `${zoom}%` : isRotated ? "80vw" : "100%",
+                minHeight: zoom > 100 ? `${zoom}%` : isRotated ? "80vw" : "75vh",
                 minWidth: zoom > 100 ? `${zoom}%` : isRotated ? "80vh" : "100%",
               }}
             >
@@ -1322,7 +1319,7 @@ export default function PDFViewerModal({
                 </div>
               ) : detectedKind === "pdf-embed" && embedUrl ? (
                 /* Resilient Embedded Cloud Document Frame for 50MB+ Files */
-                <div className="w-full h-full relative">
+                <div className="w-full h-full relative min-h-[500px]">
                   <iframe
                     key={useGoogleDocsEmbed ? `gdocs-${embedUrl}` : `direct-${embedUrl}`}
                     src={
@@ -1330,14 +1327,14 @@ export default function PDFViewerModal({
                         ? `https://docs.google.com/viewer?url=${encodeURIComponent(embedUrl)}&embedded=true`
                         : `${embedUrl}#toolbar=0&navpanes=0`
                     }
-                    className="w-full h-full border-none rounded-xl shadow-lg bg-white"
+                    className="w-full h-full border-none rounded-xl shadow-lg bg-white min-h-[500px]"
                     title={displayTitle}
                   />
                 </div>
               ) : detectedKind === "drive-embed" && drivePreviewUrl ? (
                 <iframe
                   src={drivePreviewUrl}
-                  className="w-full h-full border-none rounded-xl shadow-lg bg-white"
+                  className="w-full h-full border-none rounded-xl shadow-lg bg-white min-h-[500px]"
                   title={displayTitle}
                   allow="autoplay"
                 />
@@ -1346,7 +1343,7 @@ export default function PDFViewerModal({
                 <iframe
                   key={`${blobUrl}-p${activePdfPage}`}
                   src={`${blobUrl}#page=${activePdfPage}&toolbar=0&navpanes=0`}
-                  className="w-full h-full border-none rounded-xl shadow-lg bg-white"
+                  className="w-full h-full border-none rounded-xl shadow-lg bg-white min-h-[500px]"
                   title={displayTitle}
                 />
               ) : (

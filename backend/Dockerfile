@@ -8,7 +8,7 @@ WORKDIR /workspace
 
 # Cache dependencies
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
+RUN mvn dependency:go-offline -B || true
 
 # Copy source code and build jar
 COPY src ./src
