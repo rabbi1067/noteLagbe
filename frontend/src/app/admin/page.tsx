@@ -1,7 +1,7 @@
 "use client";
 
 import AdminAnalyticsView from "@/components/AdminAnalyticsView";
-import { getCurrentAcademicSemester, buildConciseAcademicTitle } from "@/lib/academicSemester";
+import { getCurrentAcademicSemester, buildConciseAcademicTitle, formatSemesterDisplay } from "@/lib/academicSemester";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
@@ -5025,7 +5025,7 @@ export default function AdminDashboardPage() {
                           <p className="font-medium text-slate-900 dark:text-white truncate mt-0.5">{r.title}</p>
                         </div>
                         <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 shrink-0">
-                          {r.semesterName || "Fall 2026"}
+                          {formatSemesterDisplay(r.semesterName, r.academicYear)}
                         </span>
                       </div>
                     ))}
@@ -5851,9 +5851,7 @@ export default function AdminDashboardPage() {
 
                               <td className="px-6 py-4">
                                 <span className="font-mono text-xs text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                                  {r.semesterName
-                                    ? (/\d{4}/.test(r.semesterName) ? r.semesterName : `${r.semesterName} ${r.academicYear || ""}`.trim())
-                                    : (r.academicYear ? `Semester (${r.academicYear})` : "Fall 2026")}
+                                  {formatSemesterDisplay(r.semesterName, r.academicYear)}
                                 </span>
                               </td>
 

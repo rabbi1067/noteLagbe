@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import PDFViewerModal from "@/components/PDFViewerModal";
 import FacultyAvatar from "@/components/FacultyAvatar";
+import { formatSemesterDisplay } from "@/lib/academicSemester";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
@@ -1009,9 +1010,10 @@ export default function TeacherDetailPage() {
                                 </span>
                               </div>
                               <div className="text-[10px] text-slate-400 flex items-center gap-1.5 flex-wrap">
-                                <span>
-                                  {res.semesterName || "Fall 2026"} ({res.academicYear || 2026}) •
+                                <span className="font-medium text-slate-600 dark:text-slate-300">
+                                  {formatSemesterDisplay(res.semesterName, res.academicYear)}
                                 </span>
+                                <span className="text-slate-300 dark:text-slate-600">•</span>
                                 {(() => {
                                   const contributorName =
                                     res.contributorName ||
@@ -1027,13 +1029,13 @@ export default function TeacherDetailPage() {
                                             ? `অ্যাকাডেমিক কন্ট্রিবিউটর: ${contributorName} (শীর্ষ ৫০ কন্ট্রিবিউটর তালিকায় দেখুন)`
                                             : `Academic Contributor: ${contributorName} (View in Top 50 Academic Contributors)`
                                         }
-                                        className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 hover:underline transition-all group"
+                                        className="inline-flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 hover:underline transition-all group"
                                       >
                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse"></span>
                                         <span className="truncate max-w-[140px] sm:max-w-[200px]">
-                                          {language === "bn" ? `By ${contributorName}` : `By ${contributorName}`}
+                                          By {contributorName}
                                         </span>
-                                        <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950/90 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.2 rounded-full font-bold border border-emerald-300/50 dark:border-emerald-800/60 shadow-xs group-hover:scale-105 transition-transform">
+                                        <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950/90 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-md font-bold border border-emerald-300/50 dark:border-emerald-800/60 shadow-xs group-hover:scale-105 transition-transform">
                                           {language === "bn" ? "কন্ট্রিবিউটর" : "Contributor"}
                                         </span>
                                       </Link>

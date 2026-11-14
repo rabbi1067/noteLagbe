@@ -27,6 +27,7 @@ import {
   Eye,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { formatSemesterDisplay } from "@/lib/academicSemester";
 import { api, API_BASE_URL, getToken } from "@/lib/api";
 import {
   convertImageToJpegBytes,
@@ -881,7 +882,7 @@ export default function PDFViewerModal({
               </h3>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
-                  {resource.type ? resource.type.replace(/_/g, " ") : "Document"} • {resource.semesterName || "Semester Exam"}
+                  {resource.type ? resource.type.replace(/_/g, " ") : "Document"} • {formatSemesterDisplay(resource.semesterName, resource.academicYear)}
                 </span>
                 {canDownloadAndOpen ? (
                   <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">

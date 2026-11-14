@@ -76,6 +76,7 @@ import {
   getCurrentAcademicSemester,
   getShortResourceTypeName,
   buildConciseAcademicTitle,
+  formatSemesterDisplay,
   SemesterChip,
 } from "@/lib/academicSemester";
 
@@ -1759,7 +1760,7 @@ export default function ContributePage() {
                           <strong>{item.requestedCourse1?.code}</strong> & <strong>{item.requestedCourse2?.code}</strong>
                         </span>
                         {item.uploadedResource?.semesterName && (
-                          <span className="text-slate-400">• {item.uploadedResource.semesterName}</span>
+                          <span className="text-slate-400">• {formatSemesterDisplay(item.uploadedResource.semesterName, item.uploadedResource.academicYear)}</span>
                         )}
                       </div>
 

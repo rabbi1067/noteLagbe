@@ -175,3 +175,43 @@ export function buildConciseAcademicTitle(
   const shortType = getShortResourceTypeName(resourceType);
   return `${cleanCode} ${shortType}`;
 }
+
+/**
+ * Formats a clean, non-duplicate semester and year label.
+ * Prevents issues like "Summer 2026 (2026)" or "Fall 2026 2026".
+ * Examples:
+ * - formatSemesterDisplay("Summer 2026", 2026) -> "Summer 2026"
+ * - formatSemesterDisplay("Summer 2026 (2026)", 2026) -> "Summer 2026"
+ * - formatSemesterDisplay("Summer", 2026) -> "Summer 2026"
+ * - formatSemesterDisplay(null, 2026) -> "Semester 2026"
+ * - formatSemesterDisplay(null, null) -> "Fall 2026"
+ */
+export function formatSemesterDisplay(
+  semesterName?: string | null,
+  academicYear?: number | string | null
+): string {
+  let sem = (semesterName || "").trim();
+
+  // 1. Remove redundant parenthesized year at the end, e.g. "Summer 2026 (2026)" -> "Summer 2026"
+  sem = sem.replace(/\s*\(\s*\d{4}\s*\)/g, "").trim();
+
+  // 2. Remove duplicate consecutive year, e.g. "Summer 2026 2026" -> "Summer 2026"
+  sem = sem.replace(/\b(19\d\d|20\d\d)\s+\1\b/g, "$1").trim();
+
+  // 3. If already contains a valid 4-digit year (e.g. "Summer 2026", "Fall 2025")
+  if (/\b(19\d\d|20\d\d)\b/.test(sem)) {
+    return sem;
+  }
+
+  // 4. If only season name is present (e.g. "Summer", "Fall", "Spring") and academicYear is provided
+  if (sem && academicYear) {
+    return `${sem} ${academicYear}`;
+  }
+
+  if (sem) {
+    return sem;
+  }
+
+  return academicYear ? `Semester ${academicYear}` : "Fall 2026";
+}
+

@@ -10,6 +10,7 @@ import { useDataSync } from "@/lib/sync";
 import PDFViewerModal from "@/components/PDFViewerModal";
 import CheatSheetModal from "@/components/CheatSheetModal";
 import FacultyAvatar from "@/components/FacultyAvatar";
+import { formatSemesterDisplay } from "@/lib/academicSemester";
 import { 
   BookOpen, 
   FileText, 
@@ -2441,7 +2442,7 @@ function MaterialCard({
           </span>
 
           <span className="text-[10px] font-mono text-slate-600 dark:text-slate-300 font-bold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
-            {resource.semesterName || "Fall 2026"}
+            {formatSemesterDisplay(resource.semesterName, resource.academicYear)}
           </span>
         </div>
 
