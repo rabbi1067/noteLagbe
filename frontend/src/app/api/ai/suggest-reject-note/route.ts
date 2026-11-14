@@ -17,35 +17,6 @@ const TYPE_NAMES: Record<string, { en: string; bn: string }> = {
   OTHERS: { en: "Academic Material", bn: "একাডেমিক স্টাডি মেটেরিয়াল" },
 };
 
-// Polite Academic & Administrative Review Variations (Never Falsely Accuses the Student)
-const SMART_ADMIN_FALLBACKS = [
-  {
-    category: "DUPLICATE_ARCHIVE",
-    bn: "{courseCode} কোর্সের ({semester}) মেটেরিয়াল ইতোমধ্যে ভেরিফাইড আর্কাইভে সম্পূর্ণ আকারে সংরক্ষিত রয়েছে। আপনার অবদানের জন্য ধন্যবাদ, অনুগ্রহ করে অন্য কোনো বিষয়ের বা নতুন সেমিস্টারের নোট শেয়ার করুন।",
-    en: "Academic materials for {courseCode} ({semester}) already exist in our verified repository. Thank you for your contribution, please consider sharing notes or question papers for another term or course.",
-  },
-  {
-    category: "POOR_QUALITY",
-    bn: "আপলোড করা খাতার ছবি বা পৃষ্ঠার লেখাগুলো পর্যাপ্ত আলোতে আরও সোজা ও পরিষ্কারভাবে স্ক্যান করে পুনরায় জমা দেওয়ার অনুরোধ করা হচ্ছে।",
-    en: "Please capture a clearer, well-lit, properly oriented and legible scan of each page before re-submitting.",
-  },
-  {
-    category: "INCOMPLETE_PAGES",
-    bn: "ডকুমেন্টে প্রয়োজনীয় পৃষ্ঠাগুলো অসম্পূর্ণ দেখাচ্ছে। অনুগ্রহ করে সম্পূর্ণ লেকচার নোট বা প্রশ্নপত্রের সবগুলো পেজ মার্জ করে একটি পূর্ণাঙ্গ ফাইলে সাবমিট করুন।",
-    en: "The submission appears incomplete with missing pages. Please merge all pages of the lecture notes or exam question paper into a single complete document.",
-  },
-  {
-    category: "CURRICULUM_UPDATE",
-    bn: "ডিপার্টমেন্টাল কারিকুলাম ও সিলেবাসের সর্বশেষ কাঠামোর সাথে সামঞ্জস্য রেখে হালনাগাদ মেটেরিয়ালটি পুনরায় আপলোড করার জন্য অনুরোধ করা হচ্ছে।",
-    en: "Please verify against the updated departmental curriculum guidelines and submit the revised version.",
-  },
-  {
-    category: "QUALITY_REVIEW",
-    bn: "এডমিন পর্যালোচনার ভিত্তিতে উক্ত সেমিস্টারের জন্য অতিরিক্ত কপির প্রয়োজন নেই। আপনার আগ্রহের জন্য ধন্যবাদ, পরবর্তী টার্মের রিসোর্স শেয়ার করার অনুরোধ রইল।",
-    en: "Based on administrative review, additional copies for this semester are not currently required. Thank you for your support, please feel free to share materials for upcoming terms.",
-  },
-];
-
 function detectBufferMime(buf: Buffer, headerMime?: string): string {
   if (buf.length >= 4 && buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) {
     return "application/pdf";
@@ -72,12 +43,19 @@ export async function POST(req: NextRequest) {
       title = "",
       resourceType = "NOTE",
       courseCode = "Course",
+      courseTitle = "",
       semester = "",
+      teacherName = "",
+      teacherInitial = "",
+      teacherId = null,
       fileName = "",
       fileUrl = "",
       previewUrl = "",
       cycleIndex = 0,
       language = "bn",
+      exactDuplicateFound = false,
+      exactDuplicateDetails = null,
+      existingMaterialsForCourse = [],
     } = body;
 
     const isBangla = language === "bn";
@@ -89,26 +67,34 @@ export async function POST(req: NextRequest) {
     const typeLabel = TYPE_NAMES[resourceType]?.[isBangla ? "bn" : "en"] || resourceType;
     const cleanCourse = (courseCode || "Course").toUpperCase().trim();
     const cleanSem = semester || (isBangla ? "উক্ত সেমিস্টার" : "Current Semester");
+    const cleanTeacherName = teacherName ? teacherName.trim() : (isBangla ? "সংশ্লিষ্ট শিক্ষক" : "Assigned Faculty");
+    const cleanTeacherInitial = teacherInitial ? teacherInitial.trim().toUpperCase() : "";
 
-    // 1. Genuine Multimodal Vision Inspection via Gemini 1.5 Flash
+    // 1. Resolve inspection URL (handles relative backend paths /uploads/...)
+    let inspectionUrl = previewUrl || fileUrl;
+    const backendBase = (process.env.NEXT_PUBLIC_BACKEND_URL || "https://notelagbe-backend.onrender.com").replace(/\/+$/, "");
+    if (inspectionUrl && inspectionUrl.startsWith("/")) {
+      inspectionUrl = `${backendBase}${inspectionUrl}`;
+    }
+
+    // 1. Genuine Multimodal Vision Inspection via Gemini
     if (apiKey) {
       try {
         let mediaPart: any = null;
-        let inspectionUrl = previewUrl || fileUrl;
 
-        // If Cloudinary PDF, convert to 1st page JPG thumbnail for ultra-fast vision inspection
+        // If Cloudinary image PDF, convert to page 1 JPG for faster inspection
         if (inspectionUrl && inspectionUrl.includes("res.cloudinary.com") && inspectionUrl.includes("/image/upload/")) {
           inspectionUrl = inspectionUrl.replace(/\.pdf(\?.*)?$/i, ".jpg").replace("/image/upload/", "/image/upload/pg_1,w_1200/");
         }
 
         if (inspectionUrl && /^https?:\/\//i.test(inspectionUrl)) {
           try {
-            const fetchRes = await fetch(inspectionUrl, { signal: AbortSignal.timeout(6000) });
+            const fetchRes = await fetch(inspectionUrl, { signal: AbortSignal.timeout(8000) });
             if (fetchRes.ok) {
               const arrayBuf = await fetchRes.arrayBuffer();
               const buf = Buffer.from(arrayBuf);
-              // Gemini inlineData supports images and PDFs up to ~10MB
-              if (buf.length > 0 && buf.length <= 10 * 1024 * 1024) {
+              // Gemini inlineData supports images and PDFs up to ~12MB
+              if (buf.length > 0 && buf.length <= 12 * 1024 * 1024) {
                 const detectedMime = detectBufferMime(buf, fetchRes.headers.get("content-type") || undefined);
                 mediaPart = {
                   inlineData: {
@@ -124,50 +110,96 @@ export async function POST(req: NextRequest) {
         }
 
         const langRule = isBangla
-          ? "CRITICAL: 'analysisFindings' and 'rejectionNote' MUST be written in 100% natural, polite, respectful, and standard Bengali (বাংলা). No English sentences."
+          ? "CRITICAL: 'analysisFindings' and 'rejectionNote' MUST be written in 100% natural, polite, respectful, and standard Bengali (বাংলা). Do NOT use robot-like translations or English sentences."
           : "CRITICAL: 'analysisFindings' and 'rejectionNote' MUST be written in 100% clear, professional, constructive English.";
 
-        const promptText = `You are a senior academic reviewer and document verification auditor for 'NoteLagbe' at Southeast University (SEU).
-A student submitted an academic document with the following form selection:
-- Course Code: "${cleanCourse}"
+        // Build list of existing materials in database for context
+        const existingSummary = Array.isArray(existingMaterialsForCourse) && existingMaterialsForCourse.length > 0
+          ? existingMaterialsForCourse
+              .map(
+                (m: any, idx: number) =>
+                  `${idx + 1}. [${m.type || "NOTE"}] "${m.title || "Material"}" - Semester: ${m.semester || "N/A"}, Faculty: ${m.teacherName || m.teacherInitial || "General"}`
+              )
+              .join("\n")
+          : "No materials currently archived for this course in NoteLagbe.";
+
+        const promptText = `You are the Senior Academic Document Auditor and Quality Reviewer for 'NoteLagbe' at Southeast University (SEU).
+A student has submitted an academic document with the following claimed metadata:
+- Target Course: "${cleanCourse}" (${courseTitle || ""})
+- Assigned Faculty: "${cleanTeacherName}" ${cleanTeacherInitial ? `[Initial: ${cleanTeacherInitial}]` : ""}
+- Target Semester: "${cleanSem}"
 - Resource Category: "${resourceType}" (${typeLabel})
 - Document Title: "${title}"
-- Target Semester: "${cleanSem}"
-- Uploaded File Name: "${fileName}"
+- Uploaded File: "${fileName}"
 
-Carefully inspect the attached document image / PDF page (if attached) or evaluate the metadata.
-Examine:
-1. Header / title (University name, Department of CSE, Course Code e.g. ${cleanCourse}, Exam Type e.g. Final Examination, Midterm Examination, Quiz, Date, Faculty Initial).
-2. Content: Are there legible questions, solutions, or lecture notes?
-3. Authenticity: Is this a genuine educational paper or an unrelated/corrupted file?
+VERIFIED ARCHIVE DATABASE REALITY CHECK:
+- Does an approved material already exist in NoteLagbe for this EXACT Course + EXACT Faculty (${cleanTeacherName}) + EXACT Semester (${cleanSem}) + EXACT Type (${typeLabel})?
+  ${exactDuplicateFound ? `YES! An approved material already exists in our verified repository: "${exactDuplicateDetails?.title || title}" (Semester: ${exactDuplicateDetails?.semester || cleanSem}, Faculty: ${exactDuplicateDetails?.teacherName || cleanTeacherName}).` : `NO! NoteLagbe DOES NOT currently have an approved copy for ${cleanTeacherName} in ${cleanSem} for this course.`}
+- All currently approved materials in repository for ${cleanCourse}:
+${existingSummary}
 
-CRITICAL RULES (MUST FOLLOW STRICTLY):
-1. HONESTY AND INTEGRITY RULE ("vul na thakle to ata dekhabe na"):
-   - If the document is a genuine, clear, and relevant academic document matching or relating to ${cleanCourse} and ${typeLabel}:
-     * Set "hasRealFlaw": false.
-     * DO NOT falsely accuse the student of having a content mismatch or uploading an unrelated document!
-     * In "analysisFindings", describe what you see (e.g. "ডকুমেন্টটি সাউথইস্ট ইউনিভার্সিটির একটি বৈধ ও স্পষ্ট ${typeLabel}। কনটেন্টে কোনো অমিল পাওয়া যায়নি।").
-     * In "rejectionNote": Since the admin requested an administrative reason to decline this submission (reason variation #${(cycleIndex % 4) + 1}):
-       Provide a polite, constructive administrative or archival reason, such as:
-       - Variation A: The verified departmental repository already contains an approved copy for ${cleanCourse} (${cleanSem}).
-       - Variation B: Departmental archive quota for this term has already been fulfilled; encourage sharing materials for other terms.
-       - Variation C: Academic committee recommends submitting a complete bundle including solutions or additional lecture parts.
-2. GENUINE FLAW FOUND:
-   - If the document has a REAL, VISIBLE issue:
-     * Set "hasRealFlaw": true.
-     * In "analysisFindings", describe the EXACT flaw observed (e.g. "ডকুমেন্টের হেডারে EEE বা ভিন্ন কোর্স কোড দেখা যাচ্ছে", or "হাতের লেখা অতিরিক্ত ঝাপসা ও অপাঠ্য", or "নথিটি কোনো একাডেমিক স্টাডি মেটেরিয়াল নয়").
-     * In "rejectionNote", provide a polite, actionable rejection note explaining how the student can fix and re-submit it.
-3. LANGUAGE:
-   ${langRule}
+YOUR MISSION:
+Carefully inspect the attached document image / PDF page (if attached) or audit the submitted evidence.
+1. HEADER & METADATA AUDIT:
+   - Check University header: Southeast University (SEU)?
+   - Check Course Code: Look at the printed header. Does it say "${cleanCourse}" or does it say a DIFFERENT course (e.g. CSE141, CSE241, EEE, etc.)?
+   - Check Semester: Look at the printed header. Does it state "${cleanSem}" or does it state a DIFFERENT term (e.g. Spring 2025, Fall 2024, Summer 2023)?
+   - Check Faculty / Teacher: Does the printed header, footer, or teacher signature indicate "${cleanTeacherName}" or initial "${cleanTeacherInitial}", or another faculty member?
+   - Check Exam/Document Type: Does the header say "Final Examination", "Midterm Examination", "Quiz / CT", "Lab Manual", or "Assignment"? Does it match "${typeLabel}"?
+
+2. QUESTION & CONTENT QUALITY AUDIT:
+   - Are there real academic exam questions, problem statements, diagrams, formulas, or lecture notes?
+   - Are the questions authentic and appropriate for ${cleanCourse}?
+   - Is the document blurry, skewed, unreadable, cut off at margins, missing pages, or corrupted?
+   - Is this an unrelated file (personal photo, random meme, assignment cover page, non-academic screenshot)?
+
+AUDIT DECISION CRITERIA (CRITICAL RULES - STRICT HONESTY):
+CASE 1: REAL FLAW / MISMATCH FOUND IN THE DOCUMENT ("hasRealFlaw": true):
+- If ANY of the following is true in the document:
+  * Course mismatch: The document header shows a different course than "${cleanCourse}".
+  * Semester mismatch: The document header shows a different semester than "${cleanSem}".
+  * Faculty mismatch: The document clearly belongs to a different instructor than "${cleanTeacherName}".
+  * Type mismatch: The document is an Assignment, Class Test, or Note when "${typeLabel}" was claimed.
+  * Poor quality / illegible: The handwriting or scan is too blurry, dark, cut off, or missing questions.
+  * Irrelevant / fake: Not a genuine academic study material.
+-> Set "hasRealFlaw": true.
+-> In "flawType", specify one of: "SEMESTER_MISMATCH" | "COURSE_MISMATCH" | "FACULTY_MISMATCH" | "TYPE_MISMATCH" | "ILLEGIBLE_OR_BLURRY" | "INCOMPLETE_QUESTIONS" | "UNRELATED_CONTENT".
+-> In "analysisFindings", describe the EXACT visible mismatch observed (e.g. "আপলোড করা প্রশ্নপত্রের হেডারে স্পষ্টভাবে 'Spring 2025' দেখা যাচ্ছে, কিন্তু সাবমিশনে 'Summer 2026' নির্বাচন করা হয়েছে।").
+-> In "rejectionNote", provide a polite, respectful, and crystal-clear explanation in standard Bengali telling the student what went wrong and how to fix it before re-submitting.
+
+CASE 2: DOCUMENT IS FULLY VALID & MATCHING, AND A DUPLICATE ALREADY EXISTS IN ARCHIVE ("hasRealFlaw": false, exactDuplicateFound = true):
+- If the document is authentic and matches ${cleanCourse} + ${cleanSem} + ${cleanTeacherName} + ${typeLabel}, AND exactDuplicateFound is true:
+-> Set "hasRealFlaw": false.
+-> Set "flawType": "NONE".
+-> Set "category": "DUPLICATE_ARCHIVE".
+-> In "analysisFindings", confirm the document is authentic and matches ${cleanTeacherName}'s ${cleanSem} course, but note that this exact material already exists in NoteLagbe's verified archive.
+-> In "rejectionNote", write a warm, appreciative note explicitly mentioning ${cleanCourse}, ${cleanTeacherName}, and ${cleanSem}:
+   "${cleanCourse} কোর্সের ${cleanTeacherName} শিক্ষকের ${cleanSem} সেমিস্টারের ${typeLabel} ইতোমধ্যে আমাদের ভেরিফাইড আর্কাইভে সম্পূর্ণ আকারে সংরক্ষিত রয়েছে। আপনার আন্তরিক অবদানের জন্য ধন্যবাদ, অনুগ্রহ করে অন্য কোনো সেমিস্টারের বা নতুন কোর্সের মেটেরিয়াল শেয়ার করুন।"
+
+CASE 3: DOCUMENT IS FULLY VALID & MATCHING, BUT NO DUPLICATE EXISTS IN ARCHIVE ("hasRealFlaw": false, exactDuplicateFound = false):
+- If the document is authentic and matches ${cleanCourse} + ${cleanSem} + ${cleanTeacherName}, AND exactDuplicateFound is false:
+-> Set "hasRealFlaw": false.
+-> Set "flawType": "NONE".
+-> Set "category": "ADMIN_REVIEW".
+-> CRITICAL: NEVER falsely say that the material already exists in the repository!
+-> In "analysisFindings", confirm the document is authentic for ${cleanTeacherName} and no duplicate was found.
+-> In "rejectionNote", provide a courteous administrative/review note (e.g. requesting a higher resolution multi-page scan with solutions or complete front and back pages).
+
+LANGUAGE & TONE:
+${langRule}
+Provide alternative phrasing variation #${(Number(cycleIndex) % 4) + 1}.
 
 Return STRICT JSON ONLY matching this schema:
 {
   "hasRealFlaw": boolean,
+  "flawType": "NONE" | "SEMESTER_MISMATCH" | "COURSE_MISMATCH" | "FACULTY_MISMATCH" | "TYPE_MISMATCH" | "ILLEGIBLE_OR_BLURRY" | "INCOMPLETE_QUESTIONS" | "UNRELATED_CONTENT",
   "detectedCourseCode": string or null,
-  "detectedDocType": string or null,
+  "detectedSemester": string or null,
+  "detectedFaculty": string or null,
+  "detectedExamType": string or null,
   "analysisFindings": string,
   "rejectionNote": string,
-  "category": "VALID_DOCUMENT_ADMIN_REASON" | "CONTENT_MISMATCH" | "POOR_QUALITY" | "INCOMPLETE_PAGES" | "DUPLICATE_ARCHIVE" | "IRRELEVANT_CONTENT"
+  "category": "CONTENT_MISMATCH" | "DUPLICATE_ARCHIVE" | "POOR_QUALITY" | "INCOMPLETE_PAGES" | "ADMIN_REVIEW"
 }`;
 
         const parts: any[] = [];
@@ -186,10 +218,10 @@ Return STRICT JSON ONLY matching this schema:
               generationConfig: {
                 responseMimeType: "application/json",
                 temperature: 0.2,
-                maxOutputTokens: 400,
+                maxOutputTokens: 600,
               },
             }),
-            signal: AbortSignal.timeout(8000),
+            signal: AbortSignal.timeout(10000),
           }
         );
 
@@ -203,47 +235,90 @@ Return STRICT JSON ONLY matching this schema:
                 success: true,
                 suggestion: parsed.rejectionNote.trim(),
                 hasRealFlaw: Boolean(parsed.hasRealFlaw),
+                flawType: parsed.flawType || "NONE",
                 analysisFindings: parsed.analysisFindings || (isBangla ? "ডকুমেন্ট বিশ্লেষণ সম্পন্ন হয়েছে।" : "Document analysis completed."),
                 detectedCourseCode: parsed.detectedCourseCode || null,
-                detectedDocType: parsed.detectedDocType || null,
-                category: parsed.category || (parsed.hasRealFlaw ? "CONTENT_MISMATCH" : "VALID_DOCUMENT_ADMIN_REASON"),
-                source: mediaPart ? "gemini_multimodal_vision" : "gemini_text_evaluator",
+                detectedSemester: parsed.detectedSemester || null,
+                detectedFaculty: parsed.detectedFaculty || null,
+                detectedDocType: parsed.detectedExamType || null,
+                category: parsed.category || (parsed.hasRealFlaw ? "CONTENT_MISMATCH" : exactDuplicateFound ? "DUPLICATE_ARCHIVE" : "ADMIN_REVIEW"),
+                source: mediaPart ? "gemini_multimodal_vision" : "gemini_academic_auditor",
                 language: isBangla ? "bn" : "en",
               });
             }
           }
         }
       } catch (geminiErr) {
-        console.warn("Gemini multimodal analysis failed or timed out, switching to smart rule engine:", geminiErr);
+        console.warn("Gemini multimodal analysis failed or timed out:", geminiErr);
       }
     }
 
-    // 2. Built-in Smart Academic Rule Engine (Guaranteed 0-latency fallback, Never Falsely Accuses Student)
-    const normalizedIndex = Math.abs(Number(cycleIndex) || 0) % SMART_ADMIN_FALLBACKS.length;
-    const item = SMART_ADMIN_FALLBACKS[normalizedIndex];
+    // 2. Fallback to Backend AI Service (in case GEMINI_API_KEY is configured on Render backend)
+    try {
+      const backendAiRes = await fetch(`${backendBase}/api/ai/suggest-reject-note`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(6000),
+      });
+      if (backendAiRes.ok) {
+        const backendData = await backendAiRes.json();
+        if (backendData?.suggestion) {
+          return NextResponse.json(backendData);
+        }
+      }
+    } catch {
+      // Proceed to resilient truth engine
+    }
 
-    const safeCourse = cleanCourse || (isBangla ? "কোর্স" : "Course");
-    const safeSem = cleanSem || (isBangla ? "উক্ত সেমিস্টার" : "specified semester");
-    const noteText = (isBangla ? item.bn : item.en)
-      .replace("{typeLabel}", typeLabel)
-      .replace("{courseCode}", safeCourse)
-      .replace("{semester}", safeSem);
+    // 3. Resilient Academic Truth Engine (Zero Blind Assumptions, 100% Truthful)
+    if (exactDuplicateFound) {
+      const duplicateMsg = isBangla
+        ? `${cleanCourse} কোর্সের ${cleanTeacherName} শিক্ষকের ${cleanSem} সেমিস্টারের ${typeLabel} ইতোমধ্যে আমাদের ভেরিফাইড আর্কাইভে সম্পূর্ণ আকারে সংরক্ষিত রয়েছে। আপনার আন্তরিক অবদানের জন্য ধন্যবাদ, অনুগ্রহ করে অন্য কোনো সেমিস্টার বা নতুন কোর্সের মেটেরিয়াল শেয়ার করুন।`
+        : `Academic material for ${cleanCourse} (${cleanSem}, Faculty: ${cleanTeacherName}) already exists in our verified repository. Thank you for your support, please consider sharing notes or question papers for another term or course.`;
 
-    const defaultFindings = isBangla
-      ? `ডকুমেন্টটি (${safeCourse} • ${typeLabel}) ভেরিফিকেশন কিউতে যাচাই করা হয়েছে।`
-      : `Document (${safeCourse} • ${typeLabel}) reviewed in verification queue.`;
+      const findings = isBangla
+        ? `ডাটাবেজ আর্কাইভ যাচাই: ${cleanCourse} কোর্সের ${cleanTeacherName} (${cleanSem}) এর জন্য একই মেটেরিয়াল ইতোমধ্যে সংরক্ষিত রয়েছে।`
+        : `Database archive check: A verified copy already exists for ${cleanCourse} (${cleanSem}, Faculty: ${cleanTeacherName}).`;
+
+      return NextResponse.json({
+        success: true,
+        suggestion: duplicateMsg,
+        hasRealFlaw: false,
+        flawType: "NONE",
+        analysisFindings: findings,
+        detectedCourseCode: cleanCourse,
+        detectedSemester: cleanSem,
+        detectedFaculty: cleanTeacherName,
+        detectedDocType: resourceType,
+        source: "academic_truth_engine",
+        language: isBangla ? "bn" : "en",
+        category: "DUPLICATE_ARCHIVE",
+      });
+    }
+
+    // If NOT duplicate, suggest legitimate document review without false duplicate claims!
+    const adminReviewMsg = isBangla
+      ? `আপলোড করা ডকুমেন্টের পৃষ্ঠাগুলো পর্যাপ্ত আলোতে সোজা ও স্পষ্ট করে (সকল পৃষ্ঠাসহ পূর্ণাঙ্গ ফাইলে) পুনরায় সাবমিট করার অনুরোধ করা হচ্ছে।`
+      : `Please capture a clearer, well-lit, and properly oriented scan including all pages of the document before re-submitting.`;
+
+    const findings = isBangla
+      ? `ডাটাবেজ আর্কাইভ যাচাই: ${cleanCourse} কোর্সের ${cleanTeacherName} (${cleanSem}) এর জন্য আর্কাইভে কোনো ডুপ্লিকেট পাওয়া যায়নি। প্রশাসনিক পর্যালোচনার ভিত্তিতে পুনরায় স্ক্যান কপি চাওয়া হয়েছে।`
+      : `Database archive check: No duplicate found for ${cleanCourse} (${cleanSem}, Faculty: ${cleanTeacherName}). Administrative review requested.`;
 
     return NextResponse.json({
       success: true,
-      suggestion: noteText,
+      suggestion: adminReviewMsg,
       hasRealFlaw: false,
-      analysisFindings: defaultFindings,
-      detectedCourseCode: safeCourse,
+      flawType: "NONE",
+      analysisFindings: findings,
+      detectedCourseCode: cleanCourse,
+      detectedSemester: cleanSem,
+      detectedFaculty: cleanTeacherName,
       detectedDocType: resourceType,
-      source: "academic_rules",
+      source: "academic_truth_engine",
       language: isBangla ? "bn" : "en",
-      category: item.category,
-      index: normalizedIndex,
+      category: "ADMIN_REVIEW",
     });
   } catch (error: any) {
     return NextResponse.json(

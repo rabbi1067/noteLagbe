@@ -88,6 +88,7 @@ import {
   Volume2,
   Play,
   UserX,
+  Info,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -813,19 +814,133 @@ export default function AdminDashboardPage() {
     if (!rejectingContribution) return;
     setIsAiGeneratingReject(true);
     try {
+      const courseCode = (
+        rejectingContribution.uploadedResource?.course?.code ||
+        rejectingContribution.courseCode ||
+        "Course"
+      ).toUpperCase().trim();
+
+      const courseTitle =
+        rejectingContribution.uploadedResource?.course?.title ||
+        rejectingContribution.courseTitle ||
+        "";
+
+      const semester = (
+        rejectingContribution.uploadedResource?.semesterName ||
+        rejectingContribution.semesterName ||
+        ""
+      ).trim();
+
+      const resourceType = (
+        rejectingContribution.uploadedResource?.type ||
+        rejectingContribution.type ||
+        "NOTE"
+      ).trim();
+
+      const teacherObj =
+        rejectingContribution.uploadedResource?.teacher ||
+        rejectingContribution.teacher ||
+        null;
+
+      const teacherName = teacherObj?.name || "";
+      const teacherInitial = teacherObj?.initial || "";
+      const teacherId = teacherObj?.id ? Number(teacherObj.id) : null;
+
+      // Filter all approved materials in NoteLagbe for this course
+      const existingApprovedForCourse = (resources || [])
+        .filter((r: any) => {
+          const cCode = (r.course?.code || "").toUpperCase().trim();
+          return cCode === courseCode && r.status === "APPROVED";
+        })
+        .map((r: any) => ({
+          id: r.id,
+          title: r.title,
+          type: r.type,
+          semester: r.semesterName,
+          teacherName: r.teacher?.name || "",
+          teacherInitial: r.teacher?.initial || "",
+          teacherId: r.teacher?.id ? Number(r.teacher.id) : null,
+        }));
+
+      // Check whether an exact identical copy exists in NoteLagbe for:
+      // SAME Course + SAME Faculty + SAME Semester + SAME Resource Type
+      const targetSemNorm = semester.toLowerCase().replace(/\s+/g, "");
+      const exactDuplicateMatch = existingApprovedForCourse.find((ex: any) => {
+        const exType = (ex.type || "").toUpperCase().trim();
+        const curType = resourceType.toUpperCase().trim();
+        if (exType !== curType) return false;
+
+        const exSem = (ex.semester || "").toLowerCase().replace(/\s+/g, "");
+        if (!exSem || exSem !== targetSemNorm) return false;
+
+        // Faculty check: match teacherId or initial or name
+        if (teacherId && ex.teacherId && teacherId === ex.teacherId) return true;
+        if (
+          teacherInitial &&
+          ex.teacherInitial &&
+          teacherInitial.toUpperCase() === ex.teacherInitial.toUpperCase()
+        ) {
+          return true;
+        }
+        if (
+          teacherName &&
+          ex.teacherName &&
+          teacherName.toLowerCase() === ex.teacherName.toLowerCase()
+        ) {
+          return true;
+        }
+
+        return false;
+      });
+
+      // Prepare absolute fileUrl (if relative /uploads/..., resolve using backend host)
+      let fileUrl =
+        rejectingContribution.uploadedResource?.fileUrl ||
+        rejectingContribution.fileUrl ||
+        "";
+      if (fileUrl && fileUrl.startsWith("/")) {
+        const directBackend =
+          process.env.NEXT_PUBLIC_BACKEND_URL || "https://notelagbe-backend.onrender.com";
+        fileUrl = `${directBackend.replace(/\/+$/, "")}${fileUrl}`;
+      }
+
       const res = await fetch("/api/ai/suggest-reject-note", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: rejectingContribution.uploadedResource?.title || "",
-          resourceType: rejectingContribution.uploadedResource?.type || rejectingContribution.type || "NOTE",
-          courseCode: rejectingContribution.uploadedResource?.course?.code || rejectingContribution.courseCode || "Course",
-          semester: rejectingContribution.uploadedResource?.semesterName || rejectingContribution.semesterName || "",
-          fileName: rejectingContribution.uploadedResource?.fileName || rejectingContribution.uploadedResource?.title || "",
-          fileUrl: rejectingContribution.uploadedResource?.fileUrl || "",
-          previewUrl: rejectingContribution.uploadedResource?.previewUrl || rejectingContribution.previewUrl || "",
+          title:
+            rejectingContribution.uploadedResource?.title ||
+            rejectingContribution.title ||
+            "",
+          resourceType,
+          courseCode,
+          courseTitle,
+          semester,
+          teacherName,
+          teacherInitial,
+          teacherId,
+          fileName:
+            rejectingContribution.uploadedResource?.fileName ||
+            rejectingContribution.uploadedResource?.title ||
+            "",
+          fileUrl,
+          previewUrl:
+            rejectingContribution.uploadedResource?.previewUrl ||
+            rejectingContribution.previewUrl ||
+            "",
           cycleIndex: rejectAiSuggestCount,
           language: language || "en",
+          exactDuplicateFound: Boolean(exactDuplicateMatch),
+          exactDuplicateDetails: exactDuplicateMatch
+            ? {
+                id: exactDuplicateMatch.id,
+                title: exactDuplicateMatch.title,
+                teacherName: exactDuplicateMatch.teacherName,
+                teacherInitial: exactDuplicateMatch.teacherInitial,
+                semester: exactDuplicateMatch.semester,
+              }
+            : null,
+          existingMaterialsForCourse: existingApprovedForCourse.slice(0, 10),
         }),
       });
       const data = await res.json();
@@ -847,6 +962,12 @@ export default function AdminDashboardPage() {
             language === "bn"
               ? "⚠️ AI ভিশন নথিতে অমিল/ত্রুটি শনাক্ত করেছে!"
               : "⚠️ AI Vision detected a document discrepancy!"
+          );
+        } else if (data.category === "DUPLICATE_ARCHIVE") {
+          toast.info(
+            language === "bn"
+              ? "ℹ️ AI অডিট: মেটেরিয়ালটি সঠিক কিন্তু আর্কাইভে ইতোমধ্যে সংরক্ষিত"
+              : "ℹ️ AI Audit: Valid material already exists in archive"
           );
         } else {
           toast.success(
@@ -12604,6 +12725,8 @@ export default function AdminDashboardPage() {
                   className={`p-3 rounded-2xl border text-xs space-y-1 animate-in fade-in ${
                     rejectAiObservation.hasRealFlaw
                       ? "bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300"
+                      : rejectAiObservation.category === "DUPLICATE_ARCHIVE"
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300"
                       : "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300"
                   }`}
                 >
@@ -12615,6 +12738,15 @@ export default function AdminDashboardPage() {
                           {language === "bn"
                             ? "AI ভিশন পর্যবেক্ষণ: নথিতে অসংগতি শনাক্ত হয়েছে"
                             : "AI Vision Observation: Discrepancy Detected"}
+                        </span>
+                      </>
+                    ) : rejectAiObservation.category === "DUPLICATE_ARCHIVE" ? (
+                      <>
+                        <Info className="w-4 h-4 text-amber-500" />
+                        <span>
+                          {language === "bn"
+                            ? "AI অডিট পর্যবেক্ষণ: মেটেরিয়ালটি সঠিক কিন্তু আর্কাইভে ইতোমধ্যে বিদ্যমান"
+                            : "AI Audit Observation: Material Already Exists in Archive"}
                         </span>
                       </>
                     ) : (
@@ -12631,11 +12763,18 @@ export default function AdminDashboardPage() {
                   <p className="text-[11px] leading-relaxed opacity-90 font-normal">
                     {rejectAiObservation.analysisFindings}
                   </p>
-                  {!rejectAiObservation.hasRealFlaw && (
+                  {!rejectAiObservation.hasRealFlaw && rejectAiObservation.category !== "DUPLICATE_ARCHIVE" && (
                     <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium italic pt-0.5">
                       {language === "bn"
-                        ? "💡 নথিতে কোনো ত্রুটি না থাকায় শিক্ষার্থীকে অহেতুক অভিযুক্ত না করে শালীন প্রশাসনিক/আর্কাইভ সংক্রান্ত কারণ প্রস্তাব করা হয়েছে।"
-                        : "💡 No content defects were found; a polite administrative reason has been suggested instead of a false defect accusation."}
+                        ? "💡 নথিতে কোনো ত্রুটি না থাকায় শিক্ষার্থীকে অহেতুক অভিযুক্ত না করে শালীন প্রশাসনিক পর্যালোচনার কারণ প্রস্তাব করা হয়েছে।"
+                        : "💡 No content defects found; an administrative review reason has been suggested instead of a false defect accusation."}
+                    </p>
+                  )}
+                  {rejectAiObservation.category === "DUPLICATE_ARCHIVE" && (
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium italic pt-0.5">
+                      {language === "bn"
+                        ? "💡 এই শিক্ষকের এই সেমিস্টারের মেটেরিয়াল ইতোমধ্যে নোলাগবে ভেরিফাইড ডাটাবেজে রয়েছে।"
+                        : "💡 This exact faculty material for this semester is already archived in NoteLagbe repository."}
                     </p>
                   )}
                 </div>

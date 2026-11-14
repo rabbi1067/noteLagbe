@@ -442,4 +442,100 @@ public class AiExamChatService {
 
         return sb.toString();
     }
+
+    /**
+     * Intelligent academic document review and rejection assistant powered by Gemini.
+     * Evaluates submitted course, faculty, semester, and duplicate archive reality
+     * without false assumptions or static templates.
+     */
+    public Map<String, Object> suggestRejectNote(Map<String, Object> payload) {
+        String courseCode = payload.get("courseCode") != null ? String.valueOf(payload.get("courseCode")).trim().toUpperCase(Locale.ROOT) : "COURSE";
+        String courseTitle = payload.get("courseTitle") != null ? String.valueOf(payload.get("courseTitle")).trim() : "";
+        String teacherName = payload.get("teacherName") != null ? String.valueOf(payload.get("teacherName")).trim() : "";
+        String teacherInitial = payload.get("teacherInitial") != null ? String.valueOf(payload.get("teacherInitial")).trim() : "";
+        String semester = payload.get("semester") != null ? String.valueOf(payload.get("semester")).trim() : "";
+        String resourceType = payload.get("resourceType") != null ? String.valueOf(payload.get("resourceType")).trim() : "NOTE";
+        String title = payload.get("title") != null ? String.valueOf(payload.get("title")).trim() : "";
+        String fileName = payload.get("fileName") != null ? String.valueOf(payload.get("fileName")).trim() : "";
+        boolean exactDuplicateFound = Boolean.TRUE.equals(payload.get("exactDuplicateFound"));
+
+        String cleanTeacher = !teacherName.isBlank() ? teacherName : (!teacherInitial.isBlank() ? teacherInitial : "সংশ্লিষ্ট শিক্ষক");
+        String cleanSem = !semester.isBlank() ? semester : "উক্ত সেমিস্টার";
+
+        String apiKey = (geminiApiKey != null && !geminiApiKey.isBlank()) ? geminiApiKey.trim() : System.getenv("GEMINI_API_KEY");
+        if (apiKey != null && !apiKey.isBlank()) {
+            try {
+                String promptText = "You are the Senior Academic Document Auditor for NoteLagbe at Southeast University (SEU).\n"
+                        + "A student submitted an academic document with metadata:\n"
+                        + "- Course: " + courseCode + " (" + courseTitle + ")\n"
+                        + "- Faculty: " + cleanTeacher + " [Initial: " + teacherInitial + "]\n"
+                        + "- Semester: " + cleanSem + "\n"
+                        + "- Resource Type: " + resourceType + "\n"
+                        + "- Title: " + title + "\n"
+                        + "- File: " + fileName + "\n\n"
+                        + "REPOSITORY ARCHIVE REALITY:\n"
+                        + "- Exact duplicate active in archive for SAME faculty + SAME semester + SAME course + SAME type? "
+                        + (exactDuplicateFound ? "YES, an approved copy already exists in the database." : "NO duplicate exists in NoteLagbe for this faculty and semester.") + "\n\n"
+                        + "RULES:\n"
+                        + "1. If exactDuplicateFound is true: Suggest a polite Bengali note thanking the student and explaining that this material for " + cleanTeacher + " (" + cleanSem + ") is already archived in NoteLagbe.\n"
+                        + "2. If exactDuplicateFound is false: NEVER claim the material already exists! Instead suggest an administrative scan review note in standard Bengali requesting higher resolution or complete pages.\n"
+                        + "Return STRICT JSON: {\"hasRealFlaw\": false, \"analysisFindings\": \"...\", \"rejectionNote\": \"...\", \"category\": \"" + (exactDuplicateFound ? "DUPLICATE_ARCHIVE" : "ADMIN_REVIEW") + "\"}";
+
+                Map<String, Object> reqBody = Map.of(
+                        "contents", List.of(Map.of("parts", List.of(Map.of("text", promptText)))),
+                        "generationConfig", Map.of(
+                                "responseMimeType", "application/json",
+                                "temperature", 0.2,
+                                "maxOutputTokens", 500
+                        )
+                );
+                String requestJson = objectMapper.writeValueAsString(reqBody);
+                String endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
+
+                HttpRequest httpRequest = HttpRequest.newBuilder()
+                        .uri(URI.create(endpoint))
+                        .header("Content-Type", "application/json")
+                        .timeout(Duration.ofSeconds(10))
+                        .POST(HttpRequest.BodyPublishers.ofString(requestJson))
+                        .build();
+
+                HttpResponse<String> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+                if (httpResponse.statusCode() >= 200 && httpResponse.statusCode() < 300) {
+                    JsonNode root = objectMapper.readTree(httpResponse.body());
+                    JsonNode candidates = root.path("candidates");
+                    if (candidates.isArray() && !candidates.isEmpty()) {
+                        String rawText = candidates.get(0).path("content").path("parts").get(0).path("text").asText();
+                        if (rawText != null && !rawText.isBlank()) {
+                            JsonNode parsed = objectMapper.readTree(rawText);
+                            Map<String, Object> result = new LinkedHashMap<>();
+                            result.put("success", true);
+                            result.put("suggestion", parsed.path("rejectionNote").asText(""));
+                            result.put("hasRealFlaw", parsed.path("hasRealFlaw").asBoolean(false));
+                            result.put("analysisFindings", parsed.path("analysisFindings").asText(""));
+                            result.put("category", parsed.path("category").asText(exactDuplicateFound ? "DUPLICATE_ARCHIVE" : "ADMIN_REVIEW"));
+                            result.put("source", "gemini_backend");
+                            return result;
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("[AI Reject Suggest] Gemini call failed: {}", ex.getMessage());
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", true);
+        result.put("hasRealFlaw", false);
+        if (exactDuplicateFound) {
+            result.put("category", "DUPLICATE_ARCHIVE");
+            result.put("analysisFindings", "ডাটাবেজ আর্কাইভ যাচাই: " + courseCode + " কোর্সের " + cleanTeacher + " (" + cleanSem + ") এর জন্য একটি অনুমোদিত মেটেরিয়াল আর্কাইভে বিদ্যমান রয়েছে।");
+            result.put("suggestion", courseCode + " কোর্সের " + cleanTeacher + " শিক্ষকের " + cleanSem + " সেমিস্টারের মেটেরিয়াল ইতোমধ্যে আমাদের ভেরিফাইড আর্কাইভে সম্পূর্ণ আকারে সংরক্ষিত রয়েছে। আপনার অবদানের জন্য ধন্যবাদ, অনুগ্রহ করে অন্য কোনো সেমিস্টার বা বিষয়ের স্টাডি মেটেরিয়াল শেয়ার করুন।");
+        } else {
+            result.put("category", "ADMIN_REVIEW");
+            result.put("analysisFindings", "ডাটাবেজ আর্কাইভ যাচাই: " + courseCode + " কোর্সের " + cleanTeacher + " (" + cleanSem + ") এর জন্য আর্কাইভে কোনো ডুপ্লিকেট পাওয়া যায়নি।");
+            result.put("suggestion", "আপলোড করা ডকুমেন্টের পৃষ্ঠাগুলোর স্পষ্টতা ও সম্পূর্ণতা নিশ্চিত করে (সকল পেজসহ সোজা ও পরিষ্কার আকারে) পুনরায় জমা দেওয়ার অনুরোধ করা হচ্ছে।");
+        }
+        result.put("source", "academic_truth_engine");
+        return result;
+    }
 }
