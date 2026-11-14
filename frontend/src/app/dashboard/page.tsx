@@ -44,12 +44,84 @@ import {
 import { toast } from "sonner";
 import { DeleteConfirmationModal, DeleteSuccessModal } from "@/components/DeleteConfirmationModal";
 
+function computeMyCourses(userObj: any, catalogList: any[]): any[] {
+  if (!userObj) return [];
+  const isUnlimited = Boolean(
+    userObj.unlimited ||
+    userObj.role === "ROLE_ADMIN" ||
+    userObj.role === "ROLE_SUPER_ADMIN" ||
+    userObj.role === "ROLE_MANAGER"
+  );
+  if (isUnlimited) {
+    return catalogList;
+  }
+  return catalogList
+    .map((c: any) => {
+      const matchingDetails = (userObj.unlockedCourseDetails || []).filter(
+        (d: any) => !d.isExpired && d.courseCode?.toLowerCase() === c.code?.toLowerCase()
+      );
+      const isFullUnlocked =
+        Boolean(c.unlocked) ||
+        Boolean(userObj.unlockedCourseCodes?.some((code: string) => code?.toLowerCase() === c.code?.toLowerCase())) ||
+        matchingDetails.some((d: any) => !d.teacherId);
+      const giftedDetails = matchingDetails.filter((d: any) => d.teacherId != null);
+      if (!isFullUnlocked && giftedDetails.length === 0) return null;
+      return {
+        ...c,
+        _isFullAccess: isFullUnlocked,
+        _giftedDetails: giftedDetails,
+      };
+    })
+    .filter(Boolean);
+}
+
 export default function StudentDashboardPage() {
-  const { user, isAuthenticated, isAdmin, refreshProfile, setShowAuthModal } = useAuth();
-  const [unlockedCourseDetails, setUnlockedCourseDetails] = useState<any[]>([]);
-  const [payments, setPayments] = useState<any[]>([]);
-  const [contributions, setContributions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user, isAuthenticated, isLoading, isAdmin, refreshProfile, setShowAuthModal } = useAuth();
+
+  // Instant 0ms load: Pre-populate unlocked courses from local state & catalog
+  const [unlockedCourseDetails, setUnlockedCourseDetails] = useState<any[]>(() => {
+    let initialUser = user;
+    if (!initialUser && typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("notelagbe_user");
+        if (saved) initialUser = JSON.parse(saved);
+      } catch {}
+    }
+    let catalog = (coursesCatalogData as any[]) || [];
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("notelagbe_cached_courses_v7");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) catalog = parsed;
+        }
+      } catch {}
+    }
+    return computeMyCourses(initialUser, catalog);
+  });
+
+  // Instant 0ms load: Pre-populate payments and contributions from cache
+  const [payments, setPayments] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("notelagbe_cached_payments");
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  });
+
+  const [contributions, setContributions] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("notelagbe_cached_contributions");
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  });
+
+  const [loading, setLoading] = useState(false);
 
   // Live Search & Filter Controls
   const [searchQuery, setSearchQuery] = useState("");
@@ -326,57 +398,52 @@ export default function StudentDashboardPage() {
     }
   };
 
+  // In-memory 0ms sync: Instantly update unlocked courses whenever user profile changes
+  useEffect(() => {
+    if (user) {
+      let catalog = (coursesCatalogData as any[]) || [];
+      if (typeof window !== "undefined") {
+        try {
+          const cached = localStorage.getItem("notelagbe_cached_courses_v7");
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) catalog = parsed;
+          }
+        } catch {}
+      }
+      setUnlockedCourseDetails(computeMyCourses(user, catalog));
+    }
+  }, [user]);
+
+  // Background silent revalidation: refreshes payments & contributions without blocking UI
   const loadDashboard = useCallback(async () => {
-    setLoading(true);
     try {
-      const [allCourses, pData, cData] = await Promise.all([
-        api.courses.getAll().catch(() => []),
-        api.payments.getMy().catch(() => []),
-        api.contributions.getMy().catch(() => []),
+      const [pData, cData] = await Promise.all([
+        api.payments.getMy().catch(() => null),
+        api.contributions.getMy().catch(() => null),
       ]);
 
-      const safeCourses =
-        Array.isArray(allCourses) && allCourses.length > 0
-          ? allCourses
-          : ((coursesCatalogData as any[]) || []);
+      if (Array.isArray(pData)) {
+        setPayments(pData);
+        try {
+          localStorage.setItem("notelagbe_cached_payments", JSON.stringify(pData));
+        } catch {}
+      }
 
-      const isUnlimited = Boolean(user?.unlimited || isAdmin);
-      const myCourses = isUnlimited
-        ? safeCourses
-        : safeCourses
-            .map((c: any) => {
-              const matchingDetails = (user?.unlockedCourseDetails || []).filter(
-                (d: any) => !d.isExpired && d.courseCode?.toLowerCase() === c.code?.toLowerCase()
-              );
-              const isFullUnlocked =
-                Boolean(c.unlocked) ||
-                Boolean(user?.unlockedCourseCodes?.some((code: string) => code?.toLowerCase() === c.code?.toLowerCase())) ||
-                matchingDetails.some((d: any) => !d.teacherId);
-              const giftedDetails = matchingDetails.filter((d: any) => d.teacherId != null);
-              if (!isFullUnlocked && giftedDetails.length === 0) return null;
-              return {
-                ...c,
-                _isFullAccess: isFullUnlocked,
-                _giftedDetails: giftedDetails,
-              };
-            })
-            .filter(Boolean);
-
-      setUnlockedCourseDetails(myCourses);
-      setPayments(pData || []);
-      setContributions(cData || []);
+      if (Array.isArray(cData)) {
+        setContributions(cData);
+        try {
+          localStorage.setItem("notelagbe_cached_contributions", JSON.stringify(cData));
+        } catch {}
+      }
     } catch {
-      // Ignore
-    } finally {
-      setLoading(false);
+      // Ignore network lag
     }
-  }, [user?.unlimited, user?.unlockedCourseDetails, user?.unlockedCourseCodes, isAdmin]);
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
       void loadDashboard();
-    } else {
-      setLoading(false);
     }
   }, [isAuthenticated, loadDashboard]);
 
@@ -447,6 +514,20 @@ export default function StudentDashboardPage() {
   const isFiltering = Boolean(searchQuery.trim() || typeFilter !== "ALL" || selectedSemester !== "ALL");
   const displayedCourses = isFiltering || showAllCourses ? filteredCourses : filteredCourses.slice(0, 6);
   const remainingCount = Math.max(0, filteredCourses.length - 6);
+
+  if (isLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8 animate-pulse">
+        <div className="h-44 rounded-3xl bg-slate-100 dark:bg-slate-800/60" />
+        <div className="h-20 rounded-3xl bg-slate-100 dark:bg-slate-800/60" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="h-48 rounded-3xl bg-slate-100 dark:bg-slate-800/60" />
+          <div className="h-48 rounded-3xl bg-slate-100 dark:bg-slate-800/60" />
+          <div className="h-48 rounded-3xl bg-slate-100 dark:bg-slate-800/60" />
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
