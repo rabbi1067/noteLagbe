@@ -76,7 +76,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN", "MANAGER")
 
                 // Authenticated Endpoints for Students & Admins
-                .requestMatchers("/api/courses/**", "/api/student/**", "/api/reviews/**", "/api/contributions/**", "/api/payments/**", "/api/waivers/**", "/api/notifications/**", "/api/chat/**").authenticated()
+                .requestMatchers("/api/courses/**", "/api/student/**", "/api/reviews/**", "/api/contributions/**", "/api/payments/**", "/api/waivers/**", "/api/notifications/**", "/api/chat/**", "/api/ai/**").authenticated()
 
                 .anyRequest().authenticated()
             );

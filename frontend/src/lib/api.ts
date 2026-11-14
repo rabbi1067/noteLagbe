@@ -1147,4 +1147,20 @@ export const api = {
     getPublic: () => request<{ totalViews: number; activeNow: number; status: string }>("/stats/public"),
     recordVisit: () => request<{ totalViews: number; activeNow: number; status: string }>("/stats/visit", { method: "POST" }),
   },
+
+  // AI Exam Revision Cheat Sheet & Chatbot API (Powered by Gemini)
+  aiExamChat: {
+    getMessages: (courseCode: string) =>
+      request<any[]>(`/ai/exam-chat/messages?courseCode=${encodeURIComponent(courseCode)}`),
+    sendMessage: (data: { courseCode: string; message: string; teacherId?: number | null }) =>
+      request<any>("/ai/exam-chat/send", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    clearMessages: (courseCode: string) =>
+      request<{ success: boolean; message: string }>(
+        `/ai/exam-chat/messages?courseCode=${encodeURIComponent(courseCode)}`,
+        { method: "DELETE" }
+      ),
+  },
 };

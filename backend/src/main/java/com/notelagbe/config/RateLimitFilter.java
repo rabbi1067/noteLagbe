@@ -77,6 +77,9 @@ public class RateLimitFilter implements Filter {
         } else if (path.startsWith("/api/chat/messages") || path.startsWith("/api/chat")) {
             // Chat tier: 30 messages / min (anti-spam protection)
             limit = Bandwidth.builder().capacity(30).refillGreedy(30, Duration.ofMinutes(1)).build();
+        } else if (path.startsWith("/api/ai")) {
+            // AI Exam Chat tier: 25 requests / min
+            limit = Bandwidth.builder().capacity(25).refillGreedy(25, Duration.ofMinutes(1)).build();
         } else if (path.startsWith("/api/contributions")) {
             // Mutation tier: 15 submissions / min
             limit = Bandwidth.builder().capacity(15).refillGreedy(15, Duration.ofMinutes(1)).build();

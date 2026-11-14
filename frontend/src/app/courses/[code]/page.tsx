@@ -693,11 +693,42 @@ export default function CourseDetailPage() {
           <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
             {/* AI Revision CheatSheet Button */}
             <button
-              onClick={() => setCheatSheetOpen(true)}
-              className="py-3 px-5 rounded-2xl text-xs font-bold text-slate-800 dark:text-white bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all flex items-center justify-center gap-2 shadow-sm"
+              onClick={() => {
+                if (!isCourseUnlocked) {
+                  toast.error(
+                    language === "bn"
+                      ? "কোর্সটি আনলক করার পর এআই এক্সাম রিভিশন চিট শিট ও চ্যাটবট ব্যবহার করতে পারবেন।"
+                      : "Please unlock this course to access the AI Exam Revision Assistant & Cheat Sheet."
+                  );
+                  if (!isAuthenticated) {
+                    setShowAuthModal(true);
+                  }
+                  return;
+                }
+                setCheatSheetOpen(true);
+              }}
+              title={
+                !isCourseUnlocked
+                  ? (language === "bn" ? "কোর্স আনলক করার পর ব্যবহারযোগ্য" : "Unlock course to use")
+                  : (language === "bn" ? "এআই এক্সাম চিট শিট ও চ্যাটবট ওপেন করুন" : "Open AI Exam Cheat Sheet & Chatbot")
+              }
+              className={`py-3 px-5 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm ${
+                isCourseUnlocked
+                  ? "text-slate-900 dark:text-white bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-blue-500/10 hover:from-amber-500/20 hover:via-purple-500/20 hover:to-blue-500/20 border border-amber-300/80 dark:border-amber-600/60 active:scale-95 cursor-pointer"
+                  : "text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 cursor-not-allowed opacity-80"
+              }`}
             >
-              <Sparkles className="w-4 h-4 text-amber-500" />
+              {isCourseUnlocked ? (
+                <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+              ) : (
+                <Lock className="w-4 h-4 text-slate-400" />
+              )}
               <span>{t("course.aiCheatSheet", "AI Exam Cheat Sheet")}</span>
+              {!isCourseUnlocked && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-normal">
+                  {language === "bn" ? "লকড" : "Locked"}
+                </span>
+              )}
             </button>
 
             {/* Unlock Status CTA */}
@@ -2204,6 +2235,10 @@ export default function CourseDetailPage() {
         isOpen={cheatSheetOpen}
         onClose={() => setCheatSheetOpen(false)}
         courseCode={code}
+        courseTitle={course?.title}
+        courseDepartment={course?.department}
+        isCourseUnlocked={isCourseUnlocked}
+        teachers={courseFacultyList}
       />
     </div>
   );
