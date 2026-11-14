@@ -841,16 +841,32 @@ export default function AdminDashboardPage() {
   const handleConfirmRejectModal = async () => {
     if (!rejectingContribution) return;
     const id = rejectingContribution.id;
+    const uploadedResId = rejectingContribution.uploadedResource?.id;
     setProcessingQueueKey(`contribution-${id}`);
     try {
       const feedback = rejectFeedback.trim() || "Submission does not meet quality or curriculum standards.";
       const updated = await api.admin.rejectContribution(id, feedback);
       applyStatusUpdate(setContributions, id, updated, "REJECTED");
+      if (uploadedResId) {
+        setResources((prev) => prev.filter((r) => r.id !== uploadedResId));
+      }
       markSelfQueueMutation();
       notifyDataChanged("contribution", "rejected", id);
-      notifyDataChanged("resource", "rejected", id);
-      toast.success("Contribution rejected and student notified!");
-      showDeleteSuccess("Contribution Rejected", "The student submission has been declined and feedback sent to student.", `Submission #${id}`);
+      if (uploadedResId) {
+        notifyDataChanged("resource", "deleted", uploadedResId);
+      }
+      toast.success(
+        language === "bn"
+          ? "সাবমিশন বাতিল করা হয়েছে এবং ক্লাউড স্টোরেজ ও ডাটাবেজ থেকে ফাইল মুছে ফেলা হয়েছে!"
+          : "Contribution rejected and file permanently purged from cloud storage & database!"
+      );
+      showDeleteSuccess(
+        language === "bn" ? "সাবমিশন বাতিল ও ফাইল ডিলেট সম্পন্ন" : "Contribution Rejected & File Purged",
+        language === "bn"
+          ? "শিক্ষার্থীর সাবমিশনটি বাতিল করা হয়েছে এবং এর সমস্ত ফাইল ডাটাবেজ ও ক্লাউড স্টোরেজ থেকে স্বয়ংক্রিয়ভাবে মুছে ফেলা হয়েছে।"
+          : "The student submission has been declined and its uploaded files have been permanently removed from database and cloud storage.",
+        `Submission #${id}`
+      );
       setRejectingContribution(null);
       void refreshVerificationQueues({ includeResources: true });
     } catch (err: any) {
@@ -3209,7 +3225,13 @@ export default function AdminDashboardPage() {
   };
 
   // ---------------- Filter Computations ----------------
-  const filteredResources = resources.filter((r) => {
+  // Only approved university learning assets belong in Materials & Exam Papers
+  const approvedResources = useMemo(
+    () => resources.filter((r) => !r.status || r.status === "APPROVED"),
+    [resources]
+  );
+
+  const filteredResources = approvedResources.filter((r) => {
     const q = resourceSearch.toLowerCase();
     const matchSearch =
       !q ||
@@ -3228,14 +3250,14 @@ export default function AdminDashboardPage() {
     return matchSearch && matchType && matchDept;
   });
 
-  // Resource Category KPIs
-  const totalMaterialsCount = resources.length;
-  const lectureNotesCount = resources.filter((r) => r.type === "NOTE").length;
-  const midQuestionsCount = resources.filter((r) => r.type === "MID_QUESTION").length;
-  const finalQuestionsCount = resources.filter((r) => r.type === "FINAL_QUESTION").length;
+  // Resource Category KPIs (Derived strictly from verified approved materials)
+  const totalMaterialsCount = approvedResources.length;
+  const lectureNotesCount = approvedResources.filter((r) => r.type === "NOTE").length;
+  const midQuestionsCount = approvedResources.filter((r) => r.type === "MID_QUESTION").length;
+  const finalQuestionsCount = approvedResources.filter((r) => r.type === "FINAL_QUESTION").length;
   const examQuestionsCount = midQuestionsCount + finalQuestionsCount;
-  const quizCtCount = resources.filter((r) => r.type === "QUIZ_CT").length;
-  const labAssetsCount = resources.filter((r) => r.type && r.type.startsWith("LAB_")).length;
+  const quizCtCount = approvedResources.filter((r) => r.type === "QUIZ_CT").length;
+  const labAssetsCount = approvedResources.filter((r) => r.type && r.type.startsWith("LAB_")).length;
 
   const getDeptColorClass = (dept?: string) => {
     const code = normalizeDeptCode(dept);

@@ -19,6 +19,9 @@ import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -43,6 +46,7 @@ public class ContributionService {
     private final NotificationService notificationService;
     private final ResourceDuplicateService resourceDuplicateService;
     private final CloudflareR2Service r2Service;
+    private final CloudinaryService cloudinaryService;
 
     public ContributionService(ContributionRequestRepository contributionRequestRepository,
                                ResourceRepository resourceRepository,
@@ -56,7 +60,23 @@ public class ContributionService {
                                ResourceDuplicateService resourceDuplicateService) {
         this(contributionRequestRepository, resourceRepository, courseRepository, teacherRepository,
                 teacherCourseRepository, unlockedCourseRepository, liveSyncService, inputSanitizationService,
-                notificationService, resourceDuplicateService, new CloudflareR2Service());
+                notificationService, resourceDuplicateService, new CloudflareR2Service(), new CloudinaryService());
+    }
+
+    public ContributionService(ContributionRequestRepository contributionRequestRepository,
+                               ResourceRepository resourceRepository,
+                               CourseRepository courseRepository,
+                               TeacherRepository teacherRepository,
+                               TeacherCourseRepository teacherCourseRepository,
+                               UnlockedCourseRepository unlockedCourseRepository,
+                               LiveSyncService liveSyncService,
+                               InputSanitizationService inputSanitizationService,
+                               NotificationService notificationService,
+                               ResourceDuplicateService resourceDuplicateService,
+                               CloudflareR2Service r2Service) {
+        this(contributionRequestRepository, resourceRepository, courseRepository, teacherRepository,
+                teacherCourseRepository, unlockedCourseRepository, liveSyncService, inputSanitizationService,
+                notificationService, resourceDuplicateService, r2Service, new CloudinaryService());
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -70,7 +90,8 @@ public class ContributionService {
                                InputSanitizationService inputSanitizationService,
                                NotificationService notificationService,
                                ResourceDuplicateService resourceDuplicateService,
-                               CloudflareR2Service r2Service) {
+                               CloudflareR2Service r2Service,
+                               CloudinaryService cloudinaryService) {
         this.contributionRequestRepository = contributionRequestRepository;
         this.resourceRepository = resourceRepository;
         this.courseRepository = courseRepository;
@@ -82,6 +103,7 @@ public class ContributionService {
         this.notificationService = notificationService;
         this.resourceDuplicateService = resourceDuplicateService;
         this.r2Service = r2Service != null ? r2Service : new CloudflareR2Service();
+        this.cloudinaryService = cloudinaryService != null ? cloudinaryService : new CloudinaryService();
     }
 
     @Transactional
@@ -387,19 +409,29 @@ public class ContributionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Contribution request not found: " + contributionId));
 
         Resource res = cr.getUploadedResource();
-        res.setStatus(ResourceStatus.REJECTED);
-        resourceRepository.save(res);
+        String fileUrl = res != null ? res.getFileUrl() : null;
+        String courseCode = (res != null && res.getCourse() != null) ? res.getCourse().getCode() : "SEU";
+        String resourceTitle = res != null ? res.getTitle() : "Study Material";
+
+        // 1. Permanently delete physical file from Cloud Storage (Cloudflare R2, Cloudinary, or Local Disk)
+        deletePhysicalFile(fileUrl);
+
+        // 2. Wipe the file URL and preview URL from the database resource record so no storage space is wasted
+        if (res != null) {
+            res.setStatus(ResourceStatus.REJECTED);
+            res.setFileUrl(null);
+            res.setPreviewUrl(null);
+            resourceRepository.save(res);
+        }
 
         cr.setStatus(ResourceStatus.REJECTED);
         cr.setAdminFeedback(feedback);
         cr.setReviewedAt(LocalDateTime.now());
 
-        // Send in-app notification to contributor with rejection reason
+        // 3. Send in-app notification to contributor with rejection reason
         try {
             User contributor = cr.getUser();
             if (contributor != null) {
-                String resourceTitle = res != null ? res.getTitle() : "Study Material";
-                String courseCode = (res != null && res.getCourse() != null) ? res.getCourse().getCode() : "SEU";
                 String reason = (feedback != null && !feedback.trim().isEmpty())
                         ? feedback.trim()
                         : "Submission does not meet curriculum or quality standards.";
@@ -416,9 +448,33 @@ public class ContributionService {
         }
 
         ContributionRequest saved = contributionRequestRepository.save(cr);
+        resourceDuplicateService.evictCourse(courseCode);
         liveSyncService.broadcast("contribution", "rejected", saved.getId());
-        liveSyncService.broadcast("resource", "rejected", res.getId());
+        if (res != null) {
+            liveSyncService.broadcast("resource", "deleted", res.getId());
+        }
         return saved;
+    }
+
+    private void deletePhysicalFile(String fileUrl) {
+        if (fileUrl == null || fileUrl.trim().isEmpty()) return;
+        try {
+            String cleanUrl = fileUrl.trim();
+            if (r2Service != null && r2Service.isConfigured() && (cleanUrl.contains(".r2.") || cleanUrl.contains("r2.dev") || cleanUrl.contains("r2_"))) {
+                r2Service.deleteFileByKeyOrUrl(cleanUrl);
+                log.info("Deleted rejected contribution file from Cloudflare R2: {}", cleanUrl);
+            } else if (cloudinaryService != null && cleanUrl.contains("cloudinary.com")) {
+                cloudinaryService.deleteFileByUrl(cleanUrl);
+                log.info("Deleted rejected contribution file from Cloudinary: {}", cleanUrl);
+            } else if (cleanUrl.startsWith("/uploads/") || cleanUrl.contains("/uploads/materials/")) {
+                String localFilename = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1);
+                Path localPath = Paths.get("uploads", "materials", localFilename).toAbsolutePath().normalize();
+                Files.deleteIfExists(localPath);
+                log.info("Deleted rejected contribution file from local disk: {}", localPath);
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to delete physical file from storage: {}", ex.getMessage());
+        }
     }
 
     @Transactional
@@ -435,12 +491,20 @@ public class ContributionService {
         String studentEmail = cr.getUser() != null ? cr.getUser().getEmail() : "";
         String title = res != null ? res.getTitle() : "Material";
         String courseCode = (res != null && res.getCourse() != null) ? res.getCourse().getCode() : "N/A";
+
+        if (res != null) {
+            deletePhysicalFile(res.getFileUrl());
+        }
+
         contributionRequestRepository.delete(cr);
         if (res != null && res.getStatus() != ResourceStatus.APPROVED) {
             resourceRepository.delete(res);
         }
         resourceDuplicateService.evictCourse(courseCode);
         liveSyncService.broadcast("contribution", "deleted", contributionId);
+        if (res != null) {
+            liveSyncService.broadcast("resource", "deleted", res.getId());
+        }
         return Map.of(
                 "id", contributionId,
                 "studentName", studentName,

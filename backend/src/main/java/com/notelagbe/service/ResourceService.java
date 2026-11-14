@@ -31,6 +31,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.CacheControl;
 import java.nio.charset.StandardCharsets;
+import jakarta.annotation.PostConstruct;
 import java.io.FileNotFoundException;
 
 import java.util.HashMap;
@@ -270,7 +271,7 @@ public class ResourceService {
     }
 
     public List<Resource> getAllResourcesForAdmin() {
-        List<Resource> list = resourceRepository.findAllByOrderByCreatedAtDesc();
+        List<Resource> list = resourceRepository.findByStatusOrderByCreatedAtDesc(ResourceStatus.APPROVED);
         if (r2Service.isConfigured()) {
             for (Resource r : list) {
                 if (r.getFileUrl() != null && (r.getFileUrl().contains(".r2.") || r.getFileUrl().contains("r2_"))) {
@@ -279,6 +280,31 @@ public class ResourceService {
             }
         }
         return list;
+    }
+
+    @PostConstruct
+    public void cleanupLegacyRejectedResourceFiles() {
+        try {
+            List<Resource> rejected = resourceRepository.findByStatusOrderByCreatedAtDesc(ResourceStatus.REJECTED);
+            if (rejected == null || rejected.isEmpty()) return;
+            for (Resource r : rejected) {
+                if (r.getFileUrl() != null && !r.getFileUrl().isBlank()) {
+                    String fileUrl = r.getFileUrl().trim();
+                    if (r2Service != null && r2Service.isConfigured() && (fileUrl.contains(".r2.") || fileUrl.contains("r2.dev") || fileUrl.contains("r2_"))) {
+                        r2Service.deleteFileByKeyOrUrl(fileUrl);
+                        log.info("Cleaned up orphaned storage file on Cloudflare R2 for rejected resource ID {}: {}", r.getId(), fileUrl);
+                    } else if (cloudinaryService != null && fileUrl.contains("cloudinary.com")) {
+                        cloudinaryService.deleteFileByUrl(fileUrl);
+                        log.info("Cleaned up orphaned storage file on Cloudinary for rejected resource ID {}: {}", r.getId(), fileUrl);
+                    }
+                    r.setFileUrl(null);
+                    r.setPreviewUrl(null);
+                    resourceRepository.save(r);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Legacy rejected resource file cleanup skipped: {}", e.getMessage());
+        }
     }
 
     @Transactional
