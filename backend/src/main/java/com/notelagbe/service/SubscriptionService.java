@@ -27,6 +27,36 @@ public class SubscriptionService {
     private final NotificationService notificationService;
     private final CacheManager cacheManager;
 
+    // Concurrent map to hold super admin testing lock overrides (keyed by userId + ":" + courseCode)
+    private final Set<String> superAdminTestLockedCourses = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    private String getSuperAdminTestKey(Long userId, String courseCode) {
+        if (userId == null || courseCode == null) return "";
+        return userId + ":" + courseCode.trim().toUpperCase();
+    }
+
+    public boolean isSuperAdminTestLocked(Long userId, String courseCode) {
+        if (userId == null || courseCode == null) return false;
+        return superAdminTestLockedCourses.contains(getSuperAdminTestKey(userId, courseCode));
+    }
+
+    public boolean setSuperAdminTestLock(Long userId, String courseCode, boolean locked) {
+        if (userId == null || courseCode == null) return false;
+        String key = getSuperAdminTestKey(userId, courseCode);
+        if (locked) {
+            superAdminTestLockedCourses.add(key);
+        } else {
+            superAdminTestLockedCourses.remove(key);
+        }
+        evictUnlockCaches();
+        return locked;
+    }
+
+    public boolean toggleSuperAdminTestLock(Long userId, String courseCode) {
+        boolean current = isSuperAdminTestLocked(userId, courseCode);
+        return setSuperAdminTestLock(userId, courseCode, !current);
+    }
+
     public SubscriptionService(SubscriptionRepository subscriptionRepository,
                                UnlockedCourseRepository unlockedCourseRepository,
                                NotificationService notificationService,
@@ -121,6 +151,12 @@ public class SubscriptionService {
     @Transactional
     public boolean isCourseUnlocked(User user, Course course) {
         if (user == null || course == null) return false;
+
+        // Super Admin Testing Mode override: if Super Admin explicitly locked this course for testing, treat as locked!
+        if (user.getRole() == Role.ROLE_SUPER_ADMIN && isSuperAdminTestLocked(user.getId(), course.getCode())) {
+            return false;
+        }
+
         if (isStaffUser(user)) return true;
 
         Optional<Subscription> validSub = getValidActiveSubscription(user.getId());
@@ -144,6 +180,9 @@ public class SubscriptionService {
     @Transactional
     public boolean isCourseUnlocked(User user, Course course, Teacher teacher) {
         if (user == null || course == null) return false;
+        if (user.getRole() == Role.ROLE_SUPER_ADMIN && isSuperAdminTestLocked(user.getId(), course.getCode())) {
+            return false;
+        }
         if (isCourseUnlocked(user, course)) return true;
         if (teacher == null || teacher.getId() == null) return false;
 
@@ -165,7 +204,11 @@ public class SubscriptionService {
      */
     @Transactional
     public Set<Long> getUnlockedTeacherIds(User user, Course course) {
-        if (user == null || course == null || isStaffUser(user)) return Collections.emptySet();
+        if (user == null || course == null) return Collections.emptySet();
+        if (user.getRole() == Role.ROLE_SUPER_ADMIN && isSuperAdminTestLocked(user.getId(), course.getCode())) {
+            return Collections.emptySet();
+        }
+        if (isStaffUser(user)) return Collections.emptySet();
 
         Optional<Subscription> validSub = getValidActiveSubscription(user.getId());
         if (validSub.isPresent() && validSub.get().isUnlimited()) {
@@ -194,6 +237,9 @@ public class SubscriptionService {
     @Transactional
     public boolean isResourceUnlocked(User user, Resource resource) {
         if (user == null || resource == null || resource.getCourse() == null) return false;
+        if (user.getRole() == Role.ROLE_SUPER_ADMIN && isSuperAdminTestLocked(user.getId(), resource.getCourse().getCode())) {
+            return false;
+        }
         if (isCourseUnlocked(user, resource.getCourse())) return true;
         return resource.getTeacher() != null && isCourseUnlocked(user, resource.getCourse(), resource.getTeacher());
     }

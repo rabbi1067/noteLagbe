@@ -222,7 +222,47 @@ export default function CourseDetailPage() {
     }
   };
 
-  const isCourseUnlocked = course ? (course.unlocked || hasUnlocked(code)) : false;
+  const isSuperAdmin = Boolean(user && user.role === "ROLE_SUPER_ADMIN");
+  const [superAdminTestLocked, setSuperAdminTestLocked] = useState<boolean>(false);
+  const [isTogglingLock, setIsTogglingLock] = useState<boolean>(false);
+
+  // Initialize Super Admin lock state from localStorage
+  useEffect(() => {
+    if (isSuperAdmin && typeof window !== "undefined") {
+      const saved = localStorage.getItem(`notelagbe_sa_test_lock_${code.toUpperCase()}`);
+      if (saved === "true") {
+        setSuperAdminTestLocked(true);
+      }
+    }
+  }, [isSuperAdmin, code]);
+
+  const handleToggleSuperAdminTestLock = async () => {
+    if (!isSuperAdmin) return;
+    setIsTogglingLock(true);
+    const targetLocked = !superAdminTestLocked;
+    try {
+      const res = await api.courses.toggleSuperAdminLock(code, targetLocked);
+      setSuperAdminTestLocked(res.testLocked);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`notelagbe_sa_test_lock_${code.toUpperCase()}`, String(res.testLocked));
+      }
+      toast.success(
+        res.testLocked
+          ? `🔒 Course ${code.toUpperCase()} locked for Super Admin testing!`
+          : `🔓 Course ${code.toUpperCase()} unlocked! Full access restored.`
+      );
+      await loadCourseData();
+      await refreshProfile();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to toggle test lock");
+    } finally {
+      setIsTogglingLock(false);
+    }
+  };
+
+  const isCourseUnlocked = isSuperAdmin && superAdminTestLocked
+    ? false
+    : (course ? (course.unlocked || hasUnlocked(code)) : false);
 
   const unlockedTeacherDetails = useMemo(
     () =>
@@ -240,6 +280,7 @@ export default function CourseDetailPage() {
   const isResourceUnlockedForView = useCallback(
     (res: any): boolean => {
       if (!res) return false;
+      if (isSuperAdmin && superAdminTestLocked) return false;
       if (isCourseUnlocked || Boolean(res.fileUrl)) return true;
       const tId = res.teacher?.id;
       if (tId == null) return false;
@@ -248,7 +289,7 @@ export default function CourseDetailPage() {
         Boolean(course?.unlockedTeacherIds?.some((id: number) => Number(id) === Number(tId)))
       );
     },
-    [isCourseUnlocked, hasUnlockedForTeacher, code, course?.unlockedTeacherIds]
+    [isSuperAdmin, superAdminTestLocked, isCourseUnlocked, hasUnlockedForTeacher, code, course?.unlockedTeacherIds]
   );
 
   const handleUnlockCourse = async () => {
@@ -286,7 +327,23 @@ export default function CourseDetailPage() {
     setShowOfflinePackSecurityModal(true);
   };
 
-  const handleDownloadOfflineZip = handleOfflineStudyPackDisabledNotice;
+  const handleDownloadOfflineZip = async () => {
+    if (!isSuperAdmin) {
+      handleOfflineStudyPackDisabledNotice();
+      return;
+    }
+    setDownloadingZip(true);
+    const toastId = toast.loading("Generating Super Admin offline study pack ZIP archive...");
+    try {
+      await api.courses.downloadZip(code);
+      toast.success(`${code.toUpperCase()} offline study pack downloaded successfully!`, { id: toastId });
+      confetti({ particleCount: 80, spread: 65, origin: { y: 0.6 } });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to download offline study pack", { id: toastId });
+    } finally {
+      setDownloadingZip(false);
+    }
+  };
 
   const handleOpenViewer = (res: any) => {
     setSelectedResource(res);
@@ -594,6 +651,61 @@ export default function CourseDetailPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       
+      {/* 0. SUPER ADMIN TESTING CONTROLLER BANNER */}
+      {isSuperAdmin && (
+        <div className="p-4 sm:p-5 rounded-3xl border border-purple-500/30 bg-gradient-to-r from-purple-950/50 via-slate-900/80 to-indigo-950/50 backdrop-blur-md shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="p-2.5 rounded-2xl bg-purple-500/20 text-purple-400 border border-purple-500/30 shadow-inner shrink-0">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-black uppercase tracking-wider text-purple-400">
+                  Super Admin Testing Simulator
+                </span>
+                <span
+                  className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border shadow-xs ${
+                    superAdminTestLocked
+                      ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                      : "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                  }`}
+                >
+                  {superAdminTestLocked ? "🔒 Mode: LOCKED (Testing Student View)" : "🔓 Mode: UNLOCKED (Staff Full Access)"}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300">
+                {superAdminTestLocked
+                  ? "This course is currently simulated as LOCKED for you. Test locked AI Revision Cheat Sheet, preview restrictions, and unlock prompts."
+                  : "This course is currently UNLOCKED for you. Toggle to locked state anytime to test restricted boundaries as a normal student."}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 w-full md:w-auto shrink-0 justify-end">
+            <button
+              onClick={handleToggleSuperAdminTestLock}
+              disabled={isTogglingLock}
+              className={`w-full sm:w-auto px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer ${
+                superAdminTestLocked
+                  ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/30 hover:scale-105 active:scale-95"
+                  : "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-500/30 hover:scale-105 active:scale-95"
+              }`}
+            >
+              {superAdminTestLocked ? (
+                <>
+                  <Unlock className="w-4 h-4" />
+                  <span>Restore Unlocked Access</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4" />
+                  <span>Lock Course for Testing</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 1. COURSE HERO HEADER */}
       <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -786,33 +898,59 @@ export default function CourseDetailPage() {
               </div>
             )}
 
-            {/* Offline Study Pack (ZIP) CTA - Temporarily Disabled for Security */}
-            <button
-              onClick={handleOfflineStudyPackDisabledNotice}
-              className="w-full py-3 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-between gap-2.5 cursor-pointer group bg-slate-100/90 hover:bg-slate-200/90 dark:bg-[#11192e] dark:hover:bg-[#16213b] border border-amber-500/30 shadow-xs"
-              title={
-                language === "bn"
-                  ? "নিরাপত্তাজনিত কারণে এই সেবাটি সাময়িকভাবে বন্ধ রাখা হয়েছে"
-                  : "For security purposes, this service is temporarily disabled"
-              }
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 group-hover:scale-105 transition-transform shrink-0">
-                  <ShieldAlert className="w-4 h-4" />
+            {/* Offline Study Pack (ZIP) CTA */}
+            {isSuperAdmin ? (
+              <button
+                onClick={handleDownloadOfflineZip}
+                disabled={downloadingZip}
+                className="w-full py-3 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-between gap-2.5 cursor-pointer group bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/20 active:scale-98"
+                title="Super Admin Exclusive: Download full course offline study pack archive"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-white/20 text-white group-hover:scale-105 transition-transform shrink-0">
+                    <Download className={`w-4 h-4 ${downloadingZip ? "animate-bounce" : ""}`} />
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <span className="leading-tight font-black text-[13px]">
+                      {downloadingZip ? "Generating Study Pack..." : (language === "bn" ? "অফলাইন স্টাডি প্যাক (ZIP)" : "Offline Study Pack (ZIP)")}
+                    </span>
+                    <span className="text-[10px] font-medium text-emerald-100 leading-tight">
+                      {downloadingZip ? "Preparing files & zipping..." : (language === "bn" ? "১-ক্লিকে সকল অনুমোদিত ফাইল ডাউনলোড" : "1-Click Download All Approved Notes")}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-col text-left">
-                  <span className="leading-tight font-black text-[13px] text-slate-900 dark:text-white">
-                    {language === "bn" ? "অফলাইন স্টাডি প্যাক (ZIP)" : "Offline Study Pack (ZIP)"}
-                  </span>
-                  <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400/90 leading-tight">
-                    {language === "bn" ? "নিরাপত্তার স্বার্থে সেবাটি সাময়িক স্থগিত" : "Temporarily paused for security"}
-                  </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/20 text-white border border-white/30 shrink-0 flex items-center gap-1">
+                  👑 Super Admin
+                </span>
+              </button>
+            ) : (
+              <button
+                onClick={handleOfflineStudyPackDisabledNotice}
+                className="w-full py-3 px-4 rounded-2xl text-xs font-bold transition-all flex items-center justify-between gap-2.5 cursor-pointer group bg-slate-100/90 hover:bg-slate-200/90 dark:bg-[#11192e] dark:hover:bg-[#16213b] border border-amber-500/30 shadow-xs"
+                title={
+                  language === "bn"
+                    ? "নিরাপত্তাজনিত কারণে এই সেবাটি সাময়িকভাবে বন্ধ রাখা হয়েছে"
+                    : "For security purposes, this service is temporarily disabled"
+                }
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 group-hover:scale-105 transition-transform shrink-0">
+                    <ShieldAlert className="w-4 h-4" />
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <span className="leading-tight font-black text-[13px] text-slate-900 dark:text-white">
+                      {language === "bn" ? "অফলাইন স্টাডি প্যাক (ZIP)" : "Offline Study Pack (ZIP)"}
+                    </span>
+                    <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400/90 leading-tight">
+                      {language === "bn" ? "নিরাপত্তার স্বার্থে সেবাটি সাময়িক স্থগিত" : "Temporarily paused for security"}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
-                🔒 {language === "bn" ? "স্থগিত" : "Disabled"}
-              </span>
-            </button>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                  🔒 {language === "bn" ? "স্থগিত" : "Disabled"}
+                </span>
+              </button>
+            )}
 
             {/* Real Social Proof Card - Only when real unlocks exist */}
             {Boolean(course.unlockCount && course.unlockCount > 0) && (
@@ -1040,22 +1178,37 @@ export default function CourseDetailPage() {
               )}
             </div>
 
-            {/* Quick 1-Click ZIP Download button (Temporarily Disabled for Security) */}
-            <button
-              onClick={handleOfflineStudyPackDisabledNotice}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-amber-500/30 shadow-xs cursor-pointer opacity-90 hover:opacity-100"
-              title={
-                language === "bn"
-                  ? "নিরাপত্তাজনিত কারণে এই সেবাটি সাময়িকভাবে বন্ধ রাখা হয়েছে"
-                  : "For security purposes, this service is temporarily disabled"
-              }
-            >
-              <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
-              <span className="hidden sm:inline font-bold">
-                {language === "bn" ? "অফলাইন ZIP" : "Offline ZIP"}
-              </span>
-              <span className="text-[10px] text-amber-500 font-bold">🔒</span>
-            </button>
+            {/* Quick 1-Click ZIP Download button */}
+            {isSuperAdmin ? (
+              <button
+                onClick={handleDownloadOfflineZip}
+                disabled={downloadingZip}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/25 cursor-pointer opacity-95 hover:opacity-100"
+                title="Super Admin: Download Offline ZIP Archive"
+              >
+                <Download className={`w-3.5 h-3.5 ${downloadingZip ? "animate-bounce" : ""}`} />
+                <span className="hidden sm:inline font-bold">
+                  {downloadingZip ? "Zipping..." : (language === "bn" ? "অফলাইন ZIP" : "Offline ZIP")}
+                </span>
+                <span className="text-[10px] bg-white/25 px-1 rounded font-black">👑</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleOfflineStudyPackDisabledNotice}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-amber-500/30 shadow-xs cursor-pointer opacity-90 hover:opacity-100"
+                title={
+                  language === "bn"
+                    ? "নিরাপত্তাজনিত কারণে এই সেবাটি সাময়িকভাবে বন্ধ রাখা হয়েছে"
+                    : "For security purposes, this service is temporarily disabled"
+                }
+              >
+                <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
+                <span className="hidden sm:inline font-bold">
+                  {language === "bn" ? "অফলাইন ZIP" : "Offline ZIP"}
+                </span>
+                <span className="text-[10px] text-amber-500 font-bold">🔒</span>
+              </button>
+            )}
           </div>
 
           {/* Active Instructor Feedback Pill */}

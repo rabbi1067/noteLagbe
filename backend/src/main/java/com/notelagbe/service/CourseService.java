@@ -8,6 +8,7 @@ import com.notelagbe.exception.ResourceNotFoundException;
 import com.notelagbe.repository.*;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -1196,5 +1197,30 @@ NoteLagbe - By Southeast University Students, For Southeast University Students
                 hasPdf ? "<iframe src=\"./" + escapeHtml(baseFileName) + ".pdf\" class=\"viewer-frame\"></iframe>" : "<div style=\"padding: 30px; text-align: center; color: #94a3b8;\">Note summary loaded. Open Cloud Web Version for direct external stream if online.</div>",
                 r.getId()
         );
+    }
+
+    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources"}, allEntries = true)
+    public boolean toggleSuperAdminCourseLock(String code, User user, Boolean forceLocked) {
+        if (user == null || user.getRole() != Role.ROLE_SUPER_ADMIN) {
+            throw new ApiException("Only Super Admin can toggle testing lock state", HttpStatus.FORBIDDEN);
+        }
+        Course course = courseRepository.findByCodeIgnoreCase(code.trim())
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with code: " + code));
+
+        boolean targetLocked;
+        if (forceLocked != null) {
+            subscriptionService.setSuperAdminTestLock(user.getId(), course.getCode(), forceLocked);
+            targetLocked = forceLocked;
+        } else {
+            targetLocked = subscriptionService.toggleSuperAdminTestLock(user.getId(), course.getCode());
+        }
+        return targetLocked;
+    }
+
+    public boolean isSuperAdminCourseTestLocked(String code, User user) {
+        if (user == null || user.getRole() != Role.ROLE_SUPER_ADMIN) {
+            return false;
+        }
+        return subscriptionService.isSuperAdminTestLocked(user.getId(), code);
     }
 }

@@ -595,19 +595,17 @@ public class ResourceService {
             incrementDownloadCount(id);
         }
 
-        // Direct Cloudflare R2 Streaming & CDN Delivery
+        // Direct Cloudflare R2 Streaming & CDN Delivery (Zero Render Memory Pressure, 100% S3 Authorized)
         if (r2Service.isConfigured() && (targetUrl.contains(".r2.") || targetUrl.contains("r2.dev") || targetUrl.contains("r2_"))) {
-            if (r2Service.hasPublicCdnUrl()) {
-                String presignedUrl = r2Service.getPresignedDownloadUrl(targetUrl, 24);
-                if (presignedUrl != null && !presignedUrl.isBlank() && !presignedUrl.equals(targetUrl)) {
-                    log.info("Redirecting client directly to public CDN Cloudflare R2 URL for material ID {}: {}", id, presignedUrl);
-                    return ResponseEntity.status(HttpStatus.FOUND)
-                            .location(URI.create(presignedUrl))
-                            .build();
-                }
+            String presignedUrl = r2Service.getPresignedDownloadUrl(targetUrl, 24);
+            if (presignedUrl != null && !presignedUrl.isBlank() && !presignedUrl.equals(targetUrl)) {
+                log.info("Redirecting client directly to presigned/CDN Cloudflare R2 URL for material ID {}: {}", id, presignedUrl);
+                return ResponseEntity.status(HttpStatus.FOUND)
+                        .location(URI.create(presignedUrl))
+                        .build();
             }
 
-            // Direct S3 Byte Streaming for Cloudflare R2 (100% Authorized via AWS SDK, No InvalidArgumentAuthorization)
+            // Direct S3 Byte Streaming for Cloudflare R2 fallback (100% Authorized via AWS SDK, No InvalidArgumentAuthorization)
             try {
                 byte[] fileBytes = r2Service.fetchBytes(targetUrl);
                 long contentLength = fileBytes.length;

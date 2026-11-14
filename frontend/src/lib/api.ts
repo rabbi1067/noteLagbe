@@ -688,10 +688,18 @@ export const api = {
     unlock: (code: string) => request<any>(`/courses/${code}/unlock`, { method: "POST" }),
     getCheatSheet: (code: string) => request<any>(`/courses/${code}/cheatsheet`),
     downloadZip: (code: string) =>
-      Promise.reject(
-        new Error(
-          "For security purposes, the offline study pack (ZIP) download service is temporarily disabled. Please view materials directly on NoteLagbe."
-        )
+      downloadAuthorizedBlob(
+        `/courses/${code}/download-zip`,
+        `${code.toUpperCase()}_Offline_Study_Pack.zip`,
+        "Failed to download offline study pack."
+      ),
+    toggleSuperAdminLock: (code: string, locked?: boolean) =>
+      request<{ success: boolean; courseCode: string; testLocked: boolean; isUnlocked: boolean; message: string }>(
+        `/courses/${code}/super-admin/toggle-lock`,
+        {
+          method: "POST",
+          body: JSON.stringify(locked !== undefined ? { locked } : {}),
+        }
       ),
   },
 
