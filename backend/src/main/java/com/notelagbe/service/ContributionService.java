@@ -42,6 +42,7 @@ public class ContributionService {
     private final InputSanitizationService inputSanitizationService;
     private final NotificationService notificationService;
     private final ResourceDuplicateService resourceDuplicateService;
+    private final CloudflareR2Service r2Service;
 
     public ContributionService(ContributionRequestRepository contributionRequestRepository,
                                ResourceRepository resourceRepository,
@@ -53,6 +54,23 @@ public class ContributionService {
                                InputSanitizationService inputSanitizationService,
                                NotificationService notificationService,
                                ResourceDuplicateService resourceDuplicateService) {
+        this(contributionRequestRepository, resourceRepository, courseRepository, teacherRepository,
+                teacherCourseRepository, unlockedCourseRepository, liveSyncService, inputSanitizationService,
+                notificationService, resourceDuplicateService, new CloudflareR2Service());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ContributionService(ContributionRequestRepository contributionRequestRepository,
+                               ResourceRepository resourceRepository,
+                               CourseRepository courseRepository,
+                               TeacherRepository teacherRepository,
+                               TeacherCourseRepository teacherCourseRepository,
+                               UnlockedCourseRepository unlockedCourseRepository,
+                               LiveSyncService liveSyncService,
+                               InputSanitizationService inputSanitizationService,
+                               NotificationService notificationService,
+                               ResourceDuplicateService resourceDuplicateService,
+                               CloudflareR2Service r2Service) {
         this.contributionRequestRepository = contributionRequestRepository;
         this.resourceRepository = resourceRepository;
         this.courseRepository = courseRepository;
@@ -63,6 +81,7 @@ public class ContributionService {
         this.inputSanitizationService = inputSanitizationService;
         this.notificationService = notificationService;
         this.resourceDuplicateService = resourceDuplicateService;
+        this.r2Service = r2Service != null ? r2Service : new CloudflareR2Service();
     }
 
     @Transactional
@@ -188,15 +207,30 @@ public class ContributionService {
         return saved;
     }
 
+    @Transactional(readOnly = true)
     public List<ContributionRequest> getContributions(ResourceStatus status) {
-        if (status != null) {
-            return contributionRequestRepository.findByStatusOrderByCreatedAtDesc(status);
-        }
-        return contributionRequestRepository.findAllByOrderByCreatedAtDesc();
+        List<ContributionRequest> list = status != null
+                ? contributionRequestRepository.findByStatusOrderByCreatedAtDesc(status)
+                : contributionRequestRepository.findAllByOrderByCreatedAtDesc();
+        presignContributionResources(list);
+        return list;
     }
 
+    @Transactional(readOnly = true)
     public List<ContributionRequest> getUserContributions(Long userId) {
-        return contributionRequestRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        List<ContributionRequest> list = contributionRequestRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        presignContributionResources(list);
+        return list;
+    }
+
+    private void presignContributionResources(List<ContributionRequest> list) {
+        if (r2Service == null || !r2Service.isConfigured() || list == null) return;
+        for (ContributionRequest cr : list) {
+            Resource r = cr.getUploadedResource();
+            if (r != null && r.getFileUrl() != null && (r.getFileUrl().contains(".r2.") || r.getFileUrl().contains("r2.dev") || r.getFileUrl().contains("r2_"))) {
+                r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 24));
+            }
+        }
     }
 
     @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "teachers", "teacher_details", "teacher_courses", "duplicate_slots"}, allEntries = true)

@@ -55,8 +55,30 @@ function getGoogleDrivePreviewUrl(rawUrl?: string | null): string | null {
 }
 
 function getAuthStreamUrl(resourceId: number | string, isAdminMode?: boolean, download = false): string {
-  const base = `${API_BASE_URL}/${isAdminMode ? "admin/" : ""}resources/${resourceId}/file`;
-  return `${base}?${download ? "download=true" : "preview=true"}`;
+  const cleanBase = API_BASE_URL.replace(/\/+$/, "");
+  const base = `${cleanBase}/${isAdminMode ? "admin/" : ""}resources/${resourceId}/file`;
+  const token = getToken();
+  const tokenParam = token ? `&token=${encodeURIComponent(token)}` : "";
+  return `${base}?${download ? "download=true" : "preview=true"}${tokenParam}`;
+}
+
+export function isRawR2StorageUrl(url?: string | null): boolean {
+  if (!url) return false;
+  return url.includes(".r2.cloudflarestorage.com") && !url.includes("X-Amz-Signature");
+}
+
+export function resolveSafeEmbedUrl(
+  rawUrl?: string | null,
+  resourceId?: number | string,
+  isAdmin?: boolean
+): string {
+  if (!rawUrl) return "";
+  // If it's a raw un-presigned Cloudflare R2 endpoint, direct browser iframe access will fail with InvalidArgumentAuthorization.
+  // Instead, route through the backend streaming endpoint which generates an authentic AWS HMAC-SHA256 presigned redirect!
+  if (isRawR2StorageUrl(rawUrl) && resourceId) {
+    return getAuthStreamUrl(resourceId, isAdmin, false);
+  }
+  return rawUrl;
 }
 
 async function inspectBlobFormat(
@@ -165,6 +187,7 @@ export default function PDFViewerModal({
   const activeBlobUrlRef = useRef<string | null>(null);
   const [detectedKind, setDetectedKind] = useState<ViewerDocKind>("pdf");
   const [embedUrl, setEmbedUrl] = useState<string>("");
+  const [useGoogleDocsEmbed, setUseGoogleDocsEmbed] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
 
   const replaceBlobUrl = useCallback((nextUrl: string | null) => {
@@ -309,7 +332,7 @@ export default function PDFViewerModal({
           }
           if (resource.fileUrl && !cancelled) {
             setDetectedKind("pdf-embed");
-            setEmbedUrl(resource.fileUrl);
+            setEmbedUrl(resolveSafeEmbedUrl(resource.fileUrl, resource.id, isAdminMode));
             setDocError(null);
             return;
           }
@@ -335,7 +358,7 @@ export default function PDFViewerModal({
           } catch {}
           if (resource.fileUrl && !cancelled) {
             setDetectedKind("pdf-embed");
-            setEmbedUrl(resource.fileUrl);
+            setEmbedUrl(resolveSafeEmbedUrl(resource.fileUrl, resource.id, isAdminMode));
             setDocError(null);
             return;
           }
@@ -346,7 +369,7 @@ export default function PDFViewerModal({
         if (rawBlob.size === 0) {
           if (resource.fileUrl && !cancelled) {
             setDetectedKind("pdf-embed");
-            setEmbedUrl(resource.fileUrl);
+            setEmbedUrl(resolveSafeEmbedUrl(resource.fileUrl, resource.id, isAdminMode));
             setDocError(null);
             return;
           }
@@ -361,7 +384,7 @@ export default function PDFViewerModal({
         ) {
           if (resource.fileUrl && !cancelled) {
             setDetectedKind("pdf-embed");
-            setEmbedUrl(resource.fileUrl);
+            setEmbedUrl(resolveSafeEmbedUrl(resource.fileUrl, resource.id, isAdminMode));
             setDocError(null);
             return;
           }
@@ -387,7 +410,7 @@ export default function PDFViewerModal({
           }
           if (resource.fileUrl && !cancelled) {
             setDetectedKind("pdf-embed");
-            setEmbedUrl(resource.fileUrl);
+            setEmbedUrl(resolveSafeEmbedUrl(resource.fileUrl, resource.id, isAdminMode));
             setDocError(null);
             return;
           }
@@ -457,7 +480,7 @@ export default function PDFViewerModal({
         } else if (resource.fileUrl) {
           // Automatic seamless fallback to embedded viewer for 50MB+ or external documents!
           setDetectedKind("pdf-embed");
-          setEmbedUrl(resource.fileUrl);
+          setEmbedUrl(resolveSafeEmbedUrl(resource.fileUrl, resource.id, isAdminMode));
           setDocError(null);
         } else {
           const msg = err instanceof Error ? err.message : "Failed to load document preview.";
@@ -775,7 +798,7 @@ export default function PDFViewerModal({
     blobUrl ||
     (detectedKind === "drive-embed" ? drivePreviewUrl : "") ||
     (detectedKind === "pdf-embed" ? embedUrl : "") ||
-    resource.fileUrl ||
+    resolveSafeEmbedUrl(resource.fileUrl, resource.id, isAdminMode) ||
     "";
 
   const handleDownload = async () => {
@@ -823,7 +846,7 @@ export default function PDFViewerModal({
     }
 
     if (resource.fileUrl) {
-      window.open(resource.fileUrl, "_blank", "noopener,noreferrer");
+      window.open(resolveSafeEmbedUrl(resource.fileUrl, resource.id, isAdminMode), "_blank", "noopener,noreferrer");
     }
   };
 
@@ -1167,6 +1190,21 @@ export default function PDFViewerModal({
                   )}
                 </div>
               )}
+              {detectedKind === "pdf-embed" && embedUrl.startsWith("http") && (
+                <button
+                  type="button"
+                  onClick={() => setUseGoogleDocsEmbed((v) => !v)}
+                  className={`px-2.5 py-1 rounded-xl text-[10px] font-bold border transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    useGoogleDocsEmbed
+                      ? "bg-blue-600 text-white border-blue-500 shadow-sm"
+                      : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-xs"
+                  }`}
+                  title="Switch between Direct Native PDF Viewer and Google Docs Cloud Viewer"
+                >
+                  <FileText className="w-3 h-3 text-blue-400" />
+                  <span>{useGoogleDocsEmbed ? "Using Google Docs Viewer" : "Switch to Google Viewer"}</span>
+                </button>
+              )}
             </div>
 
             {/* Right: Security & Reader Status Notice */}
@@ -1246,7 +1284,7 @@ export default function PDFViewerModal({
                           type="button"
                           onClick={() => {
                             setDetectedKind("pdf-embed");
-                            setEmbedUrl(resource.fileUrl || "");
+                            setEmbedUrl(resolveSafeEmbedUrl(resource.fileUrl, resource.id, isAdminMode));
                             setDocError(null);
                           }}
                           className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -1257,7 +1295,7 @@ export default function PDFViewerModal({
                       )}
                       {canDownloadAndOpen && resource.fileUrl && (
                         <a
-                          href={resource.fileUrl}
+                          href={resolveSafeEmbedUrl(resource.fileUrl, resource.id, isAdminMode)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors"
@@ -1280,12 +1318,18 @@ export default function PDFViewerModal({
                 </div>
               ) : detectedKind === "pdf-embed" && embedUrl ? (
                 /* Resilient Embedded Cloud Document Frame for 50MB+ Files */
-                <iframe
-                  key={embedUrl}
-                  src={`${embedUrl}#toolbar=0&navpanes=0`}
-                  className="w-full h-full border-none rounded-xl shadow-lg bg-white"
-                  title={displayTitle}
-                />
+                <div className="w-full h-full relative">
+                  <iframe
+                    key={useGoogleDocsEmbed ? `gdocs-${embedUrl}` : `direct-${embedUrl}`}
+                    src={
+                      useGoogleDocsEmbed && embedUrl.startsWith("http")
+                        ? `https://docs.google.com/viewer?url=${encodeURIComponent(embedUrl)}&embedded=true`
+                        : `${embedUrl}#toolbar=0&navpanes=0`
+                    }
+                    className="w-full h-full border-none rounded-xl shadow-lg bg-white"
+                    title={displayTitle}
+                  />
+                </div>
               ) : detectedKind === "drive-embed" && drivePreviewUrl ? (
                 <iframe
                   src={drivePreviewUrl}

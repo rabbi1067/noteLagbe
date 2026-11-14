@@ -812,16 +812,24 @@ export default function AdminDashboardPage() {
           fileName: rejectingContribution.uploadedResource?.fileName || rejectingContribution.uploadedResource?.title || "",
           fileUrl: rejectingContribution.uploadedResource?.fileUrl || "",
           cycleIndex: rejectAiSuggestCount,
-          language: "bn",
+          language: language || "en",
         }),
       });
       const data = await res.json();
       if (data?.success && data?.suggestion) {
         setRejectFeedback(data.suggestion);
         setRejectAiSuggestCount((prev) => prev + 1);
-        toast.success(`✨ AI সাজেশন #${(rejectAiSuggestCount % 5) + 1} তৈরি হয়েছে! প্রয়োজনমতো এডিট করতে পারেন।`);
+        toast.success(
+          language === "bn"
+            ? `✨ AI সাজেশন #${(rejectAiSuggestCount % 5) + 1} তৈরি হয়েছে! প্রয়োজনমতো এডিট করতে পারেন।`
+            : `✨ AI Suggestion #${(rejectAiSuggestCount % 5) + 1} generated! You can edit as needed.`
+        );
       } else {
-        toast.error("AI সাজেশন তৈরি করা সম্ভব হয়নি");
+        toast.error(
+          language === "bn"
+            ? "AI সাজেশন তৈরি করা সম্ভব হয়নি"
+            : "Failed to generate AI suggestion"
+        );
       }
     } catch (e: any) {
       toast.error(e.message || "Failed to generate AI reject note");
@@ -12353,13 +12361,13 @@ export default function AdminDashboardPage() {
                 </div>
                 <div>
                   <h3 className="font-black text-base text-slate-900 dark:text-white flex items-center gap-2">
-                    <span>Reject Student Submission</span>
+                    <span>{language === "bn" ? "শিক্ষার্থীর সাবমিশন বাতিল করুন" : "Reject Student Submission"}</span>
                     <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
                       #{rejectingContribution.id}
                     </span>
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Student: <span className="font-bold text-slate-700 dark:text-slate-300">{rejectingContribution.user?.name || "Student"}</span> ({rejectingContribution.user?.email || "SEU"})
+                    {language === "bn" ? "শিক্ষার্থী:" : "Student:"} <span className="font-bold text-slate-700 dark:text-slate-300">{rejectingContribution.user?.name || "Student"}</span> ({rejectingContribution.user?.email || "SEU"})
                   </p>
                 </div>
               </div>
@@ -12392,7 +12400,7 @@ export default function AdminDashboardPage() {
                   className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline pt-0.5"
                 >
                   <Eye className="w-3 h-3" />
-                  <span>Inspect Document / File</span>
+                  <span>{language === "bn" ? "ডকুমেন্ট / ফাইল যাচাই করুন" : "Inspect Document / File"}</span>
                   <ExternalLink className="w-2.5 h-2.5" />
                 </a>
               )}
@@ -12402,24 +12410,28 @@ export default function AdminDashboardPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                  Rejection Reason / Note (প্রত্যাখ্যানের কারণ) <span className="text-rose-500">*</span>
+                  {language === "bn" ? "প্রত্যাখ্যানের সুনির্দিষ্ট কারণ / নোট" : "Rejection Reason / Feedback Note"} <span className="text-rose-500">*</span>
                 </label>
                 <button
                   type="button"
                   onClick={handleAiSuggestRejectReason}
                   disabled={isAiGeneratingReject}
                   className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[11px] font-black text-amber-500 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
-                  title="Click to generate AI rejection note. Click again for different reasons!"
+                  title={language === "bn" ? "AI কারণ জেনারেট করতে ক্লিক করুন। ভিন্ন কারণ পেতে পুনরায় ক্লিক করুন!" : "Click to generate AI rejection note. Click again for different reasons!"}
                 >
                   {isAiGeneratingReject ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Generating Note...</span>
+                      <span>{language === "bn" ? "নোট তৈরি হচ্ছে..." : "Generating Note..."}</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-3.5 h-3.5 fill-amber-500" />
-                      <span>{rejectFeedback ? "✨ Change AI Reason" : "✨ AI Suggest Reason"}</span>
+                      <span>
+                        {rejectFeedback
+                          ? (language === "bn" ? "✨ AI কারণ পরিবর্তন" : "✨ Change AI Reason")
+                          : (language === "bn" ? "✨ AI সাজেস্টেড কারণ" : "✨ AI Suggest Reason")}
+                      </span>
                     </>
                   )}
                 </button>
@@ -12429,12 +12441,19 @@ export default function AdminDashboardPage() {
                 rows={4}
                 value={rejectFeedback}
                 onChange={(e) => setRejectFeedback(e.target.value)}
-                placeholder="Write specific rejection reason or click 'AI Suggest Reason' above. This note will be shown to the student in their notification bell icon..."
+                placeholder={
+                  language === "bn"
+                    ? "প্রত্যাখ্যানের সুনির্দিষ্ট কারণ লিখুন অথবা উপরের 'AI সাজেস্টেড কারণ' বাটনে ক্লিক করুন। এটি শিক্ষার্থীর নোটিফিকেশন বারে দেখানো হবে..."
+                    : "Write specific rejection reason or click 'AI Suggest Reason' above. This note will be shown to the student in their notification bell icon..."
+                }
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-rose-500 leading-relaxed font-medium"
               />
 
               <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                💡 <span className="font-semibold">Note:</span> এই নোটটি সরাসরি স্টুডেন্টের নোটিফিকেশন বারে চলে যাবে যেন সে বুঝতে পারে কেন রিজেক্ট হয়েছে এবং সঠিক ফাইল পুনরায় দিতে পারে। আপনি চাইলে AI সাজেস্ট নিয়ে ইচ্ছামতো এডিটও করতে পারেন।
+                💡 <span className="font-semibold">{language === "bn" ? "নোট:" : "Note:"}</span>{" "}
+                {language === "bn"
+                  ? "এই নোটটি সরাসরি শিক্ষার্থীর নোটিফিকেশন বারে চলে যাবে যেন সে বুঝতে পারে কেন রিজেক্ট হয়েছে এবং সঠিক ফাইল পুনরায় জমা দিতে পারে। আপনি চাইলে AI সাজেস্ট নিয়ে ইচ্ছামতো এডিটও করতে পারেন।"
+                  : "This message will be sent directly to the student's notification tray so they understand why the submission was declined and how to re-submit correctly. You can edit this AI-generated note anytime."}
               </p>
             </div>
 
@@ -12445,7 +12464,7 @@ export default function AdminDashboardPage() {
                 onClick={() => setRejectingContribution(null)}
                 className="px-4 py-2.5 rounded-xl font-bold text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
               >
-                Cancel
+                {language === "bn" ? "বাতিল" : "Cancel"}
               </button>
 
               <button
@@ -12457,12 +12476,12 @@ export default function AdminDashboardPage() {
                 {processingQueueKey === `contribution-${rejectingContribution.id}` ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Rejecting & Notifying...</span>
+                    <span>{language === "bn" ? "বাতিল ও জানানো হচ্ছে..." : "Rejecting & Notifying..."}</span>
                   </>
                 ) : (
                   <>
                     <Ban className="w-3.5 h-3.5" />
-                    <span>Confirm Reject & Send Note</span>
+                    <span>{language === "bn" ? "বাতিল নিশ্চিত করুন ও নোট পাঠান" : "Confirm Reject & Send Note"}</span>
                   </>
                 )}
               </button>

@@ -172,7 +172,10 @@ public class ResourceService {
             if (!resourceUnlocked) {
                 return maskLockedResource(r);
             }
-            return r;
+            if (r.getFileUrl() != null && r2Service.isConfigured() && (r.getFileUrl().contains(".r2.") || r.getFileUrl().contains("r2_"))) {
+            r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 24));
+        }
+        return r;
         }).toList();
     }
 
@@ -203,7 +206,10 @@ public class ResourceService {
             if (!isUnlocked) {
                 return maskLockedResource(r);
             }
-            return r;
+            if (r.getFileUrl() != null && r2Service.isConfigured() && (r.getFileUrl().contains(".r2.") || r.getFileUrl().contains("r2_"))) {
+            r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 24));
+        }
+        return r;
         }).toList();
     }
 
@@ -264,7 +270,15 @@ public class ResourceService {
     }
 
     public List<Resource> getAllResourcesForAdmin() {
-        return resourceRepository.findAllByOrderByCreatedAtDesc();
+        List<Resource> list = resourceRepository.findAllByOrderByCreatedAtDesc();
+        if (r2Service.isConfigured()) {
+            for (Resource r : list) {
+                if (r.getFileUrl() != null && (r.getFileUrl().contains(".r2.") || r.getFileUrl().contains("r2_"))) {
+                    r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 24));
+                }
+            }
+        }
+        return list;
     }
 
     @Transactional
@@ -487,6 +501,9 @@ public class ResourceService {
         if (!staff && !uploader && !subscriptionService.isResourceUnlocked(user, r)) {
             return maskLockedResource(r);
         }
+        if (r.getFileUrl() != null && r2Service.isConfigured() && (r.getFileUrl().contains(".r2.") || r.getFileUrl().contains("r2_"))) {
+            r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 24));
+        }
         return r;
     }
 
@@ -540,6 +557,17 @@ public class ResourceService {
 
         if (download) {
             incrementDownloadCount(id);
+        }
+
+        // Direct Cloudflare R2 Presigned Redirect (Zero Memory, Zero Server Lag, 100% Authorized)
+        if (r2Service.isConfigured() && (targetUrl.contains(".r2.") || targetUrl.contains("r2.dev") || targetUrl.contains("r2_"))) {
+            String presignedUrl = r2Service.getPresignedDownloadUrl(targetUrl, 24);
+            if (presignedUrl != null && !presignedUrl.isBlank() && !presignedUrl.equals(targetUrl)) {
+                log.info("Redirecting client directly to presigned Cloudflare R2 URL for material ID {}: {}", id, presignedUrl);
+                return ResponseEntity.status(HttpStatus.FOUND)
+                        .location(URI.create(presignedUrl))
+                        .build();
+            }
         }
 
         try {
@@ -602,9 +630,13 @@ public class ResourceService {
         } catch (Exception e) {
             log.error("Failed to stream resource file ID {}: {}", id, e.getMessage(), e);
             if (targetUrl != null && (targetUrl.startsWith("http://") || targetUrl.startsWith("https://"))) {
-                log.warn("Streaming proxy failed for external file ID {}. Redirecting client directly to cloud storage: {}", id, targetUrl);
+                String safeRedirect = targetUrl;
+                if (r2Service.isConfigured() && (targetUrl.contains(".r2.") || targetUrl.contains("r2.dev") || targetUrl.contains("r2_"))) {
+                    safeRedirect = r2Service.getPresignedDownloadUrl(targetUrl, 24);
+                }
+                log.warn("Streaming proxy failed for external file ID {}. Redirecting client directly to cloud storage: {}", id, safeRedirect);
                 return ResponseEntity.status(HttpStatus.FOUND)
-                        .location(URI.create(targetUrl))
+                        .location(URI.create(safeRedirect))
                         .build();
             }
             throw new ApiException("Unable to download or stream material: " + e.getMessage());

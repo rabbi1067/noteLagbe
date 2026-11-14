@@ -110,7 +110,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
             return bearerToken.substring(7);
         }
-        // Query-string JWT tokens are disallowed to prevent credential leakage in access logs and Referer headers.
+        // Allow query-string token strictly for secure media streaming and document preview endpoints
+        String uri = request.getRequestURI();
+        if (uri != null && uri.endsWith("/file")) {
+            String queryToken = request.getParameter("token");
+            if (StringUtils.hasText(queryToken)) {
+                return queryToken.trim();
+            }
+        }
         return null;
     }
 }
