@@ -92,6 +92,34 @@ public class SchemaMigrationRunner implements ApplicationRunner {
         } catch (Exception e) {
             log.debug("file_url NULL migration skipped/completed: {}", e.getMessage());
         }
+        try {
+            jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS offered_sections (" +
+                "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                "course_code VARCHAR(30) NOT NULL, " +
+                "section_number VARCHAR(20) NOT NULL, " +
+                "course_title VARCHAR(200), " +
+                "credits DOUBLE DEFAULT 3.0, " +
+                "faculty_initial VARCHAR(30), " +
+                "faculty_name VARCHAR(150), " +
+                "available_seats INT DEFAULT 40, " +
+                "schedule_text VARCHAR(500), " +
+                "schedule_json TEXT, " +
+                "semester VARCHAR(50) NOT NULL DEFAULT 'Spring 2026', " +
+                "uploaded_by_user_id BIGINT, " +
+                "uploader_role VARCHAR(30) DEFAULT 'SYSTEM', " +
+                "expires_at DATETIME NULL, " +
+                "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
+                "INDEX idx_offered_sections_course (course_code), " +
+                "INDEX idx_offered_sections_semester (semester), " +
+                "UNIQUE KEY idx_offered_sections_unique (course_code, section_number, semester)" +
+                ")"
+            );
+            log.info("Verified offered_sections table structure");
+        } catch (Exception e) {
+            log.debug("offered_sections table creation skipped: {}", e.getMessage());
+        }
     }
 
     private void migrateMySqlUnlockedCoursesIndexes() {

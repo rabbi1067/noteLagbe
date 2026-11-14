@@ -9,6 +9,7 @@ import EventCertificateMaker from "@/components/EventCertificateMaker";
 import AcademicCalendarTool from "@/components/AcademicCalendarTool";
 import PdfMakerTool from "@/components/PdfMakerTool";
 import ResumeMakerTool from "@/components/ResumeMakerTool";
+import SmartAdvisingRoutineTool from "@/components/SmartAdvisingRoutineTool";
 import { 
   Calculator,
   Award, 
@@ -7964,81 +7965,9 @@ export default function StudentToolsPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 10. SMART ADVISING ROUTINE VIEW (COMING SOON AS REQUESTED) */}
+      {/* 10. SMART ADVISING ROUTINE VIEW */}
       {/* ========================================================================= */}
-      {activeTab === "advising" && (
-        <div className="max-w-2xl mx-auto space-y-6">
-          <div className="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-blue-900/20 via-indigo-900/10 to-slate-900/50 border-2 border-dashed border-blue-300 dark:border-blue-800 text-center space-y-6 shadow-sm">
-            <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-blue-500/25">
-              <GraduationCap className="w-8 h-8" />
-            </div>
-
-            <div className="space-y-2">
-              <span className="text-[10px] font-mono font-extrabold px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 uppercase tracking-widest">
-                {language === "bn" ? "🚀 শীঘ্রই আসছে • পরবর্তী সেমিস্টারে উন্মোচিত হচ্ছে" : "🚀 Coming Soon • Launching Next Intake"}
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
-                {language === "bn" ? "স্মার্ট অ্যাডভাইজিং রুটিন প্ল্যানার" : "Smart Advising Routine Planner"}
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-lg mx-auto leading-relaxed">
-                {language === "bn"
-                  ? "সাউথইস্ট ইউনিভার্সিটির ওপেন ক্রেডিট সিস্টেমে সেমিস্টার রেজিস্ট্রেশনে প্রি-রিকুইজিট কোর্স যাচাই, ক্লাস ক্ল্যাশ প্রিভেনশন এবং এক ক্লিকে সেরা সেকশন কম্বিনেশন তৈরি করার স্মার্ট অ্যাডভাইজিং রুটিন অ্যাসিস্ট্যান্ট শীঘ্রই আসছে।"
-                  : "Smart advising routine planner for Southeast University students. Automatically checks course prerequisites, avoids schedule clashes, and generates optimal section combinations for semester advising."}
-              </p>
-            </div>
-
-            {/* Upcoming Features Teaser Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left pt-2 font-sans">
-              <div className="p-3.5 rounded-2xl bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                <span className="text-blue-600 font-extrabold text-xs">
-                  {language === "bn" ? "⚡ অটো কম্বিনেশন" : "⚡ Zero-Clash Combos"}
-                </span>
-                <p className="text-[11px] text-slate-500">
-                  {language === "bn"
-                    ? "আপনার পছন্দ অনুযায়ী শূন্য ক্ল্যাশ সহ সম্ভাব্য সেরা সেকশন কম্বো সাজাবে।"
-                    : "Instantly generates conflict-free section combinations based on your preferred faculty and slots."}
-                </p>
-              </div>
-              <div className="p-3.5 rounded-2xl bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                <span className="text-indigo-600 font-extrabold text-xs">
-                  {language === "bn" ? "🎯 প্রি-রিকুইজিট চেক" : "🎯 Prerequisite Validation"}
-                </span>
-                <p className="text-[11px] text-slate-500">
-                  {language === "bn"
-                    ? "পূর্বের পাসের গ্রেড অনুযায়ী স্বয়ংক্রিয়ভাবে পরবর্তী কোর্স সাজেস্ট করবে।"
-                    : "Validates completed courses and automatically recommends eligible courses for registration."}
-                </p>
-              </div>
-              <div className="p-3.5 rounded-2xl bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
-                <span className="text-emerald-600 font-extrabold text-xs">
-                  {language === "bn" ? "📊 ক্রেডিট ও ফি প্রজেকশন" : "📊 Credit & Tuition Projection"}
-                </span>
-                <p className="text-[11px] text-slate-500">
-                  {language === "bn"
-                    ? "অ্যাডভাইজিং সিলেক্ট করলেই আনুমানিক টিউশন ফি ও কিস্তি আগে থেকেই জেনে নিন।"
-                    : "Computes total credit hours and calculates estimated tuition installments before advising."}
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <button
-                onClick={() =>
-                  toast.success(
-                    language === "bn"
-                      ? "আপনি স্মার্ট অ্যাডভাইজিং রুটিনের প্রায়োরিটি আর্লি এক্সেস তালিকায় যুক্ত হয়েছেন!"
-                      : "You are on the priority early-access list for Smart Advising Routine!"
-                  )
-                }
-                className="py-3 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all inline-flex items-center gap-2 cursor-pointer"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>{language === "bn" ? "লঞ্চের নোটিফিকেশন পান" : "Notify Me on Launch"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {activeTab === "advising" && <SmartAdvisingRoutineTool />}
 
       
 

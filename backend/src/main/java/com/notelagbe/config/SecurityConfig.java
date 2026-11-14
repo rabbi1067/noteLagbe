@@ -57,6 +57,7 @@ public class SecurityConfig {
                     "/api/stats/**",
                     "/api/notices/**",
                     "/api/contributions/leaderboard",
+                    "/api/advising/**",
                     "/h2-console/**",
                     "/error"
                 ).permitAll()

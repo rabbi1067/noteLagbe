@@ -1207,4 +1207,72 @@ export const api = {
         { method: "DELETE" }
       ),
   },
+
+  advising: {
+    getSections: (semester?: string) =>
+      request<{
+        semester: string;
+        totalSections: number;
+        totalCourses: number;
+        courses: Record<string, any[]>;
+        faculties: string[];
+      }>(`/advising/sections${semester ? `?semester=${encodeURIComponent(semester)}` : ""}`),
+
+    uploadAdvisingTable: async (fileOrHtml: File | string, semester?: string) => {
+      const token = getToken();
+      if (typeof fileOrHtml === "string") {
+        return request<any>("/advising/upload", {
+          method: "POST",
+          body: JSON.stringify({ html: fileOrHtml, semester }),
+        });
+      }
+      const formData = new FormData();
+      formData.append("file", fileOrHtml);
+      if (semester) formData.append("semester", semester);
+
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://notelagbe-backend.onrender.com/api";
+      const res = await fetch(`${API_URL}/advising/upload`, {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || err.message || "Failed to upload advising table.");
+      }
+      return await res.json();
+    },
+
+    generateRoutine: (data: {
+      selectedCourses: string[];
+      timePreference?: string;
+      dayPreference?: string;
+      preferredDays?: string[];
+      facultyPreferences?: Record<string, string[]>;
+      semester?: string;
+    }) =>
+      request<{
+        success: boolean;
+        totalCombinationsTested: number;
+        validRoutinesCount: number;
+        semester: string;
+        routines: Array<{
+          sections: any[];
+          score: number;
+          matchPercentage: number;
+          activeDaysCount: number;
+          activeDays: string[];
+          totalCredits: number;
+          hasEarlyMorning: boolean;
+          hasLateEvening: boolean;
+          highlights: string[];
+        }>;
+        message?: string;
+      }>("/advising/generate-routine", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+  },
 };

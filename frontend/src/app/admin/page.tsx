@@ -1,6 +1,7 @@
 "use client";
 
 import AdminAnalyticsView from "@/components/AdminAnalyticsView";
+import AdminAdvisingManager from "@/components/AdminAdvisingManager";
 import { getCurrentAcademicSemester, buildConciseAcademicTitle, formatSemesterDisplay } from "@/lib/academicSemester";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -14,6 +15,7 @@ import BrandLogo from "@/components/BrandLogo";
 import { api, ChatMessageDto } from "@/lib/api";
 import { notifyDataChanged, useDataSync } from "@/lib/sync";
 import {
+  Calendar,
   ShieldCheck,
   Crown,
   Gift,
@@ -387,6 +389,7 @@ export default function AdminDashboardPage() {
     | "notices"
     | "chat"
     | "activityLogs"
+    | "advising"
   >("overview");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -4464,6 +4467,26 @@ export default function AdminDashboardPage() {
                     {resources.length}
                   </span>
                 </button>
+
+                <button
+                  onClick={() => {
+                    setActiveTab("advising");
+                    setMobileSidebarOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all ${
+                    activeTab === "advising"
+                      ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-600/25"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Calendar className="w-4 h-4" />
+                    <span>UMS Advising Catalog</span>
+                  </div>
+                  <span className="font-mono text-[10px] px-2 py-0.5 rounded-lg bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold">
+                    SEU
+                  </span>
+                </button>
               </div>
             </div>
 
@@ -4774,6 +4797,7 @@ export default function AdminDashboardPage() {
               {activeTab === "chat" && "SEU Campus Live Chatroom Moderation"}
               {activeTab === "staff" && "User Directory & Access Control (RBAC)"}
               {activeTab === "settings" && "Platform Configuration & SMTP Notifications"}
+              {activeTab === "advising" && "Southeast University Advising Table & Routine Catalog"}
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               {activeTab === "overview" && "Real-time key performance indicators and university operational metrics."}
@@ -4793,6 +4817,7 @@ export default function AdminDashboardPage() {
                   ? "Manage university student profiles, course managers, and administrative RBAC staff credentials."
                   : "Manage university student profiles, access statuses, and verified academic credentials.")}
               {activeTab === "settings" && "Configure university system alerts, SMTP server, and platform policies."}
+              {activeTab === "advising" && "Import official SEU UMS advising schedule HTML (up to 10MB) and manage course sections."}
             </p>
           </div>
         </div>
@@ -5977,6 +6002,11 @@ export default function AdminDashboardPage() {
           )}
 
 
+
+          {/* ========================================================================= */}
+          {/* TAB: UMS ADVISING MANAGEMENT                                              */}
+          {/* ========================================================================= */}
+          {activeTab === "advising" && <AdminAdvisingManager />}
 
           {/* ========================================================================= */}
           {/* TAB: COURSES MANAGEMENT (FULL CRUD)                                       */}
