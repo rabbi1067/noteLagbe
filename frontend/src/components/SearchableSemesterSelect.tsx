@@ -104,10 +104,10 @@ export default function SearchableSemesterSelect({
             ? "border-red-500 ring-2 ring-red-500/20"
             : isOpen
             ? "border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm"
-            : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
-        } border bg-slate-50 dark:bg-slate-800`}
+            : "border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 shadow-2xs"
+        } border bg-white dark:bg-slate-800`}
       >
-        <div className="absolute left-3.5 flex items-center pointer-events-none text-slate-400">
+        <div className="absolute left-3.5 flex items-center pointer-events-none text-slate-500 dark:text-slate-400">
           <Calendar className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
         </div>
 
@@ -127,7 +127,7 @@ export default function SearchableSemesterSelect({
               ? "সেমিস্টার খুঁজুন বা লিখুন (যেমন: Fall 2026, Summer 2026)..."
               : placeholder
           }
-          className="w-full pl-10 pr-16 py-2.5 rounded-xl text-xs sm:text-sm bg-transparent focus:outline-none font-semibold text-slate-900 dark:text-white placeholder:font-normal placeholder:text-slate-400"
+          className="w-full pl-10 pr-16 py-2.5 rounded-xl text-xs sm:text-sm bg-transparent focus:outline-none font-semibold text-slate-900 dark:text-white placeholder:font-normal placeholder:text-slate-500 dark:placeholder:text-slate-400"
         />
 
         {/* Action icons (Clear and Dropdown Toggle) */}
@@ -137,7 +137,7 @@ export default function SearchableSemesterSelect({
               type="button"
               onClick={handleClear}
               title={language === "bn" ? "মুছে ফেলুন" : "Clear selection"}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              className="p-1 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -150,7 +150,7 @@ export default function SearchableSemesterSelect({
               setIsOpen(!isOpen);
               if (!isOpen) inputRef.current?.focus();
             }}
-            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+            className="p-1 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
           >
             <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
           </button>

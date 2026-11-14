@@ -168,7 +168,7 @@ export default function SearchableTeacherSelect({
         className={`relative flex items-center w-full rounded-xl transition-all border ${
           compact
             ? "bg-slate-900 border-purple-500/30 text-purple-200 shadow-xs"
-            : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+            : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xs hover:border-slate-400 dark:hover:border-slate-600"
         } ${
           isOpen || isFocused
             ? compact
@@ -177,7 +177,7 @@ export default function SearchableTeacherSelect({
             : ""
         }`}
       >
-        <div className={`${compact ? "pl-2.5 pr-1.5" : "pl-3.5 pr-2"} pointer-events-none ${compact ? "text-purple-400" : "text-slate-400"}`}>
+        <div className={`${compact ? "pl-2.5 pr-1.5" : "pl-3.5 pr-2"} pointer-events-none ${compact ? "text-purple-400" : "text-slate-500 dark:text-slate-400"}`}>
           <User className={`${compact ? "w-3.5 h-3.5" : "w-4 h-4"}`} />
         </div>
 
@@ -198,7 +198,7 @@ export default function SearchableTeacherSelect({
           className={`w-full font-semibold bg-transparent focus:outline-none placeholder:font-normal truncate ${
             compact
               ? "py-1.5 pr-12 text-xs text-purple-200 placeholder:text-purple-300/50"
-              : "py-2.5 pr-14 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400"
+              : "py-2.5 pr-14 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400"
           }`}
         />
 
@@ -208,7 +208,7 @@ export default function SearchableTeacherSelect({
               type="button"
               onClick={handleClear}
               title={language === "bn" ? "মুছে ফেলুন" : "Clear selection"}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              className="p-1 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -220,7 +220,7 @@ export default function SearchableTeacherSelect({
               setIsOpen(!isOpen);
               if (!isOpen) inputRef.current?.focus();
             }}
-            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+            className="p-1 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
           >
             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
           </button>

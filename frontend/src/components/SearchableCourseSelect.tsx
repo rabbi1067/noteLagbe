@@ -163,11 +163,11 @@ export default function SearchableCourseSelect({
               ? "ring-2 ring-emerald-500 border-emerald-500 bg-white dark:bg-slate-800"
               : "ring-2 ring-blue-500 border-blue-500 bg-white dark:bg-slate-800"
             : isReward
-            ? "border-emerald-300 dark:border-emerald-800/80 bg-white dark:bg-slate-800/90"
-            : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+            ? "border-emerald-300 dark:border-emerald-800/80 bg-white dark:bg-slate-800/90 shadow-2xs"
+            : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xs hover:border-slate-400 dark:hover:border-slate-600"
         }`}
       >
-        <div className="pl-3.5 pr-2 pointer-events-none text-slate-400">
+        <div className="pl-3.5 pr-2 pointer-events-none text-slate-500 dark:text-slate-400">
           <BookOpen className="w-4 h-4" />
         </div>
 
@@ -186,7 +186,7 @@ export default function SearchableCourseSelect({
             inputRef.current?.select();
           }}
           placeholder={placeholder}
-          className="w-full py-2.5 pr-14 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white bg-transparent focus:outline-none placeholder:text-slate-400 placeholder:font-normal"
+          className="w-full py-2.5 pr-14 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white bg-transparent focus:outline-none placeholder:text-slate-500 dark:placeholder:text-slate-400 placeholder:font-normal"
         />
 
         <div className="absolute right-2.5 flex items-center gap-1">
@@ -195,7 +195,7 @@ export default function SearchableCourseSelect({
               type="button"
               onClick={handleClear}
               title={language === "bn" ? "মুছে ফেলুন" : "Clear selection"}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              className="p-1 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -207,7 +207,7 @@ export default function SearchableCourseSelect({
               setIsOpen(!isOpen);
               if (!isOpen) inputRef.current?.focus();
             }}
-            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            className="p-1 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
           >
             <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
           </button>
@@ -283,7 +283,7 @@ export default function SearchableCourseSelect({
                       </span>
                       <div className="truncate">
                         <span className="font-semibold block truncate">{c.title}</span>
-                        <span className="text-[10px] text-slate-400 font-normal">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
                           {c.semester ? `Semester ${c.semester}` : "Curriculum"} {c.credits ? `• ${c.credits} Credits` : ""}
                         </span>
                       </div>
