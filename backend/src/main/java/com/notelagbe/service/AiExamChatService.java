@@ -404,8 +404,8 @@ public class AiExamChatService {
 
         String requestJson = objectMapper.writeValueAsString(requestPayload);
 
-        // Candidate models in priority order: gemini-2.0-flash, gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash-lite
-        String[] candidateModels = {"gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-lite"};
+        // Candidate models in priority order: gemini-flash-lite-latest, gemini-flash-latest, gemini-3.8-flash, gemini-2.5-flash
+        String[] candidateModels = {"gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"};
         for (String model : candidateModels) {
             try {
                 String cleanKey = apiKey.trim();
@@ -901,7 +901,7 @@ public class AiExamChatService {
                         )
                 );
                 String requestJson = objectMapper.writeValueAsString(reqBody);
-                String endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
+                String endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=" + apiKey;
 
                 HttpRequest httpRequest = HttpRequest.newBuilder()
                         .uri(URI.create(endpoint))
