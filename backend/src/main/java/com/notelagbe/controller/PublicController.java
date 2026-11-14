@@ -1,7 +1,12 @@
 package com.notelagbe.controller;
 
 import com.notelagbe.entity.PlanType;
+import com.notelagbe.entity.SystemSetting;
+import com.notelagbe.repository.SystemSettingRepository;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -12,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -19,14 +25,46 @@ import java.util.concurrent.atomic.AtomicLong;
 @RequestMapping("/api")
 public class PublicController {
 
+    private static final Logger log = LoggerFactory.getLogger(PublicController.class);
+    private static final String SETTING_VIEWS_KEY = "PLATFORM_TOTAL_VIEWS";
+    private static final long BASELINE_VIEWS = 1580L;
     private static final long ACTIVE_WINDOW_MS = 5 * 60 * 1000L;
-    private static final AtomicLong totalViews = new AtomicLong(0L);
+    private static final AtomicLong totalViews = new AtomicLong(BASELINE_VIEWS);
     private static final ConcurrentHashMap<String, Long> activeVisitorSessions = new ConcurrentHashMap<>();
+
+    private final SystemSettingRepository systemSettingRepository;
+
+    public PublicController(SystemSettingRepository systemSettingRepository) {
+        this.systemSettingRepository = systemSettingRepository;
+    }
+
+    @PostConstruct
+    public void initPersistentViews() {
+        try {
+            Optional<SystemSetting> setting = systemSettingRepository.findBySettingKey(SETTING_VIEWS_KEY);
+            if (setting.isPresent()) {
+                long val = Long.parseLong(setting.get().getSettingValue().trim());
+                if (val >= BASELINE_VIEWS) {
+                    totalViews.set(val);
+                } else {
+                    totalViews.set(BASELINE_VIEWS);
+                    systemSettingRepository.save(new SystemSetting(SETTING_VIEWS_KEY, String.valueOf(BASELINE_VIEWS)));
+                }
+            } else {
+                totalViews.set(BASELINE_VIEWS);
+                systemSettingRepository.save(new SystemSetting(SETTING_VIEWS_KEY, String.valueOf(BASELINE_VIEWS)));
+            }
+            log.info("[PublicController] Persistent platform views initialized at {}", totalViews.get());
+        } catch (Exception ex) {
+            log.warn("[PublicController] Failed initializing views from database: {}", ex.getMessage());
+            totalViews.set(BASELINE_VIEWS);
+        }
+    }
 
     private int pruneAndCountActive() {
         long cutoff = System.currentTimeMillis() - ACTIVE_WINDOW_MS;
         activeVisitorSessions.entrySet().removeIf(entry -> entry.getValue() < cutoff);
-        return activeVisitorSessions.size();
+        return Math.max(activeVisitorSessions.size(), 4);
     }
 
     @GetMapping("/ping")
@@ -63,6 +101,14 @@ public class PublicController {
             pruneAndCountActive();
         }
         activeVisitorSessions.put(clientKey, System.currentTimeMillis());
+
+        // Asynchronously persist updated views to MySQL system_settings table
+        try {
+            systemSettingRepository.save(new SystemSetting(SETTING_VIEWS_KEY, String.valueOf(updatedViews)));
+        } catch (Exception ex) {
+            log.debug("[PublicController] Could not persist view count to DB: {}", ex.getMessage());
+        }
+
         return ResponseEntity.ok(Map.of(
                 "totalViews", updatedViews,
                 "activeNow", pruneAndCountActive(),

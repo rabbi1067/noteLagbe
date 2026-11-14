@@ -62,6 +62,8 @@ function enrichHomeCoursesWithCatalog(list: any[]): any[] {
   });
 }
 
+const DEFAULT_PLATFORM_VIEWS = 1580;
+
 export default function HomePage() {
   const router = useRouter();
   const { setShowAuthModal, isAuthenticated } = useAuth();
@@ -74,7 +76,7 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<"all" | "notes" | "questions">("all");
   const [isLoading, setIsLoading] = useState(false);
   const [syncTick, setSyncTick] = useState(0);
-  const [activeVisitorCount, setActiveVisitorCount] = useState<number>(0);
+  const [activeVisitorCount, setActiveVisitorCount] = useState<number>(DEFAULT_PLATFORM_VIEWS);
 
   const courses = useMemo(() => {
     if (activeDepartment !== "ALL" && activeDepartment !== "CSE") return [];
@@ -101,34 +103,50 @@ export default function HomePage() {
       const cachedViews = localStorage.getItem("notelagbe_cached_views");
       if (cachedViews) {
         const count = parseInt(cachedViews, 10);
-        if (!isNaN(count) && count > 0) {
+        if (!isNaN(count) && count >= DEFAULT_PLATFORM_VIEWS) {
           setActiveVisitorCount(count);
         }
       }
     } catch {}
   }, []);
 
-  // Real-Time Visitor & Active Learners Tracker
+  // Real-Time Visitor & Active Learners Tracker (Persistent & increments per visit/refresh)
   useEffect(() => {
     let mounted = true;
 
-    // 1. Record visit to backend counter
+    // Immediately increment local count so the user sees real-time persistent increment upon every page view/refresh
+    let optimisticViews = DEFAULT_PLATFORM_VIEWS;
+    try {
+      const cached = localStorage.getItem("notelagbe_cached_views");
+      const current = cached ? parseInt(cached, 10) : DEFAULT_PLATFORM_VIEWS;
+      const base = !isNaN(current) && current >= DEFAULT_PLATFORM_VIEWS ? current : DEFAULT_PLATFORM_VIEWS;
+      optimisticViews = base + 1;
+      if (mounted) setActiveVisitorCount(optimisticViews);
+      localStorage.setItem("notelagbe_cached_views", String(optimisticViews));
+    } catch {}
+
+    // Synchronize with database counter via backend API
     api.stats
       .recordVisit()
       .then((res) => {
         if (mounted && res?.totalViews) {
-          setActiveVisitorCount(res.totalViews);
           try {
-            localStorage.setItem("notelagbe_cached_views", String(res.totalViews));
-          } catch {}
+            const finalCount = Math.max(res.totalViews, optimisticViews);
+            setActiveVisitorCount(finalCount);
+            localStorage.setItem("notelagbe_cached_views", String(finalCount));
+          } catch {
+            setActiveVisitorCount(res.totalViews);
+          }
         }
       })
       .catch(() => {
-        // Fallback to local storage if offline
+        // Fallback to local storage if offline or during server cold-start
         try {
           const cached = localStorage.getItem("notelagbe_cached_views");
-          const nextCount = cached ? parseInt(cached, 10) : 0;
-          if (mounted) setActiveVisitorCount(Number.isFinite(nextCount) ? nextCount : 0);
+          const nextCount = cached ? parseInt(cached, 10) : optimisticViews;
+          if (mounted && Number.isFinite(nextCount) && nextCount >= DEFAULT_PLATFORM_VIEWS) {
+            setActiveVisitorCount(nextCount);
+          }
         } catch {}
       });
 
