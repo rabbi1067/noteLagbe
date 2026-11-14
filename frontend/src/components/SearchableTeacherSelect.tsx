@@ -19,6 +19,10 @@ interface SearchableTeacherSelectProps {
   placeholder?: string;
   required?: boolean;
   allowGeneral?: boolean;
+  generalLabel?: string;
+  generalSubLabel?: string;
+  compact?: boolean;
+  dropdownClassName?: string;
   language?: string;
 }
 
@@ -30,6 +34,10 @@ export default function SearchableTeacherSelect({
   placeholder = "Search faculty by name or initial (e.g. Masum, DAKM, Yusuf)...",
   required = false,
   allowGeneral = true,
+  generalLabel,
+  generalSubLabel,
+  compact = false,
+  dropdownClassName,
   language = "en",
 }: SearchableTeacherSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -50,12 +58,16 @@ export default function SearchableTeacherSelect({
         const initStr = selectedTeacher.initial ? ` [${selectedTeacher.initial}]` : "";
         setQuery(`${selectedTeacher.name}${initStr}`);
       } else if (value === "" || value === null) {
-        setQuery(allowGeneral ? (language === "bn" ? "-- সাধারণ / বিভাগীয় ম্যাটেরিয়াল --" : "-- General / Department Wide --") : "");
+        if (generalLabel) {
+          setQuery("");
+        } else {
+          setQuery(allowGeneral ? (language === "bn" ? "-- সাধারণ / বিভাগীয় ম্যাটেরিয়াল --" : "-- General / Department Wide --") : "");
+        }
       } else {
         setQuery("");
       }
     }
-  }, [value, selectedTeacher, isOpen, allowGeneral, language]);
+  }, [value, selectedTeacher, isOpen, allowGeneral, generalLabel, language]);
 
   // Click outside listener to close dropdown
   useEffect(() => {
@@ -67,7 +79,11 @@ export default function SearchableTeacherSelect({
           const initStr = selectedTeacher.initial ? ` [${selectedTeacher.initial}]` : "";
           setQuery(`${selectedTeacher.name}${initStr}`);
         } else if (value === "" || value === null) {
-          setQuery(allowGeneral ? (language === "bn" ? "-- সাধারণ / বিভাগীয় ম্যাটেরিয়াল --" : "-- General / Department Wide --") : "");
+          if (generalLabel) {
+            setQuery("");
+          } else {
+            setQuery(allowGeneral ? (language === "bn" ? "-- সাধারণ / বিভাগীয় ম্যাটেরিয়াল --" : "-- General / Department Wide --") : "");
+          }
         } else {
           setQuery("");
         }
@@ -75,7 +91,7 @@ export default function SearchableTeacherSelect({
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [selectedTeacher, value, allowGeneral, language]);
+  }, [selectedTeacher, value, allowGeneral, generalLabel, language]);
 
   // Filter teachers based on query with relevance scoring (exact initial or prefix ranks highest)
   const filteredTeachers = React.useMemo(() => {
@@ -84,7 +100,7 @@ export default function SearchableTeacherSelect({
     // If query matches current formatted name, show all
     const currentFormatted = selectedTeacher
       ? `${selectedTeacher.name}${selectedTeacher.initial ? ` [${selectedTeacher.initial}]` : ""}`
-      : (language === "bn" ? "-- সাধারণ / বিভাগীয় ম্যাটেরিয়াল --" : "-- General / Department Wide --");
+      : generalLabel || (language === "bn" ? "-- সাধারণ / বিভাগীয় ম্যাটেরিয়াল --" : "-- General / Department Wide --");
 
     if (query.trim() === currentFormatted) {
       return teachers;
@@ -125,7 +141,7 @@ export default function SearchableTeacherSelect({
       setQuery(`${t.name}${initStr}`);
     } else {
       onChange("");
-      setQuery(language === "bn" ? "-- সাধারণ / বিভাগীয় ম্যাটেরিয়াল --" : "-- General / Department Wide --");
+      setQuery(generalLabel ? "" : (language === "bn" ? "-- সাধারণ / বিভাগীয় ম্যাটেরিয়াল --" : "-- General / Department Wide --"));
     }
     setIsOpen(false);
     setIsFocused(false);
@@ -140,7 +156,7 @@ export default function SearchableTeacherSelect({
   };
 
   return (
-    <div className="relative w-full space-y-1" ref={containerRef}>
+    <div className={`relative w-full ${compact ? "space-y-0" : "space-y-1"}`} ref={containerRef}>
       {label && (
         <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
           {label} {required && <span className="text-red-500">*</span>}
@@ -150,13 +166,19 @@ export default function SearchableTeacherSelect({
       {/* Single Interactive Combobox Input (NO EXTRA SEARCH FIELD) */}
       <div
         className={`relative flex items-center w-full rounded-xl transition-all border ${
-          isOpen || isFocused
-            ? "ring-2 ring-blue-500 border-blue-500 bg-white dark:bg-slate-800"
+          compact
+            ? "bg-slate-900 border-purple-500/30 text-purple-200 shadow-xs"
             : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+        } ${
+          isOpen || isFocused
+            ? compact
+              ? "ring-2 ring-purple-500 border-purple-500 bg-slate-900"
+              : "ring-2 ring-blue-500 border-blue-500 bg-white dark:bg-slate-800"
+            : ""
         }`}
       >
-        <div className="pl-3.5 pr-2 pointer-events-none text-slate-400">
-          <User className="w-4 h-4" />
+        <div className={`${compact ? "pl-2.5 pr-1.5" : "pl-3.5 pr-2"} pointer-events-none ${compact ? "text-purple-400" : "text-slate-400"}`}>
+          <User className={`${compact ? "w-3.5 h-3.5" : "w-4 h-4"}`} />
         </div>
 
         <input
@@ -173,16 +195,20 @@ export default function SearchableTeacherSelect({
             inputRef.current?.select();
           }}
           placeholder={placeholder}
-          className="w-full py-2.5 pr-14 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white bg-transparent focus:outline-none placeholder:text-slate-400 placeholder:font-normal"
+          className={`w-full font-semibold bg-transparent focus:outline-none placeholder:font-normal truncate ${
+            compact
+              ? "py-1.5 pr-12 text-xs text-purple-200 placeholder:text-purple-300/50"
+              : "py-2.5 pr-14 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400"
+          }`}
         />
 
-        <div className="absolute right-2.5 flex items-center gap-1">
+        <div className={`absolute ${compact ? "right-1.5" : "right-2.5"} flex items-center gap-0.5`}>
           {Boolean(value) && (
             <button
               type="button"
               onClick={handleClear}
               title={language === "bn" ? "মুছে ফেলুন" : "Clear selection"}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -194,16 +220,16 @@ export default function SearchableTeacherSelect({
               setIsOpen(!isOpen);
               if (!isOpen) inputRef.current?.focus();
             }}
-            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
           >
-            <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
           </button>
         </div>
       </div>
 
       {/* Floating Dropdown List of Filtered Faculty */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className={`absolute left-0 min-w-[320px] sm:min-w-[360px] max-w-[90vw] top-full mt-1.5 z-50 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150 ${dropdownClassName || ""}`}>
           {/* Header Info */}
           <div className="px-3.5 py-2 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 font-medium">
             <span>
@@ -225,7 +251,7 @@ export default function SearchableTeacherSelect({
                 onClick={() => handleSelect(null)}
                 className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between gap-2.5 transition-colors text-xs ${
                   !value
-                    ? "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold"
+                    ? "bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold"
                     : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
                 }`}
               >
@@ -235,15 +261,15 @@ export default function SearchableTeacherSelect({
                   </div>
                   <div className="truncate">
                     <span className="font-semibold block truncate">
-                      {language === "bn" ? "-- সাধারণ / বিভাগীয় ম্যাটেরিয়াল --" : "-- General / Department Wide --"}
+                      {generalLabel || (language === "bn" ? "-- সাধারণ / বিভাগীয় ম্যাটেরিয়াল --" : "-- General / Department Wide --")}
                     </span>
                     <span className="text-[10px] text-slate-400 font-normal">
-                      {language === "bn" ? "সকল শিক্ষকের জন্য প্রযোজ্য" : "Applies to all course sections"}
+                      {generalSubLabel || (language === "bn" ? "সকল শিক্ষকের জন্য প্রযোজ্য" : "Applies to all course sections")}
                     </span>
                   </div>
                 </div>
 
-                {!value && <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />}
+                {!value && <Check className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />}
               </button>
             )}
 

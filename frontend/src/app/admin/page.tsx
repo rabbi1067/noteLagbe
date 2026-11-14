@@ -5644,53 +5644,58 @@ export default function AdminDashboardPage() {
                       <option value="LAB_HAND_NOTE">Lab Hand Notes</option>
                     </select>
 
-                    {/* SUPER ADMIN EXCLUSIVE: Faculty Selector & 1-Click Material ZIP Archive Download */}
+                    {/* SUPER ADMIN EXCLUSIVE: Searchable Faculty Selector & 1-Click Material ZIP Archive Download */}
                     {isSuperAdmin && (
                       <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-purple-500/10 border border-purple-500/30 shadow-xs">
-                        <select
-                          value={facultyFilterForMaterials}
-                          onChange={(e) => setFacultyFilterForMaterials(e.target.value)}
-                          className="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-purple-500/30 text-xs text-purple-300 font-bold focus:outline-none max-w-[190px] truncate cursor-pointer"
-                          title="Select a faculty to filter and download all their materials (Super Admin)"
-                        >
-                          <option value="ALL">👨‍🏫 Filter by Faculty ({teachers.length})</option>
-                          {teachers
-                            .slice()
-                            .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
-                            .map((t) => (
-                              <option key={t.id} value={String(t.id)}>
-                                {t.name} {t.initial ? `[${t.initial}]` : ""}
-                              </option>
-                            ))}
-                        </select>
+                        <div className="w-56 sm:w-64 md:w-72">
+                          <SearchableTeacherSelect
+                            value={facultyFilterForMaterials !== "ALL" && facultyFilterForMaterials ? Number(facultyFilterForMaterials) : ""}
+                            onChange={(val) => setFacultyFilterForMaterials(val ? String(val) : "ALL")}
+                            teachers={teachers}
+                            placeholder={
+                              language === "bn"
+                                ? `শিক্ষক খুঁজুন (মোট ${teachers.length} জন)...`
+                                : `Search faculty (${teachers.length} total)...`
+                            }
+                            allowGeneral={true}
+                            generalLabel={language === "bn" ? `👨‍🏫 সকল শিক্ষক (${teachers.length})` : `👨‍🏫 All Faculty (${teachers.length})`}
+                            generalSubLabel={language === "bn" ? "সকল ডিপার্টমেন্টের সব ম্যাটেরিয়াল দেখাবে" : "Show all materials across departments"}
+                            compact={true}
+                            language={language}
+                          />
+                        </div>
 
                         <button
                           type="button"
                           onClick={() => {
-                            if (facultyFilterForMaterials === "ALL") {
-                              toast.error("Please select a faculty member first from the dropdown.");
+                            if (facultyFilterForMaterials === "ALL" || !facultyFilterForMaterials) {
+                              toast.error(
+                                language === "bn"
+                                  ? "অনুগ্রহ করে প্রথমে শিক্ষক নির্বাচন করুন।"
+                                  : "Please search and select a faculty member first."
+                              );
                               return;
                             }
                             const tObj = teachers.find((t) => String(t.id) === String(facultyFilterForMaterials));
                             handleDownloadFacultyZip(facultyFilterForMaterials, tObj?.name || "Faculty");
                           }}
-                          disabled={facultyFilterForMaterials === "ALL" || downloadingFacultyZipId !== null}
-                          className={`px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 transition-all shadow-md ${
-                            facultyFilterForMaterials !== "ALL"
+                          disabled={facultyFilterForMaterials === "ALL" || !facultyFilterForMaterials || downloadingFacultyZipId !== null}
+                          className={`px-3 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0 ${
+                            facultyFilterForMaterials !== "ALL" && facultyFilterForMaterials
                               ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/30 cursor-pointer hover:scale-105 active:scale-95"
                               : "bg-slate-800 text-slate-500 border border-slate-700/60 cursor-not-allowed opacity-50"
                           }`}
                           title={
-                            facultyFilterForMaterials !== "ALL"
+                            facultyFilterForMaterials !== "ALL" && facultyFilterForMaterials
                               ? "Super Admin Exclusive: 1-Click Download ALL materials of this faculty as ZIP archive"
-                              : "Select a faculty from the dropdown to enable 1-Click complete materials download"
+                              : "Search and select a faculty to enable 1-Click complete materials download"
                           }
                         >
                           <Download className={`w-3.5 h-3.5 ${downloadingFacultyZipId ? "animate-bounce" : ""}`} />
                           <span className="whitespace-nowrap">
                             {downloadingFacultyZipId
                               ? "Zipping..."
-                              : facultyFilterForMaterials !== "ALL"
+                              : facultyFilterForMaterials !== "ALL" && facultyFilterForMaterials
                               ? `Download Faculty ZIP (${filteredResources.length})`
                               : "Download Faculty ZIP"}
                           </span>
