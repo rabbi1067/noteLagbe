@@ -1359,8 +1359,15 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const isAdmin = user?.role === "ROLE_ADMIN" || user?.role === "ROLE_SUPER_ADMIN" || user?.role === "ROLE_MANAGER";
-  const isSuperAdmin = user?.role === "ROLE_SUPER_ADMIN";
+  const userRoleUpper = (user?.role || "").toUpperCase();
+  const isAdmin =
+    userRoleUpper === "ROLE_ADMIN" ||
+    userRoleUpper === "ROLE_SUPER_ADMIN" ||
+    userRoleUpper === "ROLE_MANAGER" ||
+    userRoleUpper === "ADMIN" ||
+    userRoleUpper === "SUPER_ADMIN" ||
+    userRoleUpper === "MANAGER";
+  const isSuperAdmin = userRoleUpper === "ROLE_SUPER_ADMIN" || userRoleUpper === "SUPER_ADMIN";
 
   const loadAllAdminData = async (isInitial = false) => {
     if (!isInitial && isLoadingAdminRef.current) {
@@ -3906,9 +3913,16 @@ export default function AdminDashboardPage() {
           </p>
         </div>
         <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowAuthModal(true)}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md cursor-pointer"
+          >
+            Switch to Admin Account
+          </button>
           <Link
             href="/dashboard"
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-all"
           >
             Go to Student Dashboard
           </Link>

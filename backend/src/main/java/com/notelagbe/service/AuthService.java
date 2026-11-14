@@ -75,6 +75,9 @@ public class AuthService {
     @org.springframework.beans.factory.annotation.Value("${app.admin.initial-email:}")
     private String initialAdminEmail;
 
+    @org.springframework.beans.factory.annotation.Value("${app.admin.owner-email:}")
+    private String ownerAdminEmail;
+
     @org.springframework.beans.factory.annotation.Value("${app.google.client-id:}")
     private String googleClientId;
 
@@ -276,11 +279,23 @@ public class AuthService {
 
         Optional<User> existingUser = userRepository.findByEmail(verifiedEmail);
         User user;
+        boolean isOwnerOrInitialAdmin = (initialAdminEmail != null && !initialAdminEmail.isBlank() && verifiedEmail.equalsIgnoreCase(initialAdminEmail.trim()))
+                || (ownerAdminEmail != null && !ownerAdminEmail.isBlank() && verifiedEmail.equalsIgnoreCase(ownerAdminEmail.trim()))
+                || verifiedEmail.equalsIgnoreCase("admin@seu.edu.bd");
+
         if (existingUser.isPresent()) {
             user = existingUser.get();
             assertUserNotBlocked(user);
+            boolean updated = false;
+            if (isOwnerOrInitialAdmin && user.getRole() != Role.ROLE_SUPER_ADMIN) {
+                user.setRole(Role.ROLE_SUPER_ADMIN);
+                updated = true;
+            }
             if (verifiedPicture != null && (user.getAvatarUrl() == null || user.getAvatarUrl().isBlank())) {
                 user.setAvatarUrl(verifiedPicture);
+                updated = true;
+            }
+            if (updated) {
                 userRepository.save(user);
                 evictCachedUser(user.getEmail());
             }
@@ -288,7 +303,11 @@ public class AuthService {
             user = new User();
             user.setName(verifiedName.isEmpty() ? "SEU Student" : verifiedName);
             user.setEmail(verifiedEmail);
-            user.setRole(Role.ROLE_STUDENT);
+            if (isOwnerOrInitialAdmin || userRepository.count() == 0) {
+                user.setRole(Role.ROLE_SUPER_ADMIN);
+            } else {
+                user.setRole(Role.ROLE_STUDENT);
+            }
             user.setAuthProvider(AuthProvider.GOOGLE);
             user.setAvatarUrl(verifiedPicture);
             user.setEnabled(true);

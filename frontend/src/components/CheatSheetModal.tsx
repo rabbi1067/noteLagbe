@@ -34,6 +34,194 @@ interface TeacherOption {
   designation?: string;
 }
 
+interface ExamQuestionLink {
+  id: string;
+  label: string;
+  marks?: string;
+  prompt: string;
+  topic?: string;
+}
+
+interface ExamPaperLink {
+  id: string;
+  title: string;
+  semester: string;
+  faculty?: string;
+  questions: ExamQuestionLink[];
+}
+
+export function getExamPapersForCourse(
+  code: string,
+  title?: string,
+  facultyName?: string
+): ExamPaperLink[] {
+  const cleanCode = (code || "").toUpperCase();
+  const cleanTitle = (title || "").toLowerCase();
+
+  if (cleanCode.includes("241") || cleanTitle.includes("data struct")) {
+    return [
+      {
+        id: "cse241-sp24-mid",
+        title: "Spring 2024 Midterm Exam",
+        semester: "Spring 2024",
+        faculty: "Sakib Mahmud [SMA]",
+        questions: [
+          {
+            id: "q1a",
+            label: "1.(a) Time Complexity Analysis",
+            marks: "3.5M",
+            prompt: "CSE241 Spring 2024 Midterm Question 1.(a): Find out the Time Complexity of the given nested loop program (for i=1..n; for j=1..n j=j*3; k=j while k>1 k=k/3). Provide step-by-step model answer.",
+            topic: "Time Complexity of Nested Loop",
+          },
+          {
+            id: "q1b",
+            label: "1.(b) Selection Sort & Binary Search",
+            marks: "6.5M",
+            prompt: "CSE241 Spring 2024 Midterm Question 1.(b): Selection Sort array [-9, -2, 10, 12, 30, -2, 28] in descending order & Binary Search steps for finding 7.",
+            topic: "Selection Sort (Descending) & Binary Search",
+          },
+          {
+            id: "q1-full",
+            label: "1. (Full) Question 1 [10M]",
+            marks: "10M",
+            prompt: "CSE241 Spring 2024 Midterm Question 1: complete model answer for 1.(a) Time Complexity Analysis and 1.(b) Selection Sort & Binary Search.",
+            topic: "Complete Question 1",
+          },
+          {
+            id: "q2a",
+            label: "2.(a) Doubly Linked List Node Manipulation",
+            marks: "4.0M",
+            prompt: "CSE241 Spring 2024 Midterm Question 2.(a): Doubly Linked List structure definition and pointer manipulation rules with code and memory diagrams.",
+            topic: "Doubly Linked List",
+          },
+          {
+            id: "q2b",
+            label: "2.(b) Stack Infix to Postfix Conversion",
+            marks: "6.0M",
+            prompt: "CSE241 Spring 2024 Midterm Question 2.(b): Infix to Postfix conversion using Stack with operator precedence table.",
+            topic: "Stack Applications",
+          },
+          {
+            id: "q3a",
+            label: "3.(a) Circular Queue using Array",
+            marks: "5.0M",
+            prompt: "CSE241 Spring 2024 Midterm Question 3.(a): Circular Queue implementation using Array with front, rear, and modulo arithmetic.",
+            topic: "Circular Queue",
+          },
+        ],
+      },
+      {
+        id: "cse241-fl26-mid",
+        title: "Fall 2026 Midterm Exam",
+        semester: "Fall 2026",
+        faculty: "Shakib Hasan",
+        questions: [
+          {
+            id: "q1-asymp",
+            label: "1.(a) Asymptotic Notations (Big-O, Omega, Theta)",
+            marks: "4.0M",
+            prompt: "Explain Asymptotic Notations Big-O, Big-Omega, Big-Theta with formal mathematical limits, graphs, and practical code examples.",
+            topic: "Asymptotic Analysis",
+          },
+          {
+            id: "q2-sll",
+            label: "2.(a) Singly Linked List Node Deletion",
+            marks: "5.0M",
+            prompt: "Singly Linked List node deletion algorithm (delete from head, middle, and end) with complete C++ code and pointer safety.",
+            topic: "Linked List Deletion",
+          },
+          {
+            id: "q3-stack",
+            label: "3.(a) Balanced Parentheses using Stack",
+            marks: "5.0M",
+            prompt: "Balanced parentheses checking algorithm using Stack with step-by-step trace of string {[()()]}.",
+            topic: "Stack Traversal",
+          },
+        ],
+      },
+      {
+        id: "cse241-sp25-fin",
+        title: "Spring 2025 Final Exam",
+        semester: "Spring 2025",
+        faculty: "Belal Ahmed",
+        questions: [
+          {
+            id: "q1-bst",
+            label: "1.(a) BST Insertion & In/Pre/Post Traversals",
+            marks: "7.0M",
+            prompt: "Construct a Binary Search Tree (BST) for keys [45, 15, 79, 90, 10, 55, 12, 20] and write down Inorder, Preorder, Postorder traversals.",
+            topic: "BST Traversals",
+          },
+          {
+            id: "q2-graph",
+            label: "2.(a) Graph BFS & DFS Traversal",
+            marks: "7.0M",
+            prompt: "Explain Graph BFS and DFS traversal algorithms step-by-step with adjacency list representation, visited array, and queue/stack state.",
+            topic: "Graph Traversals",
+          },
+          {
+            id: "q3-avl",
+            label: "3.(a) AVL Tree Rotations & Balance Factor",
+            marks: "6.0M",
+            prompt: "AVL Tree LL, RR, LR, RL rotation rules with balance factor formula: height(left) - height(right).",
+            topic: "AVL Trees",
+          },
+        ],
+      },
+    ];
+  }
+
+  // Generic fallback for any other course
+  return [
+    {
+      id: `${cleanCode}-mid`,
+      title: `${cleanCode} Recent Midterm Exam`,
+      semester: "Recent Midterm",
+      faculty: facultyName || "Department Faculty",
+      questions: [
+        {
+          id: "g-q1",
+          label: "Q1. Core Theoretical Foundations & Definitions",
+          marks: "5M",
+          prompt: `What are the core repeated theoretical questions and definitions in ${cleanCode} Midterm exams? Solve with model answers.`,
+        },
+        {
+          id: "g-q2",
+          label: "Q2. Mathematical Derivations & Code Implementation",
+          marks: "5M",
+          prompt: `Explain the key mathematical derivations and standard code problems frequently asked in ${cleanCode} exams.`,
+        },
+        {
+          id: "g-q3",
+          label: "Q3. Repeated High-Yield Practice Problems",
+          marks: "5M",
+          prompt: `Give me 3 highest-yield exam problems for ${cleanCode} with step-by-step model solutions.`,
+        },
+      ],
+    },
+    {
+      id: `${cleanCode}-final`,
+      title: `${cleanCode} Recent Final Exam`,
+      semester: "Recent Final",
+      faculty: facultyName || "Department Faculty",
+      questions: [
+        {
+          id: "g-f1",
+          label: "Q1. Comprehensive Final Syllabus Repeated Questions",
+          marks: "10M",
+          prompt: `Analyze past final examination questions for ${cleanCode} and highlight the repeated question patterns.`,
+        },
+        {
+          id: "g-f2",
+          label: "Q2. Step-by-Step Scenario Problem Solution",
+          marks: "10M",
+          prompt: `Provide a step-by-step solution for the most common scenario-based final exam problem in ${cleanCode}.`,
+        },
+      ],
+    },
+  ];
+}
+
 interface CheatSheetModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -63,6 +251,10 @@ export default function CheatSheetModal({
   const [sending, setSending] = useState(false);
   const [selectedTeacherId, setSelectedTeacherId] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  // Question Linker States
+  const [selectedPaperIndex, setSelectedPaperIndex] = useState(0);
+  const [isQuestionLinkerOpen, setIsQuestionLinkerOpen] = useState(true);
 
   // Static Cheat Sheet State
   const [sheetData, setSheetData] = useState<any>(null);
@@ -197,6 +389,13 @@ export default function CheatSheetModal({
   // Selected faculty display name
   const activeTeacher = teachers.find((t) => t.id === selectedTeacherId);
   const teacherInit = activeTeacher?.initial || "FAC";
+
+  // Catalog of linked exam papers for this course
+  const examPapers: ExamPaperLink[] = React.useMemo(() => {
+    return getExamPapersForCourse(courseCode, courseTitle, activeTeacher?.name);
+  }, [courseCode, courseTitle, activeTeacher?.name]);
+
+  const currentPaper = examPapers[selectedPaperIndex] || examPapers[0];
 
   // Dynamic suggestion pills based on selected teacher or general and current interface language
   const promptSuggestions = activeTeacher
@@ -598,6 +797,39 @@ export default function CheatSheetModal({
                       ))}
                     </div>
                   </div>
+
+                  {/* Linked Exam Questions in Welcome State */}
+                  {currentPaper && (
+                    <div className="pt-3 space-y-2 text-left">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 uppercase tracking-wider">
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>{language === "bn" ? `বিগত প্রশ্ন সমাধান (${currentPaper.title}):` : `Solved Past Questions (${currentPaper.title}):`}</span>
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {currentPaper.questions.slice(0, 3).map((q) => (
+                          <button
+                            key={q.id}
+                            onClick={() => handleSendMessage(q.prompt)}
+                            disabled={sending}
+                            className="p-2.5 rounded-2xl bg-gradient-to-r from-blue-50/70 to-indigo-50/70 dark:from-slate-900 dark:to-indigo-950/40 hover:from-blue-100 hover:to-indigo-100 dark:hover:from-slate-800 dark:hover:to-indigo-900/60 border border-blue-200/60 dark:border-indigo-900/40 text-left text-xs font-semibold text-slate-800 dark:text-slate-200 transition-all shadow-sm flex items-center justify-between group cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2 min-w-0 pr-2">
+                              <span className="text-amber-500 font-bold">⚡</span>
+                              <span className="font-bold truncate">{q.label}</span>
+                              {q.marks && (
+                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 shrink-0">
+                                  {q.marks}
+                                </span>
+                              )}
+                            </div>
+                            <Send className="w-3.5 h-3.5 text-blue-500 opacity-60 group-hover:opacity-100 shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Chat Messages Timeline */
@@ -709,6 +941,83 @@ export default function CheatSheetModal({
                     {prompt}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {/* Exam Question Linker Bar (বিগত প্রশ্নপত্র ও প্রশ্ন লিংক) */}
+            {examPapers.length > 0 && (
+              <div className="border-t border-slate-200/90 dark:border-slate-800/90 bg-gradient-to-r from-blue-50/50 via-indigo-50/20 to-purple-50/30 dark:from-slate-900 dark:via-slate-900/95 dark:to-indigo-950/30 px-3 sm:px-6 py-2 shrink-0 transition-all">
+                {/* Bar Header: Paper Picker & Toggle */}
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap sm:flex-nowrap">
+                    <span className="flex items-center gap-1.5 text-[11px] font-black text-slate-800 dark:text-slate-200 shrink-0">
+                      <BookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      <span>{language === "bn" ? "বিগত প্রশ্ন লিংক:" : "Link Past Question:"}</span>
+                    </span>
+                    <div className="relative shrink-0">
+                      <select
+                        value={selectedPaperIndex}
+                        onChange={(e) => setSelectedPaperIndex(Number(e.target.value))}
+                        className="text-[11px] font-bold py-1 pl-2.5 pr-7 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer max-w-[200px] sm:max-w-[270px] truncate"
+                      >
+                        {examPapers.map((paper, idx) => (
+                          <option key={paper.id} value={idx}>
+                            📄 {paper.title} {paper.faculty ? `• ${paper.faculty}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-2 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsQuestionLinkerOpen(!isQuestionLinkerOpen)}
+                    className="text-[10px] font-bold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                  >
+                    <span>{isQuestionLinkerOpen ? (language === "bn" ? "লুকান" : "Hide") : (language === "bn" ? "প্রশ্ন দেখুন" : "Show Questions")}</span>
+                    <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isQuestionLinkerOpen ? "rotate-180" : ""}`} />
+                  </button>
+                </div>
+
+                {/* Horizontal Question Pills */}
+                {isQuestionLinkerOpen && currentPaper && (
+                  <div className="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar animate-in fade-in duration-150">
+                    {currentPaper.questions.map((q) => (
+                      <div
+                        key={q.id}
+                        className="inline-flex items-center rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 shadow-sm hover:border-blue-500 dark:hover:border-blue-400 transition-all shrink-0 group overflow-hidden"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleSendMessage(q.prompt)}
+                          disabled={sending}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-slate-800 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700/60 transition-colors cursor-pointer text-left disabled:opacity-50"
+                          title={q.prompt}
+                        >
+                          <span className="text-amber-500 group-hover:scale-110 transition-transform">⚡</span>
+                          <span className="font-bold">{q.label}</span>
+                          {q.marks && (
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300">
+                              {q.marks}
+                            </span>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setInputMessage(q.prompt);
+                          }}
+                          className="px-1.5 py-1 border-l border-slate-200 dark:border-slate-700 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                          title={language === "bn" ? "ইনপুট বক্সে নিন" : "Insert into input"}
+                        >
+                          <span className="text-[10px] font-bold">✏️</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

@@ -249,11 +249,169 @@ function solveAcademicExamQuestion(
   // Time Complexity of nested loop & Selection Sort (Descending) + Binary Search for 7
   // -------------------------------------------------------------
   const isSpring2024 = p.includes("spring 2024") || p.includes("spring2024") || (p.includes("2024") && p.includes("spring"));
-  const isQ1 = p.includes("number 1") || p.includes("question 1") || p.includes("q1") || p.includes("1 no") || p.includes("1 er") || p.includes("1.a") || p.includes("1.b") || p.includes("১");
   const isTimeComplexityCode = p.includes("time complexity") || (p.includes("for") && p.includes("while") && p.includes("k/3"));
   const isSelectionBinaryCode = p.includes("selection sort") || (p.includes("binary search") && p.includes("7"));
 
-  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && (isSpring2024 && isQ1 || (isTimeComplexityCode && isSelectionBinaryCode) || (isSpring2024 && !p.includes("question 2")))) {
+  // Ultra-flexible question identifiers that match: "1.(a)", "1(a)", "1.a", "1 a", "q1a", "১ এর ক", etc.
+  const isQ1aOnly =
+    /1[\.\s]*\(?a\)?/i.test(p) ||
+    /১[\.\s]*\(?ক\)?/i.test(p) ||
+    /\b(q1a|1a|q[\s\.]*1[\.\s]*a)\b/i.test(p) ||
+    (p.includes("1") && (p.includes("(a)") || p.includes(".a") || p.includes(" a ")) && !p.includes("1.b") && !p.includes("1(b)"));
+
+  const isQ1bOnly =
+    /1[\.\s]*\(?b\)?/i.test(p) ||
+    /১[\.\s]*\(?খ\)?/i.test(p) ||
+    /\b(q1b|1b|q[\s\.]*1[\.\s]*b)\b/i.test(p) ||
+    (p.includes("1") && (p.includes("(b)") || p.includes(".b") || p.includes(" b ")) && !p.includes("1.a") && !p.includes("1(a)"));
+
+  const isQ1General =
+    isSpring2024 ||
+    p.includes("question 1") ||
+    p.includes("number 1") ||
+    p.includes("q1") ||
+    p.includes("1 no") ||
+    p.includes("1 er") ||
+    p.trim() === "1" ||
+    p.trim() === "q1";
+
+  // CASE 1.A ONLY: Time Complexity Analysis [3.5 Marks]
+  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && isQ1aOnly && !isQ1bOnly) {
+    if (isBn) {
+      return `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**কোর্স:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**পরীক্ষা:** \`Spring 2024 Midterm Examination (Southeast University)\`  \n` +
+        `**শিক্ষক ফোকাস:** \`${teacherTag}\`  \n\n` +
+        `---\n\n` +
+        `### 📝 **Question 1.(a) সম্পূর্ণ সমাধান (Model Answer)**\n\n` +
+        `**প্রশ্ন:** Find out the Time Complexity of the following program. [3.5 Marks]\n\n` +
+        `\`\`\`c\n` +
+        `for(i = 1; i <= n; i++) {\n` +
+        `    for(j = 1; j <= n; j = j * 3) {\n` +
+        `        k = j;\n` +
+        `        while(k > 1)\n` +
+        `            k = k / 3;\n` +
+        `    }\n` +
+        `}\n` +
+        `\`\`\`\n\n` +
+        `#### 🔍 **ধাপভিত্তিক গাণিতিক বিশ্লেষণ (Step-by-Step Derivation):**\n\n` +
+        `1. **আউটার লুপ (\`i\`):**\n` +
+        `   * \`for(i = 1; i <= n; i++)\` লুপটি $i = 1$ থেকে শুরু করে $n$ পর্যন্ত ১ করে বৃদ্ধি পায়।\n` +
+        `   * সুতরাং, আউটার লুপটি ঠিক **$n$ বার** এক্সিকিউট হয়।\n\n` +
+        `2. **মিডল লুপ (\`j\`):**\n` +
+        `   * \`for(j = 1; j <= n; j = j * 3)\` লুপে $j$-এর মান প্রতি ধাপে ৩ দ্বারা গুণ হয়: $j = 1, 3, 9, 27, \\dots, 3^m \\le n$।\n` +
+        `   * এখানে $3^m \\le n \\implies m = \\lfloor\\log_3 n\\rfloor$।\n` +
+        `   * সুতরাং, $j$ লুপের মোট ইটারেশন সংখ্যা $\\approx \\mathbf{\\log_3 n}$ বার।\n\n` +
+        `3. **ইনার হোয়াইল লুপ (\`k\`):**\n` +
+        `   * লুপের ভেতরে: \`k = j; while(k > 1) k = k / 3;\`\n` +
+        `   * যেকোনো $j = 3^m$-এর জন্য, $k$ শুরু হয় $3^m$ থেকে এবং প্রতি ধাপে ৩ দিয়ে ভাগ হয়ে ১-এ পৌঁছায় ($3^m, 3^{m-1}, \\dots, 3^0 = 1$)।\n` +
+        `   * সুতরাং, প্রতিবার এই হোয়াইল লুপটি ঠিক **$m = \\log_3 j$ বার** চলে।\n\n` +
+        `4. **মিডল ও ইনার লুপের সমন্বিত মোট অপারেশন:**\n` +
+        `   * $j = 3^0 = 1 \\implies 0$ বার\n` +
+        `   * $j = 3^1 = 3 \\implies 1$ বার\n` +
+        `   * $j = 3^2 = 9 \\implies 2$ বার\n` +
+        `   * $\\dots$\n` +
+        `   * $j = 3^m \\implies m$ বার (যেখানে $m = \\log_3 n$)\n` +
+        `   $$\\sum_{m=0}^{\\lfloor\\log_3 n\\rfloor} m = \\frac{\\log_3 n \\cdot (\\log_3 n + 1)}{2} = \\mathbf{\\Theta((\\log_3 n)^2)}$$\n\n` +
+        `5. **সর্বমোট টাইম কমপ্লেক্সিটি (Total Time Complexity):**\n` +
+        `   $$T(n) = n \\times \\Theta((\\log_3 n)^2) = \\mathbf{O(n \\log^2 n)} \\quad \\text{বা} \\quad \\mathbf{\\Theta(n \\log^2 n)}$$\n\n` +
+        `✅ **চূড়ান্ত ফলাফল:** **$\\mathbf{O(n (\\log_3 n)^2)}$** বা **$\\mathbf{\\Theta(n \\log^2 n)}$**  \n` +
+        `> 💡 **মার্কিং টিপ:** পরীক্ষায় $\\sum m = \\frac{\\log_3 n (\\log_3 n + 1)}{2}$ যোগফলের সূত্রটি উল্লেখ করলে ৩.৫-এ ৩.৫ ফুল মার্কস নিশ্চিত পাওয়া যাবে!`;
+    }
+
+    return `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+      `**Course:** \`${cleanCourse} - Data Structures\`  \n` +
+      `**Exam:** \`Spring 2024 Midterm Examination (Southeast University)\`  \n` +
+      `**Faculty Focus:** \`${teacherTag}\`  \n\n` +
+      `---\n\n` +
+      `### 📝 **Question 1.(a) Step-by-Step Model Answer**\n\n` +
+      `**Question:** Find out the Time Complexity of the following program. [3.5 Marks]\n\n` +
+      `\`\`\`c\n` +
+      `for(i = 1; i <= n; i++) {\n` +
+      `    for(j = 1; j <= n; j = j * 3) {\n` +
+      `        k = j;\n` +
+      `        while(k > 1)\n` +
+      `            k = k / 3;\n` +
+      `    }\n` +
+      `}\n` +
+      `\`\`\`\n\n` +
+      `#### 🔍 **Mathematical Derivation:**\n\n` +
+      `1. **Outer Loop (\`i\`):** Runs from $1$ to $n$ with step $+1$, executing exactly **$n$ times**.\n` +
+      `2. **Middle Loop (\`j\`):** Multiplies by $3$ in each step: $j = 1, 3, 9, 27, \\dots, 3^m \\le n$. Thus, $m = \\lfloor\\log_3 n\\rfloor$, running $\\approx \\mathbf{\\log_3 n}$ iterations.\n` +
+      `3. **Inner While Loop (\`k\`):** For $j = 3^m$, $k$ starts at $3^m$ and is repeatedly divided by $3$ until $k \\le 1$ ($3^m \\to 3^{m-1} \\to \\dots \\to 1$). This loop runs exactly **$m = \\log_3 j$ times**.\n` +
+      `4. **Total Work per Outer Iteration:**\n` +
+      `   $$\\sum_{m=0}^{\\lfloor\\log_3 n\\rfloor} m = \\frac{\\log_3 n \\cdot (\\log_3 n + 1)}{2} = \\mathbf{\\Theta((\\log_3 n)^2)}$$\n` +
+      `5. **Overall Time Complexity:**\n` +
+      `   $$T(n) = n \\times \\Theta((\\log_3 n)^2) = \\mathbf{O(n \\log^2 n)} \\quad \\text{or} \\quad \\mathbf{\\Theta(n \\log^2 n)}$$\n\n` +
+      `✅ **Final Complexity:** **$\\mathbf{O(n (\\log_3 n)^2)}$** or **$\\mathbf{\\Theta(n \\log^2 n)}$**`;
+  }
+
+  // CASE 1.B ONLY: Selection Sort & Binary Search [6.5 Marks]
+  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && isQ1bOnly && !isQ1aOnly) {
+    if (isBn) {
+      return `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**কোর্স:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**পরীক্ষা:** \`Spring 2024 Midterm Examination (Southeast University)\`  \n` +
+        `**শিক্ষক ফোকাস:** \`${teacherTag}\`  \n\n` +
+        `---\n\n` +
+        `### 📝 **Question 1.(b) সম্পূর্ণ সমাধান (Model Answer)**\n\n` +
+        `**প্রশ্ন:** Sort the given array in descending order using Selection Sort. Then, show the steps to find 7 in the sorted array using Binary Search. [3.5 + 3 = 6.5 Marks]\n\n` +
+        `**প্রদত্ত অ্যারে:** \`[-9, -2, 10, 12, 30, -2, 28]\` ($n = 7$)\n\n` +
+        `#### 🔹 **পার্ট ১: Selection Sort দিয়ে বড় থেকে ছোট (Descending) সাজানো:**\n` +
+        `*প্রতিটি পাসে বাকি আনসর্টেড অংশের সবচেয়ে বড় মানটি খুঁজে শুরুর পজিশনের সাথে সোয়াপ করা হয়:*\n\n` +
+        `* **Pass 1 ($i = 0$):** বাকি \`[-9, -2, 10, 12, 30, -2, 28]\` এর মধ্যে সর্বোচ্চ মান **\`30\`** (index 4)। \`30\` কে \`arr[0]\` (-9) এর সাথে সোয়াপ করি।\n` +
+        `  $\\implies$ **\`[30, -2, 10, 12, -9, -2, 28]\`**\n` +
+        `* **Pass 2 ($i = 1$):** বাকি \`[-2, 10, 12, -9, -2, 28]\` এর মধ্যে সর্বোচ্চ মান **\`28\`** (index 6)। \`28\` কে \`arr[1]\` (-2) এর সাথে সোয়াপ করি।\n` +
+        `  $\\implies$ **\`[30, 28, 10, 12, -9, -2, -2]\`**\n` +
+        `* **Pass 3 ($i = 2$):** বাকি \`[10, 12, -9, -2, -2]\` এর মধ্যে সর্বোচ্চ মান **\`12\`** (index 3)। \`12\` কে \`arr[2]\` (10) এর সাথে সোয়াপ করি।\n` +
+        `  $\\implies$ **\`[30, 28, 12, 10, -9, -2, -2]\`**\n` +
+        `* **Pass 4 ($i = 3$):** বাকি \`[10, -9, -2, -2]\` এর মধ্যে সর্বোচ্চ মান **\`10\`** (index 3)। ইতিমধ্যে সঠিক পজিশনে আছে।\n` +
+        `  $\\implies$ **\`[30, 28, 12, 10, -9, -2, -2]\`**\n` +
+        `* **Pass 5 ($i = 4$):** বাকি \`[-9, -2, -2]\` এর মধ্যে সর্বোচ্চ মান **\`-2\`** (index 5)। \`-2\` কে \`arr[4]\` (-9) এর সাথে সোয়াপ করি।\n` +
+        `  $\\implies$ **\`[30, 28, 12, 10, -2, -9, -2]\`**\n` +
+        `* **Pass 6 ($i = 5$):** বাকি \`[-9, -2]\` এর মধ্যে সর্বোচ্চ মান **\`-2\`** (index 6)। \`-2\` কে \`arr[5]\` (-9) এর সাথে সোয়াপ করি।\n` +
+        `  $\\implies$ **\`[30, 28, 12, 10, -2, -2, -9]\`**\n\n` +
+        `✅ **সর্টেড ডিসেন্ডিং অ্যারে:** $\\mathbf{[30, 28, 12, 10, -2, -2, -9]}$\n\n` +
+        `#### 🔹 **পার্ট ২: সর্টেড অ্যারেতে Binary Search চালিয়ে $7$ খোঁজার স্টেপস:**\n` +
+        `* **টার্গেট ভ্যালু:** $\\text{Target} = 7$\n` +
+        `* **ডিসেন্ডিং অ্যারে:** \`[30, 28, 12, 10, -2, -2, -9]\` (Index: 0, 1, 2, 3, 4, 5, 6)\n\n` +
+        `* **স্টেপ ১:** $\\text{low} = 0, \\text{high} = 6 \\implies \\text{mid} = 3, \\text{arr}[3] = 10$।\n` +
+        `  যেহেতু $\\text{Target } (7) < 10$, তাই ডানপাশে যাব: $\\text{low} = \\text{mid} + 1 = 4$।\n` +
+        `* **স্টেপ ২:** $\\text{low} = 4, \\text{high} = 6 \\implies \\text{mid} = 5, \\text{arr}[5] = -2$।\n` +
+        `  যেহেতু $\\text{Target } (7) > -2$, তাই বামপাশে যাব: $\\text{high} = \\text{mid} - 1 = 4$।\n` +
+        `* **স্টেপ ৩:** $\\text{low} = 4, \\text{high} = 4 \\implies \\text{mid} = 4, \\text{arr}[4] = -2$।\n` +
+        `  যেহেতু $\\text{Target } (7) > -2$, তাই $\\text{high} = \\text{mid} - 1 = 3$।\n` +
+        `* **স্টেপ ৪:** $\\text{low} = 4, \\text{high} = 3$।\n` +
+        `  যেহেতু $\\text{low} > \\text{high}$, বাইনারি সার্চের স্পেস শেষ।\n\n` +
+        `💡 **চূড়ান্ত উত্তর:** **$7$ সংখ্যাটি প্রদত্ত অ্যারেতে নেই (Element not found in the array)!**`;
+    }
+
+    return `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+      `**Course:** \`${cleanCourse} - Data Structures\`  \n` +
+      `**Exam:** \`Spring 2024 Midterm Examination (Southeast University)\`  \n` +
+      `**Faculty Focus:** \`${teacherTag}\`  \n\n` +
+      `---\n\n` +
+      `### 📝 **Question 1.(b) Selection Sort & Binary Search Model Solution**\n\n` +
+      `**Given Array:** \`[-9, -2, 10, 12, 30, -2, 28]\` ($n = 7$)\n\n` +
+      `##### **Part 1: Selection Sort in Descending Order:**\n` +
+      `* **Pass 1:** Max is **\`30\`** (idx 4). Swap with \`arr[0]\` $\\implies$ **\`[30, -2, 10, 12, -9, -2, 28]\`**\n` +
+      `* **Pass 2:** Max is **\`28\`** (idx 6). Swap with \`arr[1]\` $\\implies$ **\`[30, 28, 10, 12, -9, -2, -2]\`**\n` +
+      `* **Pass 3:** Max is **\`12\`** (idx 3). Swap with \`arr[2]\` $\\implies$ **\`[30, 28, 12, 10, -9, -2, -2]\`**\n` +
+      `* **Pass 4:** Max is **\`10\`** (idx 3). Already sorted $\\implies$ **\`[30, 28, 12, 10, -9, -2, -2]\`**\n` +
+      `* **Pass 5:** Max is **\`-2\`** (idx 5). Swap with \`arr[4]\` $\\implies$ **\`[30, 28, 12, 10, -2, -9, -2]\`**\n` +
+      `* **Pass 6:** Max is **\`-2\`** (idx 6). Swap with \`arr[5]\` $\\implies$ **\`[30, 28, 12, 10, -2, -2, -9]\`**\n\n` +
+      `✅ **Sorted Array (Descending):** $\\mathbf{[30, 28, 12, 10, -2, -2, -9]}$\n\n` +
+      `##### **Part 2: Binary Search Steps to Find 7:**\n` +
+      `Target: $\\text{Key} = 7$. Array: \`[30, 28, 12, 10, -2, -2, -9]\`\n` +
+      `* **Step 1:** $\\text{low} = 0, \\text{high} = 6 \\implies \\text{mid} = 3, \\text{arr}[3] = 10$. Since $7 < 10$, search right: $\\text{low} = \\text{mid} + 1 = 4$.\n` +
+      `* **Step 2:** $\\text{low} = 4, \\text{high} = 6 \\implies \\text{mid} = 5, \\text{arr}[5] = -2$. Since $7 > -2$, search left: $\\text{high} = \\text{mid} - 1 = 4$.\n` +
+      `* **Step 3:** $\\text{low} = 4, \\text{high} = 4 \\implies \\text{mid} = 4, \\text{arr}[4] = -2$. Since $7 > -2$, search left: $\\text{high} = \\text{mid} - 1 = 3$.\n` +
+      `* **Step 4:** $\\text{low} = 4, \\text{high} = 3$. Since $\\text{low} > \\text{high}$, search terminates.\n\n` +
+      `💡 **Result:** **$7$ is NOT present in the array!**`;
+  }
+
+  // CASE 1 FULL: Both 1.a & 1.b [10 Marks]
+  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && (isQ1General || (isTimeComplexityCode && isSelectionBinaryCode))) {
     if (isBn) {
       return `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
         `**কোর্স:** \`${cleanCourse} - Data Structures\`  \n` +
@@ -376,17 +534,41 @@ function solveAcademicExamQuestion(
   }
 
   // -------------------------------------------------------------
-  // PATTERN 2: CSE241 Spring 2024 Midterm - Question 2 (Doubly Linked List)
+  // PATTERN 2: CSE241 Spring 2024 Midterm - Question 2 (Doubly Linked List & Stack Application)
   // -------------------------------------------------------------
-  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && (p.includes("question 2") || p.includes("number 2") || p.includes("doubly linked"))) {
+  const isQ2a =
+    /2[\.\s]*\(?a\)?/i.test(p) ||
+    /২[\.\s]*\(?ক\)?/i.test(p) ||
+    /\b(q2a|2a|q[\s\.]*2[\.\s]*a)\b/i.test(p) ||
+    p.includes("doubly linked") ||
+    (p.includes("2") && (p.includes("(a)") || p.includes(".a") || p.includes(" a ")));
+
+  const isQ2b =
+    /2[\.\s]*\(?b\)?/i.test(p) ||
+    /২[\.\s]*\(?খ\)?/i.test(p) ||
+    /\b(q2b|2b|q[\s\.]*2[\.\s]*b)\b/i.test(p) ||
+    p.includes("infix to postfix") ||
+    p.includes("postfix conversion") ||
+    (p.includes("2") && (p.includes("(b)") || p.includes(".b") || p.includes(" b ")));
+
+  const isQ2General =
+    p.includes("question 2") ||
+    p.includes("number 2") ||
+    p.includes("q2") ||
+    p.includes("2 no") ||
+    p.includes("2 er") ||
+    p.trim() === "2" ||
+    p.trim() === "q2";
+
+  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && (isQ2a || isQ2General) && !isQ2b) {
     return isBn
       ? `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
         `**কোর্স:** \`${cleanCourse} - Data Structures\`  \n` +
-        `**পরীক্ষা:** \`Spring 2024 Midterm Examination - Question 2\`  \n` +
+        `**পরীক্ষা:** \`Spring 2024 Midterm Examination - Question 2.(a)\`  \n` +
         `**শিক্ষক ফোকাস:** \`${teacherTag}\`  \n\n` +
         `---\n\n` +
-        `### 📝 **Question 2: Doubly Linked List Node Manipulation [4 Marks]**\n\n` +
-        `**স্ট্রাকচার ডিক্লারেশন:**\n` +
+        `### 📝 **Question 2.(a): Doubly Linked List Node Manipulation [4 Marks]**\n\n` +
+        `**স্ট্রাকচার ডিক্লারেশন (Structure Declaration):**\n` +
         `\`\`\`c\n` +
         `struct node {\n` +
         `    int data;\n` +
@@ -394,21 +576,22 @@ function solveAcademicExamQuestion(
         `    struct node *prev;\n` +
         `};\n` +
         `\`\`\`\n\n` +
-        `**কোর পয়েন্টার রুলস ও মেমোরি ইফেক্ট:**\n` +
-        `1. **নতুন নোড ক্রিয়েশন ও ইনসার্শন:**\n` +
+        `**পয়েন্টার সংযোগ ও মেমোরি ম্যানিপুলেশন (Memory Insertion Rules):**\n` +
+        `1. **নতুন নোড ক্রিয়েশন ও ইনিশিয়ালাইজেশন:**\n` +
         `   \`\`\`c\n` +
         `   struct node *newNode = (struct node*)malloc(sizeof(struct node));\n` +
         `   newNode->data = val;\n` +
-        `   newNode->next = current->next;\n` +
-        `   newNode->prev = current;\n` +
-        `   if(current->next != NULL) current->next->prev = newNode;\n` +
-        `   current->next = newNode;\n` +
+        `   newNode->next = NULL;\n` +
+        `   newNode->prev = NULL;\n` +
         `   \`\`\`\n` +
-        `2. **পয়েন্টার সংযোগ সাবধানতা:** ডাবলি লিঙ্কড লিস্টে কখনো \`next\` পয়েন্টার আগে পরিবর্তন করতে নেই; প্রথমে \`newNode->next\` ও \`newNode->prev\` লিংক সম্পন্ন করে মূল নোড পরিবর্তন করতে হয়, নইলে সংযোগ হারিয়ে মেমোরি লিক (orphan node) হয়।`
+        `2. **যেকোনো পজিশনে ইনসার্ট করার গোল্ডেন রুল:**\n` +
+        `   * প্রথমে নতুন নোডের লিংক আগে বাঁধতে হবে: \`newNode->next = current->next;\` এবং \`newNode->prev = current;\`\n` +
+        `   * তারপর পূর্বের চেইনের নোড লিংক করতে হবে: \`if(current->next != NULL) current->next->prev = newNode;\` এবং \`current->next = newNode;\`\n` +
+        `   * **সাবধানতা:** কখনো \`current->next\` আগে ওভাররাইট করবেন না, করলে পরবর্তী নোডগুলোর সংযোগ হারিয়ে যাবে এবং মেমোরি লিক (orphan node) তৈরি হবে।`
       : `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
         `**Course:** \`${cleanCourse} - Data Structures\`  \n` +
-        `**Exam:** \`Spring 2024 Midterm - Question 2 Solution\`  \n\n` +
-        `**Doubly Linked List Structure & Pointer Manipulation:**\n` +
+        `**Exam:** \`Spring 2024 Midterm - Question 2.(a) Model Solution\`  \n\n` +
+        `**Doubly Linked List Structure & Pointer Safety Rules:**\n` +
         `\`\`\`c\n` +
         `struct node {\n` +
         `    int data;\n` +
@@ -416,7 +599,34 @@ function solveAcademicExamQuestion(
         `    struct node *prev;\n` +
         `};\n` +
         `\`\`\`\n` +
-        `Always assign \`newNode->next\` and \`newNode->prev\` before updating adjacent pointers to prevent breaking the chain!`;
+        `* **Rule:** Always wire up \`newNode->next\` and \`newNode->prev\` FIRST before altering \`current->next\` to preserve the forward pointer chain!`;
+  }
+
+  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && isQ2b) {
+    return isBn
+      ? `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**কোর্স:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**পরীক্ষা:** \`Spring 2024 Midterm Examination - Question 2.(b)\`  \n` +
+        `**শিক্ষক ফোকাস:** \`${teacherTag}\`  \n\n` +
+        `---\n\n` +
+        `### 📝 **Question 2.(b): Infix to Postfix Conversion using Stack [6 Marks]**\n\n` +
+        `**অপারেটর প্রেসিডেন্স রুল:** \`^ > (*, /) > (+, -)\`\n\n` +
+        `**অ্যালগরিদম ধাপসমূহ:**\n` +
+        `1. বাম থেকে ডানে এক্সপ্রেশনটি স্ক্যান করুন।\n` +
+        `2. অপারেন্ড (A, B, C, সংখ্যা) পেলে সরাসরি আউটপুটে বসান।\n` +
+        `3. \`(\` পেলে স্ট্যাকে পুশ করুন।\n` +
+        `4. \`)\` পেলে যতক্ষণ না \`(\` পাওয়া যায়, স্ট্যাক থেকে পপ করে আউটপুটে দিন। এরপর \`(\` ফেলে দিন।\n` +
+        `5. যেকোনো অপারেটর ($+, -, *, /$) আসলে, স্ট্যাকের শীর্ষে যদি সমান বা উচ্চতর প্রেসিডেন্সের অপারেটর থাকে তাকে পপ করে আউটপুটে দিন, তারপর নতুন অপারেটর পুশ করুন।\n` +
+        `6. স্ক্যান শেষ হলে স্ট্যাকের বাকি সব অপারেটর পপ করে আউটপুটে যুক্ত করুন।`
+      : `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**Course:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**Exam:** \`Spring 2024 Midterm - Question 2.(b) Model Solution\`  \n\n` +
+        `**Infix to Postfix Conversion via Stack:**\n` +
+        `1. Scan tokens from left to right.\n` +
+        `2. Operands append directly to output.\n` +
+        `3. \`(\` is pushed onto the stack.\n` +
+        `4. \`)\` pops operators to output until matching \`(\` is discarded.\n` +
+        `5. Operators pop higher or equal precedence operators from stack before being pushed.`;
   }
 
   // -------------------------------------------------------------
@@ -689,7 +899,12 @@ CRITICAL ACADEMIC EXAM COACHING RULES:
     // invoke the Intelligent Academic Reasoning Solver so students ALWAYS get the authentic step-by-step solution!
     const isEvasivePasteRequest = Boolean(
       aiResponseText &&
-      /\b(paste\s*(the)?\s*(text|question)|provide\s*(the)?\s*(text|question)|describe\s*its\s*core\s*topic|paste\s*question)\b/i.test(aiResponseText)
+      (
+        /\b(paste\s*(the)?\s*(text|question)|type\s*out\s*or\s*paste|provide\s*(the)?\s*(text|question)|describe\s*its\s*core\s*topic|paste\s*question|didn't\s*include\s*the\s*text|what\s*does\s*question)\b/i.test(aiResponseText) ||
+        aiResponseText.includes("didn't include the text") ||
+        aiResponseText.includes("type out or paste") ||
+        aiResponseText.includes("What does Question")
+      )
     );
 
     if (!aiResponseText || isEvasivePasteRequest) {
