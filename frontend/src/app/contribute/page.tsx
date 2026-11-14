@@ -74,8 +74,6 @@ export const RESOURCE_TYPE_LABELS: Record<string, { en: string; bn: string }> = 
 
 import {
   getCurrentAcademicSemester,
-  getTwoQuickSemesters,
-  getRecentAcademicSemesters,
   getShortResourceTypeName,
   buildConciseAcademicTitle,
   SemesterChip,
@@ -205,9 +203,8 @@ export default function ContributePage() {
     setAiAnalysis(null);
   };
 
-  // Semester: searchable combobox with empty default & exactly 2 dynamic auto-progressing quick picks
+  // Semester: searchable combobox with empty default
   const [semester, setSemester] = useState("");
-  const quickSemesters = React.useMemo(() => getTwoQuickSemesters(), []);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | number>("");
   const [allTeachers, setAllTeachers] = useState<any[]>([]);
 
@@ -1363,31 +1360,6 @@ export default function ContributePage() {
                     : "Search or select semester (Required)..."
                 }
               />
-
-              {/* Exactly 2 Dynamic Quick Pick Pills (No Current/Upcoming labels, auto-advancing with academic calendar) */}
-              <div className="flex items-center gap-2 pt-1 flex-wrap">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                  {language === "bn" ? "কুইক পিক:" : "Quick Pick:"}
-                </span>
-                {quickSemesters.map((semName) => {
-                  const isSelected = semester.trim().toLowerCase() === semName.toLowerCase();
-                  return (
-                    <button
-                      key={semName}
-                      type="button"
-                      onClick={() => handleSemesterChange(semName)}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer flex items-center gap-1.5 ${
-                        isSelected
-                          ? "bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400"
-                          : "bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700"
-                      }`}
-                    >
-                      {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
-                      <span>{semName}</span>
-                    </button>
-                  );
-                })}
-              </div>
 
               {hasAttemptedSubmit && !semester.trim() && (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium pt-1 animate-in fade-in">
