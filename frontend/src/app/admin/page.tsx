@@ -474,6 +474,8 @@ export default function AdminDashboardPage() {
   const [resourceSearch, setResourceSearch] = useState("");
   const [resourceTypeFilter, setResourceTypeFilter] = useState("ALL");
   const [departmentFilter, setDepartmentFilter] = useState("ALL");
+  const [facultyFilterForMaterials, setFacultyFilterForMaterials] = useState<string>("ALL");
+  const [downloadingFacultyZipId, setDownloadingFacultyZipId] = useState<number | string | null>(null);
   const [courseSearch, setCourseSearch] = useState("");
   const [courseDeptFilter, setCourseDeptFilter] = useState("ALL");
   const [courseTypeFilter, setCourseTypeFilter] = useState<"ALL" | "THEORY" | "LAB">("ALL");
@@ -1537,7 +1539,7 @@ export default function AdminDashboardPage() {
     return () => {
       active = false;
     };
-  }, [resourceSearch, resourceTypeFilter, departmentFilter]);
+  }, [resourceSearch, resourceTypeFilter, departmentFilter, facultyFilterForMaterials]);
 
   useEffect(() => {
     let active = true;
@@ -2220,6 +2222,32 @@ export default function AdminDashboardPage() {
         }
       },
     });
+  };
+
+  const handleDownloadFacultyZip = async (teacherId: number | string, teacherName?: string) => {
+    if (!isSuperAdmin) {
+      toast.error("Access restricted: Only Super Admin can download faculty material archives.");
+      return;
+    }
+    const tIdNum = Number(teacherId);
+    if (!tIdNum) {
+      toast.error("Please select a valid faculty member.");
+      return;
+    }
+    const targetTeacher = teachers.find((t) => Number(t.id) === tIdNum);
+    const resolvedName = targetTeacher?.name || teacherName || "Faculty";
+
+    setDownloadingFacultyZipId(tIdNum);
+    const toastId = toast.loading(`Generating 1-click material ZIP archive for ${resolvedName}...`);
+    try {
+      await api.admin.downloadFacultyMaterialsZip(tIdNum, resolvedName);
+      toast.success(`Complete material archive for ${resolvedName} downloaded successfully!`, { id: toastId });
+      confetti({ particleCount: 75, spread: 60, origin: { y: 0.6 } });
+    } catch (err: any) {
+      toast.error(err.message || `Failed to download materials for ${resolvedName}`, { id: toastId });
+    } finally {
+      setDownloadingFacultyZipId(null);
+    }
   };
 
   // ---------------- User Accounts & RBAC CRUD ----------------
@@ -3275,7 +3303,10 @@ export default function AdminDashboardPage() {
     const matchDept =
       departmentFilter === "ALL" ||
       (r.course?.department && r.course.department.toUpperCase() === departmentFilter.toUpperCase());
-    return matchSearch && matchType && matchDept;
+    const matchFaculty =
+      facultyFilterForMaterials === "ALL" ||
+      (r.teacher && String(r.teacher.id) === String(facultyFilterForMaterials));
+    return matchSearch && matchType && matchDept && matchFaculty;
   });
 
   // Resource Category KPIs (Derived strictly from verified approved materials)
@@ -5490,6 +5521,61 @@ export default function AdminDashboardPage() {
                       <option value="LAB_REPORT">Lab Reports</option>
                       <option value="LAB_HAND_NOTE">Lab Hand Notes</option>
                     </select>
+
+                    {/* SUPER ADMIN EXCLUSIVE: Faculty Selector & 1-Click Material ZIP Archive Download */}
+                    {isSuperAdmin && (
+                      <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-purple-500/10 border border-purple-500/30 shadow-xs">
+                        <select
+                          value={facultyFilterForMaterials}
+                          onChange={(e) => setFacultyFilterForMaterials(e.target.value)}
+                          className="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-purple-500/30 text-xs text-purple-300 font-bold focus:outline-none max-w-[190px] truncate cursor-pointer"
+                          title="Select a faculty to filter and download all their materials (Super Admin)"
+                        >
+                          <option value="ALL">👨‍🏫 Filter by Faculty ({teachers.length})</option>
+                          {teachers
+                            .slice()
+                            .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+                            .map((t) => (
+                              <option key={t.id} value={String(t.id)}>
+                                {t.name} {t.initial ? `[${t.initial}]` : ""}
+                              </option>
+                            ))}
+                        </select>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (facultyFilterForMaterials === "ALL") {
+                              toast.error("Please select a faculty member first from the dropdown.");
+                              return;
+                            }
+                            const tObj = teachers.find((t) => String(t.id) === String(facultyFilterForMaterials));
+                            handleDownloadFacultyZip(facultyFilterForMaterials, tObj?.name || "Faculty");
+                          }}
+                          disabled={facultyFilterForMaterials === "ALL" || downloadingFacultyZipId !== null}
+                          className={`px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 transition-all shadow-md ${
+                            facultyFilterForMaterials !== "ALL"
+                              ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/30 cursor-pointer hover:scale-105 active:scale-95"
+                              : "bg-slate-800 text-slate-500 border border-slate-700/60 cursor-not-allowed opacity-50"
+                          }`}
+                          title={
+                            facultyFilterForMaterials !== "ALL"
+                              ? "Super Admin Exclusive: 1-Click Download ALL materials of this faculty as ZIP archive"
+                              : "Select a faculty from the dropdown to enable 1-Click complete materials download"
+                          }
+                        >
+                          <Download className={`w-3.5 h-3.5 ${downloadingFacultyZipId ? "animate-bounce" : ""}`} />
+                          <span className="whitespace-nowrap">
+                            {downloadingFacultyZipId
+                              ? "Zipping..."
+                              : facultyFilterForMaterials !== "ALL"
+                              ? `Download Faculty ZIP (${filteredResources.length})`
+                              : "Download Faculty ZIP"}
+                          </span>
+                          <span className="text-[10px] bg-white/20 px-1 py-0.2 rounded font-black">👑</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -5608,6 +5694,17 @@ export default function AdminDashboardPage() {
                                         {r.teacher.room && <span>• Rm {r.teacher.room}</span>}
                                       </div>
                                     </div>
+                                    {isSuperAdmin && r.teacher?.id && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDownloadFacultyZip(r.teacher.id, r.teacher.name)}
+                                        disabled={downloadingFacultyZipId === r.teacher.id}
+                                        className="p-1.5 rounded-lg hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition-colors shrink-0 cursor-pointer"
+                                        title={`1-Click Download ALL materials for ${r.teacher.name} as ZIP (Super Admin Exclusive)`}
+                                      >
+                                        <Download className={`w-3.5 h-3.5 ${downloadingFacultyZipId === r.teacher.id ? "animate-bounce" : ""}`} />
+                                      </button>
+                                    )}
                                   </div>
                                 ) : (
                                   <span className="text-slate-400 italic text-[11px]">General / Dept Shared</span>
@@ -6287,15 +6384,29 @@ export default function AdminDashboardPage() {
                           <span>View Public Profile</span>
                           <ExternalLink className="w-3 h-3" />
                         </Link>
-                        <button
-                          onClick={() => {
-                            setResourceSearch(t.name);
-                            setActiveTab("resources");
-                          }}
-                          className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline"
-                        >
-                          View Materials &rarr;
-                        </button>
+                        <div className="flex items-center gap-2">
+                          {isSuperAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadFacultyZip(t.id, t.name)}
+                              disabled={downloadingFacultyZipId === t.id}
+                              className="px-2.5 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                              title={`Download all materials archive for ${t.name} (Super Admin Exclusive)`}
+                            >
+                              <Download className={`w-3 h-3 ${downloadingFacultyZipId === t.id ? "animate-bounce" : ""}`} />
+                              <span>{downloadingFacultyZipId === t.id ? "Zipping..." : "ZIP Archive"}</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setResourceSearch(t.name);
+                              setActiveTab("resources");
+                            }}
+                            className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                          >
+                            View Materials &rarr;
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );

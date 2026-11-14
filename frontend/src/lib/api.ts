@@ -905,6 +905,14 @@ export const api = {
       request<any>(`/admin/teachers/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     deleteTeacher: (id: number) =>
       request<any>(`/admin/teachers/${id}`, { method: "DELETE" }),
+    downloadFacultyMaterialsZip: (teacherId: number | string, teacherName?: string) => {
+      const cleanName = (teacherName || "Faculty").replace(/[^a-zA-Z0-9_-]/g, "_").replace(/_+/g, "_");
+      return downloadAuthorizedBlob(
+        `/admin/teachers/${teacherId}/download-materials-zip`,
+        `${cleanName}_Materials_Archive.zip`,
+        "Failed to download faculty materials archive."
+      );
+    },
     uploadTeacherPhoto: (file: File) => {
       const formData = new FormData();
       formData.append("file", file);

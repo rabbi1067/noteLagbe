@@ -26,7 +26,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import com.notelagbe.exception.ResourceNotFoundException;
 import java.util.List;
 import java.util.Map;
 
@@ -357,6 +360,55 @@ public class AdminController {
         logAdminAction("FACULTY_DELETE", "ACADEMIC", "Admin deleted faculty profile ID #" + id);
         evictAnalyticsCache();
         return ResponseEntity.ok(Map.of("success", true, "message", "Faculty member removed successfully"));
+    }
+
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @GetMapping("/teachers/{id}/download-materials-zip")
+    public void downloadTeacherMaterialsZip(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            HttpServletResponse response) throws IOException {
+        User user = userDetails != null ? userDetails.getUser() : null;
+        if (user == null || user.getRole() != Role.ROLE_SUPER_ADMIN) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getOutputStream().write("{\"success\":false,\"message\":\"Access restricted: Only Super Admin can download complete faculty material archives.\"}".getBytes(StandardCharsets.UTF_8));
+            return;
+        }
+
+        try {
+            Teacher teacher = teacherService.getTeacherById(id);
+            String safeTeacherName = teacher.getName() != null
+                    ? teacher.getName().replaceAll("[^a-zA-Z0-9_-]", "_").replaceAll("_+", "_")
+                    : "Faculty";
+            if (safeTeacherName.startsWith("_")) safeTeacherName = safeTeacherName.substring(1);
+            if (safeTeacherName.endsWith("_")) safeTeacherName = safeTeacherName.substring(0, safeTeacherName.length() - 1);
+            if (safeTeacherName.isBlank()) safeTeacherName = "Faculty_" + id;
+
+            String filename = safeTeacherName + "_Materials_Archive.zip";
+
+            response.setContentType("application/zip");
+            response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+            teacherService.generateTeacherMaterialsZip(id, user, response.getOutputStream());
+
+            try {
+                activityLogService.logActivity(
+                        "SUPER_ADMIN_FACULTY_PACK_DOWNLOAD",
+                        "ADMIN",
+                        "Super Admin downloaded complete materials archive for faculty: " + teacher.getName() + " (ID: " + id + ")",
+                        user,
+                        httpRequest
+                );
+            } catch (Exception ignored) {}
+        } catch (ResourceNotFoundException e) {
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getOutputStream().write(("{\"success\":false,\"message\":\"" + e.getMessage() + "\"}").getBytes(StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getOutputStream().write(("{\"success\":false,\"message\":\"Failed to generate faculty materials archive: " + e.getMessage() + "\"}").getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     // ==========================================
