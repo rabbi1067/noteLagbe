@@ -59,7 +59,7 @@ interface AuthContextType {
   isStudent: boolean;
   login: (email: string, pass: string) => Promise<void>;
   register: (name: string, email: string, pass: string, studentId?: string, phone?: string) => Promise<void>;
-  logout: () => void;
+  logout: (showToast?: boolean) => void;
   refreshProfile: () => Promise<void>;
   hasUnlocked: (courseCode: string) => boolean;
   hasUnlockedForTeacher: (courseCode: string, teacherId?: number | null) => boolean;
@@ -124,6 +124,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (reason === "auto_logout") {
         clearLocalSession();
         setShowAuthModal(false);
+        if (typeof window !== "undefined") {
+          if (window.location.pathname.startsWith("/admin") || window.location.pathname.startsWith("/dashboard")) {
+            window.location.replace("/");
+            return;
+          }
+        }
         router.push("/");
       }
       setBlockedNotice({
@@ -158,6 +164,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         msg.includes("no longer exists")
       ) {
         clearLocalSession();
+        if (typeof window !== "undefined") {
+          if (window.location.pathname.startsWith("/admin") || window.location.pathname.startsWith("/dashboard")) {
+            window.location.replace("/");
+            return;
+          }
+        }
         router.push("/");
       }
     }
@@ -421,9 +433,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Strict Role-Based Redirection
       const isStaff = res.role === "ROLE_ADMIN" || res.role === "ROLE_SUPER_ADMIN" || res.role === "ROLE_MANAGER";
       if (isStaff) {
-        router.push("/admin");
+        if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) {
+          window.location.replace("/admin");
+        } else {
+          router.push("/admin");
+        }
       } else {
-        router.push("/dashboard");
+        if (typeof window !== "undefined" && window.location.pathname.startsWith("/dashboard")) {
+          window.location.replace("/dashboard");
+        } else {
+          router.push("/dashboard");
+        }
       }
     } catch (err: any) {
       if (err?.code === "ACCOUNT_BLOCKED" || err?.blocked) {
@@ -452,6 +472,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearLocalSession();
     if (showToast) {
       toast.info("Signed out successfully.");
+    }
+    if (typeof window !== "undefined") {
+      if (window.location.pathname.startsWith("/admin") || window.location.pathname.startsWith("/dashboard")) {
+        window.location.replace("/");
+        return;
+      }
     }
     router.push("/");
   };

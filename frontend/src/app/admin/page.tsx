@@ -365,7 +365,7 @@ const isDeptMatch = (itemDept?: string, targetDept?: string) => {
 };
 
 export default function AdminDashboardPage() {
-  const { user, isAuthenticated, logout, refreshProfile } = useAuth();
+  const { user, isAuthenticated, isLoading, logout, refreshProfile, setShowAuthModal } = useAuth();
   const { language, toggleLanguage } = useLanguage();
   const { theme, toggleTheme, isDark } = useTheme();
   const router = useRouter();
@@ -3849,7 +3849,50 @@ export default function AdminDashboardPage() {
     pendingReviewsCount;
 
   // ---------------- Route Guard (placed strictly after all React hooks) ----------------
-  if (!isAuthenticated || !isAdmin) {
+  // 1. Session is currently loading or hydrating
+  if (isLoading) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-900 text-white space-y-4">
+        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-medium text-slate-400">Verifying administrator credentials...</p>
+      </div>
+    );
+  }
+
+  // 2. Unauthenticated user (not logged in or during logout transition)
+  if (!isAuthenticated) {
+    return (
+      <div className="max-w-md mx-auto py-32 px-4 text-center space-y-5">
+        <div className="w-16 h-16 rounded-3xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 mx-auto flex items-center justify-center shadow-lg">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white">Admin Authentication Required</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            Please sign in with your verified Southeast University faculty or administrator account to access NoteLagbe HQ.
+          </p>
+        </div>
+        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowAuthModal(true)}
+            className="w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold text-xs bg-blue-600 text-white hover:bg-blue-700 shadow-md transition-all cursor-pointer"
+          >
+            Sign In to Console
+          </button>
+          <Link
+            href="/"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-all"
+          >
+            Back to Home
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Authenticated user, but account is a public student account (ROLE_STUDENT)
+  if (!isAdmin) {
     return (
       <div className="max-w-md mx-auto py-32 px-4 text-center space-y-5">
         <div className="w-16 h-16 rounded-3xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 mx-auto flex items-center justify-center shadow-lg">
@@ -3864,16 +3907,16 @@ export default function AdminDashboardPage() {
         </div>
         <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link
-            href="/"
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:opacity-90"
+            href="/dashboard"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs bg-blue-600 text-white hover:bg-blue-700 transition-all shadow-md"
           >
-            Back to Home
+            Go to Student Dashboard
           </Link>
           <Link
-            href="/courses"
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
+            href="/"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-all"
           >
-            Browse Courses
+            Back to Home
           </Link>
         </div>
       </div>
@@ -4210,7 +4253,10 @@ export default function AdminDashboardPage() {
                   <button
                     onClick={() => {
                       setProfileDropdownOpen(false);
-                      logout();
+                      if (typeof window !== "undefined") {
+                        window.location.replace("/");
+                      }
+                      logout(false);
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-bold transition-all group cursor-pointer"
                   >
@@ -4667,7 +4713,12 @@ export default function AdminDashboardPage() {
                 <ExternalLink className="w-3 h-3 text-slate-500 dark:text-slate-400" />
               </Link>
               <button
-                onClick={() => logout()}
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    window.location.replace("/");
+                  }
+                  logout(false);
+                }}
                 className="p-2 rounded-xl bg-white hover:bg-rose-50 dark:bg-slate-800 dark:hover:bg-rose-950/60 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 transition-colors border border-slate-200 dark:border-slate-700/60 shadow-2xs cursor-pointer"
                 title="Log out"
               >
