@@ -5590,33 +5590,37 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
 
-              {/* Search & Action Toolbar */}
-              <div className="p-4 rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-3 shadow-sm">
-                <div className="relative w-full md:w-80">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              {/* Search & Action Toolbar - 2 Distinct Rows (Row 1: Search, Row 2: All Filters & Actions) */}
+              <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 flex flex-col gap-3.5 shadow-sm">
+                {/* Row 1: Full-width Search Bar */}
+                <div className="relative w-full">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
                     value={resourceSearch}
                     onChange={(e) => setResourceSearch(e.target.value)}
                     placeholder="Search title, course code, teacher..."
-                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full pl-11 pr-10 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-all shadow-inner"
                   />
                   {resourceSearch && (
                     <button
                       onClick={() => setResourceSearch("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs rounded-lg transition-colors cursor-pointer"
+                      title="Clear search"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" />
                     </button>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 w-full md:w-auto flex-wrap justify-between md:justify-end">
-                  <div className="flex items-center gap-2">
+                {/* Row 2: All Filters & Action Buttons */}
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                  {/* Left Side: All Filters (Department, Type, Faculty Selector, Faculty ZIP) */}
+                  <div className="flex items-center gap-2 flex-wrap">
                     <select
                       value={departmentFilter}
                       onChange={(e) => setDepartmentFilter(e.target.value)}
-                      className="px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-200 font-semibold focus:outline-none"
+                      className="px-3 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-200 font-semibold focus:outline-none cursor-pointer"
                     >
                       <option value="ALL">All Departments ({filteredResources.length})</option>
                       {dynamicDepartments.map((dept) => (
@@ -5629,7 +5633,7 @@ export default function AdminDashboardPage() {
                     <select
                       value={resourceTypeFilter}
                       onChange={(e) => setResourceTypeFilter(e.target.value)}
-                      className="px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-200 font-semibold focus:outline-none"
+                      className="px-3 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-200 font-semibold focus:outline-none cursor-pointer"
                     >
                       <option value="ALL">All Material Types</option>
                       <option value="NOTE">Lecture Notes</option>
@@ -5705,15 +5709,16 @@ export default function AdminDashboardPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  {/* Right Side: Action Buttons (Upload Material & Add Department) */}
+                  <div className="flex items-center gap-2 shrink-0">
                     {/* PRIMARY ACTION: Upload Material */}
                     <button
                       type="button"
                       onClick={openNewResourceModal}
-                      className="px-4 py-2 rounded-2xl font-bold text-xs bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/25 flex items-center gap-1.5 transition-all"
+                      className="px-4 py-2.5 rounded-2xl font-bold text-xs bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/25 flex items-center gap-1.5 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
                       title="Upload new lecture notes, exam papers, or lab manuals"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-4 h-4" />
                       <span>Upload Material</span>
                     </button>
 
@@ -5721,7 +5726,7 @@ export default function AdminDashboardPage() {
                     <button
                       type="button"
                       onClick={() => setShowAddDeptModal(true)}
-                      className="px-3 py-2 rounded-2xl font-bold text-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 transition-all shadow-sm"
+                      className="px-3.5 py-2.5 rounded-2xl font-bold text-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 transition-all shadow-sm cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
                       title="Register a new academic department into the system"
                     >
                       <Building2 className="w-3.5 h-3.5 text-blue-500" />
