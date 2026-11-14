@@ -42,6 +42,26 @@ const INITIAL_CSE_COURSES = ((coursesCatalogData as any[]) || []).filter(
 );
 const INITIAL_TEACHERS = (teachersDirectoryData as any[]) || [];
 
+const catalogMap = new Map((coursesCatalogData as any[]).map((c) => [c.code?.toUpperCase(), c]));
+function enrichHomeCoursesWithCatalog(list: any[]): any[] {
+  if (!Array.isArray(list)) return [];
+  return list.map((c) => {
+    const cat = catalogMap.get(c.code?.toUpperCase());
+    if ((!c.teachers || c.teachers.length === 0) && cat?.teachers && cat.teachers.length > 0) {
+      return {
+        ...c,
+        teachers: cat.teachers,
+        hasNotes: c.hasNotes || cat.hasNotes,
+        hasQuestions: c.hasQuestions || cat.hasQuestions,
+        statusBadge: c.statusBadge && c.statusBadge !== "NONE" ? c.statusBadge : cat.statusBadge,
+        notesCount: typeof c.notesCount === "number" && c.notesCount > 0 ? c.notesCount : cat.notesCount,
+        questionsCount: typeof c.questionsCount === "number" && c.questionsCount > 0 ? c.questionsCount : cat.questionsCount,
+      };
+    }
+    return c;
+  });
+}
+
 export default function HomePage() {
   const router = useRouter();
   const { setShowAuthModal, isAuthenticated } = useAuth();
@@ -64,11 +84,11 @@ export default function HomePage() {
   // Instant cache load on client mount without causing SSR hydration mismatch
   useEffect(() => {
     try {
-      const cachedCourses = localStorage.getItem("notelagbe_cached_courses_v5");
+      const cachedCourses = localStorage.getItem("notelagbe_cached_courses_v7");
       if (cachedCourses) {
         const parsed = JSON.parse(cachedCourses);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setAllCourses(parsed);
+          setAllCourses(enrichHomeCoursesWithCatalog(parsed));
         }
       }
       const cachedTeachers = localStorage.getItem("notelagbe_cached_teachers_v5");
@@ -128,10 +148,11 @@ export default function HomePage() {
       const validTeachers = Array.isArray(teachersData) && teachersData.length > 0 ? teachersData : null;
 
       if (validAll) {
-        setAllCourses(validAll);
+        const enriched = enrichHomeCoursesWithCatalog(validAll);
+        setAllCourses(enriched);
         if (typeof window !== "undefined") {
           try {
-            localStorage.setItem("notelagbe_cached_courses_v5", JSON.stringify(validAll));
+            localStorage.setItem("notelagbe_cached_courses_v7", JSON.stringify(enriched));
           } catch {}
         }
       }

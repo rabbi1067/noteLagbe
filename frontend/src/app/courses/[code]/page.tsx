@@ -68,17 +68,22 @@ export default function CourseDetailPage() {
   const [course, setCourse] = useState<any>(() => {
     if (!code) return null;
     const cleanCode = code.toUpperCase();
+    const fromCatalog = (coursesCatalogData as any[]).find((c) => c.code?.toUpperCase() === cleanCode);
     if (typeof window !== "undefined") {
       try {
-        const cached = localStorage.getItem("notelagbe_cached_courses_v6");
+        const cached = localStorage.getItem("notelagbe_cached_courses_v7");
         if (cached) {
           const list = JSON.parse(cached);
           const found = list.find((c: any) => c.code?.toUpperCase() === cleanCode);
-          if (found) return found;
+          if (found) {
+            if ((!found.teachers || found.teachers.length === 0) && fromCatalog?.teachers?.length) {
+              return { ...found, teachers: fromCatalog.teachers };
+            }
+            return found;
+          }
         }
       } catch {}
     }
-    const fromCatalog = (coursesCatalogData as any[]).find((c) => c.code?.toUpperCase() === cleanCode);
     return fromCatalog || null;
   });
 
@@ -211,7 +216,7 @@ export default function CourseDetailPage() {
     let allList: any[] = coursesCatalogData as any[];
     if (typeof window !== "undefined") {
       try {
-        const cached = localStorage.getItem("notelagbe_cached_courses_v6");
+        const cached = localStorage.getItem("notelagbe_cached_courses_v7");
         if (cached) allList = JSON.parse(cached);
       } catch {}
     }

@@ -228,7 +228,7 @@ public class CourseService {
         // Fetch all approved resources for this course once
         List<Resource> courseResources = resourceRepository.findByCourseIdAndStatus(course.getId(), ResourceStatus.APPROVED);
 
-        // Find associated teachers with detailed per-teacher notes and questions breakdown (strictly based on authentic approved materials)
+        // Find associated teachers with detailed per-teacher notes and questions breakdown
         List<TeacherCourse> tcs = teacherCourseRepository.findByCourseId(course.getId());
         Map<Long, TeacherCourse> teacherCourseMap = new LinkedHashMap<>();
         for (TeacherCourse tc : tcs) {
@@ -237,6 +237,13 @@ public class CourseService {
             }
         }
         Map<Long, Teacher> distinctTeachers = new LinkedHashMap<>();
+        // Priority 1: All faculty officially assigned to this course by department/admin
+        for (TeacherCourse tc : tcs) {
+            if (tc.getTeacher() != null) {
+                distinctTeachers.putIfAbsent(tc.getTeacher().getId(), tc.getTeacher());
+            }
+        }
+        // Priority 2: Any additional faculty who contributed approved materials
         for (Resource r : courseResources) {
             if (r.getTeacher() != null) {
                 distinctTeachers.putIfAbsent(r.getTeacher().getId(), r.getTeacher());
@@ -358,6 +365,13 @@ public class CourseService {
             }
         }
         Map<Long, Teacher> distinctTeachers = new LinkedHashMap<>();
+        // Priority 1: All faculty officially assigned to this course by department/admin
+        for (TeacherCourse tc : tcs) {
+            if (tc.getTeacher() != null) {
+                distinctTeachers.putIfAbsent(tc.getTeacher().getId(), tc.getTeacher());
+            }
+        }
+        // Priority 2: Any additional faculty who contributed approved materials
         for (Resource r : courseResources) {
             if (r.getTeacher() != null) {
                 distinctTeachers.putIfAbsent(r.getTeacher().getId(), r.getTeacher());

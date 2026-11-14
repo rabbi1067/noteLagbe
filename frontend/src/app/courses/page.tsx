@@ -28,6 +28,27 @@ export default function CoursesPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [syncTick, setSyncTick] = useState(0);
 
+  const catalogMap = useMemo(() => new Map((coursesCatalogData as any[]).map((c) => [c.code?.toUpperCase(), c])), []);
+
+  const enrichWithCatalog = useCallback((list: any[]) => {
+    if (!Array.isArray(list)) return [];
+    return list.map((c) => {
+      const cat = catalogMap.get(c.code?.toUpperCase());
+      if ((!c.teachers || c.teachers.length === 0) && cat?.teachers && cat.teachers.length > 0) {
+        return {
+          ...c,
+          teachers: cat.teachers,
+          hasNotes: c.hasNotes || cat.hasNotes,
+          hasQuestions: c.hasQuestions || cat.hasQuestions,
+          statusBadge: c.statusBadge && c.statusBadge !== "NONE" ? c.statusBadge : cat.statusBadge,
+          notesCount: typeof c.notesCount === "number" && c.notesCount > 0 ? c.notesCount : cat.notesCount,
+          questionsCount: typeof c.questionsCount === "number" && c.questionsCount > 0 ? c.questionsCount : cat.questionsCount,
+        };
+      }
+      return c;
+    });
+  }, [catalogMap]);
+
   // Background silent revalidation: refreshes counts without wiping UI or blocking user
   const fetchCourses = useCallback(async (isSilent = true) => {
     if (!isSilent && courses.length === 0) setLoading(true);
@@ -35,10 +56,11 @@ export default function CoursesPage() {
       const data = await api.courses.getAll();
       const validCourses = Array.isArray(data) && data.length > 0 ? data : null;
       if (validCourses) {
-        setCourses(validCourses);
-        setAllCourses(validCourses);
+        const enriched = enrichWithCatalog(validCourses);
+        setCourses(enriched);
+        setAllCourses(enriched);
         try {
-          localStorage.setItem("notelagbe_cached_courses_v6", JSON.stringify(validCourses));
+          localStorage.setItem("notelagbe_cached_courses_v7", JSON.stringify(enriched));
         } catch {}
       }
     } catch {
@@ -46,23 +68,24 @@ export default function CoursesPage() {
     } finally {
       setLoading(false);
     }
-  }, [courses.length]);
+  }, [courses.length, enrichWithCatalog]);
 
   // Load from local storage cache if available and revalidate silently
   useEffect(() => {
     try {
-      const cached = localStorage.getItem("notelagbe_cached_courses_v6");
+      const cached = localStorage.getItem("notelagbe_cached_courses_v7");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setCourses(parsed);
-          setAllCourses(parsed);
+          const enriched = enrichWithCatalog(parsed);
+          setCourses(enriched);
+          setAllCourses(enriched);
         }
       }
     } catch {}
 
     fetchCourses(true);
-  }, [fetchCourses]);
+  }, [fetchCourses, enrichWithCatalog]);
 
   // Enterprise Live Sync: Instantly updates when admin adds/edits/deletes courses
   useDataSync(() => {

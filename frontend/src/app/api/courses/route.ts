@@ -5,7 +5,29 @@ import { resolveBackendBaseUrl } from "@/lib/backendUrl";
 export const dynamic = "force-dynamic";
 
 let cachedCoursesResponse: { data: any[]; timestamp: number } | null = null;
-const CACHE_TTL_MS = 30 * 1000; // 30 seconds server memory cache
+const CACHE_TTL_MS = 60 * 1000; // 60 seconds server memory cache
+
+// Pre-create catalog lookup map for instant 0ms faculty enrichment
+const catalogMap = new Map((catalogCourses as any[]).map((c) => [c.code?.toUpperCase(), c]));
+
+function enrichWithCatalog(courses: any[]): any[] {
+  if (!Array.isArray(courses)) return [];
+  return courses.map((c) => {
+    const cat = catalogMap.get(c.code?.toUpperCase());
+    if ((!c.teachers || c.teachers.length === 0) && cat?.teachers && cat.teachers.length > 0) {
+      return {
+        ...c,
+        teachers: cat.teachers,
+        hasNotes: c.hasNotes || cat.hasNotes,
+        hasQuestions: c.hasQuestions || cat.hasQuestions,
+        statusBadge: c.statusBadge && c.statusBadge !== "NONE" ? c.statusBadge : cat.statusBadge,
+        notesCount: typeof c.notesCount === "number" && c.notesCount > 0 ? c.notesCount : cat.notesCount,
+        questionsCount: typeof c.questionsCount === "number" && c.questionsCount > 0 ? c.questionsCount : cat.questionsCount,
+      };
+    }
+    return c;
+  });
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -27,9 +49,9 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // 2. Try to fetch fresh live data from Spring Boot backend with fast 2.5s resilient timeout
+  // 2. Try to fetch fresh live data from Spring Boot backend with 6s resilient timeout
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 2500);
+  const timeoutId = setTimeout(() => controller.abort(), 6000);
   try {
     const backendUrl = resolveBackendBaseUrl();
     const queryString = searchParams.toString();
@@ -40,12 +62,13 @@ export async function GET(request: NextRequest) {
     });
 
     if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
+      const rawData = await res.json();
+      if (Array.isArray(rawData) && rawData.length > 0) {
+        const enriched = enrichWithCatalog(rawData);
         if (isDefaultQuery) {
-          cachedCoursesResponse = { data, timestamp: Date.now() };
+          cachedCoursesResponse = { data: enriched, timestamp: Date.now() };
         }
-        return NextResponse.json(data, {
+        return NextResponse.json(enriched, {
           headers: {
             "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
             "X-Data-Source": "backend-live",
@@ -54,7 +77,11 @@ export async function GET(request: NextRequest) {
       }
     }
   } catch {
-    // Backend cold or offline -> fallback immediately to bundled official catalog
+    // Backend cold or offline -> trigger background warm-up ping (fire-and-forget)
+    try {
+      const backendUrl = resolveBackendBaseUrl();
+      fetch(`${backendUrl}/api/courses`, { cache: "no-store" }).catch(() => {});
+    } catch {}
   } finally {
     clearTimeout(timeoutId);
   }
