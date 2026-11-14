@@ -139,8 +139,23 @@ public class ChatService {
             throw new ApiException("Message text cannot be empty.");
         }
 
+        boolean isStaff = sender.getRole() == Role.ROLE_ADMIN ||
+                          sender.getRole() == Role.ROLE_SUPER_ADMIN ||
+                          sender.getRole() == Role.ROLE_MANAGER;
+
+        String rawText = req.getText().trim();
+        if (!isStaff) {
+            String[] words = rawText.split("\\s+");
+            if (rawText.length() > 500) {
+                throw new ApiException("Message is too long. Student messages are limited to 500 characters (approx. 100 words) to prevent database overload.");
+            }
+            if (words.length > 100) {
+                throw new ApiException("Message cannot exceed 100 words for students. Please send concise messages.");
+            }
+        }
+
         // Apply enterprise input threat shield & automated profanity filter
-        String cleanText = inputSanitizationService.sanitizeAndValidateChatMessage(req.getText().trim());
+        String cleanText = inputSanitizationService.sanitizeAndValidateChatMessage(rawText);
 
         ChatMessage msg = new ChatMessage();
         msg.setSender(sender);
@@ -227,6 +242,21 @@ public class ChatService {
                                           String replyToText) throws IOException {
         if (sender.isChatBlocked()) {
             throw new ApiException("Your chat privileges have been suspended by an administrator.");
+        }
+
+        boolean isStaff = sender.getRole() == Role.ROLE_ADMIN ||
+                          sender.getRole() == Role.ROLE_SUPER_ADMIN ||
+                          sender.getRole() == Role.ROLE_MANAGER;
+
+        if (caption != null && !caption.isBlank() && !isStaff) {
+            String cleanCaption = caption.trim();
+            String[] words = cleanCaption.split("\\s+");
+            if (cleanCaption.length() > 500) {
+                throw new ApiException("Image caption cannot exceed 500 characters.");
+            }
+            if (words.length > 100) {
+                throw new ApiException("Image caption cannot exceed 100 words.");
+            }
         }
 
         String extDot = FileUploadSecurityValidator.validateImage(imageFile, 15L * 1024 * 1024);

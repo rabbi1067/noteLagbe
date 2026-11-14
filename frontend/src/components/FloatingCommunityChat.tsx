@@ -74,6 +74,9 @@ export default function FloatingCommunityChat() {
   const { language } = useLanguage();
   const { isDark } = useTheme();
   const isBn = language === "bn";
+  const isStaff = Boolean(isAdmin || isSuperAdmin || user?.role === "ROLE_ADMIN" || user?.role === "ROLE_SUPER_ADMIN" || user?.role === "ROLE_MANAGER");
+  const MAX_STUDENT_CHARS = 500;
+  const MAX_STUDENT_WORDS = 100;
 
   const [mounted, setMounted] = useState(false);
   const formatNumber = useCallback((num: number | string) => {
@@ -628,9 +631,18 @@ export default function FloatingCommunityChat() {
     }
   }, [isOpen, messages.length, showScrollBottom, scrollToBottom]);
 
-  // Profanity detector
+  // Profanity detector & student text length limiter
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
+    if (!isStaff && val.length > MAX_STUDENT_CHARS) {
+      toast.warning(
+        isBn
+          ? "মেসেজ সর্বোচ্চ ৫০০ অক্ষরের (১০০ শব্দ) মধ্যে সীমাবদ্ধ।"
+          : "Message is limited to 500 characters (max 100 words).",
+        { id: "chat-char-limit-toast", duration: 3000 }
+      );
+      return;
+    }
     setInputText(val);
     setProfanityWarning(PROFANITY_REGEX.test(val));
   };
@@ -694,11 +706,31 @@ export default function FloatingCommunityChat() {
   const handleSendImage = async () => {
     if (!selectedImageFile || !checkAuthGuard() || isSubmitting) return;
 
+    const caption = inputText.trim();
+    if (!isStaff && caption) {
+      const words = caption.split(/\s+/).filter(Boolean);
+      if (caption.length > MAX_STUDENT_CHARS) {
+        toast.error(
+          isBn
+            ? "ছবির ক্যাপশন সর্বোচ্চ ৫০০ অক্ষরের মধ্যে সীমাবদ্ধ।"
+            : "Image caption cannot exceed 500 characters."
+        );
+        return;
+      }
+      if (words.length > MAX_STUDENT_WORDS) {
+        toast.error(
+          isBn
+            ? `ছবির ক্যাপশন সর্বোচ্চ ১০০ শব্দের মধ্যে সীমাবদ্ধ। (${words.length} শব্দ)`
+            : `Image caption cannot exceed 100 words. (${words.length} words)`
+        );
+        return;
+      }
+    }
+
     try {
       setIsSubmitting(true);
       const formData = new FormData();
       formData.append("file", selectedImageFile);
-      const caption = inputText.trim();
       if (caption) {
         formData.append("caption", caption);
       }
@@ -750,6 +782,26 @@ export default function FloatingCommunityChat() {
 
     const trimmed = inputText.trim();
     if (!trimmed || isSubmitting) return;
+
+    if (!isStaff) {
+      const words = trimmed.split(/\s+/).filter(Boolean);
+      if (trimmed.length > MAX_STUDENT_CHARS) {
+        toast.error(
+          isBn
+            ? "মেসেজ সর্বোচ্চ ৫০০ অক্ষরের মধ্যে সীমাবদ্ধ।"
+            : "Message cannot exceed 500 characters."
+        );
+        return;
+      }
+      if (words.length > MAX_STUDENT_WORDS) {
+        toast.error(
+          isBn
+            ? `মেসেজ সর্বোচ্চ ১০০ শব্দের মধ্যে সীমাবদ্ধ। (${words.length} শব্দ)`
+            : `Message cannot exceed 100 words. (${words.length} words)`
+        );
+        return;
+      }
+    }
 
     try {
       setIsSubmitting(true);
@@ -2180,6 +2232,7 @@ export default function FloatingCommunityChat() {
                     if (!isAuthenticated) checkAuthGuard();
                   }}
                   disabled={Boolean(user?.chatBlocked)}
+                  maxLength={isStaff ? 2000 : MAX_STUDENT_CHARS}
                   placeholder={
                     user?.chatBlocked
                       ? isBn
@@ -2197,12 +2250,29 @@ export default function FloatingCommunityChat() {
                       ? "লগইন করে চ্যাটে অংশ নিন..."
                       : "Sign in to participate..."
                   }
-                  className={`w-full rounded-full px-4 py-2 text-xs transition-colors disabled:opacity-50 focus:outline-none ${
+                  className={`w-full rounded-full ${
+                    !isStaff && inputText.length > 0 ? "pr-24 pl-4" : "px-4"
+                  } py-2 text-xs transition-colors disabled:opacity-50 focus:outline-none ${
                     isDark
                       ? "bg-slate-900/90 border border-white/15 focus:border-cyan-400 text-white placeholder-slate-400"
                       : "bg-white border border-slate-300 focus:border-blue-500 text-slate-900 placeholder-slate-400 shadow-inner"
                   }`}
                 />
+                {!isStaff && inputText.length > 0 && (
+                  <div
+                    className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-mono font-bold pointer-events-none px-1.5 py-0.5 rounded-full backdrop-blur-md transition-colors select-none ${
+                      inputText.length > 450 || inputText.trim().split(/\s+/).filter(Boolean).length > 90
+                        ? "bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse"
+                        : inputText.length > 350 || inputText.trim().split(/\s+/).filter(Boolean).length > 70
+                        ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                        : isDark
+                        ? "bg-slate-800/80 text-slate-400 border border-slate-700/50"
+                        : "bg-slate-200/90 text-slate-600 border border-slate-300"
+                    }`}
+                  >
+                    {inputText.trim().split(/\s+/).filter(Boolean).length}/100w • {inputText.length}/500
+                  </div>
+                )}
               </div>
 
               {/* Send Button */}
