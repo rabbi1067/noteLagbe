@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   X,
   Sparkles,
@@ -262,6 +262,17 @@ export default function CheatSheetModal({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Selected faculty display name (must be declared before callbacks and hooks)
+  const activeTeacher = teachers?.find((t) => t.id === selectedTeacherId);
+  const teacherInit = activeTeacher?.initial || "FAC";
+
+  // Catalog of linked exam papers for this course (unconditionally declared at top level)
+  const examPapers: ExamPaperLink[] = useMemo(() => {
+    return getExamPapersForCourse(courseCode, courseTitle, activeTeacher?.name);
+  }, [courseCode, courseTitle, activeTeacher?.name]);
+
+  const currentPaper = examPapers[selectedPaperIndex] || examPapers[0];
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -296,8 +307,6 @@ export default function CheatSheetModal({
       scrollToBottom();
     }
   }, [messages, activeTab]);
-
-  if (!isOpen) return null;
 
   const handlePrint = () => {
     window.print();
@@ -385,17 +394,6 @@ export default function CheatSheetModal({
       toast.error(err.message || "Failed to clear conversation.");
     }
   };
-
-  // Selected faculty display name
-  const activeTeacher = teachers.find((t) => t.id === selectedTeacherId);
-  const teacherInit = activeTeacher?.initial || "FAC";
-
-  // Catalog of linked exam papers for this course
-  const examPapers: ExamPaperLink[] = React.useMemo(() => {
-    return getExamPapersForCourse(courseCode, courseTitle, activeTeacher?.name);
-  }, [courseCode, courseTitle, activeTeacher?.name]);
-
-  const currentPaper = examPapers[selectedPaperIndex] || examPapers[0];
 
   // Dynamic suggestion pills based on selected teacher or general and current interface language
   const promptSuggestions = activeTeacher
@@ -584,6 +582,8 @@ export default function CheatSheetModal({
       return part;
     });
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
