@@ -42,6 +42,7 @@ import {
   Flame,
   FileText,
   ShieldCheck,
+  Zap,
   ExternalLink,
   BookOpen,
   Image as ImageIcon,
@@ -248,6 +249,15 @@ export default function SmartAdvisingRoutineTool() {
     "FRI",
     "SAT",
   ]);
+  const [strictDayFilter, setStrictDayFilter] = useState<boolean>(true);
+  const [strictDayConflict, setStrictDayConflict] = useState<{
+    hasConflict: boolean;
+    requestedDays: string[];
+    missingCourses: { code: string; title: string; offeredDays: string[] }[];
+    isClashOnly: boolean;
+    suggestedDay: string | null;
+  } | null>(null);
+  const [isRelaxedResult, setIsRelaxedResult] = useState<boolean>(false);
   const [facultyPreferences, setFacultyPreferences] = useState<Record<string, string[]>>({});
   const [isFacultyExpanded, setIsFacultyExpanded] = useState<boolean>(false);
 
@@ -387,6 +397,7 @@ export default function SmartAdvisingRoutineTool() {
   // Handler to toggle course selection with strict 17-credit limit enforcement
   const handleToggleCourse = (courseCode: string, credits: number) => {
     const isSelected = selectedCourses.includes(courseCode);
+    setStrictDayConflict(null);
     if (isSelected) {
       setSelectedCourses((prev) => prev.filter((code) => code !== courseCode));
     } else {
@@ -427,6 +438,13 @@ export default function SmartAdvisingRoutineTool() {
     }
 
     setGenerating(true);
+    setStrictDayConflict(null);
+
+    // If custom catalog is loaded, solve directly using client's uploaded dataset
+    if (isCustomUpload) {
+      runClientSideRoutineSolver();
+      return;
+    }
 
     try {
       const effectiveTimePref = timePreference === "CUSTOM"
@@ -443,6 +461,9 @@ export default function SmartAdvisingRoutineTool() {
       });
 
       if (res && res.routines && res.routines.length >= 1) {
+        const hasPreferredDays = preferredDays && preferredDays.length > 0 && preferredDays.length < 7;
+        const prefSet = new Set(preferredDays.map((d) => d.toUpperCase()));
+
         const formatted: GeneratedRoutineOption[] = res.routines.slice(0, 10).map((r: any, idx: number) => ({
           ...r,
           rank: idx + 1,
@@ -464,8 +485,32 @@ export default function SmartAdvisingRoutineTool() {
             };
           }),
         }));
+
+        // Strict Day Filter Enforcement:
+        if (hasPreferredDays && strictDayFilter) {
+          const strictlyMatchingRoutines = formatted.filter((r) =>
+            r.activeDays.every((d) => prefSet.has(d.toUpperCase()))
+          );
+
+          if (strictlyMatchingRoutines.length > 0) {
+            setRoutines(strictlyMatchingRoutines);
+            setSelectedRoutineIndex(0);
+            setIsRelaxedResult(false);
+            setStrictDayConflict(null);
+            triggerSuccessFeedback(strictlyMatchingRoutines.length);
+            setGenerating(false);
+            return;
+          } else {
+            // Backend returned routines with unselected days; run client solver for strict diagnosis
+            runClientSideRoutineSolver();
+            return;
+          }
+        }
+
         setRoutines(formatted);
         setSelectedRoutineIndex(0);
+        setIsRelaxedResult(false);
+        setStrictDayConflict(null);
         triggerSuccessFeedback(formatted.length);
         setGenerating(false);
         return;
@@ -478,8 +523,15 @@ export default function SmartAdvisingRoutineTool() {
     runClientSideRoutineSolver();
   };
 
-  const runClientSideRoutineSolver = () => {
+  const runClientSideRoutineSolver = (forceRelaxed = false) => {
+    const isDayFilterActive = preferredDays && preferredDays.length > 0 && preferredDays.length < 7;
+    const prefSet = new Set(preferredDays.map((d) => d.toUpperCase()));
+    const useStrict = strictDayFilter && isDayFilterActive && !forceRelaxed;
+
+    // 1. Prepare candidate sections for each selected course
     const courseSecsList: OfferedSectionItem[][] = [];
+    const missingCoursesInfo: { code: string; title: string; offeredDays: string[] }[] = [];
+
     for (const cCode of selectedCourses) {
       const pool = sections.filter((s) => s.courseCode === cCode);
       if (pool.length === 0) {
@@ -487,9 +539,67 @@ export default function SmartAdvisingRoutineTool() {
         setGenerating(false);
         return;
       }
-      courseSecsList.push(pool);
+
+      if (useStrict) {
+        const strictSecs = pool.filter(
+          (sec) =>
+            sec.slots &&
+            sec.slots.length > 0 &&
+            sec.slots.every((sl) => prefSet.has(sl.day.toUpperCase()))
+        );
+
+        if (strictSecs.length === 0) {
+          const offeredDays = Array.from(
+            new Set(pool.flatMap((sec) => sec.slots.map((sl) => sl.day.toUpperCase())))
+          );
+          missingCoursesInfo.push({
+            code: cCode,
+            title: getSeuCourseTitle(cCode, pool[0]?.courseTitle),
+            offeredDays,
+          });
+        } else {
+          courseSecsList.push(strictSecs);
+        }
+      } else if (isDayFilterActive) {
+        // Prioritize sections that fit preferred days first so outside days are explored last
+        const sortedPool = [...pool].sort((s1, s2) => {
+          const out1 = s1.slots.filter((sl) => !prefSet.has(sl.day.toUpperCase())).length;
+          const out2 = s2.slots.filter((sl) => !prefSet.has(sl.day.toUpperCase())).length;
+          return out1 - out2;
+        });
+        courseSecsList.push(sortedPool);
+      } else {
+        courseSecsList.push(pool);
+      }
     }
 
+    // In strict mode, if any course has 0 sections matching target days:
+    if (useStrict && missingCoursesInfo.length > 0) {
+      const dayFrequency: Record<string, number> = {};
+      missingCoursesInfo.forEach((m) => {
+        m.offeredDays.forEach((d) => {
+          if (!prefSet.has(d)) {
+            dayFrequency[d] = (dayFrequency[d] || 0) + 1;
+          }
+        });
+      });
+      const suggestedDay =
+        Object.entries(dayFrequency).sort((a, b) => b[1] - a[1])[0]?.[0] || "SAT";
+
+      setStrictDayConflict({
+        hasConflict: true,
+        requestedDays: preferredDays,
+        missingCourses: missingCoursesInfo,
+        isClashOnly: false,
+        suggestedDay,
+      });
+      setRoutines([]);
+      setIsRelaxedResult(false);
+      setGenerating(false);
+      return;
+    }
+
+    // 2. Backtracking search
     const validCombos: OfferedSectionItem[][] = [];
 
     const backtrack = (idx: number, current: OfferedSectionItem[]) => {
@@ -516,8 +626,25 @@ export default function SmartAdvisingRoutineTool() {
 
     backtrack(0, []);
 
+    // 3. Handle zero combinations
     if (validCombos.length === 0) {
+      if (useStrict) {
+        const suggestedDay = WEEK_DAYS.find((d) => !prefSet.has(d)) || "SAT";
+        setStrictDayConflict({
+          hasConflict: true,
+          requestedDays: preferredDays,
+          missingCourses: [],
+          isClashOnly: true,
+          suggestedDay,
+        });
+        setRoutines([]);
+        setIsRelaxedResult(false);
+        setGenerating(false);
+        return;
+      }
+
       setRoutines([]);
+      setIsRelaxedResult(false);
       toast.error(
         language === "bn"
           ? "এই কোর্সগুলোর মধ্যে ১০০% ক্ল্যাশ-মুক্ত কোনো রুটিন তৈরি সম্ভব হয়নি। দয়া করে অন্য কোর্স নির্বাচন করুন।"
@@ -526,6 +653,10 @@ export default function SmartAdvisingRoutineTool() {
       setGenerating(false);
       return;
     }
+
+    // Successful combinations found
+    setStrictDayConflict(null);
+    setIsRelaxedResult(forceRelaxed || (!useStrict && isDayFilterActive));
 
     // Score client combinations
     const scored: GeneratedRoutineOption[] = validCombos.map((combo) => {
@@ -1564,16 +1695,49 @@ export default function SmartAdvisingRoutineTool() {
 
           {/* 3. Target Days */}
           <div className="space-y-2.5">
-            <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-300">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono font-bold text-slate-300">
               <span className="flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Target Days (Strict Filter)</span>
+                <span>Target Days</span>
               </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 font-bold">
-                {preferredDays.length === 7
-                  ? "All 7 Days (Flexible)"
-                  : `${preferredDays.length} / 7 Days Active`}
-              </span>
+              <div className="flex items-center gap-2">
+                {preferredDays.length < 7 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStrictDayFilter((prev) => !prev);
+                      setStrictDayConflict(null);
+                    }}
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded-full border transition-all cursor-pointer flex items-center gap-1 ${
+                      strictDayFilter
+                        ? "bg-emerald-950/80 text-emerald-300 border-emerald-700/60 font-black shadow-sm shadow-emerald-500/20"
+                        : "bg-amber-950/80 text-amber-300 border-amber-700/60 font-medium"
+                    }`}
+                    title={
+                      strictDayFilter
+                        ? "Strict Filter: Zero classes on unselected days"
+                        : "Flexible Mode: Allow extra days if no clash-free combination exists"
+                    }
+                  >
+                    {strictDayFilter ? (
+                      <>
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                        <span>Strict Filter</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-3 h-3 text-amber-400" />
+                        <span>Flexible</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 font-bold">
+                  {preferredDays.length === 7
+                    ? "All 7 Days (Flexible)"
+                    : `${preferredDays.length} / 7 Days Active`}
+                </span>
+              </div>
             </div>
 
             {/* Quick SEU Presets */}
@@ -1594,6 +1758,7 @@ export default function SmartAdvisingRoutineTool() {
                     key={p.label}
                     type="button"
                     onClick={() => {
+                      setStrictDayConflict(null);
                       if (p.isToggle) {
                         if (preferredDays.includes("FRI")) {
                           if (preferredDays.length > 1) {
@@ -1628,6 +1793,7 @@ export default function SmartAdvisingRoutineTool() {
                     key={day}
                     type="button"
                     onClick={() => {
+                      setStrictDayConflict(null);
                       if (active) {
                         if (preferredDays.length <= 1) {
                           toast.error("Please keep at least 1 day selected.");
@@ -1654,9 +1820,20 @@ export default function SmartAdvisingRoutineTool() {
             </div>
 
             <p className="text-[10px] text-slate-400 leading-relaxed pt-0.5">
-              {language === "bn"
-                ? "💡 নির্বাচিত দিনগুলোতে ক্লাস থাকা রুটিনগুলো ১০০% প্রায়োরিটি নিয়ে সবার উপরে রাংক করবে। অনির্বাচিত দিনগুলোকে অফ-ডে রাখা হবে।"
-                : "💡 Routines fitting strictly within your selected days rank #1. Unselected days are treated as off-campus days."}
+              {strictDayFilter && preferredDays.length < 7 ? (
+                <span className="text-emerald-400 font-medium flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0 inline" />
+                  {language === "bn"
+                    ? "কঠোর ফিল্টার সক্রিয়: অনির্বাচিত কোনো বারে ক্লাস থাকবে না। ১০০% নির্বাচিত দিনগুলোতেই রুটিন সীমাবদ্ধ থাকবে।"
+                    : "Strict Filter Active: Zero classes on unselected days guaranteed. Routines will strictly fit your selected days only."}
+                </span>
+              ) : (
+                <span>
+                  {language === "bn"
+                    ? "💡 নির্বাচিত দিনগুলোতে ক্লাস থাকা রুটিনগুলো ১০০% প্রায়োরিটি নিয়ে সবার উপরে রাংক করবে। অনির্বাচিত দিনগুলোকে অফ-ডে রাখা হবে।"
+                    : "💡 Routines fitting within your selected days rank #1. Unselected days are treated as off-campus days."}
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -1845,6 +2022,105 @@ export default function SmartAdvisingRoutineTool() {
         </div>
       </div>
 
+      {/* Target Day Strict Conflict Diagnostic Alert */}
+      {strictDayConflict && (
+        <div className="rounded-3xl bg-gradient-to-b from-amber-950/40 to-slate-900/90 border border-amber-500/50 p-5 sm:p-6 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200 space-y-4">
+          <div className="flex items-start gap-3.5">
+            <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0 mt-0.5">
+              <AlertTriangle className="w-5 h-5 text-amber-400" />
+            </div>
+            <div className="space-y-1.5 flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm sm:text-base font-black text-white">
+                  {language === "bn"
+                    ? `নির্বাচিত ${strictDayConflict.requestedDays.length} দিনের মধ্যে রুটিন সাজানো সম্ভব হয়নি`
+                    : `No Clash-Free Routine Fits Strictly Within Your ${strictDayConflict.requestedDays.length} Selected Days`}
+                </h3>
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">
+                  {strictDayConflict.requestedDays.join(", ")}
+                </span>
+              </div>
+
+              <div className="text-xs text-slate-300 space-y-1.5 pt-1">
+                {strictDayConflict.missingCourses.length > 0 ? (
+                  <>
+                    <p className="text-slate-400">
+                      {language === "bn"
+                        ? "নিচের কোর্সগুলোর কোনো সেকশন আপনার নির্বাচিত দিনগুলোতে অফার করা হয়নি:"
+                        : "The following courses have NO available sections on your selected days:"}
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      {strictDayConflict.missingCourses.map((mc) => (
+                        <div
+                          key={mc.code}
+                          className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700/80 flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <span className="font-mono font-black text-xs text-blue-400 mr-2">{mc.code}</span>
+                            <span className="text-[11px] text-slate-300 truncate block">{mc.title}</span>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-[10px] font-mono text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/50">
+                              Only {mc.offeredDays.join(", ")}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-slate-300">
+                    {language === "bn"
+                      ? "আপনার নির্বাচিত কোর্সগুলোর সেকশন এই দিনগুলোতে পাওয়া গেলেও তাদের ক্লাস টাইম ওভারল্যাপ (ক্ল্যাশ) করছে।"
+                      : "The available sections for your selected courses have overlapping times (clashes) on these days."}
+                  </p>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2.5 pt-3">
+                {strictDayConflict.suggestedDay && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newDays = Array.from(new Set([...preferredDays, strictDayConflict.suggestedDay!]));
+                      setPreferredDays(newDays);
+                      setStrictDayConflict(null);
+                      setTimeout(() => {
+                        handleGenerateRoutines();
+                      }, 100);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>
+                      {language === "bn"
+                        ? `${strictDayConflict.suggestedDay} যুক্ত করুন (+১ দিন) এবং রুটিন তৈরি করুন`
+                        : `Allow ${strictDayConflict.suggestedDay} (+1 Day) & Generate`}
+                    </span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    runClientSideRoutineSolver(true); // forceRelaxed = true
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <span>
+                    {language === "bn"
+                      ? "১টি অফ-ডে সহ সেরা রুটিনগুলো দেখুন"
+                      : "View Best Routines with 1 Extra Day"}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ========================================================================= */}
       {/* 3. GENERATED ROUTINES & TIMETABLE RESULTS                                 */}
       {/* ========================================================================= */}
@@ -1854,6 +2130,31 @@ export default function SmartAdvisingRoutineTool() {
           id="routine-timetable-container"
           className="rounded-3xl bg-[#0B0F19] border border-slate-800 p-5 sm:p-7 shadow-2xl space-y-6 backdrop-blur-xl animate-in fade-in duration-300"
         >
+          {/* Relaxed Filter Notice Banner */}
+          {isRelaxedResult && (
+            <div className="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-500/40 flex flex-wrap items-center justify-between gap-3 text-xs animate-in fade-in duration-200">
+              <div className="flex items-center gap-2.5 text-amber-200">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  {language === "bn"
+                    ? "নোট: নির্বাচিত দিনগুলোতে সব কোর্সের সেকশন না থাকায় ন্যূনতম অফ-ক্যাম্পাস দিন সহ বিকল্প রুটিন দেখানো হয়েছে।"
+                    : "Notice: Showing best conflict-free routines with minimal extra days because some courses lack sections on your target days."}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStrictDayFilter(true);
+                  setIsRelaxedResult(false);
+                  runClientSideRoutineSolver();
+                }}
+                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-mono text-[10px] font-bold border border-amber-500/40 shrink-0 cursor-pointer"
+              >
+                Enforce Strict Filter
+              </button>
+            </div>
+          )}
+
           {/* Header */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
             <div className="flex items-start gap-3">
@@ -2052,6 +2353,11 @@ export default function SmartAdvisingRoutineTool() {
                           <span className="text-[10px] font-mono text-slate-400">
                             {isFree ? "Free" : `${daySlots.length} class`}
                           </span>
+                          {!isFree && preferredDays.length < 7 && !preferredDays.includes(day) && (
+                            <span className="mt-1 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                              Extra Day
+                            </span>
+                          )}
                         </div>
 
                         {/* Timeline Track */}

@@ -335,9 +335,65 @@ public class AdvisingScheduleService {
             }
         }
 
-        // Generate clash-free combinations with backtracking/pruning
+        // Generate clash-free combinations with strict target days prioritization
+        boolean hasPreferredDays = preferredDays != null && !preferredDays.isEmpty() && preferredDays.size() < 7;
+        Set<String> prefSet = hasPreferredDays
+                ? preferredDays.stream().map(String::toUpperCase).collect(Collectors.toSet())
+                : Collections.emptySet();
+
         List<List<OfferedSection>> validCombinations = new ArrayList<>();
-        backtrackCombinations(courseSectionsList, 0, new ArrayList<>(), validCombinations);
+        boolean strictMatchesFound = false;
+        List<String> coursesWithNoStrictSections = new ArrayList<>();
+
+        if (hasPreferredDays) {
+            // Tier 1: Try strict filtering first (only candidate sections whose slots all lie in prefSet)
+            List<List<OfferedSection>> strictSectionsList = new ArrayList<>();
+            boolean allCoursesHaveStrictSecs = true;
+
+            for (int i = 0; i < cleanCourseCodes.size(); i++) {
+                String cCode = cleanCourseCodes.get(i);
+                List<OfferedSection> allSecs = courseSectionsList.get(i);
+                List<OfferedSection> strictSecs = allSecs.stream().filter(s -> {
+                    List<TimeSlot> slots = parseSlots(s.getScheduleJson());
+                    if (slots.isEmpty()) return false;
+                    return slots.stream().allMatch(slot -> prefSet.contains(slot.day.toUpperCase()));
+                }).collect(Collectors.toList());
+
+                if (strictSecs.isEmpty()) {
+                    allCoursesHaveStrictSecs = false;
+                    coursesWithNoStrictSections.add(cCode);
+                } else {
+                    strictSectionsList.add(strictSecs);
+                }
+            }
+
+            if (allCoursesHaveStrictSecs && strictSectionsList.size() == cleanCourseCodes.size()) {
+                backtrackCombinations(strictSectionsList, 0, new ArrayList<>(), validCombinations);
+                if (!validCombinations.isEmpty()) {
+                    strictMatchesFound = true;
+                }
+            }
+        }
+
+        // Tier 2: If no target day filter or if strict mode yielded 0 clash-free combinations:
+        if (validCombinations.isEmpty()) {
+            if (hasPreferredDays) {
+                // Prioritize sections that fit preferred days first so outside days are explored last
+                List<List<OfferedSection>> prioritizedList = new ArrayList<>();
+                for (List<OfferedSection> secs : courseSectionsList) {
+                    List<OfferedSection> sortedSecs = new ArrayList<>(secs);
+                    sortedSecs.sort((s1, s2) -> {
+                        long out1 = parseSlots(s1.getScheduleJson()).stream().filter(slot -> !prefSet.contains(slot.day.toUpperCase())).count();
+                        long out2 = parseSlots(s2.getScheduleJson()).stream().filter(slot -> !prefSet.contains(slot.day.toUpperCase())).count();
+                        return Long.compare(out1, out2);
+                    });
+                    prioritizedList.add(sortedSecs);
+                }
+                backtrackCombinations(prioritizedList, 0, new ArrayList<>(), validCombinations);
+            } else {
+                backtrackCombinations(courseSectionsList, 0, new ArrayList<>(), validCombinations);
+            }
+        }
 
         if (validCombinations.isEmpty()) {
             Map<String, Object> emptyRes = new HashMap<>();
@@ -345,6 +401,8 @@ public class AdvisingScheduleService {
             emptyRes.put("totalCombinationsTested", 0);
             emptyRes.put("validRoutinesCount", 0);
             emptyRes.put("routines", Collections.emptyList());
+            emptyRes.put("strictDayMatch", false);
+            emptyRes.put("coursesWithNoStrictSections", coursesWithNoStrictSections);
             emptyRes.put("message", "No 100% clash-free routine combination is possible with these chosen courses. Try swapping one course or offering alternate sections.");
             return emptyRes;
         }
@@ -358,7 +416,6 @@ public class AdvisingScheduleService {
 
         // Sort descending by score, strictly prioritizing combinations that match user's selected preferred days
         if (preferredDays != null && !preferredDays.isEmpty()) {
-            Set<String> prefSet = preferredDays.stream().map(String::toUpperCase).collect(Collectors.toSet());
             scoredList.sort((a, b) -> {
                 long aOutside = a.activeDays.stream().filter(d -> !prefSet.contains(d)).count();
                 long bOutside = b.activeDays.stream().filter(d -> !prefSet.contains(d)).count();
@@ -384,6 +441,8 @@ public class AdvisingScheduleService {
         res.put("totalCombinationsTested", validCombinations.size());
         res.put("validRoutinesCount", scoredList.size());
         res.put("semester", targetSemester);
+        res.put("strictDayMatch", strictMatchesFound);
+        res.put("coursesWithNoStrictSections", coursesWithNoStrictSections);
         res.put("routines", topRoutines);
         return res;
     }
