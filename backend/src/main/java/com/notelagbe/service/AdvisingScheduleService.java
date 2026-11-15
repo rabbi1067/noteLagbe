@@ -744,7 +744,7 @@ public class AdvisingScheduleService {
         Pattern credPattern = Pattern.compile("ml-3[^\"]*\">([0-9.]+)<");
         Pattern facPattern = Pattern.compile("\\[([A-Za-z0-9_-]+)\\]\\s*([^<]+)<");
         Pattern seatsPattern = Pattern.compile("(\\d+)\\s*</div>\\s*<div[^>]*><div[^>]*class=\"[^\"]*ng-star-inserted");
-        Pattern schedPattern = Pattern.compile("(SUN|MON|TUE|WED|THU|FRI|SAT)\\s*#\\s*([0-9]{2}:[0-9]{2})\\s*~\\s*([0-9]{2}:[0-9]{2})\\s*@\\s*([A-Za-z0-9_-]+)");
+        Pattern schedPattern = Pattern.compile("(?i)(SUN|MON|TUE|WED|THU|FRI|SAT)\\s*#?\\s*([0-9]{1,2}:[0-9]{2})\\s*(?:~|---|--|–|—|-|to)\\s*([0-9]{1,2}:[0-9]{2})(?:\\s*@?\\s*([A-Za-z0-9_-]+))?");
 
         for (int i = 1; i < blocks.length; i++) {
             String chunk = blocks[i].length() > 3000 ? blocks[i].substring(0, 3000) : blocks[i];
@@ -845,7 +845,7 @@ public class AdvisingScheduleService {
 
         if (matchStarts.isEmpty()) return list;
 
-        Pattern schedPattern = Pattern.compile("(?i)(SUN|MON|TUE|WED|THU|FRI|SAT)\\s*#?\\s*([0-9]{1,2}:[0-9]{2})\\s*(?:~|-|to)\\s*([0-9]{1,2}:[0-9]{2})(?:\\s*@?\\s*([A-Za-z0-9_-]+))?");
+        Pattern schedPattern = Pattern.compile("(?i)(SUN|MON|TUE|WED|THU|FRI|SAT)\\s*#?\\s*([0-9]{1,2}:[0-9]{2})\\s*(?:~|---|--|–|—|-|to)\\s*([0-9]{1,2}:[0-9]{2})(?:\\s*@?\\s*([A-Za-z0-9_-]+))?");
         Pattern facPattern = Pattern.compile("\\[([A-Za-z0-9_-]{2,6})\\]\\s*([^\\n\\r0-9<]+)?");
         Pattern credPattern = Pattern.compile("(?:^|\\s)(1\\.0|1\\.5|2\\.0|3\\.0|4\\.0|1|2|3|4)(?:\\s|Cr|cr|Credits|\\b)");
 
@@ -890,22 +890,38 @@ public class AdvisingScheduleService {
                 } catch (Exception ignored) {}
             }
 
+            int availableSeats = 40;
             String title = courseCode;
-            String afterSec = chunk.replaceFirst("^[A-Z]{3,4}\\d{3}\\.\\d+", "").trim();
-            String[] lines = afterSec.split("[\\r\\n]+");
-            for (String line : lines) {
-                String candidate = line.replaceAll("\\[.*?\\]", "").replaceAll("\\d+\\s*(?:Cr|cr)?", "").trim();
-                if (candidate.isEmpty()) continue;
-                String upper = candidate.toUpperCase();
-                if (upper.equals("CSE.") || upper.equals("CSE") || upper.equals("EEE.") || upper.equals("EEE") ||
-                    upper.equals("BBA.") || upper.equals("BBA") || upper.startsWith("B.SC") ||
-                    upper.startsWith("DEPT") || upper.contains("SUN") || upper.contains("MON") ||
-                    upper.contains("TUE") || upper.contains("WED") || upper.contains("THU") || upper.contains("FRI") || upper.contains("SAT")) {
-                    continue;
+            if (chunk.contains("\t")) {
+                String[] cols = chunk.split("\t");
+                if (cols.length >= 2) {
+                    String candidate = cols[1].replaceAll("\\[.*?\\]", "").replaceAll("\\d+", "").trim();
+                    if (candidate.length() >= 3 && !candidate.equalsIgnoreCase("CSE.") && !candidate.equalsIgnoreCase("CSE")) {
+                        title = candidate;
+                    }
                 }
-                if (candidate.length() >= 3) {
-                    title = candidate;
-                    break;
+                if (cols.length >= 5) {
+                    try {
+                        availableSeats = Integer.parseInt(cols[4].trim());
+                    } catch (Exception ignored) {}
+                }
+            } else {
+                String afterSec = chunk.replaceFirst("^[A-Z]{3,4}\\d{3}\\.\\d+", "").trim();
+                String[] lines = afterSec.split("[\\r\\n]+");
+                for (String line : lines) {
+                    String candidate = line.replaceAll("\\[.*?\\]", "").replaceAll("\\d+\\s*(?:Cr|cr)?", "").trim();
+                    if (candidate.isEmpty()) continue;
+                    String upper = candidate.toUpperCase();
+                    if (upper.equals("CSE.") || upper.equals("CSE") || upper.equals("EEE.") || upper.equals("EEE") ||
+                        upper.equals("BBA.") || upper.equals("BBA") || upper.startsWith("B.SC") ||
+                        upper.startsWith("DEPT") || upper.contains("SUN") || upper.contains("MON") ||
+                        upper.contains("TUE") || upper.contains("WED") || upper.contains("THU") || upper.contains("FRI") || upper.contains("SAT")) {
+                        continue;
+                    }
+                    if (candidate.length() >= 3) {
+                        title = candidate;
+                        break;
+                    }
                 }
             }
 
@@ -916,7 +932,7 @@ public class AdvisingScheduleService {
             ps.credits = credits;
             ps.facultyInitial = facInit;
             ps.facultyName = facName;
-            ps.availableSeats = 40;
+            ps.availableSeats = availableSeats;
             ps.scheduleText = schedSummary.toString();
             ps.slots = slots;
             list.add(ps);
