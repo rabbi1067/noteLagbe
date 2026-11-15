@@ -9,6 +9,7 @@ import {
   OfferedSectionItem,
   TimeSlot,
 } from "@/data/seuAdvisingCatalog";
+import { getSeuCourseTitle } from "@/data/seuCourseTitles";
 import {
   Calendar,
   Clock,
@@ -23,10 +24,13 @@ import {
   AlertTriangle,
   Info,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
   ChevronLeft,
   Filter,
   Search,
+  Plus,
+  X,
   RefreshCw,
   Trash2,
   Star,
@@ -190,6 +194,7 @@ export default function SmartAdvisingRoutineTool() {
   // Selection: Starts EMPTY (Manual course selection by student)
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const [courseSearchQuery, setCourseSearchQuery] = useState<string>("");
+  const [isCoursesExpanded, setIsCoursesExpanded] = useState<boolean>(false);
 
   // Preferences: Default to ANY (Balanced / Any Time Slot Flexible)
   const [timePreference, setTimePreference] = useState<
@@ -286,14 +291,18 @@ export default function SmartAdvisingRoutineTool() {
   const coursesCatalog = useMemo(() => {
     const map = new Map<string, { title: string; credits: number; sections: OfferedSectionItem[] }>();
     sections.forEach((s) => {
+      const canonicalTitle = getSeuCourseTitle(s.courseCode, s.courseTitle);
       if (!map.has(s.courseCode)) {
         map.set(s.courseCode, {
-          title: s.courseTitle,
+          title: canonicalTitle,
           credits: s.credits,
           sections: [],
         });
       }
-      map.get(s.courseCode)!.sections.push(s);
+      map.get(s.courseCode)!.sections.push({
+        ...s,
+        courseTitle: canonicalTitle,
+      });
     });
 
     const all = Array.from(map.entries()).map(([code, data]) => ({
@@ -332,6 +341,26 @@ export default function SmartAdvisingRoutineTool() {
       return sum + (match?.credits || 3.0);
     }, 0);
   }, [selectedCourses, coursesCatalog]);
+
+  // Handler to toggle course selection with strict 17-credit limit enforcement
+  const handleToggleCourse = (courseCode: string, credits: number) => {
+    const isSelected = selectedCourses.includes(courseCode);
+    if (isSelected) {
+      setSelectedCourses((prev) => prev.filter((code) => code !== courseCode));
+    } else {
+      const currentTotal = selectedCreditsTotal;
+      const newTotal = currentTotal + credits;
+      if (newTotal > 17) {
+        toast.error(
+          language === "bn"
+            ? `সর্বোচ্চ ১৭ ক্রেডিট নির্বাচন করা যাবে (থিয়োরি ও ল্যাব মিলিয়ে)। ${courseCode} (${credits} Cr) যোগ করলে মোট ${newTotal} ক্রেডিট হয়ে যায়!`
+            : `Maximum 17 credits allowed per semester (Theory + Lab combined). Adding ${courseCode} (${credits} Cr) exceeds 17 credits!`
+        );
+        return;
+      }
+      setSelectedCourses((prev) => [...prev, courseCode]);
+    }
+  };
 
   // Search-filtered theory & lab courses
   const filteredTheoryCourses = useMemo(() => {
@@ -845,15 +874,37 @@ export default function SmartAdvisingRoutineTool() {
         if (!isNaN(parsedCred)) credits = parsedCred;
       }
 
-      let title = courseCode;
+      let title = "";
       const afterSec = chunk.replace(/^[A-Z]{3,4}\d{3}\.\d+/, "").trim();
       const lines = afterSec.split(/[\r\n]+/);
-      if (lines.length > 0 && lines[0].trim()) {
-        const candidate = lines[0].replace(/\[.*?\]/g, "").replace(/\d+\s*(?:Cr|cr)?/g, "").trim();
-        if (candidate.length >= 3 && !candidate.toUpperCase().includes("SUN") && !candidate.toUpperCase().includes("MON")) {
+      for (const line of lines) {
+        const candidate = line
+          .replace(/\[.*?\]/g, "")
+          .replace(/\d+\s*(?:Cr|cr|Credits)?/g, "")
+          .replace(/&amp;/g, "&")
+          .trim();
+        if (!candidate) continue;
+        const upper = candidate.toUpperCase();
+        if (
+          upper === "CSE." || upper === "CSE" ||
+          upper === "EEE." || upper === "EEE" ||
+          upper === "BBA." || upper === "BBA" ||
+          upper === "TEXTILE" || upper === "LAW" || upper === "PHR" || upper === "ENG" ||
+          upper === "B.SC." || upper === "B.SC" || upper.startsWith("B.SC IN") ||
+          upper.startsWith("DEPARTMENT") || upper.startsWith("DEPT") || upper.startsWith("PROGRAM") ||
+          upper === "SL" || upper === "COURSE" || upper === "SECTION" ||
+          upper.includes("SUN") || upper.includes("MON") || upper.includes("TUE") ||
+          upper.includes("WED") || upper.includes("THU") || upper.includes("FRI") || upper.includes("SAT")
+        ) {
+          continue;
+        }
+        if (candidate.length >= 3) {
           title = candidate;
+          break;
         }
       }
+
+      title = getSeuCourseTitle(courseCode, title);
 
       list.push({
         courseCode,
@@ -892,7 +943,7 @@ export default function SmartAdvisingRoutineTool() {
 
         const titleM = chunk.match(titlePattern);
         const rawTitle = titleM ? titleM[1].trim() : courseCode;
-        const title = rawTitle.replace(/&amp;/g, "&").trim();
+        const title = getSeuCourseTitle(courseCode, rawTitle.replace(/&amp;/g, "&").trim());
 
         const credM = chunk.match(credPattern);
         const credits = credM ? parseFloat(credM[1].trim()) : 3.0;
@@ -1101,215 +1152,401 @@ export default function SmartAdvisingRoutineTool() {
       )}
 
       {/* ========================================================================= */}
-      {/* 1. TARGET COURSE SELECTOR (FULL WIDTH - MANUAL SELECTION) */}
+      {/* 1. TARGET COURSE SELECTOR (SEARCH-TO-ADD & SEE MORE / SEE LESS)           */}
       {/* ========================================================================= */}
-      <div className="rounded-3xl bg-slate-900/60 border border-slate-800 p-5 sm:p-6 backdrop-blur-md space-y-5">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-blue-400" />
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                <span>{language === "bn" ? "১. টার্গেট কোর্স নির্বাচন করুন" : "1. Select Target Courses"}</span>
-                <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                  {selectedCourses.length} Courses • {selectedCreditsTotal} Credits
-                </span>
-              </h2>
-              <p className="text-xs text-slate-400">
-                {language === "bn"
-                  ? "যেসব কোর্স এই সেমিস্টারে নিতে চান সেগুলো ক্লিক করে নির্বাচন করুন। ওপেন ক্রেডিট ও ল্যাব সহজে কম্বাইন করুন।"
-                  : "Click courses you intend to register this semester. Combine Theory and Labs to build your schedule."}
-              </p>
+      {(() => {
+        const isSearching = courseSearchQuery.trim().length > 0;
+        const theoryToShow = isSearching || isCoursesExpanded ? filteredTheoryCourses : filteredTheoryCourses.slice(0, 6);
+        const labToShow = isSearching || isCoursesExpanded ? filteredLabCourses : filteredLabCourses.slice(0, 4);
+        const totalAvailable = filteredTheoryCourses.length + filteredLabCourses.length;
+        const totalShown = theoryToShow.length + labToShow.length;
+        const hasMore = !isSearching && totalShown < totalAvailable;
+
+        return (
+          <div className="rounded-3xl bg-slate-900/60 border border-slate-800 p-5 sm:p-6 backdrop-blur-md space-y-5">
+            {/* Header: Title, Credit Tracker Badge, Search Bar & Quick Actions */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0 mt-0.5">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-base sm:text-lg font-black text-white">
+                      {language === "bn" ? "১. টার্গেট কোর্স নির্বাচন করুন" : "1. Select Target Courses"}
+                    </h2>
+                    <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      {selectedCourses.length} {language === "bn" ? "টি কোর্স" : "Courses"}
+                    </span>
+                    {/* Max 17-Credit Limit Badge */}
+                    <span className={`text-xs font-mono font-bold px-3 py-0.5 rounded-full border transition-all ${
+                      selectedCreditsTotal >= 17
+                        ? "bg-amber-950/70 text-amber-300 border-amber-500/60 shadow-sm"
+                        : selectedCreditsTotal > 0
+                        ? "bg-blue-950/70 text-blue-300 border-blue-500/40"
+                        : "bg-slate-800 text-slate-400 border-slate-700"
+                    }`}>
+                      {selectedCreditsTotal} / 17 Credits
+                      {selectedCreditsTotal >= 17 && (
+                        <span className="ml-1 text-[10px] text-amber-400 font-sans font-bold">
+                          ({language === "bn" ? "সর্বোচ্চ সীমা" : "Max Reached"})
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    {language === "bn"
+                      ? "থিয়োরি ও ল্যাব মিলিয়ে সর্বোচ্চ ১৭ ক্রেডিট পর্যন্ত নির্বাচন করা যাবে। সার্চ করে সহজে যেকোনো কোর্স যুক্ত করুন।"
+                      : "Select Theory and Lab courses (max 17 credits combined). Search to quickly add courses."}
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Actions & Live Search-to-Add Input */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative min-w-[210px] sm:min-w-[260px] flex-1">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={courseSearchQuery}
+                    onChange={(e) => setCourseSearchQuery(e.target.value)}
+                    placeholder={language === "bn" ? "কোর্স সার্চ করে যুক্ত করুন (e.g. CSE4, Compiler)..." : "Search to add (e.g. CSE4, Compiler, Lab)..."}
+                    className="w-full text-xs py-2 pl-8 pr-7 rounded-xl bg-slate-800/90 border border-slate-700 text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
+                  />
+                  {courseSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setCourseSearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 cursor-pointer"
+                      title="Clear search"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sample = ["CSE355", "CSE381", "CSE382", "CSE443", "CSE444"].filter(c => coursesCatalog.some(cat => cat.code === c));
+                    const targetList = sample.length > 0 ? sample : coursesCatalog.slice(0, 5).map(c => c.code);
+                    let total = 0;
+                    const capped: string[] = [];
+                    for (const code of targetList) {
+                      const cObj = coursesCatalog.find(c => c.code === code);
+                      const cred = cObj?.credits || 3.0;
+                      if (total + cred <= 17) {
+                        capped.push(code);
+                        total += cred;
+                      }
+                    }
+                    setSelectedCourses(capped);
+                    toast.success(
+                      language === "bn"
+                        ? `৫টি রেকমেন্ডেড কোর্স (${total} ক্রেডিট) সিলেক্ট করা হয়েছে!`
+                        : `Loaded recommended standard courses (${total} credits)!`
+                    );
+                  }}
+                  className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                  <span>Recommend 5 (11 Cr)</span>
+                </button>
+
+                {selectedCourses.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCourses([])}
+                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-mono font-bold transition-all cursor-pointer"
+                    >
+                      Clear ({selectedCourses.length})
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleGenerateRoutines}
+                      disabled={generating}
+                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black shadow-lg shadow-emerald-500/25 transition-all flex items-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      <Sparkles className={`w-3.5 h-3.5 ${generating ? "animate-spin" : ""}`} />
+                      <span>
+                        {generating
+                          ? "Solving..."
+                          : language === "bn"
+                          ? `১০টি রুটিন সাজান (${selectedCourses.length}টি কোর্স) 🚀`
+                          : `Generate 10 Routines 🚀`}
+                      </span>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Quick Actions & Live Filter */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[180px] sm:min-w-[220px]">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={courseSearchQuery}
-                onChange={(e) => setCourseSearchQuery(e.target.value)}
-                placeholder={language === "bn" ? "কোর্স সার্চ (e.g. CSE355, Lab)..." : "Filter courses (e.g. CSE355, Embedded)..."}
-                className="w-full text-xs py-2 pl-8 pr-3 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                const sample = ["CSE355", "CSE381", "CSE382", "CSE443", "CSE444"].filter(c => coursesCatalog.some(cat => cat.code === c));
-                setSelectedCourses(sample.length > 0 ? sample : coursesCatalog.slice(0, 5).map(c => c.code));
-                toast.success("Loaded 5 recommended standard courses (11 credits)!");
-              }}
-              className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-              <span>Recommend 5 (11 Cr)</span>
-            </button>
-
+            {/* Active Selected Target Courses Shelf */}
             {selectedCourses.length > 0 && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCourses([])}
-                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-mono font-bold transition-all cursor-pointer"
-                >
-                  Clear ({selectedCourses.length})
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleGenerateRoutines}
-                  disabled={generating}
-                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black shadow-lg shadow-emerald-500/25 transition-all flex items-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-                >
-                  <Sparkles className={`w-3.5 h-3.5 ${generating ? "animate-spin" : ""}`} />
-                  <span>
-                    {generating
-                      ? "Solving..."
-                      : language === "bn"
-                      ? `১০টি রুটিন সাজান (${selectedCourses.length}টি কোর্স) 🚀`
-                      : `Generate 10 Routines 🚀`}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-slate-900 border border-blue-500/30 space-y-2.5 animate-in fade-in duration-200">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="font-bold text-blue-300 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-blue-400" />
+                    <span>{language === "bn" ? "সিলেক্ট করা টার্গেট কোর্সসমূহ:" : "Active Selected Target Courses:"}</span>
+                    <span className="font-mono text-[11px] text-slate-400">({selectedCourses.length})</span>
                   </span>
-                </button>
-              </>
+                  <span className="text-[11px] font-mono font-bold text-slate-300">
+                    {selectedCreditsTotal} / 17 Credits
+                    {selectedCreditsTotal < 17 ? (
+                      <span className="text-emerald-400 font-normal ml-1">
+                        ({17 - selectedCreditsTotal} Cr remaining)
+                      </span>
+                    ) : (
+                      <span className="text-amber-400 font-bold ml-1">
+                        ({language === "bn" ? "১৭ ক্রেডিট পূর্ণ" : "17 Cr Full"})
+                      </span>
+                    )}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {selectedCourses.map((cCode) => {
+                    const cObj = coursesCatalog.find((c) => c.code === cCode);
+                    const isLab = cObj?.isLab || false;
+                    const cred = cObj?.credits || 3.0;
+                    return (
+                      <div
+                        key={cCode}
+                        className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-2 shadow-sm transition-all ${
+                          isLab
+                            ? "bg-cyan-950/70 border-cyan-500/40 text-cyan-200"
+                            : "bg-blue-950/70 border-blue-500/40 text-blue-200"
+                        }`}
+                      >
+                        <span className="font-mono font-black">{cCode}</span>
+                        <span className="text-slate-300 text-[11px] truncate max-w-[130px] sm:max-w-[200px]" title={cObj?.title}>
+                          {cObj?.title || cCode}
+                        </span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-black/40 text-slate-300 border border-white/10 font-bold">
+                          {cred} Cr
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleCourse(cCode, cred)}
+                          className="p-0.5 rounded-md hover:bg-white/20 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                          title={`Remove ${cCode}`}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             )}
-          </div>
-        </div>
 
-        <div className="space-y-5">
-          {/* Theory Courses Group */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-300">
-              <div className="flex items-center gap-2">
-                <GraduationCap className="w-4 h-4 text-indigo-400" />
-                <span>Theory Courses (Paired Days • SUN+TUE / MON+WED / THU+SAT)</span>
-              </div>
-              <span className="text-[11px] text-slate-400 font-normal">
-                {filteredTheoryCourses.length} available
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {filteredTheoryCourses.map((c) => {
-                const isSelected = selectedCourses.includes(c.code);
-                return (
-                  <div
-                    key={c.code}
-                    onClick={() => {
-                      if (isSelected) {
-                        setSelectedCourses(selectedCourses.filter((code) => code !== c.code));
-                      } else {
-                        if (selectedCourses.length >= 7) {
-                          toast.error("Maximum 7 courses can be scheduled simultaneously.");
-                          return;
-                        }
-                        setSelectedCourses([...selectedCourses, c.code]);
-                      }
-                    }}
-                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-start justify-between gap-3 ${
-                      isSelected
-                        ? "bg-blue-600/15 border-blue-500/60 shadow-md shadow-blue-500/15 scale-[1.01]"
-                        : "bg-slate-800/40 border-slate-700/60 hover:border-slate-600 hover:bg-slate-800/70"
-                    }`}
-                  >
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-black text-sm text-white">{c.code}</span>
-                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                          {c.credits} Cr
-                        </span>
-                        <span className="text-[10px] text-slate-400">
-                          ({c.sections.length} sec)
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 truncate">{c.title}</p>
-                      <span className="text-[9px] font-mono text-indigo-400 block">
-                        Paired 80m Slots
-                      </span>
+            {/* Courses Groups (Theory & Lab) */}
+            <div className="space-y-5">
+              {/* Theory Courses Group */}
+              {theoryToShow.length > 0 && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-300">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="w-4 h-4 text-indigo-400" />
+                      <span>Theory Courses (Paired Days • SUN+TUE / MON+WED / THU+SAT)</span>
                     </div>
-                    <div
-                      className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
-                        isSelected
-                          ? "bg-blue-600 border-blue-500 text-white"
-                          : "border-slate-600 bg-slate-800/80 text-transparent"
-                      }`}
-                    >
-                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    </div>
+                    <span className="text-[11px] text-slate-400 font-normal">
+                      {isSearching
+                        ? `${theoryToShow.length} matches`
+                        : `${theoryToShow.length} of ${filteredTheoryCourses.length} shown`}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          </div>
 
-          {/* Practical Lab Courses Group */}
-          <div className="space-y-2.5 pt-3 border-t border-slate-800/80">
-            <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-300">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-cyan-400" />
-                <span>Lab Courses (Single Day • 2-Hour Practical Sessions)</span>
-              </div>
-              <span className="text-[11px] text-slate-400 font-normal">
-                {filteredLabCourses.length} available
-              </span>
-            </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {theoryToShow.map((c) => {
+                      const isSelected = selectedCourses.includes(c.code);
+                      const exceedsLimit = !isSelected && selectedCreditsTotal + c.credits > 17;
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {filteredLabCourses.map((c) => {
-                const isSelected = selectedCourses.includes(c.code);
-                return (
-                  <div
-                    key={c.code}
-                    onClick={() => {
-                      if (isSelected) {
-                        setSelectedCourses(selectedCourses.filter((code) => code !== c.code));
-                      } else {
-                        if (selectedCourses.length >= 7) {
-                          toast.error("Maximum 7 courses can be scheduled simultaneously.");
-                          return;
-                        }
-                        setSelectedCourses([...selectedCourses, c.code]);
-                      }
-                    }}
-                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-start justify-between gap-3 ${
-                      isSelected
-                        ? "bg-cyan-600/15 border-cyan-500/60 shadow-md shadow-cyan-500/15 scale-[1.01]"
-                        : "bg-slate-800/40 border-slate-700/60 hover:border-slate-600 hover:bg-slate-800/70"
-                    }`}
-                  >
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-black text-sm text-white">{c.code}</span>
-                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                          {c.credits} Cr
-                        </span>
-                        <span className="text-[10px] text-slate-400">
-                          ({c.sections.length} sec)
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-400 truncate">{c.title}</p>
-                      <span className="text-[9px] font-mono text-cyan-400 block">
-                        Single Day 120m Lab
-                      </span>
-                    </div>
-                    <div
-                      className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
-                        isSelected
-                          ? "bg-cyan-600 border-cyan-500 text-white"
-                          : "border-slate-600 bg-slate-800/80 text-transparent"
-                      }`}
-                    >
-                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    </div>
+                      return (
+                        <div
+                          key={c.code}
+                          onClick={() => handleToggleCourse(c.code, c.credits)}
+                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-start justify-between gap-3 group ${
+                            isSelected
+                              ? "bg-blue-600/15 border-blue-500/60 shadow-md shadow-blue-500/15 scale-[1.01]"
+                              : exceedsLimit
+                              ? "bg-slate-900/40 border-slate-800/80 text-slate-500 opacity-60 hover:border-amber-500/40"
+                              : "bg-slate-800/40 border-slate-700/60 hover:border-slate-500 hover:bg-slate-800/70"
+                          }`}
+                        >
+                          <div className="space-y-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-black text-sm text-white">{c.code}</span>
+                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                                {c.credits} Cr
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                ({c.sections.length} sec)
+                              </span>
+                            </div>
+                            {/* Real Course Title! */}
+                            <p className="text-xs font-bold text-slate-200 line-clamp-1 group-hover:text-blue-300 transition-colors" title={c.title}>
+                              {c.title}
+                            </p>
+                            <div className="flex items-center justify-between text-[9px] font-mono">
+                              <span className="text-indigo-400 block">
+                                Paired 80m Slots
+                              </span>
+                              {exceedsLimit && !isSelected && (
+                                <span className="text-amber-400 font-bold">
+                                  {language === "bn" ? ">১৭ ক্রেডিট" : ">17 Cr"}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div
+                            className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
+                              isSelected
+                                ? "bg-blue-600 border-blue-500 text-white"
+                                : "border-slate-600 bg-slate-800/80 text-transparent"
+                            }`}
+                          >
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              )}
+
+              {/* Practical Lab Courses Group */}
+              {labToShow.length > 0 && (
+                <div className="space-y-2.5 pt-3 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-300">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-cyan-400" />
+                      <span>Lab Courses (Single Day • 2-Hour Practical Sessions)</span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-normal">
+                      {isSearching
+                        ? `${labToShow.length} matches`
+                        : `${labToShow.length} of ${filteredLabCourses.length} shown`}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {labToShow.map((c) => {
+                      const isSelected = selectedCourses.includes(c.code);
+                      const exceedsLimit = !isSelected && selectedCreditsTotal + c.credits > 17;
+
+                      return (
+                        <div
+                          key={c.code}
+                          onClick={() => handleToggleCourse(c.code, c.credits)}
+                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-start justify-between gap-3 group ${
+                            isSelected
+                              ? "bg-cyan-600/15 border-cyan-500/60 shadow-md shadow-cyan-500/15 scale-[1.01]"
+                              : exceedsLimit
+                              ? "bg-slate-900/40 border-slate-800/80 text-slate-500 opacity-60 hover:border-amber-500/40"
+                              : "bg-slate-800/40 border-slate-700/60 hover:border-slate-500 hover:bg-slate-800/70"
+                          }`}
+                        >
+                          <div className="space-y-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-black text-sm text-white">{c.code}</span>
+                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                                {c.credits} Cr
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                ({c.sections.length} sec)
+                              </span>
+                            </div>
+                            {/* Real Course Title! */}
+                            <p className="text-xs font-bold text-slate-200 line-clamp-1 group-hover:text-cyan-300 transition-colors" title={c.title}>
+                              {c.title}
+                            </p>
+                            <div className="flex items-center justify-between text-[9px] font-mono">
+                              <span className="text-cyan-400 block">
+                                Single Day 120m Lab
+                              </span>
+                              {exceedsLimit && !isSelected && (
+                                <span className="text-amber-400 font-bold">
+                                  {language === "bn" ? ">১৭ ক্রেডিট" : ">17 Cr"}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div
+                            className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
+                              isSelected
+                                ? "bg-cyan-600 border-cyan-500 text-white"
+                                : "border-slate-600 bg-slate-800/80 text-transparent"
+                            }`}
+                          >
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* No Courses Match Search Feedback */}
+              {isSearching && theoryToShow.length === 0 && labToShow.length === 0 && (
+                <div className="p-8 rounded-2xl bg-slate-800/40 border border-slate-700/60 text-center space-y-2">
+                  <p className="text-sm font-bold text-slate-300">
+                    {language === "bn"
+                      ? `"${courseSearchQuery}" দিয়ে কোনো কোর্স পাওয়া যায়নি`
+                      : `No courses found matching "${courseSearchQuery}"`}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {language === "bn"
+                      ? "কোর্স কোড (e.g. CSE355, CSE4) বা বিষয়ের নাম দিয়ে সার্চ করুন।"
+                      : "Try searching by course code (e.g. CSE355, CSE4) or title keywords."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setCourseSearchQuery("")}
+                    className="px-4 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-bold cursor-pointer"
+                  >
+                    {language === "bn" ? "সার্চ ক্লিয়ার করুন" : "Clear Search Filter"}
+                  </button>
+                </div>
+              )}
+
+              {/* See More / See Less Toggle Button */}
+              {!isSearching && (
+                <div className="pt-2 flex justify-center">
+                  {!isCoursesExpanded && hasMore ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsCoursesExpanded(true)}
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 hover:border-blue-500 text-blue-400 hover:text-blue-300 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md hover:scale-[1.01]"
+                    >
+                      <span>
+                        {language === "bn"
+                          ? `সকল কোর্স দেখুন (${totalAvailable}টি কোর্স উপলব্ধ) ↓`
+                          : `See More Courses (${totalAvailable} available) ↓`}
+                      </span>
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                  ) : isCoursesExpanded ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsCoursesExpanded(false)}
+                      className="w-full sm:w-auto px-6 py-2 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                    >
+                      <span>
+                        {language === "bn" ? "কোর্স তালিকা সংক্ষেপ করুন ↑" : "See Less (Collapse) ↑"}
+                      </span>
+                      <ChevronUp className="w-4 h-4" />
+                    </button>
+                  ) : null}
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* 2 & 3. WORKSPACE: PRIORITIES & GENERATED ROUTINES (SIDE-BY-SIDE / FULL)   */}

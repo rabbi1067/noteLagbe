@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { api } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatTime12 } from "@/components/SmartAdvisingRoutineTool";
+import { getSeuCourseTitle } from "@/data/seuCourseTitles";
 import {
   Upload,
   Calendar,
@@ -478,8 +479,8 @@ export default function AdminAdvisingManager() {
                     <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
                       {s.courseCode}.{s.sectionNumber}
                     </td>
-                    <td className="py-3 px-4 font-sans text-slate-700 dark:text-slate-300 max-w-[220px] truncate">
-                      {s.courseTitle}
+                    <td className="py-3 px-4 font-sans text-slate-700 dark:text-slate-300 max-w-[220px] truncate" title={getSeuCourseTitle(s.courseCode, s.courseTitle)}>
+                      {getSeuCourseTitle(s.courseCode, s.courseTitle)}
                     </td>
                     <td className="py-3 px-4 text-slate-600 dark:text-slate-400 font-bold">
                       {s.credits} Cr

@@ -834,10 +834,19 @@ public class AdvisingScheduleService {
             String title = courseCode;
             String afterSec = chunk.replaceFirst("^[A-Z]{3,4}\\d{3}\\.\\d+", "").trim();
             String[] lines = afterSec.split("[\\r\\n]+");
-            if (lines.length > 0 && !lines[0].trim().isEmpty()) {
-                String candidate = lines[0].replaceAll("\\[.*?\\]", "").replaceAll("\\d+\\s*(?:Cr|cr)?", "").trim();
-                if (candidate.length() >= 3 && !candidate.toUpperCase().contains("SUN") && !candidate.toUpperCase().contains("MON")) {
+            for (String line : lines) {
+                String candidate = line.replaceAll("\\[.*?\\]", "").replaceAll("\\d+\\s*(?:Cr|cr)?", "").trim();
+                if (candidate.isEmpty()) continue;
+                String upper = candidate.toUpperCase();
+                if (upper.equals("CSE.") || upper.equals("CSE") || upper.equals("EEE.") || upper.equals("EEE") ||
+                    upper.equals("BBA.") || upper.equals("BBA") || upper.startsWith("B.SC") ||
+                    upper.startsWith("DEPT") || upper.contains("SUN") || upper.contains("MON") ||
+                    upper.contains("TUE") || upper.contains("WED") || upper.contains("THU") || upper.contains("FRI") || upper.contains("SAT")) {
+                    continue;
+                }
+                if (candidate.length() >= 3) {
                     title = candidate;
+                    break;
                 }
             }
 
