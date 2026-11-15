@@ -437,10 +437,13 @@ public class ContributionService {
                 String reason = !safeFeedback.isEmpty()
                         ? safeFeedback
                         : "Submission does not meet curriculum or quality standards.";
+                String clippedReason = reason.length() > 180 ? reason.substring(0, 177) + "..." : reason;
+                String safeResTitle = resourceTitle != null && resourceTitle.length() > 60
+                        ? resourceTitle.substring(0, 57) + "..." : (resourceTitle != null ? resourceTitle : "Material");
                 notificationService.createNotification(
                         contributor,
-                        "Submission Declined: " + resourceTitle,
-                        "Your contribution for " + courseCode + " was declined. Reason: " + reason,
+                        "Submission Declined: " + safeResTitle,
+                        "Your contribution for " + courseCode + " was declined. Reason: " + clippedReason,
                         "CONTRIBUTION_REJECTED",
                         "/contribute"
                 );

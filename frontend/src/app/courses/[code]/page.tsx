@@ -2400,7 +2400,8 @@ export default function CourseDetailPage() {
         courseTitle={course?.title}
         courseDepartment={course?.department}
         isCourseUnlocked={isCourseUnlocked}
-        teachers={courseFacultyList}
+        teachers={courseFacultyList || []}
+        resources={resources || []}
       />
     </div>
   );

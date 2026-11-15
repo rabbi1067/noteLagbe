@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -41,7 +42,7 @@ public class ActivityLogService {
     /**
      * Log an action with detailed metadata, client IP, and device info.
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ActivityLog logActivity(String action, String actionType, String details, String userEmail, String userName, String userRole, String ipAddress, String deviceInfo, String status) {
         try {
             String safeIp = clip((ipAddress != null && !ipAddress.isBlank()) ? ipAddress : "127.0.0.1", 58);

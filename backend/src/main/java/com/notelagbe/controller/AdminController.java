@@ -703,21 +703,27 @@ public class AdminController {
     }
 
     @PostMapping("/contributions/{id}/reject")
-    public ResponseEntity<ContributionRequest> rejectContribution(
+    public ResponseEntity<?> rejectContribution(
             @PathVariable Long id,
             @RequestBody(required = false) Map<String, String> body,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         User actor = resolveActor(userDetails);
         String feedback = body != null && body.containsKey("feedback") ? body.get("feedback") : "Resource does not meet quality requirements.";
-        ContributionRequest c = contributionService.rejectContribution(id, feedback);
-        Resource res = c.getUploadedResource();
-        String finalTitle = res != null ? res.getTitle() : "Material";
-        String finalCourse = (res != null && res.getCourse() != null) ? res.getCourse().getCode() : "N/A";
-        logAdminAction(actor, "CONTRIBUTION_REJECT", "CONTENT",
-                formatActorPrefix(actor) + " rejected Student Submission #" + id + " (\"" + finalTitle + "\" • " + finalCourse
-                        + ") from " + formatStudentLabel(c.getUser()) + " (" + feedback + ")");
-        evictAnalyticsCache();
-        return ResponseEntity.ok(c);
+        try {
+            ContributionRequest c = contributionService.rejectContribution(id, feedback);
+            Resource res = c.getUploadedResource();
+            String finalTitle = res != null ? res.getTitle() : "Material";
+            String finalCourse = (res != null && res.getCourse() != null) ? res.getCourse().getCode() : "N/A";
+            logAdminAction(actor, "CONTRIBUTION_REJECT", "CONTENT",
+                    formatActorPrefix(actor) + " rejected Student Submission #" + id + " (\"" + finalTitle + "\" • " + finalCourse
+                            + ") from " + formatStudentLabel(c.getUser()) + " (" + feedback + ")");
+            evictAnalyticsCache();
+            return ResponseEntity.ok(c);
+        } catch (ResourceNotFoundException ex) {
+            return ResponseEntity.status(404).body(Map.of("message", ex.getMessage()));
+        } catch (Exception ex) {
+            return ResponseEntity.status(400).body(Map.of("message", "Failed to reject submission: " + ex.getMessage()));
+        }
     }
 
     @DeleteMapping("/contributions/{id}")
