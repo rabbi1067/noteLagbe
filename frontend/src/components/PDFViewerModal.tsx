@@ -39,6 +39,7 @@ import {
 } from "@/lib/pdfMerger";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
+import PDFCanvasViewer from "@/components/PDFCanvasViewer";
 
 type ViewerDocKind = "pdf" | "image" | "drive-embed" | "pdf-embed" | "unsupported";
 
@@ -164,6 +165,7 @@ export default function PDFViewerModal({
   const [zoom, setZoom] = useState(100);
   const [rotation, setRotation] = useState(0); // 0, 90, 180, 270 degrees (for images/embeds)
   const [viewWidthMode, setViewWidthMode] = useState<"narrow" | "wide">("wide");
+  const [pdfViewLayout, setPdfViewLayout] = useState<"scroll" | "single">("scroll");
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Per-page PDF orientation normalization & rotation state
@@ -950,8 +952,8 @@ export default function PDFViewerModal({
         {isUnlocked && (resource.fileUrl || resource.id) && (
           <div className="flex items-center justify-between px-3 sm:px-6 py-2 border-b border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-900/90 text-xs flex-wrap gap-2">
             
-            {/* Left: View Width Switcher (Narrow vs Full Page) */}
-            <div className="flex items-center gap-1.5">
+            {/* Left: View Width Switcher (Narrow vs Full Page) & PDF Page Layout Switcher */}
+            <div className="flex items-center gap-2">
               <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 hidden md:inline">
                 View:
               </span>
@@ -983,6 +985,35 @@ export default function PDFViewerModal({
                   <span>Full Page</span>
                 </button>
               </div>
+
+              {detectedKind === "pdf" && (
+                <div className="flex items-center bg-white dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPdfViewLayout("scroll")}
+                    className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                      pdfViewLayout === "scroll"
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                    title="Continuous vertical scroll for all pages"
+                  >
+                    Scroll
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPdfViewLayout("single")}
+                    className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                      pdfViewLayout === "single"
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                    title="Single page flip mode"
+                  >
+                    Single
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Center: Zoom and Rotate ("Side Korao") Controls */}
@@ -1237,15 +1268,23 @@ export default function PDFViewerModal({
         >
           {isUnlocked && (resource.fileUrl || resource.id) ? (
             <div
-              className="relative flex items-center justify-center transition-all duration-200 ease-out origin-center w-full min-h-[72vh] sm:min-h-[80vh] h-[78vh] sm:h-[82vh]"
-              style={{
-                transform: `rotate(${cssRotationDeg}deg) scale(${zoom / 100})`,
-                transformOrigin: "center center",
-                width: isRotated ? "80vh" : "100%",
-                height: isRotated ? "80vw" : "100%",
-                minHeight: zoom > 100 ? `${zoom}%` : isRotated ? "80vw" : "75vh",
-                minWidth: zoom > 100 ? `${zoom}%` : isRotated ? "80vh" : "100%",
-              }}
+              className={`relative flex items-center justify-center transition-all duration-200 ease-out origin-center w-full ${
+                detectedKind === "pdf"
+                  ? "min-h-full h-auto py-2"
+                  : "min-h-[72vh] sm:min-h-[80vh] h-[78vh] sm:h-[82vh]"
+              }`}
+              style={
+                detectedKind === "pdf"
+                  ? undefined
+                  : {
+                      transform: `rotate(${cssRotationDeg}deg) scale(${zoom / 100})`,
+                      transformOrigin: "center center",
+                      width: isRotated ? "80vh" : "100%",
+                      height: isRotated ? "80vw" : "100%",
+                      minHeight: zoom > 100 ? `${zoom}%` : isRotated ? "80vw" : "75vh",
+                      minWidth: zoom > 100 ? `${zoom}%` : isRotated ? "80vh" : "100%",
+                    }
+              }
             >
               {/* Security Watermark Overlay for Student Anti-Scraping */}
               <div className="absolute inset-0 pointer-events-none z-10 flex flex-wrap items-center justify-around opacity-[0.05] select-none overflow-hidden">
@@ -1339,14 +1378,34 @@ export default function PDFViewerModal({
                   title={displayTitle}
                   allow="autoplay"
                 />
-              ) : detectedKind === "pdf" && blobUrl ? (
-                /* Embedded Document Frame (with #toolbar=0 to suppress browser PDF download/print tools) */
-                <iframe
-                  key={`${blobUrl}-p${activePdfPage}`}
-                  src={`${blobUrl}#page=${activePdfPage}&toolbar=0&navpanes=0`}
-                  className="w-full h-full border-none rounded-xl shadow-lg bg-white min-h-[500px]"
-                  title={displayTitle}
-                />
+              ) : detectedKind === "pdf" && (activePdfBytes || rawPdfBytes || blobUrl) ? (
+                /* High-Resolution HTML5 Canvas PDF Renderer (100% Mobile & Desktop Compatibility) */
+                <div className="w-full flex justify-center">
+                  <PDFCanvasViewer
+                    pdfBytes={activePdfBytes || rawPdfBytes}
+                    blobUrl={blobUrl}
+                    activePage={activePdfPage}
+                    onPageChange={(p) => {
+                      setActivePdfPage(p);
+                      if (pdfViewLayout === "scroll") {
+                        const targetEl = document.getElementById(`pdf-page-${p}`);
+                        targetEl?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }
+                    }}
+                    onTotalPagesDetected={(total) => {
+                      setPdfPageCount(total);
+                    }}
+                    zoom={zoom}
+                    rotation={applyCssTransformRotation ? 0 : rotation}
+                    pageExtraRotations={pageExtraRotations}
+                    viewMode={pdfViewLayout}
+                    watermarkText={user?.email || "Student Academic Portal"}
+                    onFallbackRequested={() => {
+                      setDetectedKind("pdf-embed");
+                      setEmbedUrl(blobUrl || resolveSafeEmbedUrl(resource.fileUrl, resource.id, isAdminMode));
+                    }}
+                  />
+                </div>
               ) : (
                 <div className="w-full h-full flex items-center justify-center p-6 rounded-xl bg-slate-900/95 border border-slate-800">
                   <div className="max-w-md w-full rounded-2xl bg-slate-950/90 border border-slate-800 p-6 text-center space-y-4">

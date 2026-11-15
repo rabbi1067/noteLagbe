@@ -289,13 +289,15 @@ export default function CourseDetailPage() {
       if (isSuperAdmin && superAdminTestLocked) return false;
       if (isCourseUnlocked || Boolean(res.fileUrl)) return true;
       const tId = res.teacher?.id;
-      if (tId == null) return false;
+      if (tId == null) {
+        return hasAnyCourseAccess;
+      }
       return (
         hasUnlockedForTeacher(code, tId) ||
         Boolean(course?.unlockedTeacherIds?.some((id: number) => Number(id) === Number(tId)))
       );
     },
-    [isSuperAdmin, superAdminTestLocked, isCourseUnlocked, hasUnlockedForTeacher, code, course?.unlockedTeacherIds]
+    [isSuperAdmin, superAdminTestLocked, isCourseUnlocked, hasUnlockedForTeacher, code, course?.unlockedTeacherIds, hasAnyCourseAccess]
   );
 
   const handleUnlockCourse = async () => {

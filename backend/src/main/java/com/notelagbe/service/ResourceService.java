@@ -178,7 +178,8 @@ public class ResourceService {
         // Mask the direct file URLs for resources the student has not unlocked (full course or gifted faculty)
         return resources.stream().map(r -> {
             boolean resourceUnlocked = fullCourseUnlocked
-                    || (r.getTeacher() != null && unlockedTeacherIds.contains(r.getTeacher().getId()));
+                    || (r.getTeacher() != null && unlockedTeacherIds.contains(r.getTeacher().getId()))
+                    || (r.getTeacher() == null && !unlockedTeacherIds.isEmpty());
             if (!resourceUnlocked) {
                 return maskLockedResource(r);
             }

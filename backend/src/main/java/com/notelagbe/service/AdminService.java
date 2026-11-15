@@ -400,23 +400,23 @@ public class AdminService {
             throw new ApiException("Target course code is required.");
         }
 
-        if (req.getTeacherId() == null || req.getTeacherId() <= 0) {
-            throw new ApiException("Please select a specific faculty member under this course to gift.");
-        }
-
         Course course = courseRepository.findByCodeIgnoreCase(req.getCourseCode().trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with code: " + req.getCourseCode()));
 
-        Teacher teacher = teacherRepository.findById(req.getTeacherId())
-                .orElseThrow(() -> new ResourceNotFoundException("Faculty member not found with ID: " + req.getTeacherId()));
+        Teacher teacher = null;
+        if (req.getTeacherId() != null && req.getTeacherId() > 0) {
+            teacher = teacherRepository.findById(req.getTeacherId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Faculty member not found with ID: " + req.getTeacherId()));
+        }
 
         LocalDateTime expiresAt = null;
         if (req.getValidityMonths() != null && req.getValidityMonths() > 0) {
             expiresAt = LocalDateTime.now().plusMonths(req.getValidityMonths());
         }
 
-        Optional<UnlockedCourse> existingOpt = unlockedCourseRepository.findByUserIdAndCourseIdAndTeacherId(
-                student.getId(), course.getId(), teacher.getId());
+        Optional<UnlockedCourse> existingOpt = teacher != null
+                ? unlockedCourseRepository.findByUserIdAndCourseIdAndTeacherId(student.getId(), course.getId(), teacher.getId())
+                : unlockedCourseRepository.findByUserIdAndCourseIdAndTeacherIsNull(student.getId(), course.getId());
         UnlockedCourse uc;
         boolean isExtension = false;
         if (existingOpt.isPresent()) {
@@ -430,7 +430,9 @@ public class AdminService {
         }
         unlockedCourseRepository.save(uc);
 
-        String teacherLabel = teacher.getName() + (teacher.getInitial() != null && !teacher.getInitial().isBlank() ? " [" + teacher.getInitial() + "]" : "");
+        String teacherLabel = teacher != null
+                ? teacher.getName() + (teacher.getInitial() != null && !teacher.getInitial().isBlank() ? " [" + teacher.getInitial() + "]" : "")
+                : "All Faculty (Full Course)";
 
         // 1. In-App Bell Notification + real-time SSE trigger for NotificationBell
         boolean bellNotified = false;
@@ -439,10 +441,11 @@ public class AdminService {
             String noteText = (req.getNote() != null && !req.getNote().trim().isEmpty())
                     ? " Admin Message: \"" + req.getNote().trim() + "\""
                     : "";
+            String scopeTitle = teacher != null ? "Faculty: " + teacherLabel : "All Faculty & Materials Unlocked";
             notificationService.createNotification(
                     student,
-                    "Faculty Course Gift from Administration! 🎁",
-                    "Super Admin has gifted you " + validityText + " to " + course.getCode() + " (" + course.getTitle() + ") — Faculty: " + teacherLabel + "!" + noteText,
+                    "Course Gift from Administration! 🎁",
+                    "Super Admin has gifted you " + validityText + " to " + course.getCode() + " (" + course.getTitle() + ") — " + scopeTitle + "!" + noteText,
                     "COURSE_GIFT",
                     "/courses/" + course.getCode()
             );
@@ -475,9 +478,9 @@ public class AdminService {
         res.put("courseId", course.getId());
         res.put("courseCode", course.getCode());
         res.put("courseTitle", course.getTitle());
-        res.put("teacherId", teacher.getId());
-        res.put("teacherName", teacher.getName());
-        res.put("teacherInitial", teacher.getInitial());
+        res.put("teacherId", teacher != null ? teacher.getId() : null);
+        res.put("teacherName", teacher != null ? teacher.getName() : "All Faculty (Full Course)");
+        res.put("teacherInitial", teacher != null ? teacher.getInitial() : null);
         res.put("studentId", student.getId());
         res.put("studentName", student.getName());
         res.put("studentEmail", student.getEmail());

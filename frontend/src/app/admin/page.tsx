@@ -2597,16 +2597,13 @@ export default function AdminDashboardPage() {
       toast.error("Please select a target course to gift.");
       return;
     }
-    if (!giftTeacherId) {
-      toast.error("Please select 1 faculty member under this course to gift.");
-      return;
-    }
+    const targetTeacherId = giftTeacherId ? Number(giftTeacherId) : undefined;
 
     setGiftingCourse(true);
     try {
       const res = await api.admin.giftCourseToStudent(giftTargetStudent.id, {
         courseCode: giftCourseCode,
-        teacherId: Number(giftTeacherId),
+        teacherId: targetTeacherId && targetTeacherId > 0 ? targetTeacherId : undefined,
         validityMonths: giftValidityMonths,
         note: giftNote.trim() || undefined,
       });
@@ -2615,7 +2612,7 @@ export default function AdminDashboardPage() {
       const notifSuffix = res.emailQueued
         ? " 🔔 Bell & Email Notification sent!"
         : " 🔔 Bell Notification sent!";
-      toast.success((res.message || `Faculty access for ${giftCourseCode} gifted successfully!`) + notifSuffix);
+      toast.success((res.message || `Access for ${giftCourseCode} gifted successfully!`) + notifSuffix);
       // Reset selectors so admin can immediately gift another faculty or course if desired
       setGiftCourseCode("");
       setGiftTeacherId("");
@@ -11893,49 +11890,62 @@ export default function AdminDashboardPage() {
                 return (
                   <div className="p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2.5 animate-in fade-in duration-200">
                     <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                      <span>2. Target Faculty under {giftCourseCode} * (1 Faculty)</span>
+                      <span>2. Target Faculty Scope under {giftCourseCode}</span>
                       <span className="text-[10px] text-amber-500 font-semibold">
-                        {courseTeachers.length} assigned w/ archive
+                        {giftTeacherId ? "1 Faculty Selected" : "Full Course (All Faculty)"}
                       </span>
                     </label>
 
-                    {courseTeachers.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {courseTeachers.map((t: any) => {
-                          const isSelected = Number(giftTeacherId) === Number(t.id);
-                          const count = (t.notesCount || 0) + (t.questionsCount || 0);
-                          return (
-                            <button
-                              key={t.id}
-                              type="button"
-                              onClick={() => setGiftTeacherId(Number(t.id))}
-                              className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                                isSelected
-                                  ? "bg-amber-500 text-slate-950 border-amber-400 shadow-sm shadow-amber-500/30"
-                                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-500/50"
-                              }`}
-                            >
-                              <span>{t.name}{t.initial ? ` [${t.initial}]` : ""}</span>
-                              {count > 0 && (
-                                <span className={`text-[9px] px-1.5 py-0.2 rounded-full ${
-                                  isSelected ? "bg-slate-950/20 text-slate-950" : "bg-blue-500/15 text-blue-500"
-                                }`}>
-                                  {count}
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        key="all-faculty"
+                        type="button"
+                        onClick={() => setGiftTeacherId("")}
+                        className={`px-3 py-1.5 rounded-xl border text-[11px] font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                          !giftTeacherId || Number(giftTeacherId) === 0
+                            ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-emerald-400 shadow-sm shadow-emerald-500/30"
+                            : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-emerald-500/50"
+                        }`}
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>All Faculty (Full Course 🎁)</span>
+                      </button>
+
+                      {courseTeachers.map((t: any) => {
+                        const isSelected = Number(giftTeacherId) === Number(t.id);
+                        const count = (t.notesCount || 0) + (t.questionsCount || 0);
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => setGiftTeacherId(Number(t.id))}
+                            className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                              isSelected
+                                ? "bg-amber-500 text-slate-950 border-amber-400 shadow-sm shadow-amber-500/30"
+                                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-amber-500/50"
+                            }`}
+                          >
+                            <span>{t.name}{t.initial ? ` [${t.initial}]` : ""}</span>
+                            {count > 0 && (
+                              <span className={`text-[9px] px-1.5 py-0.2 rounded-full ${
+                                isSelected ? "bg-slate-950/20 text-slate-950" : "bg-blue-500/15 text-blue-500"
+                              }`}>
+                                {count}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
 
                     <SearchableTeacherSelect
                       teachers={giftFacultyOptions}
                       value={giftTeacherId}
                       onChange={(id) => setGiftTeacherId(id)}
-                      allowGeneral={false}
-                      required={true}
-                      placeholder={`Search faculty under ${giftCourseCode} or full directory...`}
+                      allowGeneral={true}
+                      generalLabel="All Faculty (Full Course Unlock)"
+                      required={false}
+                      placeholder={`Search faculty under ${giftCourseCode} or leave empty for full course...`}
                     />
                   </div>
                 );
@@ -11994,11 +12004,17 @@ export default function AdminDashboardPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={giftingCourse || !giftCourseCode || !giftTeacherId}
+                  disabled={giftingCourse || !giftCourseCode}
                   className="px-5 py-2.5 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/25 disabled:opacity-50 flex items-center gap-1.5 transition-all cursor-pointer"
                 >
                   <Gift className="w-4 h-4" />
-                  <span>{giftingCourse ? "Gifting Faculty Access..." : "Confirm & Gift Faculty Access 🎁"}</span>
+                  <span>
+                    {giftingCourse
+                      ? "Gifting Access..."
+                      : giftTeacherId
+                      ? "Confirm & Gift Faculty Access 🎁"
+                      : "Confirm & Gift Full Course Access 🎁"}
+                  </span>
                 </button>
               </div>
             </form>
