@@ -735,7 +735,122 @@ public class AdvisingScheduleService {
                 list.add(ps);
             }
         }
+        if (list.isEmpty()) {
+            list = parseRawTextOrGenericTable(html);
+        }
         return list;
+    }
+
+    /**
+     * Resilient parser for copied UMS text, TSV tables, or non-Angular HTML tables
+     * (e.g. direct copy-paste from browser table or seu-routine-builder text)
+     */
+    private List<ParsedSection> parseRawTextOrGenericTable(String input) {
+        List<ParsedSection> list = new ArrayList<>();
+        if (input == null || input.trim().isEmpty()) return list;
+
+        String text = input;
+        if (text.contains("<") && text.contains(">")) {
+            text = text.replaceAll("(?i)<br\\s*/?>", "\n")
+                       .replaceAll("(?i)</(?:div|p|tr|li|td)>", "\n")
+                       .replaceAll("<[^>]+>", " ")
+                       .replace("&amp;", "&")
+                       .replace("&nbsp;", " ");
+        }
+
+        Pattern secPattern = Pattern.compile("(?m)(?:^|[\\s|,]|^)([A-Z]{3,4}\\d{3})\\.(\\d+)(?:[\\s|,]|$|:)");
+        Matcher secMatcher = secPattern.matcher(text);
+
+        List<Integer> matchStarts = new ArrayList<>();
+        List<String> courseCodes = new ArrayList<>();
+        List<String> sectionNums = new ArrayList<>();
+
+        while (secMatcher.find()) {
+            matchStarts.add(secMatcher.start(1));
+            courseCodes.add(secMatcher.group(1).trim().toUpperCase());
+            sectionNums.add(secMatcher.group(2).trim());
+        }
+
+        if (matchStarts.isEmpty()) return list;
+
+        Pattern schedPattern = Pattern.compile("(?i)(SUN|MON|TUE|WED|THU|FRI|SAT)\\s*#?\\s*([0-9]{1,2}:[0-9]{2})\\s*(?:~|-|to)\\s*([0-9]{1,2}:[0-9]{2})(?:\\s*@?\\s*([A-Za-z0-9_-]+))?");
+        Pattern facPattern = Pattern.compile("\\[([A-Za-z0-9_-]{2,6})\\]\\s*([^\\n\\r0-9<]+)?");
+        Pattern credPattern = Pattern.compile("(?:^|\\s)(1\\.0|1\\.5|2\\.0|3\\.0|4\\.0|1|2|3|4)(?:\\s|Cr|cr|Credits|\\b)");
+
+        for (int i = 0; i < matchStarts.size(); i++) {
+            int start = matchStarts.get(i);
+            int end = (i + 1 < matchStarts.size()) ? matchStarts.get(i + 1) : text.length();
+            String chunk = text.substring(start, end);
+
+            String courseCode = courseCodes.get(i);
+            String secNum = sectionNums.get(i);
+
+            Matcher schedM = schedPattern.matcher(chunk);
+            List<TimeSlot> slots = new ArrayList<>();
+            StringBuilder schedSummary = new StringBuilder();
+            while (schedM.find()) {
+                String day = schedM.group(1).trim().toUpperCase();
+                String startTime = normalizeTime(schedM.group(2).trim());
+                String endTime = normalizeTime(schedM.group(3).trim());
+                String room = schedM.group(4) != null ? schedM.group(4).trim() : "SEU-TBA";
+                slots.add(new TimeSlot(day, startTime, endTime, room));
+                if (schedSummary.length() > 0) schedSummary.append(" / ");
+                schedSummary.append(day).append(" # ").append(startTime).append(" ~ ").append(endTime).append(" @ ").append(room);
+            }
+
+            if (slots.isEmpty()) continue;
+
+            String facInit = "TBA";
+            String facName = "To Be Announced";
+            Matcher facM = facPattern.matcher(chunk);
+            if (facM.find()) {
+                facInit = facM.group(1).trim().toUpperCase();
+                if (facM.group(2) != null && !facM.group(2).trim().isEmpty()) {
+                    facName = facM.group(2).trim().replaceAll("\\s+", " ");
+                }
+            }
+
+            Double credits = (courseCode.endsWith("2") || courseCode.endsWith("4") || courseCode.endsWith("6") || courseCode.endsWith("8")) ? 1.0 : 3.0;
+            Matcher credM = credPattern.matcher(chunk);
+            if (credM.find()) {
+                try {
+                    credits = Double.parseDouble(credM.group(1).trim());
+                } catch (Exception ignored) {}
+            }
+
+            String title = courseCode;
+            String afterSec = chunk.replaceFirst("^[A-Z]{3,4}\\d{3}\\.\\d+", "").trim();
+            String[] lines = afterSec.split("[\\r\\n]+");
+            if (lines.length > 0 && !lines[0].trim().isEmpty()) {
+                String candidate = lines[0].replaceAll("\\[.*?\\]", "").replaceAll("\\d+\\s*(?:Cr|cr)?", "").trim();
+                if (candidate.length() >= 3 && !candidate.toUpperCase().contains("SUN") && !candidate.toUpperCase().contains("MON")) {
+                    title = candidate;
+                }
+            }
+
+            ParsedSection ps = new ParsedSection();
+            ps.courseCode = courseCode;
+            ps.sectionNumber = secNum;
+            ps.courseTitle = title;
+            ps.credits = credits;
+            ps.facultyInitial = facInit;
+            ps.facultyName = facName;
+            ps.availableSeats = 40;
+            ps.scheduleText = schedSummary.toString();
+            ps.slots = slots;
+            list.add(ps);
+        }
+
+        return list;
+    }
+
+    private String normalizeTime(String t) {
+        if (t == null) return "00:00";
+        t = t.trim();
+        if (t.matches("^\\d:\\d{2}$")) {
+            return "0" + t;
+        }
+        return t;
     }
 
     /**

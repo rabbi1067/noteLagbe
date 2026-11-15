@@ -187,19 +187,14 @@ export default function SmartAdvisingRoutineTool() {
   const [sections, setSections] = useState<OfferedSectionItem[]>(REAL_SEU_OFFERED_SECTIONS);
   const [semester, setSemester] = useState<string>("Spring 2026");
 
-  // Selection: Default 5 authentic courses (11 Credits)
-  const [selectedCourses, setSelectedCourses] = useState<string[]>([
-    "CSE355",
-    "CSE381",
-    "CSE382",
-    "CSE443",
-    "CSE444",
-  ]);
+  // Selection: Starts EMPTY (Manual course selection by student)
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const [courseSearchQuery, setCourseSearchQuery] = useState<string>("");
 
-  // Preferences
+  // Preferences: Default to ANY (Balanced / Any Time Slot Flexible)
   const [timePreference, setTimePreference] = useState<
     "ANY" | "AVOID_MORNING" | "AVOID_LATE" | "PREFER_MORNING" | "PREFER_AFTERNOON"
-  >("AVOID_MORNING");
+  >("ANY");
   const [dayPreference, setDayPreference] = useState<
     "MINIMIZE_DAYS" | "COMPACT_GAPS" | "ANY"
   >("COMPACT_GAPS");
@@ -211,11 +206,7 @@ export default function SmartAdvisingRoutineTool() {
     "THU",
     "SAT",
   ]);
-  const [facultyPreferences, setFacultyPreferences] = useState<Record<string, string[]>>({
-    CSE355: ["JAR", "MAHB"],
-    CSE381: ["DSS", "JABA"],
-    CSE443: ["NIBI", "GMRN"],
-  });
+  const [facultyPreferences, setFacultyPreferences] = useState<Record<string, string[]>>({});
 
   // Generated Routines (at least 15 options)
   const [routines, setRoutines] = useState<GeneratedRoutineOption[]>([]);
@@ -227,8 +218,10 @@ export default function SmartAdvisingRoutineTool() {
   const [viewMode, setViewMode] = useState<"Weekly" | "Daily" | "Overview">("Weekly");
   const [dailyDay, setDailyDay] = useState<string>("SUN");
 
-  // Upload Modal State
+  // Upload Modal State (Dual-mode: File or Direct Text/HTML Paste)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
+  const [uploadTab, setUploadTab] = useState<"file" | "paste">("file");
+  const [pastedText, setPastedText] = useState<string>("");
   const [uploadingFile, setUploadingFile] = useState<boolean>(false);
   const [isCustomUpload, setIsCustomUpload] = useState<boolean>(false);
   const [customUploadName, setCustomUploadName] = useState<string>("");
@@ -335,6 +328,21 @@ export default function SmartAdvisingRoutineTool() {
       return sum + (match?.credits || 3.0);
     }, 0);
   }, [selectedCourses, coursesCatalog]);
+
+  // Search-filtered theory & lab courses
+  const filteredTheoryCourses = useMemo(() => {
+    const list = coursesCatalog.filter((c) => !c.isLab);
+    if (!courseSearchQuery.trim()) return list;
+    const q = courseSearchQuery.toLowerCase();
+    return list.filter((c) => c.code.toLowerCase().includes(q) || c.title.toLowerCase().includes(q));
+  }, [coursesCatalog, courseSearchQuery]);
+
+  const filteredLabCourses = useMemo(() => {
+    const list = coursesCatalog.filter((c) => c.isLab);
+    if (!courseSearchQuery.trim()) return list;
+    const q = courseSearchQuery.toLowerCase();
+    return list.filter((c) => c.code.toLowerCase().includes(q) || c.title.toLowerCase().includes(q));
+  }, [coursesCatalog, courseSearchQuery]);
 
   // Generate Routines Handler (Client-side fast solver with back-to-back gap minimization)
   const handleGenerateRoutines = async () => {
@@ -611,9 +619,9 @@ export default function SmartAdvisingRoutineTool() {
     } catch (e) {}
   };
 
-  // Run initial solve on mount
+  // Run initial solve on mount ONLY if courses are already selected
   useEffect(() => {
-    if (sections.length > 0 && routines.length === 0) {
+    if (sections.length > 0 && selectedCourses.length > 0 && routines.length === 0) {
       runClientSideRoutineSolver();
     }
   }, [sections]);
@@ -621,7 +629,8 @@ export default function SmartAdvisingRoutineTool() {
   // Reset from custom student upload back to official SEU master catalog
   const handleResetToOfficial = () => {
     setSections(REAL_SEU_OFFERED_SECTIONS);
-    setSelectedCourses(["CSE355", "CSE381", "CSE382", "CSE443", "CSE444"]);
+    setSelectedCourses([]);
+    setRoutines([]);
     setIsCustomUpload(false);
     setCustomUploadName("");
     toast.success(
@@ -647,15 +656,15 @@ export default function SmartAdvisingRoutineTool() {
         setSections(parsedList);
         setIsCustomUpload(true);
         setCustomUploadName(file.name);
-        const uniqueCourses = Array.from(new Set(parsedList.map((s) => s.courseCode))).slice(0, 5);
-        if (uniqueCourses.length > 0) {
-          setSelectedCourses(uniqueCourses);
-        }
+        setSelectedCourses([]);
+        setRoutines([]);
         toast.success(
           language === "bn"
-            ? `✅ আপনার ফাইলের ${parsedList.length}টি সেকশন আলাদাভাবে লোড করা হয়েছে! রুটিন সাজানো হচ্ছে...`
-            : `✅ Successfully extracted ${parsedList.length} sections from your file! Re-optimizing routines...`
+            ? `✅ আপনার ফাইলের ${parsedList.length}টি সেকশন আলাদাভাবে লোড করা হয়েছে! এবার আপনার পছন্দের কোর্স সিলেক্ট করুন।`
+            : `✅ Successfully extracted ${parsedList.length} sections from your file! Now select your target courses.`
         );
+      } else {
+        toast.error("Could not extract sections. Please check your HTML file format.");
       }
 
       // Safe isolated backend upload call (never merges into admin master catalog)
@@ -668,61 +677,226 @@ export default function SmartAdvisingRoutineTool() {
     }
   };
 
-  const parseHtmlClientSide = (html: string): OfferedSectionItem[] => {
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim()) {
+        setPastedText(text);
+        toast.success("Pasted content from clipboard!");
+      } else {
+        toast.error("Clipboard is empty or contains no text.");
+      }
+    } catch (e) {
+      toast.error("Please press Ctrl+V inside the text box to paste.");
+    }
+  };
+
+  const handleApplyPastedText = async () => {
+    if (!pastedText.trim()) {
+      toast.error("Please paste your UMS table text or HTML first!");
+      return;
+    }
+
+    setUploadingFile(true);
+    try {
+      const parsedList = parseHtmlClientSide(pastedText);
+      if (parsedList.length === 0) {
+        toast.error(
+          "Could not detect valid course sections. Please ensure you copied table rows containing course codes (e.g. CSE355.1) and schedule times."
+        );
+        return;
+      }
+
+      setSections(parsedList);
+      setIsCustomUpload(true);
+      setCustomUploadName(`Pasted Table (${parsedList.length} sections)`);
+      setSelectedCourses([]);
+      setRoutines([]);
+      toast.success(
+        language === "bn"
+          ? `✅ পেস্ট করা টেবিল থেকে ${parsedList.length}টি সেকশন সফলভাবে লোড হয়েছে! এবার আপনার পছন্দের কোর্স সিলেক্ট করুন।`
+          : `✅ Successfully extracted ${parsedList.length} sections from pasted data! Now select your target courses.`
+      );
+
+      // Safe isolated backend upload call (never merges into admin master catalog)
+      api.advising.uploadAdvisingTable(pastedText, semester).catch(() => {});
+      setIsUploadModalOpen(false);
+      setPastedText("");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to parse pasted table.");
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const parseRawTextOrGenericTableClient = (input: string): OfferedSectionItem[] => {
     const list: OfferedSectionItem[] = [];
-    const blocks = html.split("ums-grid-offered-section");
+    if (!input || !input.trim()) return list;
 
-    const secPattern = /(?:class="[^"]*mat-mdc-tooltip-trigger[^"]*"[^>]*>|>)\s*([A-Z]{3}\d{3}\.\d+)\s*</;
-    const titlePattern = /hidden md:block[^"]*">[\s\S]*?<div[^>]*>([^<]+)<\/div>/;
-    const credPattern = /ml-3[^"]*">([0-9.]+)</;
-    const facPattern = /\[([A-Za-z0-9_-]+)\]\s*([^<]+)</;
-    const schedPattern = /(SUN|MON|TUE|WED|THU|FRI|SAT)\s*#\s*([0-9]{2}:[0-9]{2})\s*~\s*([0-9]{2}:[0-9]{2})\s*@\s*([A-Za-z0-9_-]+)/g;
+    let text = input;
+    if (text.includes("<") && text.includes(">")) {
+      text = text
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/(?:div|p|tr|li|td)>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&nbsp;/g, " ");
+    }
 
-    for (let i = 1; i < blocks.length; i++) {
-      const chunk = blocks[i].slice(0, 3000);
-      const secM = chunk.match(secPattern);
-      if (!secM) continue;
-      const fullSec = secM[1].trim();
-      const [courseCode, secNum] = fullSec.split(".");
+    const secPattern = /(?:^|[\s|,]|^)([A-Z]{3,4}\d{3})\.(\d+)(?:[\s|,]|$|:)/gm;
+    const matchStarts: number[] = [];
+    const courseCodes: string[] = [];
+    const sectionNums: string[] = [];
 
-      const titleM = chunk.match(titlePattern);
-      const rawTitle = titleM ? titleM[1].trim() : courseCode;
-      const title = rawTitle.replace(/&amp;/g, "&").trim();
+    let m: RegExpExecArray | null;
+    while ((m = secPattern.exec(text)) !== null) {
+      matchStarts.push(m.index);
+      courseCodes.push(m[1].trim().toUpperCase());
+      sectionNums.push(m[2].trim());
+    }
 
-      const credM = chunk.match(credPattern);
-      const credits = credM ? parseFloat(credM[1].trim()) : 3.0;
+    if (matchStarts.length === 0) return list;
 
-      const facM = chunk.match(facPattern);
-      const facInit = facM ? facM[1].trim().toUpperCase() : "TBA";
-      const facName = facM ? facM[2].trim().replace(/\s+/g, " ") : "To Be Announced";
+    const schedPattern = /(SUN|MON|TUE|WED|THU|FRI|SAT)\s*#?\s*([0-9]{1,2}:[0-9]{2})\s*(?:~|-|to)\s*([0-9]{1,2}:[0-9]{2})(?:\s*@?\s*([A-Za-z0-9_-]+))?/gi;
+    const facPattern = /\[([A-Za-z0-9_-]{2,6})\]\s*([^\n\r0-9<]+)?/;
+    const credPattern = /(?:^|\s)(1\.0|1\.5|2\.0|3\.0|4\.0|1|2|3|4)(?:\s|Cr|cr|Credits|\b)/;
+
+    for (let i = 0; i < matchStarts.length; i++) {
+      const start = matchStarts[i];
+      const end = i + 1 < matchStarts.length ? matchStarts[i + 1] : text.length;
+      const chunk = text.substring(start, end);
+
+      const courseCode = courseCodes[i];
+      const secNum = sectionNums[i];
 
       const slots: TimeSlot[] = [];
-      let match: RegExpExecArray | null;
-      while ((match = schedPattern.exec(chunk)) !== null) {
+      let schedM: RegExpExecArray | null;
+      schedPattern.lastIndex = 0;
+      while ((schedM = schedPattern.exec(chunk)) !== null) {
+        const day = schedM[1].toUpperCase();
+        let st = schedM[2].trim();
+        if (st.length === 4) st = "0" + st;
+        let et = schedM[3].trim();
+        if (et.length === 4) et = "0" + et;
+        const rm = schedM[4] ? schedM[4].trim() : "SEU-TBA";
         slots.push({
-          day: match[1].toUpperCase(),
-          start: match[2],
-          end: match[3],
-          room: match[4],
-          startMinutes: timeToMinutes(match[2]),
-          endMinutes: timeToMinutes(match[3]),
+          day,
+          start: st,
+          end: et,
+          room: rm,
+          startMinutes: timeToMinutes(st),
+          endMinutes: timeToMinutes(et),
         });
       }
 
-      if (slots.length > 0) {
-        list.push({
-          courseCode,
-          sectionNumber: secNum,
-          courseTitle: title,
-          credits,
-          facultyInitial: facInit,
-          facultyName: facName,
-          scheduleText: slots.map((s) => `${s.day} # ${s.start} ~ ${s.end} @ ${s.room}`).join(" / "),
-          slots,
-          semester,
-        });
+      if (slots.length === 0) continue;
+
+      let facInit = "TBA";
+      let facName = "To Be Announced";
+      const facM = chunk.match(facPattern);
+      if (facM) {
+        facInit = facM[1].trim().toUpperCase();
+        if (facM[2] && facM[2].trim()) {
+          facName = facM[2].trim().replace(/\s+/g, " ");
+        }
+      }
+
+      let credits = (courseCode.endsWith("2") || courseCode.endsWith("4") || courseCode.endsWith("6") || courseCode.endsWith("8")) ? 1.0 : 3.0;
+      const credM = chunk.match(credPattern);
+      if (credM) {
+        const parsedCred = parseFloat(credM[1]);
+        if (!isNaN(parsedCred)) credits = parsedCred;
+      }
+
+      let title = courseCode;
+      const afterSec = chunk.replace(/^[A-Z]{3,4}\d{3}\.\d+/, "").trim();
+      const lines = afterSec.split(/[\r\n]+/);
+      if (lines.length > 0 && lines[0].trim()) {
+        const candidate = lines[0].replace(/\[.*?\]/g, "").replace(/\d+\s*(?:Cr|cr)?/g, "").trim();
+        if (candidate.length >= 3 && !candidate.toUpperCase().includes("SUN") && !candidate.toUpperCase().includes("MON")) {
+          title = candidate;
+        }
+      }
+
+      list.push({
+        courseCode,
+        sectionNumber: secNum,
+        courseTitle: title,
+        credits,
+        facultyInitial: facInit,
+        facultyName: facName,
+        availableSeats: 40,
+        scheduleText: slots.map((s) => `${s.day} # ${s.start} ~ ${s.end} @ ${s.room}`).join(" / "),
+        slots,
+        semester,
+      });
+    }
+
+    return list;
+  };
+
+  const parseHtmlClientSide = (html: string): OfferedSectionItem[] => {
+    let list: OfferedSectionItem[] = [];
+    if (html.includes("ums-grid-offered-section")) {
+      const blocks = html.split("ums-grid-offered-section");
+
+      const secPattern = /(?:class="[^"]*mat-mdc-tooltip-trigger[^"]*"[^>]*>|>)\s*([A-Z]{3}\d{3}\.\d+)\s*</;
+      const titlePattern = /hidden md:block[^"]*">[\s\S]*?<div[^>]*>([^<]+)<\/div>/;
+      const credPattern = /ml-3[^"]*">([0-9.]+)</;
+      const facPattern = /\[([A-Za-z0-9_-]+)\]\s*([^<]+)</;
+      const schedPattern = /(SUN|MON|TUE|WED|THU|FRI|SAT)\s*#\s*([0-9]{2}:[0-9]{2})\s*~\s*([0-9]{2}:[0-9]{2})\s*@\s*([A-Za-z0-9_-]+)/g;
+
+      for (let i = 1; i < blocks.length; i++) {
+        const chunk = blocks[i].slice(0, 3000);
+        const secM = chunk.match(secPattern);
+        if (!secM) continue;
+        const fullSec = secM[1].trim();
+        const [courseCode, secNum] = fullSec.split(".");
+
+        const titleM = chunk.match(titlePattern);
+        const rawTitle = titleM ? titleM[1].trim() : courseCode;
+        const title = rawTitle.replace(/&amp;/g, "&").trim();
+
+        const credM = chunk.match(credPattern);
+        const credits = credM ? parseFloat(credM[1].trim()) : 3.0;
+
+        const facM = chunk.match(facPattern);
+        const facInit = facM ? facM[1].trim().toUpperCase() : "TBA";
+        const facName = facM ? facM[2].trim().replace(/\s+/g, " ") : "To Be Announced";
+
+        const slots: TimeSlot[] = [];
+        let match: RegExpExecArray | null;
+        while ((match = schedPattern.exec(chunk)) !== null) {
+          slots.push({
+            day: match[1].toUpperCase(),
+            start: match[2],
+            end: match[3],
+            room: match[4],
+            startMinutes: timeToMinutes(match[2]),
+            endMinutes: timeToMinutes(match[3]),
+          });
+        }
+
+        if (slots.length > 0) {
+          list.push({
+            courseCode,
+            sectionNumber: secNum,
+            courseTitle: title,
+            credits,
+            facultyInitial: facInit,
+            facultyName: facName,
+            scheduleText: slots.map((s) => `${s.day} # ${s.start} ~ ${s.end} @ ${s.room}`).join(" / "),
+            slots,
+            semester,
+          });
+        }
       }
     }
+
+    if (list.length === 0) {
+      list = parseRawTextOrGenericTableClient(html);
+    }
+
     return list;
   };
 
@@ -907,182 +1081,249 @@ export default function SmartAdvisingRoutineTool() {
       )}
 
       {/* ========================================================================= */}
-      {/* 2. COURSE SELECTOR (THEORY PAIRED DAYS vs LAB SINGLE DAYS) & PREFERENCES */}
+      {/* 1. TARGET COURSE SELECTOR (FULL WIDTH - MANUAL SELECTION) */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Course Selection Box (7 Cols) */}
-        <div className="lg:col-span-7 rounded-3xl bg-slate-900/60 border border-slate-800 p-5 sm:p-6 backdrop-blur-md space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-blue-400" />
-              <h2 className="text-base sm:text-lg font-bold text-white">
-                {language === "bn" ? "১. টার্গেট কোর্স নির্বাচন করুন" : "1. Select Target Courses"}
+      <div className="rounded-3xl bg-slate-900/60 border border-slate-800 p-5 sm:p-6 backdrop-blur-md space-y-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-blue-400" />
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <span>{language === "bn" ? "১. টার্গেট কোর্স নির্বাচন করুন" : "1. Select Target Courses"}</span>
+                <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  {selectedCourses.length} Courses • {selectedCreditsTotal} Credits
+                </span>
               </h2>
+              <p className="text-xs text-slate-400">
+                {language === "bn"
+                  ? "যেসব কোর্স এই সেমিস্টারে নিতে চান সেগুলো ক্লিক করে নির্বাচন করুন। সর্বোচ্চ ৭টি কোর্স নির্বাচন করা যাবে।"
+                  : "Click courses you intend to register this semester. Combine Theory and Labs to build your schedule."}
+              </p>
             </div>
-            <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              {selectedCourses.length} Courses • {selectedCreditsTotal} Credits
-            </span>
           </div>
 
-          <div className="space-y-4">
-            {/* Theory Courses Group */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs font-mono font-bold text-slate-300">
-                <GraduationCap className="w-4 h-4 text-indigo-400" />
-                <span>Theory Courses (Paired Days • SUN+TUE / MON+WED / THU+SAT)</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {coursesCatalog
-                  .filter((c) => !c.isLab)
-                  .map((c) => {
-                    const isSelected = selectedCourses.includes(c.code);
-                    const theme = COURSE_THEMES[c.code] || DEFAULT_THEME;
-                    return (
-                      <div
-                        key={c.code}
-                        onClick={() => {
-                          if (isSelected) {
-                            setSelectedCourses(selectedCourses.filter((code) => code !== c.code));
-                          } else {
-                            if (selectedCourses.length >= 7) {
-                              toast.error("Maximum 7 courses can be scheduled simultaneously.");
-                              return;
-                            }
-                            setSelectedCourses([...selectedCourses, c.code]);
-                          }
-                        }}
-                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-start justify-between gap-3 ${
-                          isSelected
-                            ? "bg-blue-600/15 border-blue-500/60 shadow-md shadow-blue-500/10"
-                            : "bg-slate-800/40 border-slate-700/60 hover:border-slate-600 hover:bg-slate-800/70"
-                        }`}
-                      >
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-black text-sm text-white">{c.code}</span>
-                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                              {c.credits} Cr
-                            </span>
-                            <span className="text-[10px] text-slate-400">
-                              ({c.sections.length} sec)
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-400 truncate">{c.title}</p>
-                          <span className="text-[9px] font-mono text-indigo-400 block">
-                            Paired 80m Slots
-                          </span>
-                        </div>
-                        <div
-                          className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
-                            isSelected
-                              ? "bg-blue-600 border-blue-500 text-white"
-                              : "border-slate-600 bg-slate-800/80 text-transparent"
-                          }`}
-                        >
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
+          {/* Quick Actions & Live Filter */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[200px] sm:min-w-[240px]">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={courseSearchQuery}
+                onChange={(e) => setCourseSearchQuery(e.target.value)}
+                placeholder={language === "bn" ? "কোর্স সার্চ (e.g. CSE355, Lab)..." : "Filter courses (e.g. CSE355, Embedded)..."}
+                className="w-full text-xs py-2 pl-8 pr-3 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
 
-            {/* Practical Lab Courses Group */}
-            <div className="space-y-2 pt-2 border-t border-slate-800/80">
-              <div className="flex items-center gap-2 text-xs font-mono font-bold text-slate-300">
-                <Layers className="w-4 h-4 text-cyan-400" />
-                <span>Lab Courses (Single Day • 2-Hour Practical Sessions)</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {coursesCatalog
-                  .filter((c) => c.isLab)
-                  .map((c) => {
-                    const isSelected = selectedCourses.includes(c.code);
-                    return (
-                      <div
-                        key={c.code}
-                        onClick={() => {
-                          if (isSelected) {
-                            setSelectedCourses(selectedCourses.filter((code) => code !== c.code));
-                          } else {
-                            if (selectedCourses.length >= 7) {
-                              toast.error("Maximum 7 courses can be scheduled simultaneously.");
-                              return;
-                            }
-                            setSelectedCourses([...selectedCourses, c.code]);
-                          }
-                        }}
-                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-start justify-between gap-3 ${
-                          isSelected
-                            ? "bg-cyan-600/15 border-cyan-500/60 shadow-md shadow-cyan-500/10"
-                            : "bg-slate-800/40 border-slate-700/60 hover:border-slate-600 hover:bg-slate-800/70"
-                        }`}
-                      >
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-black text-sm text-white">{c.code}</span>
-                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                              {c.credits} Cr
-                            </span>
-                            <span className="text-[10px] text-slate-400">
-                              ({c.sections.length} sec)
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-400 truncate">{c.title}</p>
-                          <span className="text-[9px] font-mono text-cyan-400 block">
-                            Single Day 120m Lab
-                          </span>
-                        </div>
-                        <div
-                          className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
-                            isSelected
-                              ? "bg-cyan-600 border-cyan-500 text-white"
-                              : "border-slate-600 bg-slate-800/80 text-transparent"
-                          }`}
-                        >
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const sample = ["CSE355", "CSE381", "CSE382", "CSE443", "CSE444"].filter(c => coursesCatalog.some(cat => cat.code === c));
+                setSelectedCourses(sample.length > 0 ? sample : coursesCatalog.slice(0, 5).map(c => c.code));
+                toast.success("Loaded 5 recommended standard courses (11 credits)!");
+              }}
+              className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+              <span>Recommend 5 (11 Cr)</span>
+            </button>
+
+            {selectedCourses.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedCourses([])}
+                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-mono font-bold transition-all cursor-pointer"
+              >
+                Clear Selection ({selectedCourses.length})
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Priority & Preferences Config (5 Cols) */}
-        <div className="lg:col-span-5 rounded-3xl bg-slate-900/60 border border-slate-800 p-5 sm:p-6 backdrop-blur-md space-y-5">
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-base sm:text-lg font-bold text-white">
-              {language === "bn" ? "২. সময়, গ্যাপ ও ফ্যাকাল্টি প্রায়োরিটি" : "2. Priorities & Gap Control"}
-            </h2>
+        <div className="space-y-5">
+          {/* Theory Courses Group */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-300">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="w-4 h-4 text-indigo-400" />
+                <span>Theory Courses (Paired Days • SUN+TUE / MON+WED / THU+SAT)</span>
+              </div>
+              <span className="text-[11px] text-slate-400 font-normal">
+                {filteredTheoryCourses.length} available
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {filteredTheoryCourses.map((c) => {
+                const isSelected = selectedCourses.includes(c.code);
+                return (
+                  <div
+                    key={c.code}
+                    onClick={() => {
+                      if (isSelected) {
+                        setSelectedCourses(selectedCourses.filter((code) => code !== c.code));
+                      } else {
+                        if (selectedCourses.length >= 7) {
+                          toast.error("Maximum 7 courses can be scheduled simultaneously.");
+                          return;
+                        }
+                        setSelectedCourses([...selectedCourses, c.code]);
+                      }
+                    }}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-start justify-between gap-3 ${
+                      isSelected
+                        ? "bg-blue-600/15 border-blue-500/60 shadow-md shadow-blue-500/15 scale-[1.01]"
+                        : "bg-slate-800/40 border-slate-700/60 hover:border-slate-600 hover:bg-slate-800/70"
+                    }`}
+                  >
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-black text-sm text-white">{c.code}</span>
+                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                          {c.credits} Cr
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          ({c.sections.length} sec)
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 truncate">{c.title}</p>
+                      <span className="text-[9px] font-mono text-indigo-400 block">
+                        Paired 80m Slots
+                      </span>
+                    </div>
+                    <div
+                      className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
+                        isSelected
+                          ? "bg-blue-600 border-blue-500 text-white"
+                          : "border-slate-600 bg-slate-800/80 text-transparent"
+                      }`}
+                    >
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Time Priority */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+          {/* Practical Lab Courses Group */}
+          <div className="space-y-2.5 pt-3 border-t border-slate-800/80">
+            <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-300">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-cyan-400" />
+                <span>Lab Courses (Single Day • 2-Hour Practical Sessions)</span>
+              </div>
+              <span className="text-[11px] text-slate-400 font-normal">
+                {filteredLabCourses.length} available
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {filteredLabCourses.map((c) => {
+                const isSelected = selectedCourses.includes(c.code);
+                return (
+                  <div
+                    key={c.code}
+                    onClick={() => {
+                      if (isSelected) {
+                        setSelectedCourses(selectedCourses.filter((code) => code !== c.code));
+                      } else {
+                        if (selectedCourses.length >= 7) {
+                          toast.error("Maximum 7 courses can be scheduled simultaneously.");
+                          return;
+                        }
+                        setSelectedCourses([...selectedCourses, c.code]);
+                      }
+                    }}
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-start justify-between gap-3 ${
+                      isSelected
+                        ? "bg-cyan-600/15 border-cyan-500/60 shadow-md shadow-cyan-500/15 scale-[1.01]"
+                        : "bg-slate-800/40 border-slate-700/60 hover:border-slate-600 hover:bg-slate-800/70"
+                    }`}
+                  >
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-black text-sm text-white">{c.code}</span>
+                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                          {c.credits} Cr
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          ({c.sections.length} sec)
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 truncate">{c.title}</p>
+                      <span className="text-[9px] font-mono text-cyan-400 block">
+                        Single Day 120m Lab
+                      </span>
+                    </div>
+                    <div
+                      className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
+                        isSelected
+                          ? "bg-cyan-600 border-cyan-500 text-white"
+                          : "border-slate-600 bg-slate-800/80 text-transparent"
+                      }`}
+                    >
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 2. PRIORITIES & GAP CONTROL (FULL WIDTH - TIME, GAPS & TEACHERS) */}
+      {/* ========================================================================= */}
+      <div className="rounded-3xl bg-slate-900/60 border border-slate-800 p-5 sm:p-6 backdrop-blur-md space-y-6">
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal className="w-5 h-5 text-indigo-400" />
+          <div>
+            <h2 className="text-base sm:text-lg font-bold text-white">
+              {language === "bn" ? "২. সময়, গ্যাপ ও শিক্ষক প্রায়োরিটি কন্ট্রোল" : "2. Priorities & Gap Control"}
+            </h2>
+            <p className="text-xs text-slate-400">
+              {language === "bn"
+                ? "ক্লাসের সময় পছন্দ, ক্যাম্পাসে আসার দিন এবং পছন্দের শিক্ষকদের সিলেক্ট করে রুটিনের কোয়ালিটি নিয়ন্ত্রণ করুন।"
+                : "Fine-tune preferred 12-hour AM/PM time slots, back-to-back class gaps, and prioritized teachers."}
+            </p>
+          </div>
+        </div>
+
+        {/* 3 Columns: Time Slot, Gap Style, Preferred Days */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {/* Time Priority (12-Hour AM/PM) - Default is ANY Balanced */}
+          <div className="space-y-2 p-4 rounded-2xl bg-slate-800/40 border border-slate-700/60">
+            <label className="text-xs font-semibold text-slate-200 flex items-center justify-between">
               <span>{language === "bn" ? "ক্লাসের সময় পছন্দ (Time Preference)" : "Time Preference (12-Hour AM/PM)"}</span>
-              <Clock className="w-3.5 h-3.5 text-slate-400" />
+              <Clock className="w-3.5 h-3.5 text-blue-400" />
             </label>
             <select
               value={timePreference}
               onChange={(e) => setTimePreference(e.target.value as any)}
               className="w-full text-xs font-semibold py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
+              <option value="ANY">⚡ Balanced / Any Time Slot (Flexible - Default)</option>
               <option value="AVOID_MORNING">☀️ Avoid Morning (No 08:30 AM Classes)</option>
               <option value="PREFER_MORNING">🌅 Prefer Morning Slots (08:30 AM - 01:00 PM)</option>
               <option value="PREFER_AFTERNOON">☕ Prefer Afternoon Slots (11:30 AM - 04:30 PM)</option>
               <option value="AVOID_LATE">🌇 Avoid Late Afternoon (No 04:30 PM+ Classes)</option>
-              <option value="ANY">⚡ Balanced / Any Time Slot</option>
             </select>
+            <p className="text-[11px] text-slate-400 leading-tight">
+              {timePreference === "ANY"
+                ? "Flexible across all SEU slots: 08:30 AM, 10:00 AM, 11:30 AM, 01:30 PM, 03:00 PM."
+                : timePreference === "AVOID_MORNING"
+                ? "Penalizes early 08:00 AM & 08:30 AM morning slots in score ranking."
+                : "Optimizes class combinations according to your selected daytime window."}
+            </p>
           </div>
 
           {/* Day & Gap Priority */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+          <div className="space-y-2 p-4 rounded-2xl bg-slate-800/40 border border-slate-700/60">
+            <label className="text-xs font-semibold text-slate-200 flex items-center justify-between">
               <span>{language === "bn" ? "টাইম গ্যাপ অপটিমাইজেশন" : "Gap & Schedule Style"}</span>
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <Calendar className="w-3.5 h-3.5 text-indigo-400" />
             </label>
             <select
               value={dayPreference}
@@ -1093,14 +1334,22 @@ export default function SmartAdvisingRoutineTool() {
               <option value="MINIMIZE_DAYS">⚡ Minimize Campus Days (Pack into 2 or 3 Days)</option>
               <option value="ANY">🗓️ Any Day Distribution</option>
             </select>
+            <p className="text-[11px] text-slate-400 leading-tight">
+              Option #1 maximizes back-to-back classes with 10-15m room transitions, eliminating multi-hour dead breaks.
+            </p>
           </div>
 
           {/* Preferred Days Toggle */}
-          <div className="space-y-2">
-            <span className="text-xs font-semibold text-slate-300 block">
-              {language === "bn" ? "পছন্দের বারসমূহ (Preferred Days)" : "Preferred Days"}
-            </span>
-            <div className="flex flex-wrap gap-1.5">
+          <div className="space-y-2 p-4 rounded-2xl bg-slate-800/40 border border-slate-700/60">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-200 block">
+                {language === "bn" ? "পছন্দের বারসমূহ (Preferred Days)" : "Preferred Days"}
+              </span>
+              <span className="text-[10px] font-mono text-slate-400">
+                {preferredDays.length} / 6 Days Active
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 pt-0.5">
               {WEEK_DAYS.filter((d) => d !== "FRI").map((day) => {
                 const active = preferredDays.includes(day);
                 return (
@@ -1114,9 +1363,9 @@ export default function SmartAdvisingRoutineTool() {
                         setPreferredDays([...preferredDays, day]);
                       }
                     }}
-                    className={`px-3 py-1 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
                       active
-                        ? "bg-indigo-600 text-white shadow-sm shadow-indigo-500/30"
+                        ? "bg-indigo-600 text-white shadow-sm shadow-indigo-500/30 ring-1 ring-indigo-400"
                         : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200"
                     }`}
                   >
@@ -1125,26 +1374,81 @@ export default function SmartAdvisingRoutineTool() {
                 );
               })}
             </div>
+            <p className="text-[11px] text-slate-400 leading-tight">
+              Click any day badge to include/exclude specific weekdays from your generated routines.
+            </p>
+          </div>
+        </div>
+
+        {/* Preferred Faculty Selection (Spacious, Elegant & User-Friendly) */}
+        <div className="space-y-3 pt-3 border-t border-slate-800/80">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                <span className="text-sm font-bold text-white">
+                  {language === "bn" ? "পছন্দের শিক্ষক নির্বাচন (Preferred Faculty Focus)" : "Preferred Faculty Selection"}
+                </span>
+              </span>
+              <p className="text-[11px] text-slate-400">
+                {language === "bn"
+                  ? "যেসব শিক্ষকের সেকশন পছন্দ সেগুলো স্টার করুন। রুটিন জেনারেটর আপনার পছন্দের শিক্ষকদের সর্বোচ্চ প্রায়োরিটি দেবে।"
+                  : "Tap teachers you prefer for each course. The solver rewards routines featuring your chosen professors."}
+              </p>
+            </div>
+            {Object.values(facultyPreferences).some((arr) => arr.length > 0) && (
+              <button
+                type="button"
+                onClick={() => setFacultyPreferences({})}
+                className="text-[11px] font-mono text-slate-400 hover:text-amber-400 underline transition-colors cursor-pointer self-start sm:self-auto"
+              >
+                Clear all faculty preferences
+              </button>
+            )}
           </div>
 
-          {/* Faculty Picker for selected courses */}
-          {selectedCourses.length > 0 && (
-            <div className="space-y-2 pt-2 border-t border-slate-800">
-              <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                <span>{language === "bn" ? "প্রিয় শিক্ষক নির্বাচন (Faculty Focus)" : "Preferred Faculty Selection"}</span>
-              </span>
-              <div className="space-y-2 max-h-40 overflow-y-auto pr-1 no-scrollbar">
-                {selectedCourses.map((code) => {
-                  const facs = courseFaculties[code] || [];
-                  if (facs.length === 0) return null;
-                  const currentFav = facultyPreferences[code] || [];
-                  return (
-                    <div key={code} className="p-2 rounded-xl bg-slate-800/50 border border-slate-700/60 text-xs">
-                      <span className="font-mono font-bold text-blue-400 mr-2">{code}:</span>
-                      <div className="inline-flex flex-wrap gap-1 mt-1">
+          {selectedCourses.length === 0 ? (
+            <div className="p-5 rounded-2xl bg-slate-800/20 border border-dashed border-slate-700 text-center text-xs text-slate-400">
+              👉 Please select your courses in Section 1 above to view and choose available faculty members.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {selectedCourses.map((code) => {
+                const courseInfo = coursesCatalog.find((c) => c.code === code);
+                const facs = courseFaculties[code] || [];
+                const currentFav = facultyPreferences[code] || [];
+                const isAny = currentFav.length === 0;
+
+                return (
+                  <div
+                    key={code}
+                    className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700/70 hover:border-slate-600 transition-all space-y-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="font-mono font-black text-sm text-blue-400 mr-2">{code}</span>
+                        <span className="text-xs text-slate-300 font-medium truncate block">
+                          {courseInfo?.title || code}
+                        </span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                          isAny
+                            ? "bg-slate-700/60 text-slate-400"
+                            : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                        }`}
+                      >
+                        {isAny ? "Any Faculty" : `${currentFav.length} Fav`}
+                      </span>
+                    </div>
+
+                    {facs.length === 0 ? (
+                      <p className="text-xs text-slate-500 italic">No specific faculty assigned yet (TBA)</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
                         {facs.map((f) => {
                           const isFav = currentFav.includes(f.initial);
+                          const secCount = courseInfo?.sections.filter(s => s.facultyInitial === f.initial).length || 0;
                           return (
                             <button
                               key={f.initial}
@@ -1157,26 +1461,69 @@ export default function SmartAdvisingRoutineTool() {
                                     : [...currentFav, f.initial],
                                 });
                               }}
-                              className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer ${
+                              className={`group px-3 py-1.5 rounded-xl text-xs font-mono transition-all cursor-pointer flex items-center gap-1.5 border ${
                                 isFav
-                                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                                  : "bg-slate-700/60 text-slate-300 hover:bg-slate-700"
+                                  ? "bg-amber-500/20 border-amber-500/60 text-amber-200 shadow-md shadow-amber-500/10 font-bold"
+                                  : "bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white"
                               }`}
-                              title={f.name}
+                              title={`${f.name} (${secCount} sections)`}
                             >
-                              [{f.initial}] {f.name.split(" ").slice(-1)[0]}
+                              <Star
+                                className={`w-3.5 h-3.5 shrink-0 ${
+                                  isFav ? "text-amber-400 fill-amber-400" : "text-slate-500 group-hover:text-slate-400"
+                                }`}
+                              />
+                              <span className="font-bold">[{f.initial}]</span>
+                              <span className="text-[11px] font-sans truncate max-w-[130px]">
+                                {f.name.split(" ").slice(-1)[0]}
+                              </span>
+                              <span className="text-[9px] px-1 py-0.2 rounded bg-slate-900/60 text-slate-400 border border-slate-800">
+                                {secCount}
+                              </span>
                             </button>
                           );
                         })}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
       </div>
+
+      {/* Empty State when no routines generated yet */}
+      {routines.length === 0 && (
+        <div className="rounded-3xl bg-slate-900/40 border border-slate-800/80 p-8 sm:p-12 text-center space-y-4 backdrop-blur-md">
+          <div className="w-16 h-16 rounded-3xl bg-blue-600/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto">
+            <Sparkles className="w-8 h-8" />
+          </div>
+          <div className="max-w-md mx-auto space-y-2">
+            <h3 className="text-lg font-bold text-white">
+              {language === "bn" ? "রুটিন তৈরির জন্য কোর্স সিলেক্ট করুন" : "Select Courses to Build Your Routine"}
+            </h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              {language === "bn"
+                ? "উপরের '১. টার্গেট কোর্স নির্বাচন করুন' অংশ থেকে আপনার পছন্দের কোর্সগুলো সিলেক্ট করুন এবং 'Generate 15 Routines' বাটনে ক্লিক করুন।"
+                : "Choose 3 to 6 courses from Section 1 above, adjust your preferences in Section 2, and click 'Generate 15 Routines' to get optimal zero-clash schedules."}
+            </p>
+          </div>
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => {
+                const sample = ["CSE355", "CSE381", "CSE382", "CSE443", "CSE444"].filter(c => coursesCatalog.some(cat => cat.code === c));
+                setSelectedCourses(sample.length > 0 ? sample : coursesCatalog.slice(0, 5).map(c => c.code));
+                toast.success("Loaded 5 recommended standard courses (11 credits)!");
+              }}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+            >
+              <Star className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+              <span>Recommend Standard 5 Courses (11 Cr)</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 3. GENERATED ROUTINE OPTIONS SWITCHER (15 RANKED OPTIONS) */}
@@ -1674,61 +2021,146 @@ export default function SmartAdvisingRoutineTool() {
       )}
 
       {/* ========================================================================= */}
-      {/* 5. UPLOAD ADVISING TABLE MODAL (SUPPORT UP TO 10MB) */}
+      {/* 5. UPLOAD / PASTE ADVISING TABLE MODAL */}
       {/* ========================================================================= */}
       {isUploadModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 space-y-6 shadow-2xl relative">
+          <div className="w-full max-w-xl rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-7 space-y-5 shadow-2xl relative">
             <button
               onClick={() => setIsUploadModalOpen(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              className="absolute top-5 right-5 text-slate-400 hover:text-white transition-colors cursor-pointer text-base"
             >
               ✕
             </button>
 
-            <div className="space-y-2">
-              <div className="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/30 text-blue-400 flex items-center justify-center">
-                <Upload className="w-6 h-6" />
+            <div className="space-y-1.5">
+              <div className="w-11 h-11 rounded-2xl bg-blue-600/20 border border-blue-500/30 text-blue-400 flex items-center justify-center">
+                <Upload className="w-5 h-5" />
               </div>
-              <h3 className="text-xl font-bold text-white">
-                {language === "bn" ? "সাউথইস্ট ইউনিভার্সিটি UMS টেবিল আপলোড" : "Upload Southeast University UMS Table"}
+              <h3 className="text-lg sm:text-xl font-bold text-white">
+                {language === "bn" ? "সাউথইস্ট ইউনিভার্সিটি UMS টেবিল ইম্পোর্ট" : "Import Southeast University UMS Table"}
               </h3>
               <p className="text-xs text-slate-400 leading-relaxed">
                 {language === "bn"
-                  ? "সাউথইস্ট ইউনিভার্সিটির UMS পোর্টাল (ums.seu.edu.bd) থেকে Advising Table পেজের .html ফাইলটি (সর্বোচ্চ ১০ মেগাবাইট) এখানে আপলোড করুন। স্বয়ংক্রিয়ভাবে সব সেকশন ও রুটিন এক্সট্র্যাক্ট করা হবে।"
-                  : "Save your SEU UMS Advising Table page as .html (up to 10MB) and drop it here. All sections, faculty codes, and day/time schedules will be parsed instantly."}
+                  ? "সাউথইস্ট ইউনিভার্সিটির UMS পোর্টাল (ums.seu.edu.bd) থেকে Advising Table-এর .html ফাইল আপলোড করুন অথবা টেবিল থেকে কপি করে সরাসরি পেস্ট করুন।"
+                  : "Upload official advising .html file or copy-paste table text directly from UMS. Auto-extracts all sections, slots, and faculty."}
               </p>
             </div>
 
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className="p-8 rounded-2xl border-2 border-dashed border-slate-700 hover:border-blue-500 bg-slate-800/40 hover:bg-slate-800/80 transition-all text-center space-y-3 cursor-pointer"
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".html,.htm"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) handleFileUpload(e.target.files[0]);
-                }}
-                className="hidden"
-              />
-              <FileText className="w-10 h-10 text-slate-400 mx-auto" />
-              <div className="space-y-1">
-                <p className="text-xs font-bold text-slate-200">
-                  {language === "bn" ? "ক্লিক করুন অথবা ফাইল ড্রপ করুন" : "Click to browse or drop .html file"}
-                </p>
-                <p className="text-[10px] text-slate-400 font-mono">Supports SEU UMS HTML up to 10MB</p>
-              </div>
+            {/* Mode Switcher Tabs */}
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-slate-800/80 border border-slate-700/80">
+              <button
+                type="button"
+                onClick={() => setUploadTab("file")}
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  uploadTab === "file"
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Upload .html File</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setUploadTab("paste")}
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  uploadTab === "paste"
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>Paste Table / HTML</span>
+              </button>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-blue-950/40 border border-blue-900/60 text-xs text-slate-300 space-y-1">
+            {/* Tab 1: File Upload */}
+            {uploadTab === "file" && (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="p-7 rounded-2xl border-2 border-dashed border-slate-700 hover:border-blue-500 bg-slate-800/40 hover:bg-slate-800/80 transition-all text-center space-y-3 cursor-pointer"
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".html,.htm"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) handleFileUpload(e.target.files[0]);
+                  }}
+                  className="hidden"
+                />
+                <FileText className="w-9 h-9 text-slate-400 mx-auto" />
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-slate-200">
+                    {language === "bn" ? "ক্লিক করুন অথবা ফাইল ড্রপ করুন" : "Click to browse or drop .html file"}
+                  </p>
+                  <p className="text-[10px] text-slate-400 font-mono">Supports SEU UMS HTML up to 10MB</p>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Direct Paste (Supports UMS table text, raw HTML, or seu-routine-builder format) */}
+            {uploadTab === "paste" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-300">
+                    {language === "bn" ? "টেবিল বা HTML কোড পেস্ট করুন" : "Paste Copied Table or HTML Source"}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handlePasteFromClipboard}
+                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 text-[11px] font-mono font-bold transition-all flex items-center gap-1 cursor-pointer"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>Paste Clipboard</span>
+                    </button>
+                    {pastedText && (
+                      <button
+                        type="button"
+                        onClick={() => setPastedText("")}
+                        className="text-[11px] font-mono text-slate-400 hover:text-rose-400 cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <textarea
+                  value={pastedText}
+                  onChange={(e) => setPastedText(e.target.value)}
+                  placeholder="Paste copied UMS advising table text or HTML source code here...&#10;&#10;Supported formats:&#10;• Full HTML source from ums.seu.edu.bd&#10;• Plain-text rows copied directly from browser (e.g. CSE355.1 Image Processing 3.0 [JAR] SUN # 10:00 ~ 11:20 @ SEU527 / TUE # 10:00 ~ 11:20 @ SEU527)&#10;• Formats from seu-routine-builder"
+                  rows={7}
+                  className="w-full text-xs font-mono p-3 rounded-2xl bg-slate-800/70 border border-slate-700 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed resize-none"
+                />
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[10px] font-mono text-slate-400">
+                    {pastedText.length > 0 ? `${pastedText.length.toLocaleString()} characters entered` : "Supports plain text or HTML"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleApplyPastedText}
+                    disabled={uploadingFile || !pastedText.trim()}
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                  >
+                    <Sparkles className={`w-3.5 h-3.5 ${uploadingFile ? "animate-spin" : ""}`} />
+                    <span>{uploadingFile ? "Parsing..." : "Parse & Apply Schedule"}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Sandbox Guarantee Note */}
+            <div className="p-3 rounded-xl bg-blue-950/40 border border-blue-900/60 text-xs text-slate-300 space-y-1">
               <div className="flex items-center gap-1.5 font-bold text-blue-400">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
                 <span>Private Student Sandbox Guarantee</span>
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                Your uploaded advising schedule is exclusively used for your personal routine generation and conflict analysis. It is completely isolated and will <strong>never merge into or alter the university administration master catalog</strong>.
+                Your uploaded or pasted schedule is exclusively processed inside your personal browser session. It will <strong>never alter or merge into the university administration master catalog</strong>.
               </p>
             </div>
           </div>
