@@ -27,6 +27,9 @@ public interface OfferedSectionRepository extends JpaRepository<OfferedSection, 
     @Query("SELECT DISTINCT o.facultyInitial FROM OfferedSection o WHERE o.semester = :semester AND o.facultyInitial IS NOT NULL AND o.facultyInitial <> '' ORDER BY o.facultyInitial ASC")
     List<String> findDistinctFacultyInitialsBySemester(@Param("semester") String semester);
 
+    @Query("SELECT DISTINCT o.semester FROM OfferedSection o ORDER BY o.semester DESC")
+    List<String> findDistinctSemesters();
+
     @Modifying
     @Query("DELETE FROM OfferedSection o WHERE o.expiresAt IS NOT NULL AND o.expiresAt < :now")
     int deleteExpiredSections(@Param("now") LocalDateTime now);
@@ -35,5 +38,12 @@ public interface OfferedSectionRepository extends JpaRepository<OfferedSection, 
     @Query("DELETE FROM OfferedSection o WHERE o.semester = :semester")
     int deleteBySemester(@Param("semester") String semester);
 
+    @Modifying
+    @Query("DELETE FROM OfferedSection o WHERE o.semester = :semester AND o.uploaderRole IN ('ADMIN', 'SYSTEM')")
+    int deleteMasterSectionsBySemester(@Param("semester") String semester);
+
     long countBySemester(String semester);
+
+    @Query("SELECT COUNT(o) FROM OfferedSection o WHERE o.semester = :semester AND o.uploaderRole IN ('ADMIN', 'SYSTEM')")
+    long countMasterSectionsBySemester(@Param("semester") String semester);
 }

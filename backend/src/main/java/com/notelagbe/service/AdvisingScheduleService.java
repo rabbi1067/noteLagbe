@@ -64,7 +64,9 @@ public class AdvisingScheduleService {
     }
 
     /**
-     * Parses Southeast University UMS HTML string and saves sections with deduplication.
+     * Parses Southeast University UMS HTML string.
+     * Note: Admin uploads go to the official Master Catalog.
+     * Student uploads are strictly isolated and NEVER merge into or overwrite the Admin Master Catalog!
      */
     @Transactional
     public Map<String, Object> parseAndSaveHtml(String htmlContent, User uploader, String semester) {
@@ -74,9 +76,48 @@ public class AdvisingScheduleService {
 
         String targetSemester = (semester != null && !semester.trim().isEmpty()) ? semester.trim() : DEFAULT_SEMESTER;
         boolean isAdmin = uploader != null && (uploader.getRole().name().contains("ADMIN") || uploader.getRole().name().contains("MANAGER"));
-        Long uploaderId = uploader != null ? uploader.getId() : null;
-        String uploaderRole = isAdmin ? "ADMIN" : (uploader != null ? "STUDENT" : "GUEST");
-        LocalDateTime expiresAt = isAdmin ? null : LocalDateTime.now().plusDays(10);
+
+        if (isAdmin) {
+            return parseAndSaveAdminMasterHtml(htmlContent, uploader, targetSemester, false);
+        }
+
+        // Student Upload: Parse sections and return directly for student session without touching Admin Master DB
+        List<ParsedSection> parsedList = parseUmsHtml(htmlContent);
+        if (parsedList.isEmpty()) {
+            throw new IllegalArgumentException("Could not extract any offered sections from the uploaded HTML. Please ensure it is an official Southeast University UMS advising table.");
+        }
+
+        log.info("Student {} uploaded advising HTML with {} sections (isolated from Admin Master)",
+                uploader != null ? uploader.getEmail() : "Guest", parsedList.size());
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("totalParsed", parsedList.size());
+        result.put("semester", targetSemester);
+        result.put("isStudentPrivate", true);
+        result.put("sections", parsedList);
+        return result;
+    }
+
+    /**
+     * Official Admin Master Table Importer.
+     * Saves official sections with uploaderRole = "ADMIN", expiresAt = null.
+     * If replaceExisting is true, purges previous master sections for this semester first.
+     */
+    @Transactional
+    public Map<String, Object> parseAndSaveAdminMasterHtml(
+            String htmlContent, User adminUser, String semester, boolean replaceExisting) {
+        if (htmlContent == null || htmlContent.trim().isEmpty()) {
+            throw new IllegalArgumentException("HTML content cannot be empty.");
+        }
+
+        String targetSemester = (semester != null && !semester.trim().isEmpty()) ? semester.trim() : DEFAULT_SEMESTER;
+        Long uploaderId = adminUser != null ? adminUser.getId() : null;
+
+        if (replaceExisting) {
+            int deleted = sectionRepository.deleteMasterSectionsBySemester(targetSemester);
+            log.info("Admin master import: purged {} existing master sections for {}", deleted, targetSemester);
+        }
 
         List<ParsedSection> parsedList = parseUmsHtml(htmlContent);
         if (parsedList.isEmpty()) {
@@ -102,10 +143,9 @@ public class AdvisingScheduleService {
                 existing.setScheduleText(ps.scheduleText);
                 existing.setScheduleJson(scheduleJson);
                 existing.setUpdatedAt(LocalDateTime.now());
-                if (isAdmin) {
-                    existing.setExpiresAt(null);
-                    existing.setUploaderRole("ADMIN");
-                }
+                existing.setExpiresAt(null);
+                existing.setUploaderRole("ADMIN");
+                existing.setUploadedByUserId(uploaderId);
                 sectionRepository.save(existing);
                 updatedCount++;
             } else {
@@ -121,16 +161,16 @@ public class AdvisingScheduleService {
                         scheduleJson,
                         targetSemester,
                         uploaderId,
-                        uploaderRole,
-                        expiresAt
+                        "ADMIN",
+                        null
                 );
                 sectionRepository.save(newSec);
                 createdCount++;
             }
         }
 
-        log.info("Advising HTML processed for {}: {} sections created, {} updated by {}",
-                targetSemester, createdCount, updatedCount, uploaderRole);
+        log.info("Admin Master Advising HTML saved for {}: {} created, {} updated",
+                targetSemester, createdCount, updatedCount);
 
         Map<String, Object> result = new HashMap<>();
         result.put("success", true);
@@ -138,8 +178,94 @@ public class AdvisingScheduleService {
         result.put("createdCount", createdCount);
         result.put("updatedCount", updatedCount);
         result.put("semester", targetSemester);
-        result.put("expiresAt", expiresAt != null ? expiresAt.toString() : "Permanent (Admin Upload)");
+        result.put("replaceExisting", replaceExisting);
         return result;
+    }
+
+    /**
+     * Admin: Purges all master advising sections for a specific semester
+     */
+    @Transactional
+    public Map<String, Object> purgeMasterCatalog(String semester) {
+        String targetSemester = (semester != null && !semester.trim().isEmpty()) ? semester.trim() : DEFAULT_SEMESTER;
+        int deleted = sectionRepository.deleteMasterSectionsBySemester(targetSemester);
+        log.info("Admin purged {} master advising sections for semester {}", deleted, targetSemester);
+        Map<String, Object> res = new HashMap<>();
+        res.put("success", true);
+        res.put("deletedCount", deleted);
+        res.put("semester", targetSemester);
+        return res;
+    }
+
+    /**
+     * Admin: Deletes an individual offered section by ID
+     */
+    @Transactional
+    public Map<String, Object> deleteSection(Long id) {
+        if (!sectionRepository.existsById(id)) {
+            throw new IllegalArgumentException("Offered section not found with ID: " + id);
+        }
+        sectionRepository.deleteById(id);
+        log.info("Admin deleted advising section ID: {}", id);
+        Map<String, Object> res = new HashMap<>();
+        res.put("success", true);
+        res.put("deletedId", id);
+        return res;
+    }
+
+    /**
+     * Admin: Resets/restores the official 62 Spring 2026 sections from seed data
+     */
+    @Transactional
+    public Map<String, Object> resetToDefaultCatalog(String semester) {
+        String targetSemester = (semester != null && !semester.trim().isEmpty()) ? semester.trim() : DEFAULT_SEMESTER;
+        sectionRepository.deleteMasterSectionsBySemester(targetSemester);
+        seedDefaultSections();
+        long count = sectionRepository.countMasterSectionsBySemester(targetSemester);
+        Map<String, Object> res = new HashMap<>();
+        res.put("success", true);
+        res.put("restoredCount", count);
+        res.put("semester", targetSemester);
+        return res;
+    }
+
+    /**
+     * Admin: Retrieves the official Master Table catalog with available semesters and metadata
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getAdminMasterCatalog(String semester) {
+        String targetSemester = (semester != null && !semester.trim().isEmpty()) ? semester.trim() : DEFAULT_SEMESTER;
+        List<OfferedSection> list = sectionRepository.findBySemesterOrderByCourseCodeAscSectionNumberAsc(targetSemester);
+
+        // Strictly filter to official master sections (ADMIN or SYSTEM)
+        List<OfferedSection> masterList = list.stream()
+                .filter(s -> "ADMIN".equalsIgnoreCase(s.getUploaderRole()) || "SYSTEM".equalsIgnoreCase(s.getUploaderRole()))
+                .collect(Collectors.toList());
+
+        Map<String, List<OfferedSection>> grouped = masterList.stream()
+                .collect(Collectors.groupingBy(OfferedSection::getCourseCode, LinkedHashMap::new, Collectors.toList()));
+
+        List<String> distinctFaculties = masterList.stream()
+                .map(OfferedSection::getFacultyInitial)
+                .filter(f -> f != null && !f.trim().isEmpty())
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+
+        List<String> distinctSemesters = sectionRepository.findDistinctSemesters();
+        if (distinctSemesters.isEmpty()) {
+            distinctSemesters = List.of(DEFAULT_SEMESTER);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("semester", targetSemester);
+        response.put("availableSemesters", distinctSemesters);
+        response.put("totalSections", masterList.size());
+        response.put("totalCourses", grouped.size());
+        response.put("courses", grouped);
+        response.put("sections", masterList);
+        response.put("faculties", distinctFaculties);
+        return response;
     }
 
     /**
@@ -155,8 +281,14 @@ public class AdvisingScheduleService {
 
         List<String> distinctFaculties = sectionRepository.findDistinctFacultyInitialsBySemester(targetSemester);
 
+        List<String> distinctSemesters = sectionRepository.findDistinctSemesters();
+        if (distinctSemesters.isEmpty()) {
+            distinctSemesters = List.of(DEFAULT_SEMESTER);
+        }
+
         Map<String, Object> response = new HashMap<>();
         response.put("semester", targetSemester);
+        response.put("availableSemesters", distinctSemesters);
         response.put("totalSections", list.size());
         response.put("totalCourses", grouped.size());
         response.put("courses", grouped);

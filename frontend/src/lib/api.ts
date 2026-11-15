@@ -1212,11 +1212,68 @@ export const api = {
     getSections: (semester?: string) =>
       request<{
         semester: string;
+        availableSemesters?: string[];
         totalSections: number;
         totalCourses: number;
         courses: Record<string, any[]>;
         faculties: string[];
       }>(`/advising/sections${semester ? `?semester=${encodeURIComponent(semester)}` : ""}`),
+
+    getAdminCatalog: (semester?: string) =>
+      request<{
+        semester: string;
+        availableSemesters: string[];
+        totalSections: number;
+        totalCourses: number;
+        courses: Record<string, any[]>;
+        sections: any[];
+        faculties: string[];
+      }>(`/advising/admin/catalog${semester ? `?semester=${encodeURIComponent(semester)}` : ""}`),
+
+    uploadAdminMasterTable: async (fileOrHtml: File | string, semester?: string, replaceExisting = true) => {
+      const token = getToken();
+      if (typeof fileOrHtml === "string") {
+        return request<any>("/advising/admin/upload", {
+          method: "POST",
+          body: JSON.stringify({ html: fileOrHtml, semester, replaceExisting }),
+        });
+      }
+      const formData = new FormData();
+      formData.append("file", fileOrHtml);
+      if (semester) formData.append("semester", semester);
+      formData.append("replaceExisting", String(replaceExisting));
+
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://notelagbe-backend.onrender.com/api";
+      const res = await fetch(`${API_URL}/advising/admin/upload`, {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || err.message || "Failed to upload master advising table.");
+      }
+      return await res.json();
+    },
+
+    purgeAdminMasterCatalog: (semester: string) =>
+      request<{ success: boolean; deletedCount: number; semester: string }>(
+        `/advising/admin/purge?semester=${encodeURIComponent(semester)}`,
+        { method: "DELETE" }
+      ),
+
+    deleteAdminSection: (id: number) =>
+      request<{ success: boolean; deletedId: number }>(`/advising/admin/section/${id}`, {
+        method: "DELETE",
+      }),
+
+    resetAdminDefault: (semester?: string) =>
+      request<{ success: boolean; restoredCount: number; semester: string }>(
+        `/advising/admin/reset-default${semester ? `?semester=${encodeURIComponent(semester)}` : ""}`,
+        { method: "POST" }
+      ),
 
     uploadAdvisingTable: async (fileOrHtml: File | string, semester?: string) => {
       const token = getToken();

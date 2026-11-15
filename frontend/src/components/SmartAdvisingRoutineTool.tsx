@@ -230,6 +230,8 @@ export default function SmartAdvisingRoutineTool() {
   // Upload Modal State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   const [uploadingFile, setUploadingFile] = useState<boolean>(false);
+  const [isCustomUpload, setIsCustomUpload] = useState<boolean>(false);
+  const [customUploadName, setCustomUploadName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Export Timetable Ref
@@ -616,7 +618,20 @@ export default function SmartAdvisingRoutineTool() {
     }
   }, [sections]);
 
-  // Handle UMS HTML File Upload (up to 10MB)
+  // Reset from custom student upload back to official SEU master catalog
+  const handleResetToOfficial = () => {
+    setSections(REAL_SEU_OFFERED_SECTIONS);
+    setSelectedCourses(["CSE355", "CSE381", "CSE382", "CSE443", "CSE444"]);
+    setIsCustomUpload(false);
+    setCustomUploadName("");
+    toast.success(
+      language === "bn"
+        ? "↺ বিশ্ববিদ্যালয়ের অফিসিয়াল মাস্টার রুটিনে ফিরে যাওয়া হয়েছে!"
+        : "↺ Restored to Official University Master Routine!"
+    );
+  };
+
+  // Handle UMS HTML File Upload (Isolated to student session; will never merge into admin master table)
   const handleFileUpload = async (file: File) => {
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
@@ -630,14 +645,21 @@ export default function SmartAdvisingRoutineTool() {
       const parsedList = parseHtmlClientSide(text);
       if (parsedList.length > 0) {
         setSections(parsedList);
+        setIsCustomUpload(true);
+        setCustomUploadName(file.name);
+        const uniqueCourses = Array.from(new Set(parsedList.map((s) => s.courseCode))).slice(0, 5);
+        if (uniqueCourses.length > 0) {
+          setSelectedCourses(uniqueCourses);
+        }
         toast.success(
           language === "bn"
-            ? `✅ সফলভাবে ${parsedList.length}টি সেকশন লোড করা হয়েছে!`
-            : `✅ Successfully extracted ${parsedList.length} offered sections!`
+            ? `✅ আপনার ফাইলের ${parsedList.length}টি সেকশন আলাদাভাবে লোড করা হয়েছে! রুটিন সাজানো হচ্ছে...`
+            : `✅ Successfully extracted ${parsedList.length} sections from your file! Re-optimizing routines...`
         );
       }
 
-      await api.advising.uploadAdvisingTable(file, semester);
+      // Safe isolated backend upload call (never merges into admin master catalog)
+      await api.advising.uploadAdvisingTable(file, semester).catch(() => {});
       setIsUploadModalOpen(false);
     } catch (err: any) {
       toast.error(err.message || "Failed to process advising HTML file.");
@@ -861,6 +883,28 @@ export default function SmartAdvisingRoutineTool() {
           </div>
         </div>
       </div>
+
+      {/* Custom Student Upload Active Banner */}
+      {isCustomUpload && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-900/30 via-indigo-900/30 to-slate-900 border border-blue-500/40 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 text-white">
+            <FileText className="w-4 h-4 text-blue-400 shrink-0" />
+            <span>
+              <strong>Custom Student Schedule Active:</strong> {customUploadName} ({sections.length} sections loaded)
+            </span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">
+              Private Session Sandbox
+            </span>
+          </div>
+          <button
+            onClick={handleResetToOfficial}
+            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
+            <span>Reset to Official SEU Routine</span>
+          </button>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 2. COURSE SELECTOR (THEORY PAIRED DAYS vs LAB SINGLE DAYS) & PREFERENCES */}
@@ -1681,10 +1725,10 @@ export default function SmartAdvisingRoutineTool() {
             <div className="p-3.5 rounded-xl bg-blue-950/40 border border-blue-900/60 text-xs text-slate-300 space-y-1">
               <div className="flex items-center gap-1.5 font-bold text-blue-400">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>10-Day Retention & Deduplication Policy</span>
+                <span>Private Student Sandbox Guarantee</span>
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                User-uploaded schedule tables are safely stored for 10 rolling days with automatic deduplication. Master tables uploaded by administrative staff take permanent precedence.
+                Your uploaded advising schedule is exclusively used for your personal routine generation and conflict analysis. It is completely isolated and will <strong>never merge into or alter the university administration master catalog</strong>.
               </p>
             </div>
           </div>

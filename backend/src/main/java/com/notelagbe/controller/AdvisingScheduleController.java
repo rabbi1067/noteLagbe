@@ -37,6 +37,107 @@ public class AdvisingScheduleController {
     }
 
     /**
+     * Admin: Fetch official Master Catalog with semester list and master sections only
+     */
+    @GetMapping("/admin/catalog")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'MANAGER')")
+    public ResponseEntity<Map<String, Object>> getAdminCatalog(
+            @RequestParam(value = "semester", required = false) String semester) {
+        return ResponseEntity.ok(advisingScheduleService.getAdminMasterCatalog(semester));
+    }
+
+    /**
+     * Admin: Official Master Table upload (supports replacing existing semester catalog)
+     */
+    @PostMapping("/admin/upload")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'MANAGER')")
+    public ResponseEntity<Map<String, Object>> uploadAdminMasterTable(
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "semester", required = false) String semester,
+            @RequestParam(value = "replaceExisting", required = false, defaultValue = "true") boolean replaceExisting,
+            @RequestBody(required = false) Map<String, Object> jsonBody,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        User adminUser = resolveUser(userDetails);
+        String htmlContent = null;
+        String targetSemester = semester;
+        boolean replace = replaceExisting;
+
+        if (file != null && !file.isEmpty()) {
+            try {
+                htmlContent = new String(file.getBytes(), StandardCharsets.UTF_8);
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "error", "Failed to read uploaded HTML file."));
+            }
+        } else if (jsonBody != null && jsonBody.containsKey("html")) {
+            htmlContent = (String) jsonBody.get("html");
+            if (jsonBody.containsKey("semester") && (targetSemester == null || targetSemester.isBlank())) {
+                targetSemester = (String) jsonBody.get("semester");
+            }
+            if (jsonBody.containsKey("replaceExisting")) {
+                replace = Boolean.parseBoolean(String.valueOf(jsonBody.get("replaceExisting")));
+            }
+        }
+
+        if (htmlContent == null || htmlContent.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "error", "No HTML content provided."));
+        }
+
+        try {
+            Map<String, Object> result = advisingScheduleService.parseAndSaveAdminMasterHtml(htmlContent, adminUser, targetSemester, replace);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "error", "Master upload failed: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Admin: Purge all master sections for a specific semester
+     */
+    @DeleteMapping("/admin/purge")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'MANAGER')")
+    public ResponseEntity<Map<String, Object>> purgeMasterCatalog(
+            @RequestParam("semester") String semester) {
+        try {
+            return ResponseEntity.ok(advisingScheduleService.purgeMasterCatalog(semester));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "error", "Failed to purge semester catalog: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Admin: Delete an individual section by ID
+     */
+    @DeleteMapping("/admin/section/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'MANAGER')")
+    public ResponseEntity<Map<String, Object>> deleteSection(
+            @PathVariable("id") Long id) {
+        try {
+            return ResponseEntity.ok(advisingScheduleService.deleteSection(id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "error", "Failed to delete section: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Admin: Reset / restore authentic default 62 SEU sections from bundled catalog
+     */
+    @PostMapping("/admin/reset-default")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'MANAGER')")
+    public ResponseEntity<Map<String, Object>> resetDefaultCatalog(
+            @RequestParam(value = "semester", required = false) String semester) {
+        try {
+            return ResponseEntity.ok(advisingScheduleService.resetToDefaultCatalog(semester));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "error", "Failed to reset default catalog: " + e.getMessage()));
+        }
+    }
+
+    /**
      * Upload and parse Southeast University UMS Advising Table HTML file
      * Supports both multipart/form-data (up to 10MB) and JSON payload
      */
