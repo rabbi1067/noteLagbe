@@ -548,7 +548,7 @@ public class AdvisingScheduleService {
             int insideCount = 0;
             int totalSlotsCount = 0;
             for (OfferedSection s : sections) {
-                for (TimeSlot sl : s.getSlots()) {
+                for (TimeSlot sl : parseSlots(s.getScheduleJson())) {
                     totalSlotsCount++;
                     if (sl.startMinutes >= targetStartMin && sl.endMinutes <= targetEndMin) {
                         insideCount++;
