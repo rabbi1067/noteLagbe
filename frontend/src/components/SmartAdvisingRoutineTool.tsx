@@ -43,6 +43,9 @@ import {
   FileText,
   ShieldCheck,
   Zap,
+  FileCode,
+  UploadCloud,
+  RotateCcw,
   ExternalLink,
   BookOpen,
   Image as ImageIcon,
@@ -223,8 +226,10 @@ export default function SmartAdvisingRoutineTool() {
   const { user, isAdmin, isSuperAdmin } = useAuth();
   const { language } = useLanguage();
 
-  // State: Sections loaded from verified real SEU dataset
-  const [sections, setSections] = useState<OfferedSectionItem[]>(REAL_SEU_OFFERED_SECTIONS);
+  // State: Sections loaded from verified backend or student sandbox session
+  const [sections, setSections] = useState<OfferedSectionItem[]>([]);
+  const [officialSections, setOfficialSections] = useState<OfferedSectionItem[]>([]);
+  const [isLoadingCatalog, setIsLoadingCatalog] = useState<boolean>(true);
   const [semester, setSemester] = useState<string>("Spring 2026");
 
   // Selection
@@ -279,24 +284,15 @@ export default function SmartAdvisingRoutineTool() {
   // Export Timetable Ref
   const routineContainerRef = useRef<HTMLDivElement>(null);
 
-  // Load sections from localStorage (if custom upload exists) or backend on mount
+  // Load official sections from backend on mount or semester change
+  // Note: Student custom uploads are session-only and NOT saved to localStorage or backend.
+  // Refreshing always restores whatever official catalog is published in the Admin Backend.
   useEffect(() => {
-    try {
-      const saved = typeof window !== "undefined" ? localStorage.getItem(`notelagbe_custom_advising_${semester}`) : null;
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setSections(parsed);
-          setIsCustomUpload(true);
-          setCustomUploadName(`Custom Catalog (${parsed.length} sections)`);
-          return;
-        }
-      }
-    } catch {}
     fetchBackendSections();
   }, [semester]);
 
   const fetchBackendSections = async () => {
+    setIsLoadingCatalog(true);
     try {
       const res = await api.advising.getSections(semester);
       if (res && res.courses && Object.keys(res.courses).length > 0) {
@@ -330,12 +326,21 @@ export default function SmartAdvisingRoutineTool() {
             });
           });
         });
-        if (flat.length >= 60) {
-          setSections(flat);
-        }
+        setOfficialSections(flat);
+        setSections(flat);
+        setIsCustomUpload(false);
+        setCustomUploadName("");
+      } else {
+        // Backend has no sections published by admin for this semester
+        setOfficialSections([]);
+        setSections([]);
       }
     } catch (err) {
-      console.warn("Backend advising fetch fallback to verified static data:", err);
+      console.warn("Backend advising fetch error:", err);
+      setOfficialSections([]);
+      setSections([]);
+    } finally {
+      setIsLoadingCatalog(false);
     }
   };
 
@@ -918,65 +923,39 @@ export default function SmartAdvisingRoutineTool() {
     } catch (e) {}
   };
 
-  // Reset from custom student upload back to official SEU master catalog
+  // Reset from custom student session sandbox back to official university catalog
   const handleResetToOfficial = () => {
     try {
       if (typeof window !== "undefined") {
         localStorage.removeItem(`notelagbe_custom_advising_${semester}`);
       }
     } catch {}
-    setSections(REAL_SEU_OFFERED_SECTIONS);
+    setSections(officialSections);
     setSelectedCourses([]);
     setRoutines([]);
     setIsCustomUpload(false);
     setCustomUploadName("");
     toast.success(
       language === "bn"
-        ? "↺ বিশ্ববিদ্যালয়ের অফিসিয়াল মাস্টার রুটিনে ফিরে যাওয়া হয়েছে!"
-        : "↺ Restored to Official University Master Routine!"
+        ? "↺ বিশ্ববিদ্যালয়ের অফিসিয়াল মাস্টার ক্যাটালগে ফিরে যাওয়া হয়েছে!"
+        : "↺ Restored to Official University Catalog!"
     );
   };
 
-  // Handle Save Catalog from AdvisingDataModal (persists locally and syncs to backend)
-  const handleSaveCatalog = async (newSections: OfferedSectionItem[], rawText?: string) => {
+  // Handle Apply Catalog from AdvisingDataModal (Private Session Sandbox ONLY)
+  // Per requirement: user inputs are applied in memory only, NEVER saved to backend or localStorage.
+  // On page refresh, user inputs are cleared and official backend data is restored.
+  const handleSaveCatalog = (newSections: OfferedSectionItem[]) => {
     setSections(newSections);
     setIsCustomUpload(true);
-    setCustomUploadName(`Custom Catalog (${newSections.length} sections)`);
+    setCustomUploadName(`Custom Session Catalog (${newSections.length} sections)`);
     setSelectedCourses([]);
     setRoutines([]);
-    try {
-      if (typeof window !== "undefined") {
-        localStorage.setItem(`notelagbe_custom_advising_${semester}`, JSON.stringify(newSections));
-      }
-    } catch {}
-
-    // Auto-sync to backend in background so database stores it
-    if (rawText && rawText.trim()) {
-      try {
-        await api.advising.uploadAdvisingTable(rawText, semester);
-        console.log("Successfully synced advising data to backend");
-      } catch (err) {
-        console.warn("Backend advising sync error:", err);
-      }
-    }
-  };
-
-  // Handle Merge Catalog from AdvisingDataModal
-  const handleMergeCatalog = (mergedSections: OfferedSectionItem[]) => {
-    setSections((prev) => {
-      const map = new Map<string, OfferedSectionItem>();
-      prev.forEach((s) => map.set(`${s.courseCode}.${s.sectionNumber}`, s));
-      mergedSections.forEach((s) => map.set(`${s.courseCode}.${s.sectionNumber}`, s));
-      const updated = Array.from(map.values());
-      try {
-        if (typeof window !== "undefined") {
-          localStorage.setItem(`notelagbe_custom_advising_${semester}`, JSON.stringify(updated));
-        }
-      } catch {}
-      return updated;
-    });
-    setIsCustomUpload(true);
-    setCustomUploadName(`Merged Catalog`);
+    toast.success(
+      language === "bn"
+        ? `✅ সেশনের জন্য ${newSections.length}টি সেকশন লোড করা হয়েছে!`
+        : `✅ Loaded ${newSections.length} sections into your private session sandbox!`
+    );
   };
 
 
@@ -1108,8 +1087,8 @@ export default function SmartAdvisingRoutineTool() {
               onClick={() => setIsUploadModalOpen(true)}
               className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-blue-500/25 transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
             >
-              <Upload className="w-4 h-4 text-blue-200" />
-              <span>{language === "bn" ? "অ্যাডভাইজিং ডাটা / UMS আপলোড" : "Advising Data / Upload UMS"}</span>
+              <FileCode className="w-4 h-4 text-blue-200" />
+              <span>{language === "bn" ? "UMS ডাটা আপলোড (.html) / ইনপুট" : "Upload UMS Data (.html / Input)"}</span>
             </button>
           </div>
         </div>
@@ -1119,20 +1098,21 @@ export default function SmartAdvisingRoutineTool() {
       {isCustomUpload && (
         <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-900/30 via-indigo-900/30 to-slate-900 border border-blue-500/40 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2 text-white">
-            <FileText className="w-4 h-4 text-blue-400 shrink-0" />
+            <FileCode className="w-4 h-4 text-blue-400 shrink-0" />
             <span>
-              <strong>Custom Student Schedule Active:</strong> {customUploadName} ({sections.length} sections loaded)
+              <strong>{language === "bn" ? "কাস্টম সেশন স্যান্ডবক্স সক্রিয়:" : "Custom Session Sandbox Active:"}</strong>{" "}
+              {customUploadName} ({sections.length} {language === "bn" ? "টি সেকশন" : "sections"})
             </span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">
-              Private Session Sandbox
+              {language === "bn" ? "প্রাইভেট সেশন • রিফ্রেশ দিলে ব্যাকএন্ড ডাটা ফিরবে" : "Session Only • Refresh resets to official"}
             </span>
           </div>
           <button
             onClick={handleResetToOfficial}
             className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
-            <span>Reset to Official SEU Routine</span>
+            <RotateCcw className="w-3.5 h-3.5 text-blue-400" />
+            <span>{language === "bn" ? "অফিসিয়াল ক্যাটালগে ব্যাক করুন" : "Reset to Official Catalog"}</span>
           </button>
         </div>
       )}
@@ -1290,9 +1270,51 @@ export default function SmartAdvisingRoutineTool() {
               </div>
             )}
 
-            {/* Courses Groups (Theory & Lab) */}
-            <div className="space-y-5">
-              {/* Theory Courses Group */}
+            {/* Courses Groups (Theory & Lab) or Loading / Empty State */}
+            {isLoadingCatalog ? (
+              <div className="py-12 text-center space-y-3">
+                <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-xs font-mono text-slate-400">
+                  {language === "bn"
+                    ? "বিশ্ববিদ্যালয়ের অ্যাডভাইজিং ক্যাটালগ যাচাই করা হচ্ছে..."
+                    : "Verifying official university advising catalog..."}
+                </p>
+              </div>
+            ) : totalAvailable === 0 ? (
+              <div className="py-12 px-6 rounded-2xl bg-slate-900/40 border border-dashed border-slate-800 text-center space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 mx-auto flex items-center justify-center">
+                  <FileCode className="w-7 h-7" />
+                </div>
+                <div className="space-y-1.5 max-w-md mx-auto">
+                  <h3 className="text-base font-black text-white">
+                    {language === "bn"
+                      ? "কোনো কোর্স ডাটা পাওয়া যায়নি"
+                      : "No Advising Course Data Available"}
+                  </h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    {language === "bn"
+                      ? "অ্যাডমিন প্যানেল থেকে এখনও এই সেমিস্টারের কোনো অফিশিয়াল কোর্স ডাটা পাবলিশ করা হয়নি। আপনি আপনার UMS টেবিলের .html ফাইল আপলোড করে অথবা টেক্সট পেস্ট করে সরাসরি কনফ্লিক্ট-মুক্ত রুটিন তৈরি করতে পারেন!"
+                      : "No official advising catalog has been published by Admin for this semester yet. Upload your UMS .html table file or paste advising rows above to generate conflict-free routines in your private session sandbox!"}
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsUploadModalOpen(true)}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-blue-500/25 transition-all inline-flex items-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    <UploadCloud className="w-4 h-4 text-white" />
+                    <span>
+                      {language === "bn"
+                        ? "UMS .html ফাইল আপলোড করুন / পেস্ট করুন"
+                        : "Upload UMS .html / Input Data"}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {/* Theory Courses Group */}
               {theoryToShow.length > 0 && (
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-300">
@@ -1559,6 +1581,7 @@ export default function SmartAdvisingRoutineTool() {
                 </div>
               )}
             </div>
+          )}
 
             {/* See More / See Less Toggle */}
             {hasMore && (
@@ -2515,16 +2538,8 @@ export default function SmartAdvisingRoutineTool() {
         onClose={() => setIsUploadModalOpen(false)}
         currentSections={sections}
         onSaveCatalog={handleSaveCatalog}
-        onMergeCatalog={handleMergeCatalog}
         semester={semester}
         isStaffOrAdmin={Boolean(isAdmin || isSuperAdmin || user?.role === "ROLE_ADMIN" || user?.role === "ROLE_MANAGER" || user?.role === "ROLE_SUPER_ADMIN")}
-        onSyncBackend={async (rawText) => {
-          try {
-            await api.advising.uploadAdvisingTable(rawText, semester);
-          } catch (e) {
-            console.warn("Background advising sync failed:", e);
-          }
-        }}
       />
     </div>
   );
