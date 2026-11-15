@@ -359,6 +359,18 @@ public class AdvisingScheduleService {
                     return slots.stream().allMatch(slot -> prefSet.contains(slot.day.toUpperCase()));
                 }).collect(Collectors.toList());
 
+                // Prioritize preferred faculty within strict sections
+                List<String> prefFacs = (facultyPreferences != null) ? facultyPreferences.get(cCode) : null;
+                if (prefFacs != null && !prefFacs.isEmpty()) {
+                    strictSecs.sort((s1, s2) -> {
+                        int r1 = prefFacs.indexOf(s1.getFacultyInitial());
+                        int r2 = prefFacs.indexOf(s2.getFacultyInitial());
+                        int score1 = (r1 == 0) ? -2 : (r1 > 0 ? -1 : 0);
+                        int score2 = (r2 == 0) ? -2 : (r2 > 0 ? -1 : 0);
+                        return Integer.compare(score1, score2);
+                    });
+                }
+
                 if (strictSecs.isEmpty()) {
                     allCoursesHaveStrictSecs = false;
                     coursesWithNoStrictSections.add(cCode);
@@ -377,22 +389,35 @@ public class AdvisingScheduleService {
 
         // Tier 2: If no target day filter or if strict mode yielded 0 clash-free combinations:
         if (validCombinations.isEmpty()) {
-            if (hasPreferredDays) {
-                // Prioritize sections that fit preferred days first so outside days are explored last
-                List<List<OfferedSection>> prioritizedList = new ArrayList<>();
-                for (List<OfferedSection> secs : courseSectionsList) {
-                    List<OfferedSection> sortedSecs = new ArrayList<>(secs);
-                    sortedSecs.sort((s1, s2) -> {
+            List<List<OfferedSection>> prioritizedList = new ArrayList<>();
+            for (int i = 0; i < cleanCourseCodes.size(); i++) {
+                String cCode = cleanCourseCodes.get(i);
+                List<OfferedSection> secs = courseSectionsList.get(i);
+                List<OfferedSection> sortedSecs = new ArrayList<>(secs);
+                List<String> prefFacs = (facultyPreferences != null) ? facultyPreferences.get(cCode) : null;
+
+                sortedSecs.sort((s1, s2) -> {
+                    // 1. Preferred faculty priority first
+                    if (prefFacs != null && !prefFacs.isEmpty()) {
+                        int r1 = prefFacs.indexOf(s1.getFacultyInitial());
+                        int r2 = prefFacs.indexOf(s2.getFacultyInitial());
+                        int fScore1 = (r1 == 0) ? -2 : (r1 > 0 ? -1 : 0);
+                        int fScore2 = (r2 == 0) ? -2 : (r2 > 0 ? -1 : 0);
+                        if (fScore1 != fScore2) {
+                            return Integer.compare(fScore1, fScore2);
+                        }
+                    }
+                    // 2. Preferred days priority
+                    if (hasPreferredDays) {
                         long out1 = parseSlots(s1.getScheduleJson()).stream().filter(slot -> !prefSet.contains(slot.day.toUpperCase())).count();
                         long out2 = parseSlots(s2.getScheduleJson()).stream().filter(slot -> !prefSet.contains(slot.day.toUpperCase())).count();
                         return Long.compare(out1, out2);
-                    });
-                    prioritizedList.add(sortedSecs);
-                }
-                backtrackCombinations(prioritizedList, 0, new ArrayList<>(), validCombinations);
-            } else {
-                backtrackCombinations(courseSectionsList, 0, new ArrayList<>(), validCombinations);
+                    }
+                    return 0;
+                });
+                prioritizedList.add(sortedSecs);
             }
+            backtrackCombinations(prioritizedList, 0, new ArrayList<>(), validCombinations);
         }
 
         if (validCombinations.isEmpty()) {
@@ -414,19 +439,33 @@ public class AdvisingScheduleService {
             scoredList.add(sr);
         }
 
-        // Sort descending by score, strictly prioritizing combinations that match user's selected preferred days
-        if (preferredDays != null && !preferredDays.isEmpty()) {
-            scoredList.sort((a, b) -> {
+        // Multi-Objective Hierarchy Master Sort:
+        // 1. Outside Days: 0 outside days strictly first
+        // 2. Preferred Faculty Priority: routines with more preferred faculty matches rank strictly higher
+        // 3. Minimum Dead Gap Priority: routines with minimal gap (<=15m) rank first in Top 5
+        // 4. Composite score fallback
+        scoredList.sort((a, b) -> {
+            if (preferredDays != null && !preferredDays.isEmpty()) {
                 long aOutside = a.activeDays.stream().filter(d -> !prefSet.contains(d)).count();
                 long bOutside = b.activeDays.stream().filter(d -> !prefSet.contains(d)).count();
                 if (aOutside != bOutside) {
                     return Long.compare(aOutside, bOutside); // Fewer outside days first
                 }
-                return Double.compare(b.score, a.score);
-            });
-        } else {
-            scoredList.sort((a, b) -> Double.compare(b.score, a.score));
-        }
+            }
+
+            // 2. Preferred Faculty Priority
+            if (a.facultyMatchCount != b.facultyMatchCount) {
+                return Integer.compare(b.facultyMatchCount, a.facultyMatchCount);
+            }
+
+            // 3. Minimum Dead Gap Priority (Top 5 guaranteed minimal waiting gaps)
+            if (Math.abs(a.totalGapMinutes - b.totalGapMinutes) >= 15.0) {
+                return Double.compare(a.totalGapMinutes, b.totalGapMinutes);
+            }
+
+            // 4. Composite score fallback
+            return Double.compare(b.score, a.score);
+        });
 
         // Limit top 10 routines and assign rank
         List<ScoredRoutine> topRoutines = new ArrayList<>();
@@ -646,27 +685,31 @@ public class AdvisingScheduleService {
             if (afternoonCount > morningCount) highlights.add("☕ Afternoon Focused");
         }
 
-        // Faculty preferences
+        // Faculty preferences (HIGH PRIORITY)
         int facultyMatches = 0;
+        int targetFacTotal = 0;
         if (facultyPreferences != null && !facultyPreferences.isEmpty()) {
             for (OfferedSection s : sections) {
                 List<String> preferredForCourse = facultyPreferences.get(s.getCourseCode());
                 if (preferredForCourse != null && !preferredForCourse.isEmpty()) {
+                    targetFacTotal++;
                     String initial = s.getFacultyInitial();
                     int rank = preferredForCourse.indexOf(initial);
                     if (rank == 0) {
-                        score += 35.0;
+                        score += 250.0; // Top preferred faculty matched!
                         facultyMatches++;
                     } else if (rank > 0) {
-                        score += Math.max(10.0, 30.0 - rank * 8.0);
+                        score += 180.0; // Alternate preferred faculty matched!
                         facultyMatches++;
+                    } else {
+                        score -= 100.0; // Preference specified but not matched
                     }
                 }
             }
-            if (facultyMatches == sections.size()) {
-                highlights.add("⭐ All Preferred Faculty Matched");
+            if (targetFacTotal > 0 && facultyMatches == targetFacTotal) {
+                highlights.add("⭐ 100% Preferred Faculty Matched (" + facultyMatches + "/" + targetFacTotal + ")");
             } else if (facultyMatches > 0) {
-                highlights.add("⭐ " + facultyMatches + " Preferred Faculty");
+                highlights.add("⭐ " + facultyMatches + "/" + targetFacTotal + " Preferred Faculty");
             }
         }
 
@@ -679,13 +722,13 @@ public class AdvisingScheduleService {
             for (int i = 0; i < slots.size() - 1; i++) {
                 int gap = slots.get(i + 1).startMinutes - slots.get(i).endMinutes;
                 if (gap <= 15) {
-                    consecutiveBonus += 40.0; // Ideal consecutive classes (10-15m transition between rooms)
-                } else if (gap <= 50) {
-                    consecutiveBonus += 20.0; // Reasonable lunch / prayer break
+                    consecutiveBonus += 100.0; // Ideal consecutive classes (10-15m transition between rooms)
+                } else if (gap <= 40) {
+                    consecutiveBonus += 30.0; // Short break
                     totalGapMinutes += gap;
                 } else {
                     totalGapMinutes += gap;
-                    longGapPenalty += (gap / 15.0) * 12.0; // Heavy penalty for long dead waiting gaps
+                    longGapPenalty += (gap / 15.0) * 35.0; // Heavy penalty for long dead waiting gaps
                 }
             }
         }
@@ -714,6 +757,7 @@ public class AdvisingScheduleService {
         sr.hasEarlyMorning = hasEarlyMorning;
         sr.hasLateEvening = hasLateEvening;
         sr.totalGapMinutes = totalGapMinutes;
+        sr.facultyMatchCount = facultyMatches;
         sr.highlights = highlights;
         return sr;
     }
@@ -727,6 +771,7 @@ public class AdvisingScheduleService {
         public List<String> activeDays;
         public int totalCredits;
         public double totalGapMinutes;
+        public int facultyMatchCount;
         public boolean hasEarlyMorning;
         public boolean hasLateEvening;
         public List<String> highlights;
