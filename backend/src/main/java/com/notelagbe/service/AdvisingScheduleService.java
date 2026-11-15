@@ -506,7 +506,66 @@ public class AdvisingScheduleService {
             }
         }
 
-        if ("AVOID_MORNING".equalsIgnoreCase(timePref)) {
+        // Time window & custom preferences
+        int targetStartMin = -1;
+        int targetEndMin = -1;
+        String windowLabel = "";
+
+        if ("WINDOW_10_TO_1".equalsIgnoreCase(timePref)) {
+            targetStartMin = 600;
+            targetEndMin = 780;
+            windowLabel = "10:00 AM - 01:00 PM";
+        } else if ("WINDOW_10_TO_3".equalsIgnoreCase(timePref)) {
+            targetStartMin = 600;
+            targetEndMin = 900;
+            windowLabel = "10:00 AM - 03:00 PM";
+        } else if ("WINDOW_830_TO_1130".equalsIgnoreCase(timePref)) {
+            targetStartMin = 510;
+            targetEndMin = 690;
+            windowLabel = "08:30 AM - 11:30 AM";
+        } else if ("WINDOW_130_TO_430".equalsIgnoreCase(timePref)) {
+            targetStartMin = 810;
+            targetEndMin = 990;
+            windowLabel = "01:30 PM - 04:30 PM";
+        } else if ("WINDOW_300_TO_600".equalsIgnoreCase(timePref)) {
+            targetStartMin = 900;
+            targetEndMin = 1080;
+            windowLabel = "03:00 PM - 06:00 PM";
+        } else if (timePref != null && timePref.toUpperCase().startsWith("CUSTOM_")) {
+            try {
+                String[] parts = timePref.split("_");
+                if (parts.length >= 3) {
+                    targetStartMin = Integer.parseInt(parts[1]);
+                    targetEndMin = Integer.parseInt(parts[2]);
+                    windowLabel = formatMinutesTo12(targetStartMin) + " - " + formatMinutesTo12(targetEndMin);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse custom time preference {}: {}", timePref, e.getMessage());
+            }
+        }
+
+        if (targetStartMin >= 0 && targetEndMin > targetStartMin) {
+            int insideCount = 0;
+            int totalSlotsCount = 0;
+            for (OfferedSection s : sections) {
+                for (TimeSlot sl : s.getSlots()) {
+                    totalSlotsCount++;
+                    if (sl.startMinutes >= targetStartMin && sl.endMinutes <= targetEndMin) {
+                        insideCount++;
+                    }
+                }
+            }
+            if (insideCount == totalSlotsCount) {
+                score += 90.0;
+                highlights.add("🎯 100% Fits " + windowLabel + " Window");
+            } else if (insideCount > 0) {
+                score += ((double) insideCount / totalSlotsCount) * 50.0;
+                score -= (totalSlotsCount - insideCount) * 20.0;
+                highlights.add("🎯 " + insideCount + "/" + totalSlotsCount + " Classes in " + windowLabel);
+            } else {
+                score -= 60.0;
+            }
+        } else if ("AVOID_MORNING".equalsIgnoreCase(timePref)) {
             if (!hasEarlyMorning) {
                 score += 40.0;
                 highlights.add("☀️ No Early 08:30 Classes");
@@ -873,6 +932,15 @@ public class AdvisingScheduleService {
             return "0" + t;
         }
         return t;
+    }
+
+    private String formatMinutesTo12(int totalMinutes) {
+        int hours = totalMinutes / 60;
+        int mins = totalMinutes % 60;
+        String period = hours >= 12 ? "PM" : "AM";
+        int h12 = hours % 12;
+        if (h12 == 0) h12 = 12;
+        return String.format("%02d:%02d %s", h12, mins, period);
     }
 
     /**

@@ -150,34 +150,37 @@ export const SEU_OFFICIAL_COURSE_TITLES: Record<string, string> = {
 export function getSeuCourseTitle(code: string, fallbackTitle?: string): string {
   if (!code) return "Academic Course";
   const cleanCode = code.trim().toUpperCase();
+  const baseCode = cleanCode.split(".")[0];
 
-  // If a valid descriptive title exists that is not a placeholder or department name
-  if (fallbackTitle) {
-    const trimmed = fallbackTitle.trim();
-    const upper = trimmed.toUpperCase();
-    if (
-      trimmed.length >= 3 &&
-      upper !== "CSE." &&
-      upper !== "CSE" &&
-      upper !== "EEE." &&
-      upper !== "EEE" &&
-      upper !== "BBA." &&
-      upper !== "BBA" &&
-      upper !== cleanCode
-    ) {
-      return trimmed;
-    }
-  }
-
-  // Look up in dictionary
+  // 1. Highest Priority: Authentic Official Southeast University (SEU) Dictionary
   if (SEU_OFFICIAL_COURSE_TITLES[cleanCode]) {
     return SEU_OFFICIAL_COURSE_TITLES[cleanCode];
   }
-
-  // If 3-digit or 4-digit prefix match (e.g. CSE437 in CSE437.1)
-  const baseCode = cleanCode.split(".")[0];
   if (SEU_OFFICIAL_COURSE_TITLES[baseCode]) {
     return SEU_OFFICIAL_COURSE_TITLES[baseCode];
+  }
+
+  // 2. Second Priority: Use fallbackTitle ONLY if it is genuine descriptive title
+  // and NOT a department/code placeholder like "CSE.", "EEE.", "BBA.", "B.Sc", etc.
+  if (fallbackTitle) {
+    const trimmed = fallbackTitle.trim();
+    const upper = trimmed.toUpperCase();
+    const isDeptToken =
+      upper.startsWith("CSE.") ||
+      upper.startsWith("EEE.") ||
+      upper.startsWith("BBA.") ||
+      upper === "CSE" ||
+      upper === "EEE" ||
+      upper === "BBA" ||
+      upper.startsWith("B.SC") ||
+      upper.startsWith("DEPT") ||
+      upper.startsWith("DEPARTMENT") ||
+      upper === cleanCode ||
+      upper === baseCode;
+
+    if (!isDeptToken && trimmed.length >= 3) {
+      return trimmed;
+    }
   }
 
   return cleanCode;

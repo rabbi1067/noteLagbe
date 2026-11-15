@@ -75,6 +75,21 @@ export function timeToMinutes(t: string): number {
   return (h || 0) * 60 + (m || 0);
 }
 
+// Convert 12-hour "10:00 AM" or "01:00 PM" to minutes from midnight
+export function time12ToMinutes(t12: string): number {
+  if (!t12) return 0;
+  const clean = t12.trim();
+  const isPM = clean.toUpperCase().includes("PM");
+  const isAM = clean.toUpperCase().includes("AM");
+  const timePart = clean.replace(/(?:AM|PM)/gi, "").trim();
+  const [hStr, mStr] = timePart.split(":");
+  let h = parseInt(hStr, 10) || 0;
+  const m = parseInt(mStr, 10) || 0;
+  if (isPM && h < 12) h += 12;
+  if (isAM && h === 12) h = 0;
+  return h * 60 + m;
+}
+
 // Convert 24-hour "08:30" or "15:00" to friendly 12-hour "08:30 AM" or "03:00 PM"
 export function formatTime12(t: string): string {
   if (!t || !t.includes(":")) return t;
@@ -197,9 +212,9 @@ export default function SmartAdvisingRoutineTool() {
   const [isCoursesExpanded, setIsCoursesExpanded] = useState<boolean>(false);
 
   // Preferences: Default to ANY (Balanced / Any Time Slot Flexible)
-  const [timePreference, setTimePreference] = useState<
-    "ANY" | "AVOID_MORNING" | "AVOID_LATE" | "PREFER_MORNING" | "PREFER_AFTERNOON"
-  >("ANY");
+  const [timePreference, setTimePreference] = useState<string>("ANY");
+  const [customStartTime, setCustomStartTime] = useState<string>("10:00 AM");
+  const [customEndTime, setCustomEndTime] = useState<string>("01:00 PM");
   const [dayPreference, setDayPreference] = useState<
     "MINIMIZE_DAYS" | "COMPACT_GAPS" | "ANY"
   >("COMPACT_GAPS");
@@ -388,9 +403,13 @@ export default function SmartAdvisingRoutineTool() {
 
     try {
       // 1. Try Backend API
+      const effectiveTimePref = timePreference === "CUSTOM"
+        ? `CUSTOM_${time12ToMinutes(customStartTime)}_${time12ToMinutes(customEndTime)}`
+        : timePreference;
+
       const res = await api.advising.generateRoutine({
         selectedCourses,
-        timePreference,
+        timePreference: effectiveTimePref,
         dayPreference,
         preferredDays,
         facultyPreferences,
@@ -587,8 +606,62 @@ export default function SmartAdvisingRoutineTool() {
         highlights.push(`⏱️ ${totalGapMinutes}m Total Gap`);
       }
 
-      // 4. TIME PREFERENCES
-      if (timePreference === "AVOID_MORNING") {
+      // 4. TIME PREFERENCES & DEDICATED WINDOW SCORING
+      let targetStartMin = -1;
+      let targetEndMin = -1;
+      let windowLabel = "";
+
+      if (timePreference === "WINDOW_10_TO_1") {
+        targetStartMin = 600; // 10:00 AM
+        targetEndMin = 780;   // 01:00 PM
+        windowLabel = "10:00 AM - 01:00 PM";
+      } else if (timePreference === "WINDOW_10_TO_3") {
+        targetStartMin = 600; // 10:00 AM
+        targetEndMin = 900;   // 03:00 PM
+        windowLabel = "10:00 AM - 03:00 PM";
+      } else if (timePreference === "WINDOW_830_TO_1130") {
+        targetStartMin = 510; // 08:30 AM
+        targetEndMin = 690;   // 11:30 AM
+        windowLabel = "08:30 AM - 11:30 AM";
+      } else if (timePreference === "WINDOW_130_TO_430") {
+        targetStartMin = 810; // 01:30 PM
+        targetEndMin = 990;   // 04:30 PM
+        windowLabel = "01:30 PM - 04:30 PM";
+      } else if (timePreference === "WINDOW_300_TO_600") {
+        targetStartMin = 900; // 03:00 PM
+        targetEndMin = 1080;  // 06:00 PM
+        windowLabel = "03:00 PM - 06:00 PM";
+      } else if (timePreference === "CUSTOM") {
+        targetStartMin = time12ToMinutes(customStartTime);
+        targetEndMin = time12ToMinutes(customEndTime);
+        windowLabel = `${customStartTime} - ${customEndTime}`;
+      }
+
+      if (targetStartMin >= 0 && targetEndMin > targetStartMin) {
+        let insideCount = 0;
+        let totalSlotsCount = 0;
+        combo.forEach((sec) => {
+          sec.slots.forEach((slot) => {
+            totalSlotsCount++;
+            const sm = slot.startMinutes ?? timeToMinutes(slot.start);
+            const em = slot.endMinutes ?? timeToMinutes(slot.end);
+            if (sm >= targetStartMin && em <= targetEndMin) {
+              insideCount++;
+            }
+          });
+        });
+
+        if (insideCount === totalSlotsCount) {
+          score += 90;
+          highlights.push(`🎯 100% Fits ${windowLabel} Window`);
+        } else if (insideCount > 0) {
+          score += (insideCount / totalSlotsCount) * 50;
+          score -= (totalSlotsCount - insideCount) * 20;
+          highlights.push(`🎯 ${insideCount}/${totalSlotsCount} Classes in ${windowLabel}`);
+        } else {
+          score -= 60;
+        }
+      } else if (timePreference === "AVOID_MORNING") {
         if (!hasEarly) {
           score += 45;
           highlights.push("☀️ No Early 08:30 Classes");
@@ -1586,27 +1659,135 @@ export default function SmartAdvisingRoutineTool() {
             {/* Control Groups: Stacked in sidebar, 3-columns when full-width */}
             <div className={isSidebar ? "space-y-3.5" : "grid grid-cols-1 md:grid-cols-3 gap-5"}>
               {/* Time Priority (12-Hour AM/PM) - Default is ANY Balanced */}
-              <div className="space-y-2 p-3.5 rounded-2xl bg-slate-800/40 border border-slate-700/60">
-                <label className="text-xs font-semibold text-slate-200 flex items-center justify-between">
-                  <span>{language === "bn" ? "ক্লাসের সময় পছন্দ" : "Time Preference (12-Hour AM/PM)"}</span>
-                  <Clock className="w-3.5 h-3.5 text-blue-400" />
-                </label>
+              <div className="space-y-2.5 p-3.5 rounded-2xl bg-slate-800/40 border border-slate-700/60">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-blue-400" />
+                    <span>{language === "bn" ? "ক্লাসের সময় পছন্দ" : "Time Preference (12-Hour AM/PM)"}</span>
+                  </label>
+                  {timePreference === "CUSTOM" && (
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      {customStartTime} - {customEndTime}
+                    </span>
+                  )}
+                </div>
+
                 <select
                   value={timePreference}
                   onChange={(e) => setTimePreference(e.target.value as any)}
                   className="w-full text-xs font-semibold py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
                   <option value="ANY">⚡ Balanced / Any Time Slot (Flexible - Default)</option>
+                  <option value="WINDOW_10_TO_1">🎯 10:00 AM - 01:00 PM (Midday Window)</option>
+                  <option value="WINDOW_10_TO_3">☀️ 10:00 AM - 03:00 PM (Comfortable Day)</option>
+                  <option value="WINDOW_830_TO_1130">🌅 08:30 AM - 11:30 AM (Early Morning Focus)</option>
+                  <option value="WINDOW_130_TO_430">☕ 01:30 PM - 04:30 PM (Afternoon Focus)</option>
+                  <option value="WINDOW_300_TO_600">🌇 03:00 PM - 06:00 PM (Late Afternoon)</option>
                   <option value="AVOID_MORNING">☀️ Avoid Morning (No 08:30 AM Classes)</option>
-                  <option value="PREFER_MORNING">🌅 Prefer Morning Slots (08:30 AM - 01:00 PM)</option>
-                  <option value="PREFER_AFTERNOON">☕ Prefer Afternoon Slots (11:30 AM - 04:30 PM)</option>
-                  <option value="AVOID_LATE">🌇 Avoid Late Afternoon (No 04:30 PM+ Classes)</option>
+                  <option value="AVOID_LATE">🌇 Avoid Late Afternoon (Finish by 04:30 PM)</option>
+                  <option value="CUSTOM">⚙️ Custom User Selection (নিজের পছন্দমতো সময় নির্ধারণ)...</option>
                 </select>
+
+                {/* Dedicated Custom Time Selection System */}
+                {timePreference === "CUSTOM" && (
+                  <div className="p-3 rounded-xl bg-slate-900/90 border border-blue-500/30 space-y-2.5 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-300 font-medium">
+                        {language === "bn" ? "নিজের সময় উইন্ডো সিলেক্ট করুন:" : "Set Custom Time Window:"}
+                      </span>
+                      <span className="text-blue-400 font-mono font-bold text-[10px]">
+                        {customStartTime} ➔ {customEndTime}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1 font-mono">
+                          {language === "bn" ? "শুরুর সময়" : "Start Time"}
+                        </label>
+                        <select
+                          value={customStartTime}
+                          onChange={(e) => setCustomStartTime(e.target.value)}
+                          className="w-full text-xs font-mono font-bold py-1.5 px-2.5 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                        >
+                          <option value="08:00 AM">08:00 AM</option>
+                          <option value="08:30 AM">08:30 AM</option>
+                          <option value="09:00 AM">09:00 AM</option>
+                          <option value="10:00 AM">10:00 AM</option>
+                          <option value="11:00 AM">11:00 AM</option>
+                          <option value="11:30 AM">11:30 AM</option>
+                          <option value="01:00 PM">01:00 PM</option>
+                          <option value="01:30 PM">01:30 PM</option>
+                          <option value="02:00 PM">02:00 PM</option>
+                          <option value="03:00 PM">03:00 PM</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1 font-mono">
+                          {language === "bn" ? "শেষের সময়" : "End Time"}
+                        </label>
+                        <select
+                          value={customEndTime}
+                          onChange={(e) => setCustomEndTime(e.target.value)}
+                          className="w-full text-xs font-mono font-bold py-1.5 px-2.5 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                        >
+                          <option value="11:30 AM">11:30 AM</option>
+                          <option value="01:00 PM">01:00 PM</option>
+                          <option value="02:00 PM">02:00 PM</option>
+                          <option value="03:00 PM">03:00 PM</option>
+                          <option value="04:30 PM">04:30 PM</option>
+                          <option value="05:00 PM">05:00 PM</option>
+                          <option value="06:00 PM">06:00 PM</option>
+                          <option value="07:00 PM">07:00 PM</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Quick 1-Click Time Chip Presets */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-slate-400 block">
+                        {language === "bn" ? "কুইক টাইম প্রিসেট:" : "Quick Time Presets:"}
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {[
+                          { label: "10 AM - 1 PM", start: "10:00 AM", end: "01:00 PM" },
+                          { label: "10 AM - 3 PM", start: "10:00 AM", end: "03:00 PM" },
+                          { label: "8:30 AM - 1 PM", start: "08:30 AM", end: "01:00 PM" },
+                          { label: "1:30 PM - 4:30 PM", start: "01:30 PM", end: "04:30 PM" },
+                          { label: "3 PM - 6 PM", start: "03:00 PM", end: "06:00 PM" },
+                        ].map((preset) => (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => {
+                              setCustomStartTime(preset.start);
+                              setCustomEndTime(preset.end);
+                              toast.success(`Custom window set to ${preset.label}!`);
+                            }}
+                            className={`px-2 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer ${
+                              customStartTime === preset.start && customEndTime === preset.end
+                                ? "bg-blue-600/30 border-blue-400 text-blue-200 font-bold"
+                                : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <p className="text-[11px] text-slate-400 leading-tight">
                   {timePreference === "ANY"
                     ? "Flexible across all SEU slots: 08:30 AM, 10:00 AM, 11:30 AM, 01:30 PM, 03:00 PM."
-                    : timePreference === "AVOID_MORNING"
-                    ? "Penalizes early 08:00 AM & 08:30 AM morning slots in score ranking."
+                    : timePreference === "WINDOW_10_TO_1"
+                    ? "Prioritizes classes strictly between 10:00 AM and 01:00 PM."
+                    : timePreference === "WINDOW_10_TO_3"
+                    ? "Prioritizes daytime classes between 10:00 AM and 03:00 PM."
+                    : timePreference === "CUSTOM"
+                    ? `Solver strictly optimizes routine combinations to fit within ${customStartTime} - ${customEndTime}.`
                     : "Optimizes class combinations according to your selected daytime window."}
                 </p>
               </div>
