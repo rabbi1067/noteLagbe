@@ -228,6 +228,7 @@ export default function SmartAdvisingRoutineTool() {
     "SAT",
   ]);
   const [facultyPreferences, setFacultyPreferences] = useState<Record<string, string[]>>({});
+  const [isFacultyExpanded, setIsFacultyExpanded] = useState<boolean>(false);
 
   // Generated Routines (Top 10 options)
   const [routines, setRoutines] = useState<GeneratedRoutineOption[]>([]);
@@ -235,8 +236,8 @@ export default function SmartAdvisingRoutineTool() {
   const [generating, setGenerating] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
-  // Layout Mode: "split" (Side-by-side) or "full" (Full-width timetable)
-  const [layoutMode, setLayoutMode] = useState<"split" | "full">("split");
+  // Layout Mode: Always full width for uncompressed, clear timetable
+  const [layoutMode, setLayoutMode] = useState<"split" | "full">("full");
 
   // Timetable View Mode (Weekly, Daily, Overview)
   const [viewMode, setViewMode] = useState<"Weekly" | "Daily" | "Overview">("Weekly");
@@ -1625,161 +1626,157 @@ export default function SmartAdvisingRoutineTool() {
       {/* 2 & 3. WORKSPACE: PRIORITIES & GENERATED ROUTINES (SIDE-BY-SIDE / FULL)   */}
       {/* ========================================================================= */}
       {(() => {
-        // RENDER HELPER: 2. Priorities & Gap Control Card
-        const renderPrioritiesCard = (isSidebar: boolean = false) => (
-          <div
-            className={`rounded-3xl bg-slate-900/60 border border-slate-800 backdrop-blur-md transition-all ${
-              isSidebar ? "p-4 sm:p-5 space-y-4" : "p-5 sm:p-6 space-y-6"
-            }`}
-          >
+        // RENDER HELPER: 2. Priorities & Gap Control Card (Clean, Full-Width 3-Column Layout)
+        const renderPrioritiesCard = () => (
+          <div className="rounded-3xl bg-slate-900/60 border border-slate-800 backdrop-blur-md p-5 sm:p-6 space-y-6 transition-all">
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <SlidersHorizontal className="w-5 h-5 text-indigo-400 shrink-0" />
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
+                  <SlidersHorizontal className="w-5 h-5" />
+                </div>
                 <div>
-                  <h2 className="text-base sm:text-lg font-bold text-white">
+                  <h2 className="text-base sm:text-lg font-black text-white">
                     {language === "bn" ? "২. প্রায়োরিটি ও গ্যাপ কন্ট্রোল" : "2. Priorities & Gap Control"}
                   </h2>
-                  {!isSidebar && (
-                    <p className="text-xs text-slate-400">
-                      {language === "bn"
-                        ? "ক্লাসের সময় পছন্দ, ক্যাম্পাসে আসার দিন এবং পছন্দের শিক্ষকদের সিলেক্ট করে রুটিনের কোয়ালিটি নিয়ন্ত্রণ করুন।"
-                        : "Fine-tune preferred 12-hour AM/PM time slots, back-to-back class gaps, and prioritized teachers."}
-                    </p>
-                  )}
+                  <p className="text-xs text-slate-400">
+                    {language === "bn"
+                      ? "ক্লাসের সময় পছন্দ, ক্যাম্পাসে আসার দিন এবং পছন্দের শিক্ষকদের সিলেক্ট করে রুটিনের কোয়ালিটি নিয়ন্ত্রণ করুন।"
+                      : "Fine-tune preferred 12-hour AM/PM time slots, back-to-back class gaps, and prioritized teachers."}
+                  </p>
                 </div>
               </div>
 
-              {isSidebar && (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 shrink-0">
-                  Control Panel
-                </span>
-              )}
+              <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 shrink-0 hidden sm:inline-block">
+                Smart Routine Optimizer
+              </span>
             </div>
 
-            {/* Control Groups: Stacked in sidebar, 3-columns when full-width */}
-            <div className={isSidebar ? "space-y-3.5" : "grid grid-cols-1 md:grid-cols-3 gap-5"}>
+            {/* Control Groups: Clean 3-Column Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {/* Time Priority (12-Hour AM/PM) - Default is ANY Balanced */}
-              <div className="space-y-2.5 p-3.5 rounded-2xl bg-slate-800/40 border border-slate-700/60">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-blue-400" />
-                    <span>{language === "bn" ? "ক্লাসের সময় পছন্দ" : "Time Preference (12-Hour AM/PM)"}</span>
-                  </label>
+              <div className="space-y-2.5 p-4 rounded-2xl bg-slate-800/40 border border-slate-700/60 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-blue-400" />
+                      <span>{language === "bn" ? "ক্লাসের সময় পছন্দ" : "Time Preference (12-Hour AM/PM)"}</span>
+                    </label>
+                    {timePreference === "CUSTOM" && (
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                        {customStartTime} - {customEndTime}
+                      </span>
+                    )}
+                  </div>
+
+                  <select
+                    value={timePreference}
+                    onChange={(e) => setTimePreference(e.target.value as any)}
+                    className="w-full text-xs font-semibold py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value="ANY">⚡ Balanced / Any Time Slot (Flexible - Default)</option>
+                    <option value="WINDOW_10_TO_1">🎯 10:00 AM - 01:00 PM (Midday Window)</option>
+                    <option value="WINDOW_10_TO_3">☀️ 10:00 AM - 03:00 PM (Comfortable Day)</option>
+                    <option value="WINDOW_830_TO_1130">🌅 08:30 AM - 11:30 AM (Early Morning Focus)</option>
+                    <option value="WINDOW_130_TO_430">☕ 01:30 PM - 04:30 PM (Afternoon Focus)</option>
+                    <option value="WINDOW_300_TO_600">🌇 03:00 PM - 06:00 PM (Late Afternoon)</option>
+                    <option value="AVOID_MORNING">☀️ Avoid Morning (No 08:30 AM Classes)</option>
+                    <option value="AVOID_LATE">🌇 Avoid Late Afternoon (Finish by 04:30 PM)</option>
+                    <option value="CUSTOM">⚙️ Custom User Selection (নিজের পছন্দমতো সময় নির্ধারণ)...</option>
+                  </select>
+
+                  {/* Dedicated Custom Time Selection System */}
                   {timePreference === "CUSTOM" && (
-                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                      {customStartTime} - {customEndTime}
-                    </span>
+                    <div className="mt-2.5 p-3 rounded-xl bg-slate-900/90 border border-blue-500/30 space-y-2.5 animate-in fade-in duration-200">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-300 font-medium">
+                          {language === "bn" ? "নিজের সময় নির্ধারণ:" : "Set Custom Time Window:"}
+                        </span>
+                        <span className="text-blue-400 font-mono font-bold text-[10px]">
+                          {customStartTime} ➔ {customEndTime}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] text-slate-400 block mb-1 font-mono">
+                            {language === "bn" ? "শুরুর সময়" : "Start Time"}
+                          </label>
+                          <select
+                            value={customStartTime}
+                            onChange={(e) => setCustomStartTime(e.target.value)}
+                            className="w-full text-xs font-mono font-bold py-1.5 px-2.5 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                          >
+                            <option value="08:00 AM">08:00 AM</option>
+                            <option value="08:30 AM">08:30 AM</option>
+                            <option value="09:00 AM">09:00 AM</option>
+                            <option value="10:00 AM">10:00 AM</option>
+                            <option value="11:00 AM">11:00 AM</option>
+                            <option value="11:30 AM">11:30 AM</option>
+                            <option value="01:00 PM">01:00 PM</option>
+                            <option value="01:30 PM">01:30 PM</option>
+                            <option value="02:00 PM">02:00 PM</option>
+                            <option value="03:00 PM">03:00 PM</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-slate-400 block mb-1 font-mono">
+                            {language === "bn" ? "শেষের সময়" : "End Time"}
+                          </label>
+                          <select
+                            value={customEndTime}
+                            onChange={(e) => setCustomEndTime(e.target.value)}
+                            className="w-full text-xs font-mono font-bold py-1.5 px-2.5 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                          >
+                            <option value="11:30 AM">11:30 AM</option>
+                            <option value="01:00 PM">01:00 PM</option>
+                            <option value="02:00 PM">02:00 PM</option>
+                            <option value="03:00 PM">03:00 PM</option>
+                            <option value="04:30 PM">04:30 PM</option>
+                            <option value="05:00 PM">05:00 PM</option>
+                            <option value="06:00 PM">06:00 PM</option>
+                            <option value="07:00 PM">07:00 PM</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Quick 1-Click Time Chip Presets */}
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-slate-400 block">
+                          {language === "bn" ? "কুইক টাইম প্রিসেট:" : "Quick Time Presets:"}
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {[
+                            { label: "10 AM - 1 PM", start: "10:00 AM", end: "01:00 PM" },
+                            { label: "10 AM - 3 PM", start: "10:00 AM", end: "03:00 PM" },
+                            { label: "8:30 AM - 1 PM", start: "08:30 AM", end: "01:00 PM" },
+                            { label: "1:30 PM - 4:30 PM", start: "01:30 PM", end: "04:30 PM" },
+                            { label: "3 PM - 6 PM", start: "03:00 PM", end: "06:00 PM" },
+                          ].map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => {
+                                setCustomStartTime(preset.start);
+                                setCustomEndTime(preset.end);
+                                toast.success(`Custom window set to ${preset.label}!`);
+                              }}
+                              className={`px-2 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer ${
+                                customStartTime === preset.start && customEndTime === preset.end
+                                  ? "bg-blue-600/30 border-blue-400 text-blue-200 font-bold"
+                                  : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
+                              }`}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
 
-                <select
-                  value={timePreference}
-                  onChange={(e) => setTimePreference(e.target.value as any)}
-                  className="w-full text-xs font-semibold py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                >
-                  <option value="ANY">⚡ Balanced / Any Time Slot (Flexible - Default)</option>
-                  <option value="WINDOW_10_TO_1">🎯 10:00 AM - 01:00 PM (Midday Window)</option>
-                  <option value="WINDOW_10_TO_3">☀️ 10:00 AM - 03:00 PM (Comfortable Day)</option>
-                  <option value="WINDOW_830_TO_1130">🌅 08:30 AM - 11:30 AM (Early Morning Focus)</option>
-                  <option value="WINDOW_130_TO_430">☕ 01:30 PM - 04:30 PM (Afternoon Focus)</option>
-                  <option value="WINDOW_300_TO_600">🌇 03:00 PM - 06:00 PM (Late Afternoon)</option>
-                  <option value="AVOID_MORNING">☀️ Avoid Morning (No 08:30 AM Classes)</option>
-                  <option value="AVOID_LATE">🌇 Avoid Late Afternoon (Finish by 04:30 PM)</option>
-                  <option value="CUSTOM">⚙️ Custom User Selection (নিজের পছন্দমতো সময় নির্ধারণ)...</option>
-                </select>
-
-                {/* Dedicated Custom Time Selection System */}
-                {timePreference === "CUSTOM" && (
-                  <div className="p-3 rounded-xl bg-slate-900/90 border border-blue-500/30 space-y-2.5 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-300 font-medium">
-                        {language === "bn" ? "নিজের সময় উইন্ডো সিলেক্ট করুন:" : "Set Custom Time Window:"}
-                      </span>
-                      <span className="text-blue-400 font-mono font-bold text-[10px]">
-                        {customStartTime} ➔ {customEndTime}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[10px] text-slate-400 block mb-1 font-mono">
-                          {language === "bn" ? "শুরুর সময়" : "Start Time"}
-                        </label>
-                        <select
-                          value={customStartTime}
-                          onChange={(e) => setCustomStartTime(e.target.value)}
-                          className="w-full text-xs font-mono font-bold py-1.5 px-2.5 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                        >
-                          <option value="08:00 AM">08:00 AM</option>
-                          <option value="08:30 AM">08:30 AM</option>
-                          <option value="09:00 AM">09:00 AM</option>
-                          <option value="10:00 AM">10:00 AM</option>
-                          <option value="11:00 AM">11:00 AM</option>
-                          <option value="11:30 AM">11:30 AM</option>
-                          <option value="01:00 PM">01:00 PM</option>
-                          <option value="01:30 PM">01:30 PM</option>
-                          <option value="02:00 PM">02:00 PM</option>
-                          <option value="03:00 PM">03:00 PM</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] text-slate-400 block mb-1 font-mono">
-                          {language === "bn" ? "শেষের সময়" : "End Time"}
-                        </label>
-                        <select
-                          value={customEndTime}
-                          onChange={(e) => setCustomEndTime(e.target.value)}
-                          className="w-full text-xs font-mono font-bold py-1.5 px-2.5 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                        >
-                          <option value="11:30 AM">11:30 AM</option>
-                          <option value="01:00 PM">01:00 PM</option>
-                          <option value="02:00 PM">02:00 PM</option>
-                          <option value="03:00 PM">03:00 PM</option>
-                          <option value="04:30 PM">04:30 PM</option>
-                          <option value="05:00 PM">05:00 PM</option>
-                          <option value="06:00 PM">06:00 PM</option>
-                          <option value="07:00 PM">07:00 PM</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Quick 1-Click Time Chip Presets */}
-                    <div className="space-y-1">
-                      <span className="text-[10px] text-slate-400 block">
-                        {language === "bn" ? "কুইক টাইম প্রিসেট:" : "Quick Time Presets:"}
-                      </span>
-                      <div className="flex flex-wrap gap-1">
-                        {[
-                          { label: "10 AM - 1 PM", start: "10:00 AM", end: "01:00 PM" },
-                          { label: "10 AM - 3 PM", start: "10:00 AM", end: "03:00 PM" },
-                          { label: "8:30 AM - 1 PM", start: "08:30 AM", end: "01:00 PM" },
-                          { label: "1:30 PM - 4:30 PM", start: "01:30 PM", end: "04:30 PM" },
-                          { label: "3 PM - 6 PM", start: "03:00 PM", end: "06:00 PM" },
-                        ].map((preset) => (
-                          <button
-                            key={preset.label}
-                            type="button"
-                            onClick={() => {
-                              setCustomStartTime(preset.start);
-                              setCustomEndTime(preset.end);
-                              toast.success(`Custom window set to ${preset.label}!`);
-                            }}
-                            className={`px-2 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer ${
-                              customStartTime === preset.start && customEndTime === preset.end
-                                ? "bg-blue-600/30 border-blue-400 text-blue-200 font-bold"
-                                : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
-                            }`}
-                          >
-                            {preset.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <p className="text-[11px] text-slate-400 leading-tight">
+                <p className="text-[11px] text-slate-400 leading-tight mt-2">
                   {timePreference === "ANY"
                     ? "Flexible across all SEU slots: 08:30 AM, 10:00 AM, 11:30 AM, 01:30 PM, 03:00 PM."
                     : timePreference === "WINDOW_10_TO_1"
@@ -1793,519 +1790,520 @@ export default function SmartAdvisingRoutineTool() {
               </div>
 
               {/* Day & Gap Priority */}
-              <div className="space-y-2 p-3.5 rounded-2xl bg-slate-800/40 border border-slate-700/60">
-                <label className="text-xs font-semibold text-slate-200 flex items-center justify-between">
-                  <span>{language === "bn" ? "টাইম গ্যাপ অপটিমাইজেশন" : "Gap & Schedule Style"}</span>
-                  <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                </label>
-                <select
-                  value={dayPreference}
-                  onChange={(e) => setDayPreference(e.target.value as any)}
-                  className="w-full text-xs font-semibold py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                >
-                  <option value="COMPACT_GAPS">⏱️ Minimum Gap (Consecutive / Back-to-Back Classes)</option>
-                  <option value="MINIMIZE_DAYS">⚡ Minimize Campus Days (Pack into 2 or 3 Days)</option>
-                  <option value="ANY">🗓️ Any Day Distribution</option>
-                </select>
-                <p className="text-[11px] text-slate-400 leading-tight">
+              <div className="space-y-2.5 p-4 rounded-2xl bg-slate-800/40 border border-slate-700/60 flex flex-col justify-between">
+                <div>
+                  <label className="text-xs font-semibold text-slate-200 flex items-center justify-between mb-2">
+                    <span>{language === "bn" ? "টাইম গ্যাপ অপটিমাইজেশন" : "Gap & Schedule Style"}</span>
+                    <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                  </label>
+                  <select
+                    value={dayPreference}
+                    onChange={(e) => setDayPreference(e.target.value as any)}
+                    className="w-full text-xs font-semibold py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value="COMPACT_GAPS">⏱️ Minimum Gap (Consecutive / Back-to-Back Classes)</option>
+                    <option value="MINIMIZE_DAYS">⚡ Minimize Campus Days (Pack into 2 or 3 Days)</option>
+                    <option value="ANY">🗓️ Any Day Distribution</option>
+                  </select>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-tight mt-2">
                   Option #1 maximizes back-to-back classes with 10-15m room transitions, eliminating multi-hour dead breaks.
                 </p>
               </div>
 
               {/* Preferred Days Toggle with 1-Click Presets */}
-              <div className="space-y-2.5 p-3.5 rounded-2xl bg-slate-800/40 border border-slate-700/60">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-200 block">
-                    {language === "bn" ? "পছন্দের বারসমূহ (Target Days)" : "Target Days (Strict Filter)"}
-                  </span>
-                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">
-                    {preferredDays.length} / 7 Days Active
-                  </span>
-                </div>
+              <div className="space-y-2.5 p-4 rounded-2xl bg-slate-800/40 border border-slate-700/60 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-slate-200 block">
+                      {language === "bn" ? "পছন্দের বারসমূহ (Target Days)" : "Target Days (Strict Filter)"}
+                    </span>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">
+                      {preferredDays.length} / 7 Days Active
+                    </span>
+                  </div>
 
-                {/* Quick Presets for University Open-Credit Routines */}
-                <div className="flex flex-wrap gap-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPreferredDays(["SUN", "TUE"]);
-                      toast.success("Set Target Days to SUN+TUE (2 Days)!");
-                    }}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border transition-all cursor-pointer ${
-                      preferredDays.length === 2 && preferredDays.includes("SUN") && preferredDays.includes("TUE")
-                        ? "bg-indigo-600/30 border-indigo-400 text-indigo-200 shadow-sm"
-                        : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
-                    }`}
-                  >
-                    ⚡ SUN+TUE
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPreferredDays(["MON", "WED"]);
-                      toast.success("Set Target Days to MON+WED (2 Days)!");
-                    }}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border transition-all cursor-pointer ${
-                      preferredDays.length === 2 && preferredDays.includes("MON") && preferredDays.includes("WED")
-                        ? "bg-indigo-600/30 border-indigo-400 text-indigo-200 shadow-sm"
-                        : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
-                    }`}
-                  >
-                    ⚡ MON+WED
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPreferredDays(["THU", "SAT"]);
-                      toast.success("Set Target Days to THU+SAT (2 Days)!");
-                    }}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border transition-all cursor-pointer ${
-                      preferredDays.length === 2 && preferredDays.includes("THU") && preferredDays.includes("SAT")
-                        ? "bg-indigo-600/30 border-indigo-400 text-indigo-200 shadow-sm"
-                        : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
-                    }`}
-                  >
-                    ⚡ THU+SAT
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (preferredDays.includes("FRI")) {
-                        setPreferredDays(preferredDays.filter((d) => d !== "FRI"));
-                      } else {
-                        setPreferredDays([...preferredDays, "FRI"]);
-                        toast.success("Included Friday for 2-hour practical lab sessions!");
-                      }
-                    }}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border transition-all cursor-pointer ${
-                      preferredDays.includes("FRI")
-                        ? "bg-emerald-600/30 border-emerald-400 text-emerald-200"
-                        : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
-                    }`}
-                  >
-                    + FRI (2h)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreferredDays(["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"])}
-                    className="px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-slate-800/80 border border-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer"
-                  >
-                    All 7d
-                  </button>
-                </div>
+                  {/* Quick Presets for University Open-Credit Routines */}
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreferredDays(["SUN", "TUE"]);
+                        toast.success("Set Target Days to SUN+TUE (2 Days)!");
+                      }}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border transition-all cursor-pointer ${
+                        preferredDays.length === 2 && preferredDays.includes("SUN") && preferredDays.includes("TUE")
+                          ? "bg-indigo-600/30 border-indigo-400 text-indigo-200 shadow-sm"
+                          : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      ⚡ SUN+TUE
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreferredDays(["MON", "WED"]);
+                        toast.success("Set Target Days to MON+WED (2 Days)!");
+                      }}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border transition-all cursor-pointer ${
+                        preferredDays.length === 2 && preferredDays.includes("MON") && preferredDays.includes("WED")
+                          ? "bg-indigo-600/30 border-indigo-400 text-indigo-200 shadow-sm"
+                          : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      ⚡ MON+WED
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreferredDays(["THU", "SAT"]);
+                        toast.success("Set Target Days to THU+SAT (2 Days)!");
+                      }}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border transition-all cursor-pointer ${
+                        preferredDays.length === 2 && preferredDays.includes("THU") && preferredDays.includes("SAT")
+                          ? "bg-indigo-600/30 border-indigo-400 text-indigo-200 shadow-sm"
+                          : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      ⚡ THU+SAT
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (preferredDays.includes("FRI")) {
+                          setPreferredDays(preferredDays.filter((d) => d !== "FRI"));
+                        } else {
+                          setPreferredDays([...preferredDays, "FRI"]);
+                          toast.success("Included Friday for 2-hour practical lab sessions!");
+                        }
+                      }}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border transition-all cursor-pointer ${
+                        preferredDays.includes("FRI")
+                          ? "bg-emerald-600/30 border-emerald-400 text-emerald-200"
+                          : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      + FRI (2h)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreferredDays(["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"])}
+                      className="px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-slate-800/80 border border-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer"
+                    >
+                      All 7d
+                    </button>
+                  </div>
 
-                {/* Individual 7 Day Pills (Including Friday!) */}
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {WEEK_DAYS.map((day) => {
-                    const active = preferredDays.includes(day);
-                    return (
-                      <button
-                        key={day}
-                        type="button"
-                        onClick={() => {
-                          if (active) {
-                            if (preferredDays.length <= 1) {
-                              toast.error("Please keep at least 1 day selected.");
-                              return;
+                  {/* Individual 7 Day Pills */}
+                  <div className="flex flex-wrap gap-1">
+                    {WEEK_DAYS.map((day) => {
+                      const active = preferredDays.includes(day);
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => {
+                            if (active) {
+                              if (preferredDays.length <= 1) {
+                                toast.error("Please keep at least 1 day selected.");
+                                return;
+                              }
+                              setPreferredDays(preferredDays.filter((d) => d !== day));
+                            } else {
+                              setPreferredDays([...preferredDays, day]);
                             }
-                            setPreferredDays(preferredDays.filter((d) => d !== day));
-                          } else {
-                            setPreferredDays([...preferredDays, day]);
-                          }
-                        }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                          active
-                            ? "bg-indigo-600 text-white shadow-sm shadow-indigo-500/30 ring-1 ring-indigo-400"
-                            : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200"
-                        }`}
-                      >
-                        {day}
-                      </button>
-                    );
-                  })}
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                            active
+                              ? "bg-indigo-600 text-white shadow-sm shadow-indigo-500/30 ring-1 ring-indigo-400"
+                              : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200"
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <p className="text-[11px] text-slate-400 leading-tight">
+                <p className="text-[11px] text-slate-400 leading-tight mt-2">
                   {preferredDays.length < 7
-                    ? `Solver prioritizes conflict-free combos fitting strictly into: ${preferredDays.join(", ")}.`
-                    : "Flexible across all weekdays. Uncheck days or click presets to restrict campus visits."}
+                    ? `Solver prioritizes combos fitting into: ${preferredDays.join(", ")}.`
+                    : "Flexible across all days. Click presets to restrict campus visits."}
                 </p>
               </div>
             </div>
 
-            {/* Preferred Faculty Selection */}
-            <div className="space-y-3 pt-3 border-t border-slate-800/80">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                    <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                    <span className="text-sm font-bold text-white">
-                      {language === "bn" ? "পছন্দের শিক্ষক নির্বাচন" : "Preferred Faculty Selection"}
+            {/* Expandable Preferred Faculty Selection Accordion (Clean & Non-Intrusive) */}
+            <div className="pt-2 border-t border-slate-800/80">
+              <button
+                type="button"
+                onClick={() => setIsFacultyExpanded((prev) => !prev)}
+                className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-slate-800/40 hover:bg-slate-800/70 border border-slate-700/60 transition-all cursor-pointer text-left group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Star className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
+                  <div>
+                    <span className="text-xs sm:text-sm font-bold text-white group-hover:text-amber-300 transition-colors">
+                      {language === "bn" ? "পছন্দের শিক্ষক নির্বাচন (ঐচ্ছিক)" : "Preferred Faculty Selection (Optional)"}
                     </span>
-                  </span>
-                  <p className="text-[11px] text-slate-400">
-                    {language === "bn"
-                      ? "যেসব শিক্ষকের সেকশন পছন্দ সেগুলো স্টার করুন। রুটিন জেনারেটর তাদের সর্বোচ্চ প্রায়োরিটি দেবে।"
-                      : "Star teachers you prefer for each course. Solver prioritizes sections taught by them."}
-                  </p>
+                    <span className="text-[11px] text-slate-400 block">
+                      {language === "bn"
+                        ? "নির্দিষ্ট শিক্ষকদের অগ্রাধিকার দিতে ক্লিক করে ওপেন করুন"
+                        : "Click to prioritize specific instructors for your courses"}
+                    </span>
+                  </div>
                 </div>
-                {Object.values(facultyPreferences).some((arr) => arr.length > 0) && (
-                  <button
-                    type="button"
-                    onClick={() => setFacultyPreferences({})}
-                    className="text-[11px] font-mono text-slate-400 hover:text-amber-400 underline transition-colors cursor-pointer self-start sm:self-auto"
-                  >
-                    Clear all faculty stars
-                  </button>
-                )}
-              </div>
 
-              {selectedCourses.length === 0 ? (
-                <div className="p-4 rounded-2xl bg-slate-800/20 border border-dashed border-slate-700 text-center text-xs text-slate-400">
-                  👉 Please select your courses in Section 1 to view and choose available faculty members.
+                <div className="flex items-center gap-2.5">
+                  {Object.values(facultyPreferences).some((arr) => arr.length > 0) ? (
+                    <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      {Object.values(facultyPreferences).reduce((sum, arr) => sum + arr.length, 0)} Starred
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono text-slate-400">
+                      (Any Faculty)
+                    </span>
+                  )}
+                  <div className={`p-1 rounded-lg bg-slate-800 text-slate-300 transition-transform duration-200 ${isFacultyExpanded ? "rotate-180 text-amber-400" : ""}`}>
+                    <ChevronDown className="w-4 h-4" />
+                  </div>
                 </div>
-              ) : (
-                <div className={isSidebar ? "space-y-3" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5"}>
-                  {selectedCourses.map((code) => {
-                    const courseInfo = coursesCatalog.find((c) => c.code === code);
-                    const facs = courseFaculties[code] || [];
-                    const currentFav = facultyPreferences[code] || [];
-                    const isAny = currentFav.length === 0;
+              </button>
 
-                    return (
-                      <div
-                        key={code}
-                        className="p-3.5 rounded-2xl bg-slate-800/40 border border-slate-700/70 hover:border-slate-600 transition-all space-y-2.5"
+              {/* Expanded Faculty Selector Panel */}
+              {isFacultyExpanded && (
+                <div className="pt-4 space-y-3 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400">
+                      {language === "bn"
+                        ? "কোর্সের বিপরীতে পছন্দের শিক্ষকদের স্টার করুন:"
+                        : "Click stars next to instructor initials to prioritize them:"}
+                    </span>
+                    {Object.values(facultyPreferences).some((arr) => arr.length > 0) && (
+                      <button
+                        type="button"
+                        onClick={() => setFacultyPreferences({})}
+                        className="text-[11px] font-mono text-slate-400 hover:text-amber-400 underline transition-colors cursor-pointer"
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <span className="font-mono font-black text-xs text-blue-400 mr-2">{code}</span>
-                            <span className="text-[11px] text-slate-300 font-medium truncate block">
-                              {courseInfo?.title || code}
-                            </span>
-                          </div>
-                          <span
-                            className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                              isAny
-                                ? "bg-slate-700/60 text-slate-400"
-                                : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                            }`}
-                          >
-                            {isAny ? "Any Faculty" : `${currentFav.length} Fav`}
-                          </span>
-                        </div>
+                        Clear all faculty stars
+                      </button>
+                    )}
+                  </div>
 
-                        {facs.length === 0 ? (
-                          <p className="text-xs text-slate-500 italic">No specific faculty assigned yet (TBA)</p>
-                        ) : (
-                          <div className="flex flex-wrap gap-1.5">
-                            {facs.map((f) => {
-                              const isFav = currentFav.includes(f.initial);
-                              const secCount =
-                                courseInfo?.sections.filter((s) => s.facultyInitial === f.initial).length || 0;
-                              return (
-                                <button
-                                  key={f.initial}
-                                  type="button"
-                                  onClick={() => {
-                                    setFacultyPreferences({
-                                      ...facultyPreferences,
-                                      [code]: isFav
-                                        ? currentFav.filter((x) => x !== f.initial)
-                                        : [...currentFav, f.initial],
-                                    });
-                                  }}
-                                  className={`group px-2.5 py-1 rounded-xl text-xs font-mono transition-all cursor-pointer flex items-center gap-1.5 border ${
-                                    isFav
-                                      ? "bg-amber-500/20 border-amber-500/60 text-amber-200 shadow-md shadow-amber-500/10 font-bold"
-                                      : "bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white"
-                                  }`}
-                                  title={`${f.name} (${secCount} sections)`}
-                                >
-                                  <Star
-                                    className={`w-3 h-3 shrink-0 ${
-                                      isFav ? "text-amber-400 fill-amber-400" : "text-slate-500 group-hover:text-slate-400"
-                                    }`}
-                                  />
-                                  <span className="font-bold">[{f.initial}]</span>
-                                  <span className="text-[10px] font-sans truncate max-w-[100px]">
-                                    {f.name.split(" ").slice(-1)[0]}
-                                  </span>
-                                </button>
-                              );
-                            })}
+                  {selectedCourses.length === 0 ? (
+                    <div className="p-4 rounded-2xl bg-slate-800/20 border border-dashed border-slate-700 text-center text-xs text-slate-400">
+                      👉 Please select your courses in Section 1 to view and choose available faculty members.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                      {selectedCourses.map((code) => {
+                        const courseInfo = coursesCatalog.find((c) => c.code === code);
+                        const facs = courseFaculties[code] || [];
+                        const currentFav = facultyPreferences[code] || [];
+                        const isAny = currentFav.length === 0;
+
+                        return (
+                          <div
+                            key={code}
+                            className="p-3.5 rounded-2xl bg-slate-800/40 border border-slate-700/70 hover:border-slate-600 transition-all space-y-2.5"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <span className="font-mono font-black text-xs text-blue-400 mr-2">{code}</span>
+                                <span className="text-[11px] text-slate-300 font-medium truncate block">
+                                  {courseInfo?.title || code}
+                                </span>
+                              </div>
+                              <span
+                                className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                                  isAny
+                                    ? "bg-slate-700/60 text-slate-400"
+                                    : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                }`}
+                              >
+                                {isAny ? "Any Faculty" : `${currentFav.length} Fav`}
+                              </span>
+                            </div>
+
+                            {facs.length === 0 ? (
+                              <p className="text-xs text-slate-500 italic">No specific faculty assigned yet (TBA)</p>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {facs.map((f) => {
+                                  const isFav = currentFav.includes(f.initial);
+                                  const secCount =
+                                    courseInfo?.sections.filter((s) => s.facultyInitial === f.initial).length || 0;
+                                  return (
+                                    <button
+                                      key={f.initial}
+                                      type="button"
+                                      onClick={() => {
+                                        setFacultyPreferences({
+                                          ...facultyPreferences,
+                                          [code]: isFav
+                                            ? currentFav.filter((x) => x !== f.initial)
+                                            : [...currentFav, f.initial],
+                                        });
+                                      }}
+                                      className={`group px-2.5 py-1 rounded-xl text-xs font-mono transition-all cursor-pointer flex items-center gap-1.5 border ${
+                                        isFav
+                                          ? "bg-amber-500/20 border-amber-500/60 text-amber-200 shadow-md shadow-amber-500/10 font-bold"
+                                          : "bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white"
+                                      }`}
+                                      title={`${f.name} (${secCount} sections)`}
+                                    >
+                                      <Star
+                                        className={`w-3 h-3 shrink-0 ${
+                                          isFav ? "text-amber-400 fill-amber-400" : "text-slate-500 group-hover:text-slate-400"
+                                        }`}
+                                      />
+                                      <span className="font-bold">[{f.initial}]</span>
+                                      <span className="text-[10px] font-sans truncate max-w-[100px]">
+                                        {f.name.split(" ").slice(-1)[0]}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* MASTER GENERATE BUTTON (Placed intuitively at the bottom of Priorities) */}
-            <div className="pt-2">
+            {/* MASTER GENERATE BUTTON (Prominent, High-Contrast Hero CTA) */}
+            <div className="pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-xs text-slate-400">
+                {selectedCourses.length === 0 ? (
+                  <span className="text-amber-400 font-medium flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>{language === "bn" ? "প্রথমে ধাপ ১ থেকে কোর্স সিলেক্ট করুন" : "Please select your courses in Step 1 first"}</span>
+                  </span>
+                ) : (
+                  <span className="text-slate-300 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>
+                      <strong>{selectedCourses.length}</strong> {language === "bn" ? "টি কোর্স রেডি" : "courses selected"} • <strong>{selectedCreditsTotal}</strong> / 17 {language === "bn" ? "ক্রেডিট" : "Credits"}
+                    </span>
+                  </span>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={handleGenerateRoutines}
                 disabled={generating || selectedCourses.length === 0}
-                className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-sm shadow-xl shadow-emerald-500/30 transition-all flex items-center justify-center gap-2.5 cursor-pointer hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40"
+                className="w-full sm:w-auto min-w-[280px] py-4 px-8 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-black text-sm shadow-xl shadow-indigo-500/25 transition-all flex items-center justify-center gap-2.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:hover:scale-100"
               >
-                <Sparkles className={`w-5 h-5 ${generating ? "animate-spin" : ""}`} />
-                <span>
-                  {generating
-                    ? language === "bn"
-                      ? "সেরা ১০টি রুটিন সাজানো হচ্ছে..."
-                      : "Optimizing Top 10 Routines..."
-                    : selectedCourses.length === 0
-                    ? language === "bn"
-                      ? "প্রথমে ধাপ ১ থেকে কোর্স সিলেক্ট করুন"
-                      : "Select Courses in Step 1 to Generate"
-                    : language === "bn"
-                    ? `১০টি সেরা রুটিন সাজান (${selectedCourses.length}টি কোর্স) 🚀`
-                    : `Generate 10 Clash-Free Routines (${selectedCourses.length} Courses) 🚀`}
-                </span>
+                {generating ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                    <span>{language === "bn" ? "সেরা ১০টি রুটিন সাজানো হচ্ছে..." : "Computing Routines..."}</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                    <span>
+                      {selectedCourses.length === 0
+                        ? (language === "bn" ? "কোর্স সিলেক্ট করুন" : "Select Courses to Generate")
+                        : (language === "bn" ? `১০টি সেরা রুটিন সাজান (${selectedCourses.length}টি কোর্স) 🚀` : `Generate 10 Conflict-Free Routines 🚀`)}
+                    </span>
+                  </>
+                )}
               </button>
             </div>
           </div>
         );
 
-        // RENDER HELPER: 3 & 4. Generated Routines & Timetable Results
+        // RENDER HELPER: 3 & 4. Generated Routines & Full-Width Timetable Workspace
         const renderRoutineResults = () => {
           if (routines.length === 0) return null;
 
           return (
-            <div className="space-y-5">
-              {/* Top 10 Options Selector Bar */}
-              <div className="p-4 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-amber-400 shrink-0" />
-                    <div>
-                      <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                        <span>
-                          {language === "bn"
-                            ? `সেরা ১০টি ক্ল্যাশ-মুক্ত রুটিন`
-                            : `Top 10 Ranked Clash-Free Routines`}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-mono">
-                          100% Zero-Clash
-                        </span>
-                      </h3>
-                      <p className="text-xs text-slate-400">
-                        {language === "bn"
-                          ? "১ নাম্বার অপশনটি সর্বনিম্ন টাইম গ্যাপ (ব্যাক-টু-ব্যাক) সহ সর্বাধিক প্রায়োরিটি প্রাপ্ত।"
-                          : "Option 1 has the absolute highest priority score and minimal gaps."}
-                      </p>
-                    </div>
+            <div
+              ref={routineContainerRef}
+              id="routine-timetable-container"
+              className="rounded-3xl bg-[#0B0F19] border border-slate-800 p-5 sm:p-7 shadow-2xl space-y-6 backdrop-blur-xl animate-in fade-in duration-300"
+            >
+              {/* Header: Title, Zero-Clash Badge, Option Navigation & Action Controls */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
+                <div className="flex items-start gap-3">
+                  <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0 mt-0.5">
+                    <Trophy className="w-6 h-6" />
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    {/* Side-by-Side vs Full-Width Toggle on Desktop */}
-                    <div className="hidden lg:inline-flex items-center gap-1 rounded-xl bg-slate-900 border border-slate-800 p-1">
-                      <button
-                        type="button"
-                        onClick={() => setLayoutMode("split")}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                          layoutMode === "split"
-                            ? "bg-indigo-600 text-white shadow-sm"
-                            : "text-slate-400 hover:text-white"
-                        }`}
-                        title="Side-by-Side: Controls on Left, Timetable on Right"
-                      >
-                        🪟 Side-by-Side
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setLayoutMode("full")}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                          layoutMode === "full"
-                            ? "bg-indigo-600 text-white shadow-sm"
-                            : "text-slate-400 hover:text-white"
-                        }`}
-                        title="Full Width: Maximum width timetable display"
-                      >
-                        ⛶ Full Width
-                      </button>
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-lg sm:text-xl font-black text-white tracking-wide">
+                        {language === "bn" ? "সেরা ১০টি ক্ল্যাশ-মুক্ত রুটিন" : "Top 10 Ranked Clash-Free Routines"}
+                      </h2>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono font-bold">
+                        100% Zero-Clash Guarantee
+                      </span>
                     </div>
+                    <p className="text-xs text-slate-400">
+                      {language === "bn"
+                        ? "১ নাম্বার অপশনটি সর্বনিম্ন টাইম গ্যাপ (ব্যাক-টু-ব্যাক) সহ সর্বাধিক প্রায়োরিটি প্রাপ্ত।"
+                        : "Option 1 has the absolute highest priority score with minimal gaps and optimized timings."}
+                    </p>
+                  </div>
+                </div>
 
+                <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
+                  {/* Prev / Next Controls */}
+                  <div className="inline-flex items-center gap-1 rounded-xl bg-slate-900 border border-slate-800 p-1">
                     <button
                       onClick={() => setSelectedRoutineIndex((prev) => Math.max(0, prev - 1))}
                       disabled={selectedRoutineIndex === 0}
-                      className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all disabled:opacity-40 cursor-pointer"
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all disabled:opacity-30 cursor-pointer"
                       title="Previous Option"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
-                    <span className="text-xs font-mono font-bold text-slate-300 px-1 shrink-0">
+                    <span className="text-xs font-mono font-bold text-slate-300 px-2 shrink-0">
                       Option {selectedRoutineIndex + 1} of {routines.length}
                     </span>
                     <button
                       onClick={() => setSelectedRoutineIndex((prev) => Math.min(routines.length - 1, prev + 1))}
                       disabled={selectedRoutineIndex === routines.length - 1}
-                      className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all disabled:opacity-40 cursor-pointer"
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all disabled:opacity-30 cursor-pointer"
                       title="Next Option"
                     >
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
-                </div>
 
-                {/* Horizontal Quick Scrollable Option Pills */}
-                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
-                  {routines.map((opt, idx) => {
-                    const isActive = selectedRoutineIndex === idx;
-                    const isBest = idx === 0;
-                    return (
+                  {/* View Switcher: Weekly / Daily / Overview */}
+                  <div className="inline-flex rounded-xl bg-slate-900 border border-slate-800 p-1">
+                    {(["Weekly", "Daily", "Overview"] as const).map((tab) => (
                       <button
-                        key={idx}
+                        key={tab}
                         type="button"
-                        onClick={() => setSelectedRoutineIndex(idx)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 border ${
-                          isActive
-                            ? "bg-blue-600 text-white border-blue-400 shadow-lg shadow-blue-500/25 scale-105"
-                            : isBest
-                            ? "bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20"
-                            : "bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white"
+                        onClick={() => setViewMode(tab)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          viewMode === tab
+                            ? "bg-blue-600 text-white shadow-md shadow-blue-500/25"
+                            : "text-slate-400 hover:text-white"
                         }`}
                       >
-                        {isBest && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />}
-                        <span>Option {idx + 1}</span>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.2 rounded-md ${
-                            isActive ? "bg-blue-800 text-white" : "bg-slate-800 text-slate-300"
-                          }`}
-                        >
-                          {opt.matchPercentage}%
-                        </span>
+                        {tab === "Weekly" ? (language === "bn" ? "সাপ্তাহিক রুটিন" : "Weekly Grid") : tab === "Daily" ? (language === "bn" ? "দৈনিক ভিউ" : "Daily Agenda") : (language === "bn" ? "কোর্স লিস্ট" : "Section List")}
                       </button>
-                    );
-                  })}
-                </div>
-
-                {/* Active Option Highlight Bar */}
-                {activeRoutine && (
-                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/40 to-slate-900 border border-blue-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="space-y-1.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono font-black text-sm text-white flex items-center gap-1.5">
-                          <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs">
-                            #{selectedRoutineIndex + 1}
-                          </span>
-                          <span>Option {selectedRoutineIndex + 1}</span>
-                        </span>
-                        <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                          {activeRoutine.matchPercentage}% Efficiency Score
-                        </span>
-                        {selectedRoutineIndex === 0 && (
-                          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                            <Star className="w-3 h-3 fill-amber-300" />
-                            <span>Best Choice (Lowest Gap)</span>
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                        {activeRoutine.highlights.map((h, i) => (
-                          <span
-                            key={i}
-                            className="px-2.5 py-0.5 rounded-lg bg-slate-800/90 text-slate-300 border border-slate-700/80 font-medium text-[11px]"
-                          >
-                            {h}
-                          </span>
-                        ))}
-                        <span className="px-2.5 py-0.5 rounded-lg bg-indigo-950/80 text-indigo-300 border border-indigo-800 font-mono text-[11px]">
-                          🎓 {activeRoutine.totalCredits} Cr
-                        </span>
-                        <span className="px-2.5 py-0.5 rounded-lg bg-blue-950/80 text-blue-300 border border-blue-800 font-mono text-[11px]">
-                          🗓️ {activeRoutine.activeDaysCount} Days ({activeRoutine.activeDays.join(", ")})
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-                      <button
-                        onClick={handleCopySectionCodes}
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Copy className="w-3.5 h-3.5 text-blue-400" />
-                        <span>{language === "bn" ? "সেকশন কোড কপি" : "Copy Codes"}</span>
-                      </button>
-                    </div>
+                    ))}
                   </div>
-                )}
+
+                  {/* Export Controls */}
+                  <button
+                    type="button"
+                    onClick={handleDownloadPNG}
+                    disabled={isExporting}
+                    className="px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    title="Download Class Routine as PNG"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    <span>PNG</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadPDF}
+                    disabled={isExporting}
+                    className="px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    title="Download Class Routine as PDF"
+                  >
+                    <FileDown className="w-3.5 h-3.5" />
+                    <span>PDF</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Interactive Timetable Grid (12-Hour AM/PM, Full Friday Support, Download PNG/PDF) */}
+              {/* 10 Option Tabs Selector Strip */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                {routines.map((opt, idx) => {
+                  const isActive = selectedRoutineIndex === idx;
+                  const isBest = idx === 0;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedRoutineIndex(idx)}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-mono font-bold transition-all shrink-0 cursor-pointer flex items-center gap-2 border ${
+                        isActive
+                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-400 shadow-lg shadow-blue-500/30 scale-105"
+                          : isBest
+                          ? "bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20"
+                          : "bg-slate-900/80 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white"
+                      }`}
+                    >
+                      {isBest && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />}
+                      <span>Option {idx + 1}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-md ${
+                          isActive ? "bg-blue-900/80 text-blue-100" : "bg-slate-800 text-slate-300"
+                        }`}
+                      >
+                        {opt.matchPercentage}%
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Active Option Highlight Banner with Badges & Copy Section Codes Button */}
               {activeRoutine && (
-                <div
-                  ref={routineContainerRef}
-                  id="routine-timetable-container"
-                  className="rounded-3xl bg-[#0B0F19] border border-slate-800 p-4 sm:p-6 shadow-2xl space-y-5"
-                >
-                  {/* Header Bar with Action Buttons (Download PNG, Download PDF, View Switcher) */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-lg sm:text-xl font-black text-white tracking-wide">
-                          Class Information
-                        </h2>
-                        <span className="px-2 py-0.5 rounded-md bg-blue-950 text-blue-300 border border-blue-800 font-mono text-xs font-bold">
-                          Option #{selectedRoutineIndex + 1}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/40 to-slate-900 border border-blue-500/30 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono font-black text-sm text-white flex items-center gap-1.5">
+                        <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs">
+                          #{selectedRoutineIndex + 1}
                         </span>
-                      </div>
-                      <p className="text-xs text-slate-400 font-mono mt-0.5 flex items-center gap-2">
-                        <span>Southeast University Spring 2026</span>
-                        <span>•</span>
-                        <span className="text-emerald-400">12-Hour AM/PM Timetable</span>
-                      </p>
+                        <span>Option {selectedRoutineIndex + 1}</span>
+                      </span>
+                      <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                        {activeRoutine.matchPercentage}% Efficiency Score
+                      </span>
+                      {selectedRoutineIndex === 0 && (
+                        <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                          <Star className="w-3 h-3 fill-amber-300" />
+                          <span>Best Choice (Lowest Gap)</span>
+                        </span>
+                      )}
                     </div>
 
-                    {/* Right Side: View Switcher & Download Controls */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      {/* View Switcher: Weekly / Daily / Overview */}
-                      <div className="inline-flex rounded-xl bg-slate-900 border border-slate-800 p-1">
-                        {(["Weekly", "Daily", "Overview"] as const).map((tab) => (
-                          <button
-                            key={tab}
-                            type="button"
-                            onClick={() => setViewMode(tab)}
-                            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                              viewMode === tab
-                                ? "bg-blue-600 text-white shadow-sm"
-                                : "text-slate-400 hover:text-white"
-                            }`}
-                          >
-                            {tab}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Download PNG Button */}
-                      <button
-                        type="button"
-                        onClick={handleDownloadPNG}
-                        disabled={isExporting}
-                        className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                        title="Download Class Routine as High-Quality PNG Image"
-                      >
-                        <ImageIcon className="w-3.5 h-3.5" />
-                        <span>PNG</span>
-                      </button>
-
-                      {/* Download PDF Button */}
-                      <button
-                        type="button"
-                        onClick={handleDownloadPDF}
-                        disabled={isExporting}
-                        className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                        title="Download Class Routine as Landscape PDF"
-                      >
-                        <FileDown className="w-3.5 h-3.5" />
-                        <span>PDF</span>
-                      </button>
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      {activeRoutine.highlights.map((h, i) => (
+                        <span
+                          key={i}
+                          className="px-2.5 py-1 rounded-lg bg-slate-800/90 text-slate-200 border border-slate-700/80 font-medium text-[11px]"
+                        >
+                          {h}
+                        </span>
+                      ))}
+                      <span className="px-2.5 py-1 rounded-lg bg-indigo-950/80 text-indigo-300 border border-indigo-800 font-mono text-[11px]">
+                        🎓 {activeRoutine.totalCredits} Cr
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg bg-blue-950/80 text-blue-300 border border-blue-800 font-mono text-[11px]">
+                        🗓️ {activeRoutine.activeDaysCount} Days ({activeRoutine.activeDays.join(", ")})
+                      </span>
                     </div>
                   </div>
 
+                  <button
+                    onClick={handleCopySectionCodes}
+                    className="self-start md:self-auto px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 text-xs font-mono font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:border-slate-500"
+                  >
+                    <Copy className="w-4 h-4 text-blue-400" />
+                    <span>{language === "bn" ? "সেকশন কোড কপি করুন" : "Copy Advising Codes"}</span>
+                  </button>
+                </div>
+              )}
+
+              {/* TIMETABLE CONTENT: Weekly / Daily / Overview Views */}
+              {activeRoutine && (
+                <div className="pt-2 space-y-4">
                   {/* VIEW: WEEKLY TIMETABLE GRID (All 7 Days including Friday with 2h sessions) */}
                   {viewMode === "Weekly" && (
                     <div className="overflow-x-auto scrollbar-thin pb-2">
@@ -2600,28 +2598,11 @@ export default function SmartAdvisingRoutineTool() {
           );
         };
 
-        // When routines are present, support both Side-by-Side (Split) and Full-Width layouts
+        // Full-width, clean linear workspace: 2. Priorities Card -> 3. Routine Results & Timetable
         if (routines.length > 0) {
-          if (layoutMode === "split") {
-            return (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-in fade-in duration-300">
-                {/* Left Column (Sticky Sidebar on lg): 2. Priorities & Gap Control */}
-                <div className="lg:col-span-5 xl:col-span-4 space-y-5 lg:sticky lg:top-20">
-                  {renderPrioritiesCard(true)}
-                </div>
-
-                {/* Right Column: Top 10 Routines & Timetable */}
-                <div className="lg:col-span-7 xl:col-span-8 space-y-5 min-w-0">
-                  {renderRoutineResults()}
-                </div>
-              </div>
-            );
-          }
-
-          // Full Width Mode
           return (
             <div className="space-y-6 animate-in fade-in duration-300">
-              {renderPrioritiesCard(false)}
+              {renderPrioritiesCard()}
               {renderRoutineResults()}
             </div>
           );
@@ -2630,7 +2611,7 @@ export default function SmartAdvisingRoutineTool() {
         // When no routines generated yet: render Priorities Card + Helpful Empty State
         return (
           <div className="space-y-6 animate-in fade-in duration-300">
-            {renderPrioritiesCard(false)}
+            {renderPrioritiesCard()}
 
             <div className="rounded-3xl bg-slate-900/40 border border-slate-800/80 p-8 sm:p-12 text-center space-y-4 backdrop-blur-md">
               <div className="w-16 h-16 rounded-3xl bg-blue-600/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto">
