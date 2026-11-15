@@ -75,6 +75,7 @@ export interface GeneratedRoutineOption {
   totalCredits: number;
   totalGapMinutes: number;
   facultyMatchCount: number;
+  outsideWindowCount: number;
   hasEarlyMorning: boolean;
   hasLateEvening: boolean;
   highlights: string[];
@@ -509,6 +510,52 @@ export default function SmartAdvisingRoutineTool() {
     const prefSet = new Set(preferredDays.map((d) => d.toUpperCase()));
     const useStrict = strictDayFilter && isDayFilterActive && !forceRelaxed;
 
+    // Parse target timing window parameters
+    let targetStartMin = -1;
+    let targetEndMin = -1;
+    let windowLabel = "";
+
+    if (timePreference === "WINDOW_10_TO_1") {
+      targetStartMin = 600;
+      targetEndMin = 780;
+      windowLabel = "10:00 AM - 01:00 PM";
+    } else if (timePreference === "WINDOW_10_TO_3") {
+      targetStartMin = 600;
+      targetEndMin = 900;
+      windowLabel = "10:00 AM - 03:00 PM";
+    } else if (timePreference === "WINDOW_800_TO_1130" || timePreference === "WINDOW_830_TO_1130") {
+      targetStartMin = 480;
+      targetEndMin = 690;
+      windowLabel = "08:00 AM - 11:30 AM";
+    } else if (timePreference === "WINDOW_130_TO_430") {
+      targetStartMin = 810;
+      targetEndMin = 990;
+      windowLabel = "01:30 PM - 04:30 PM";
+    } else if (timePreference === "WINDOW_300_TO_630" || timePreference === "WINDOW_300_TO_600") {
+      targetStartMin = 900;
+      targetEndMin = 1110;
+      windowLabel = "03:00 PM - 06:30 PM";
+    } else if (timePreference === "CUSTOM") {
+      targetStartMin = time12ToMinutes(customStartTime);
+      targetEndMin = time12ToMinutes(customEndTime);
+      windowLabel = `${customStartTime} - ${customEndTime}`;
+    }
+
+    // Helper: count how many slots in a section violate the user's requested time window
+    const getSectionTimePenalty = (sec: OfferedSectionItem) => {
+      if (!sec.slots || sec.slots.length === 0) return 0;
+      return sec.slots.filter((sl) => {
+        const sm = sl.startMinutes ?? timeToMinutes(sl.start);
+        const em = sl.endMinutes ?? timeToMinutes(sl.end);
+        if (targetStartMin >= 0 && targetEndMin > targetStartMin) {
+          return sm < targetStartMin || em > targetEndMin;
+        }
+        if (timePreference === "AVOID_MORNING") return sm < 600;
+        if (timePreference === "AVOID_LATE") return em > 990;
+        return false;
+      }).length;
+    };
+
     // 1. Prepare candidate sections for each selected course
     const courseSecsList: OfferedSectionItem[][] = [];
     const missingCoursesInfo: { code: string; title: string; offeredDays: string[] }[] = [];
@@ -523,8 +570,34 @@ export default function SmartAdvisingRoutineTool() {
 
       const prefFacs = facultyPreferences[cCode] || [];
 
+      // Sort candidate sections by time window penalty FIRST, then preferred faculty, then outside days
+      const sortCandidates = (list: OfferedSectionItem[]) => {
+        return [...list].sort((s1, s2) => {
+          // 1. Time Window Penalty: Sections that fit user's chosen hours come first!
+          const t1 = getSectionTimePenalty(s1);
+          const t2 = getSectionTimePenalty(s2);
+          if (t1 !== t2) return t1 - t2;
+
+          // 2. Preferred Faculty Priority
+          if (prefFacs.length > 0) {
+            const p1 = prefFacs.includes(s1.facultyInitial);
+            const p2 = prefFacs.includes(s2.facultyInitial);
+            if (p1 !== p2) return p1 ? -1 : 1;
+          }
+
+          // 3. Outside Days Priority (if not in strict mode)
+          if (isDayFilterActive) {
+            const out1 = s1.slots.filter((sl) => !prefSet.has(sl.day.toUpperCase())).length;
+            const out2 = s2.slots.filter((sl) => !prefSet.has(sl.day.toUpperCase())).length;
+            if (out1 !== out2) return out1 - out2;
+          }
+
+          return 0;
+        });
+      };
+
       if (useStrict) {
-        let strictSecs = pool.filter(
+        const strictSecs = pool.filter(
           (sec) =>
             sec.slots &&
             sec.slots.length > 0 &&
@@ -541,42 +614,10 @@ export default function SmartAdvisingRoutineTool() {
             offeredDays,
           });
         } else {
-          // Put preferred faculty sections FIRST so backtracking explores them first!
-          if (prefFacs.length > 0) {
-            strictSecs = [...strictSecs].sort((s1, s2) => {
-              const p1 = prefFacs.includes(s1.facultyInitial);
-              const p2 = prefFacs.includes(s2.facultyInitial);
-              if (p1 !== p2) return p1 ? -1 : 1;
-              return 0;
-            });
-          }
-          courseSecsList.push(strictSecs);
+          courseSecsList.push(sortCandidates(strictSecs));
         }
-      } else if (isDayFilterActive) {
-        // Prioritize preferred faculty first, then fewer outside days
-        const sortedPool = [...pool].sort((s1, s2) => {
-          if (prefFacs.length > 0) {
-            const p1 = prefFacs.includes(s1.facultyInitial);
-            const p2 = prefFacs.includes(s2.facultyInitial);
-            if (p1 !== p2) return p1 ? -1 : 1;
-          }
-          const out1 = s1.slots.filter((sl) => !prefSet.has(sl.day.toUpperCase())).length;
-          const out2 = s2.slots.filter((sl) => !prefSet.has(sl.day.toUpperCase())).length;
-          return out1 - out2;
-        });
-        courseSecsList.push(sortedPool);
       } else {
-        if (prefFacs.length > 0) {
-          const sorted = [...pool].sort((s1, s2) => {
-            const p1 = prefFacs.includes(s1.facultyInitial);
-            const p2 = prefFacs.includes(s2.facultyInitial);
-            if (p1 !== p2) return p1 ? -1 : 1;
-            return 0;
-          });
-          courseSecsList.push(sorted);
-        } else {
-          courseSecsList.push(pool);
-        }
+        courseSecsList.push(sortCandidates(pool));
       }
     }
 
@@ -782,7 +823,7 @@ export default function SmartAdvisingRoutineTool() {
         highlights.push(`⏱️ ${totalGapMinutes}m Total Gap`);
       }
 
-      // 4. TIME PREFERENCES
+      // 4. TIME PREFERENCES & WINDOW STRICTNESS
       let targetStartMin = -1;
       let targetEndMin = -1;
       let windowLabel = "";
@@ -813,49 +854,52 @@ export default function SmartAdvisingRoutineTool() {
         windowLabel = `${customStartTime} - ${customEndTime}`;
       }
 
-      if (targetStartMin >= 0 && targetEndMin > targetStartMin) {
-        let insideCount = 0;
-        let totalSlotsCount = 0;
-        combo.forEach((sec) => {
-          sec.slots.forEach((slot) => {
-            totalSlotsCount++;
-            const sm = slot.startMinutes ?? timeToMinutes(slot.start);
-            const em = slot.endMinutes ?? timeToMinutes(slot.end);
-            if (sm >= targetStartMin && em <= targetEndMin) {
-              insideCount++;
+      let outsideWindowCount = 0;
+      let totalSlotsCount = 0;
+      combo.forEach((sec) => {
+        sec.slots.forEach((slot) => {
+          totalSlotsCount++;
+          const sm = slot.startMinutes ?? timeToMinutes(slot.start);
+          const em = slot.endMinutes ?? timeToMinutes(slot.end);
+          if (targetStartMin >= 0 && targetEndMin > targetStartMin) {
+            if (sm < targetStartMin || em > targetEndMin) {
+              outsideWindowCount++;
             }
-          });
+          } else if (timePreference === "AVOID_MORNING") {
+            if (sm < 600) outsideWindowCount++;
+          } else if (timePreference === "AVOID_LATE") {
+            if (em > 990) outsideWindowCount++;
+          }
         });
+      });
 
-        if (insideCount === totalSlotsCount) {
-          score += 90;
+      if (targetStartMin >= 0 && targetEndMin > targetStartMin) {
+        if (outsideWindowCount === 0) {
+          score += 250;
           highlights.push(`🎯 100% Fits ${windowLabel} Window`);
-        } else if (insideCount > 0) {
-          score += (insideCount / totalSlotsCount) * 50;
-          score -= (totalSlotsCount - insideCount) * 20;
-          highlights.push(`🎯 ${insideCount}/${totalSlotsCount} Classes in ${windowLabel}`);
         } else {
-          score -= 60;
+          score -= outsideWindowCount * 120;
+          highlights.push(`⚠️ ${outsideWindowCount} class(es) outside ${windowLabel}`);
         }
       } else if (timePreference === "AVOID_MORNING") {
-        if (!hasEarly) {
-          score += 45;
+        if (outsideWindowCount === 0) {
+          score += 200;
           highlights.push("☀️ No Early 08:30 Classes");
         } else {
-          score -= 40;
+          score -= outsideWindowCount * 120;
         }
       } else if (timePreference === "AVOID_LATE") {
-        if (!hasLate) {
-          score += 35;
+        if (outsideWindowCount === 0) {
+          score += 150;
           highlights.push("🌇 No Late Afternoon Classes");
         } else {
-          score -= 30;
+          score -= outsideWindowCount * 100;
         }
       } else if (timePreference === "PREFER_MORNING") {
-        score += morningCount * 12;
+        score += morningCount * 15;
         if (morningCount > afternoonCount) highlights.push("🌅 Morning Focused");
       } else if (timePreference === "PREFER_AFTERNOON") {
-        score += afternoonCount * 12;
+        score += afternoonCount * 15;
         if (afternoonCount > morningCount) highlights.push("☕ Afternoon Focused");
       }
 
@@ -905,6 +949,7 @@ export default function SmartAdvisingRoutineTool() {
         totalCredits,
         totalGapMinutes,
         facultyMatchCount: facMatchCount,
+        outsideWindowCount,
         hasEarlyMorning: hasEarly,
         hasLateEvening: hasLate,
         highlights,
@@ -913,10 +958,11 @@ export default function SmartAdvisingRoutineTool() {
 
     // Multi-Objective Hierarchy Master Sort:
     // 1. Outside Days: 0 outside days ALWAYS comes first!
-    // 2. Preferred Faculty Priority: routines with MORE preferred faculty matches rank strictly higher!
-    // 3. Minimum Dead Gap Priority (Top options guarantee minimal gap!):
+    // 2. Strict Timing Window Compliance: routines with 0 outside-window classes ALWAYS rank first!
+    // 3. Preferred Faculty Priority: routines with MORE preferred faculty matches rank strictly higher!
+    // 4. Minimum Dead Gap Priority (Top options guarantee minimal gap!):
     //    Routines with 0m or 10-15m gap strictly rank in Top 5!
-    // 4. Composite score
+    // 5. Composite score
     scored.sort((a, b) => {
       // 1. Outside Days Strictness (if user selected specific days)
       if (preferredDays && preferredDays.length > 0 && preferredDays.length < 7) {
@@ -927,19 +973,26 @@ export default function SmartAdvisingRoutineTool() {
         }
       }
 
-      // 2. Preferred Faculty Priority:
+      // 2. Strict Timing Window Compliance:
+      // When a user selects a timing window (Custom, Prime, Early Morning, Afternoon, Avoid 08:30, etc.),
+      // routines with 0 classes outside that window MUST rank ahead of routines that have outside classes!
+      if (a.outsideWindowCount !== b.outsideWindowCount) {
+        return a.outsideWindowCount - b.outsideWindowCount;
+      }
+
+      // 3. Preferred Faculty Priority:
       if (a.facultyMatchCount !== b.facultyMatchCount) {
         return b.facultyMatchCount - a.facultyMatchCount; // More preferred faculty first!
       }
 
-      // 3. Minimum Dead Gap Priority (Top options guarantee minimal gap!):
+      // 4. Minimum Dead Gap Priority (Top options guarantee minimal gap!):
       if (dayPreference === "COMPACT_GAPS" || dayPreference === "ANY" || !dayPreference) {
         if (Math.abs(a.totalGapMinutes - b.totalGapMinutes) >= 15) {
           return a.totalGapMinutes - b.totalGapMinutes; // Lowest waiting gap first (0m, 10m first)!
         }
       }
 
-      // 4. Composite score fallback
+      // 5. Composite score fallback
       return b.score - a.score;
     });
 

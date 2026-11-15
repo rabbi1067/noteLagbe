@@ -441,9 +441,10 @@ public class AdvisingScheduleService {
 
         // Multi-Objective Hierarchy Master Sort:
         // 1. Outside Days: 0 outside days strictly first
-        // 2. Preferred Faculty Priority: routines with more preferred faculty matches rank strictly higher
-        // 3. Minimum Dead Gap Priority: routines with minimal gap (<=15m) rank first in Top 5
-        // 4. Composite score fallback
+        // 2. Strict Timing Window Compliance: 0 outside-window classes strictly first
+        // 3. Preferred Faculty Priority: routines with more preferred faculty matches rank strictly higher
+        // 4. Minimum Dead Gap Priority: routines with minimal gap (<=15m) rank first in Top 5
+        // 5. Composite score fallback
         scoredList.sort((a, b) -> {
             if (preferredDays != null && !preferredDays.isEmpty()) {
                 long aOutside = a.activeDays.stream().filter(d -> !prefSet.contains(d)).count();
@@ -453,17 +454,22 @@ public class AdvisingScheduleService {
                 }
             }
 
-            // 2. Preferred Faculty Priority
+            // 2. Strict Timing Window Compliance
+            if (a.outsideWindowCount != b.outsideWindowCount) {
+                return Integer.compare(a.outsideWindowCount, b.outsideWindowCount);
+            }
+
+            // 3. Preferred Faculty Priority
             if (a.facultyMatchCount != b.facultyMatchCount) {
                 return Integer.compare(b.facultyMatchCount, a.facultyMatchCount);
             }
 
-            // 3. Minimum Dead Gap Priority (Top 5 guaranteed minimal waiting gaps)
+            // 4. Minimum Dead Gap Priority (Top 5 guaranteed minimal waiting gaps)
             if (Math.abs(a.totalGapMinutes - b.totalGapMinutes) >= 15.0) {
                 return Double.compare(a.totalGapMinutes, b.totalGapMinutes);
             }
 
-            // 4. Composite score fallback
+            // 5. Composite score fallback
             return Double.compare(b.score, a.score);
         });
 
@@ -642,6 +648,7 @@ public class AdvisingScheduleService {
             }
         }
 
+        int outsideWindowCount = 0;
         if (targetStartMin >= 0 && targetEndMin > targetStartMin) {
             int insideCount = 0;
             int totalSlotsCount = 0;
@@ -650,38 +657,47 @@ public class AdvisingScheduleService {
                     totalSlotsCount++;
                     if (sl.startMinutes >= targetStartMin && sl.endMinutes <= targetEndMin) {
                         insideCount++;
+                    } else {
+                        outsideWindowCount++;
                     }
                 }
             }
-            if (insideCount == totalSlotsCount) {
-                score += 90.0;
+            if (outsideWindowCount == 0) {
+                score += 250.0;
                 highlights.add("🎯 100% Fits " + windowLabel + " Window");
-            } else if (insideCount > 0) {
-                score += ((double) insideCount / totalSlotsCount) * 50.0;
-                score -= (totalSlotsCount - insideCount) * 20.0;
-                highlights.add("🎯 " + insideCount + "/" + totalSlotsCount + " Classes in " + windowLabel);
             } else {
-                score -= 60.0;
+                score -= outsideWindowCount * 120.0;
+                highlights.add("⚠️ " + outsideWindowCount + " class(es) outside " + windowLabel);
             }
         } else if ("AVOID_MORNING".equalsIgnoreCase(timePref)) {
-            if (!hasEarlyMorning) {
-                score += 40.0;
+            for (OfferedSection s : sections) {
+                for (TimeSlot sl : parseSlots(s.getScheduleJson())) {
+                    if (sl.startMinutes < 600) outsideWindowCount++;
+                }
+            }
+            if (outsideWindowCount == 0) {
+                score += 200.0;
                 highlights.add("☀️ No Early 08:30 Classes");
             } else {
-                score -= 35.0;
+                score -= outsideWindowCount * 120.0;
             }
         } else if ("AVOID_LATE".equalsIgnoreCase(timePref)) {
-            if (!hasLateEvening) {
-                score += 35.0;
+            for (OfferedSection s : sections) {
+                for (TimeSlot sl : parseSlots(s.getScheduleJson())) {
+                    if (sl.endMinutes > 990) outsideWindowCount++;
+                }
+            }
+            if (outsideWindowCount == 0) {
+                score += 150.0;
                 highlights.add("🌇 No Late Afternoon Classes");
             } else {
-                score -= 30.0;
+                score -= outsideWindowCount * 100.0;
             }
         } else if ("PREFER_MORNING".equalsIgnoreCase(timePref)) {
-            score += morningCount * 10.0;
+            score += morningCount * 15.0;
             if (morningCount > afternoonCount) highlights.add("🌅 Morning Centered");
         } else if ("PREFER_AFTERNOON".equalsIgnoreCase(timePref)) {
-            score += afternoonCount * 10.0;
+            score += afternoonCount * 15.0;
             if (afternoonCount > morningCount) highlights.add("☕ Afternoon Focused");
         }
 
@@ -758,6 +774,7 @@ public class AdvisingScheduleService {
         sr.hasLateEvening = hasLateEvening;
         sr.totalGapMinutes = totalGapMinutes;
         sr.facultyMatchCount = facultyMatches;
+        sr.outsideWindowCount = outsideWindowCount;
         sr.highlights = highlights;
         return sr;
     }
@@ -772,6 +789,7 @@ public class AdvisingScheduleService {
         public int totalCredits;
         public double totalGapMinutes;
         public int facultyMatchCount;
+        public int outsideWindowCount;
         public boolean hasEarlyMorning;
         public boolean hasLateEvening;
         public List<String> highlights;
