@@ -43,6 +43,7 @@ import {
   FileText,
   ShieldCheck,
   Zap,
+  Coffee,
   FileCode,
   UploadCloud,
   RotateCcw,
@@ -243,7 +244,7 @@ export default function SmartAdvisingRoutineTool() {
   const [customStartTime, setCustomStartTime] = useState<string>("10:00 AM");
   const [customEndTime, setCustomEndTime] = useState<string>("01:00 PM");
   const [dayPreference, setDayPreference] = useState<
-    "MINIMIZE_DAYS" | "COMPACT_GAPS" | "ANY"
+    "MINIMIZE_DAYS" | "COMPACT_GAPS" | "BALANCED_BREAK" | "ANY"
   >("COMPACT_GAPS");
   const [preferredDays, setPreferredDays] = useState<string[]>([
     "SUN",
@@ -435,6 +436,57 @@ export default function SmartAdvisingRoutineTool() {
     return list.filter((c) => c.code.toLowerCase().includes(q) || c.title.toLowerCase().includes(q));
   }, [coursesCatalog, courseSearchQuery]);
 
+  // Target Days Multi-Additive Toggle (supports combining pairs to make 2, 4, 6 days)
+  const handleToggleDayPair = (daysToToggle: string[]) => {
+    setStrictDayConflict(null);
+    const allPresent = daysToToggle.every((d) => preferredDays.includes(d));
+    if (allPresent) {
+      const remaining = preferredDays.filter((d) => !daysToToggle.includes(d));
+      if (remaining.length === 0) {
+        toast.error(language === "bn" ? "কমপক্ষে ১টি বার নির্বাচিত রাখতে হবে।" : "Please keep at least 1 day selected.");
+        return;
+      }
+      setPreferredDays(remaining);
+    } else {
+      setPreferredDays((prev) => Array.from(new Set([...prev, ...daysToToggle])));
+    }
+  };
+
+  // Quick Preset Goals (2 Days, 3 Days, 4 Days, 5 Days, All 7 Days)
+  const handleApplyDayGoal = (goal: "2DAYS" | "3DAYS" | "4DAYS" | "5DAYS" | "ALL") => {
+    setStrictDayConflict(null);
+    if (goal === "2DAYS") {
+      setPreferredDays(["SUN", "TUE"]);
+      toast.success(language === "bn" ? "⚡ ২ দিনের টার্গেট (রবি + মঙ্গল) নির্বাচিত হয়েছে" : "⚡ 2-Day Target (Sun + Tue) selected");
+    } else if (goal === "3DAYS") {
+      setPreferredDays(["SUN", "TUE", "THU"]);
+      toast.success(language === "bn" ? "🎯 ৩ দিনের টার্গেট (রবি + মঙ্গল + বৃহঃ) নির্বাচিত হয়েছে" : "🎯 3-Day Target (Sun, Tue, Thu) selected");
+    } else if (goal === "4DAYS") {
+      setPreferredDays(["SUN", "MON", "TUE", "WED"]);
+      toast.success(language === "bn" ? "🗓️ ৪ দিনের টার্গেট (রবি - বুধ) নির্বাচিত হয়েছে" : "🗓️ 4-Day Target (Sun - Wed) selected");
+    } else if (goal === "5DAYS") {
+      setPreferredDays(["SUN", "MON", "TUE", "WED", "THU"]);
+      toast.success(language === "bn" ? "🏢 ৫ দিনের উইকডেজ (রবি - বৃহঃ) নির্বাচিত হয়েছে" : "🏢 5-Day Weekdays (Sun - Thu) selected");
+    } else if (goal === "ALL") {
+      setPreferredDays(["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]);
+      toast.success(language === "bn" ? "🌐 সব ৭ দিন (ফুল ফ্লেক্সিবল) নির্বাচিত হয়েছে" : "🌐 All 7 Days (Full Flexibility) selected");
+    }
+  };
+
+  // Toggle Individual Day
+  const handleToggleSingleDay = (day: string) => {
+    setStrictDayConflict(null);
+    if (preferredDays.includes(day)) {
+      if (preferredDays.length <= 1) {
+        toast.error(language === "bn" ? "কমপক্ষে ১টি বার নির্বাচিত রাখতে হবে।" : "Please keep at least 1 day selected.");
+        return;
+      }
+      setPreferredDays((prev) => prev.filter((d) => d !== day));
+    } else {
+      setPreferredDays((prev) => [...prev, day]);
+    }
+  };
+
   // Generate Routines Handler
   const handleGenerateRoutines = async () => {
     if (selectedCourses.length === 0) {
@@ -445,8 +497,9 @@ export default function SmartAdvisingRoutineTool() {
     setGenerating(true);
     setStrictDayConflict(null);
 
-    // If custom catalog is loaded, solve directly using client's uploaded dataset
-    if (isCustomUpload) {
+    // If strict day filter is active or custom session is loaded, solve directly using client's engine for 100% strict guarantee
+    const hasPreferredDays = preferredDays && preferredDays.length > 0 && preferredDays.length < 7;
+    if (isCustomUpload || (hasPreferredDays && strictDayFilter)) {
       runClientSideRoutineSolver();
       return;
     }
@@ -701,14 +754,25 @@ export default function SmartAdvisingRoutineTool() {
           const s2 = slots[i + 1];
           const gap = (s2.startMinutes ?? 0) - (s1.endMinutes ?? 0);
 
-          if (gap <= 15) {
-            consecutiveBonus += 45;
-          } else if (gap <= 50) {
-            consecutiveBonus += 20;
-            totalGapMinutes += gap;
+          if (dayPreference === "BALANCED_BREAK") {
+            if (gap >= 25 && gap <= 65) {
+              consecutiveBonus += 55;
+            } else if (gap < 20) {
+              consecutiveBonus += 15;
+            } else {
+              totalGapMinutes += gap;
+              longGapPenalty += Math.floor(gap / 15) * 12;
+            }
           } else {
-            totalGapMinutes += gap;
-            longGapPenalty += Math.floor(gap / 15) * 14;
+            if (gap <= 15) {
+              consecutiveBonus += 45;
+            } else if (gap <= 50) {
+              consecutiveBonus += 20;
+              totalGapMinutes += gap;
+            } else {
+              totalGapMinutes += gap;
+              longGapPenalty += Math.floor(gap / 15) * 14;
+            }
           }
         }
       });
@@ -719,7 +783,7 @@ export default function SmartAdvisingRoutineTool() {
       // 2. PREFERRED DAYS & STRICT DAY MATCHING
       const activeDays = Object.keys(daySlotsMap);
       const dayCount = activeDays.length;
-      const outsideDays = activeDays.filter((d) => !preferredDays.includes(d));
+      const outsideDays = activeDays.filter((d) => !prefSet.has(d.toUpperCase()));
       const isStrictDayMatch = outsideDays.length === 0;
 
       if (isStrictDayMatch) {
@@ -733,14 +797,16 @@ export default function SmartAdvisingRoutineTool() {
       // Campus Days bonus
       if (dayPreference === "MINIMIZE_DAYS") {
         if (dayCount <= 2) {
-          score += 90;
+          score += 100;
           highlights.push(`⚡ Ultra-Compact (${dayCount} Campus Days)`);
         } else if (dayCount === 3) {
-          score += 50;
+          score += 60;
           highlights.push(`🗓️ Balanced 3 Campus Days`);
         } else if (dayCount >= 5) {
           score -= 60;
         }
+      } else if (dayPreference === "BALANCED_BREAK") {
+        highlights.push(`☕ Healthy 30-60m Breaks`);
       } else {
         if (dayCount <= 2) {
           score += 60;
@@ -1609,63 +1675,351 @@ export default function SmartAdvisingRoutineTool() {
       })()}
 
       {/* ========================================================================= */}
-      {/* 2. PRIORITIES & GAP CONTROL (CLEAN, WELL-SPACED & FULLY FUNCTIONAL)        */}
+      {/* 2. PRIORITIES & GAP CONTROL (OVERHAULED: INTUITIVE, PROFESSIONAL & POWERFUL) */}
       {/* ========================================================================= */}
-      <div className="rounded-3xl bg-slate-900/60 border border-slate-800 p-5 sm:p-6 backdrop-blur-md space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+      <div className="rounded-3xl bg-slate-900/60 border border-slate-800 p-5 sm:p-7 backdrop-blur-md space-y-7 shadow-xl">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/10 text-indigo-400 border border-indigo-500/30 shadow-inner">
               <SlidersHorizontal className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-black text-white">
-                {language === "bn" ? "২. সময় ও গ্যাপ প্রায়োরিটি কন্ট্রোল" : "2. Priorities & Gap Control"}
+              <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                <span>{language === "bn" ? "২. সময়সূচি, গ্যাপ ও টার্গেট দিন নির্বাচন" : "2. Priorities, Schedule Style & Target Days"}</span>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                  {preferredDays.length} {language === "bn" ? "দিন নির্বাচিত" : "Days Active"}
+                </span>
               </h2>
-              <p className="text-xs text-slate-400">
-                Configure preferred class timing windows, consecutive back-to-back breaks, and target campus days.
+              <p className="text-xs text-slate-400 mt-0.5">
+                {language === "bn"
+                  ? "ক্যাম্পাসে যাওয়ার দিনসমূহ, ক্লাসের ফাঁকে গ্যাপের ধরণ এবং সুবিধাজনক সময়সূচি নির্ধারণ করুন।"
+                  : "Configure your target campus days, class break styles, and preferred daily timing windows."}
               </p>
             </div>
           </div>
-          <span className="text-[11px] font-mono text-slate-400 bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700">
-            Control Panel
-          </span>
+
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            <span className="text-[11px] font-mono px-3 py-1.5 rounded-xl bg-slate-800/90 text-slate-300 border border-slate-700/80 shadow-xs flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              <span>
+                {dayPreference === "COMPACT_GAPS"
+                  ? "Back-to-Back"
+                  : dayPreference === "BALANCED_BREAK"
+                  ? "Healthy Break"
+                  : dayPreference === "MINIMIZE_DAYS"
+                  ? "Max Days Off"
+                  : "Balanced Spread"}
+              </span>
+            </span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {/* 1. Time Preference (12-Hour AM/PM) */}
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-bold text-slate-300 flex items-center justify-between">
-              <span>Time Preference (12-Hour AM/PM)</span>
-              <Clock className="w-3.5 h-3.5 text-slate-400" />
-            </label>
-            <select
-              value={timePreference}
-              onChange={(e) => setTimePreference(e.target.value)}
-              className="w-full text-xs font-bold py-2.5 px-3 rounded-2xl bg-slate-800/80 border border-slate-700 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-            >
-              <option value="ANY">⚡ Balanced / Any Time Slot (Flexible - Default)</option>
-              <option value="WINDOW_10_TO_1">🎯 10:00 AM - 01:00 PM (Late Morning Peak)</option>
-              <option value="WINDOW_10_TO_3">🎯 10:00 AM - 03:00 PM (Full Daytime Slot)</option>
-              <option value="WINDOW_830_TO_1130">🎯 08:30 AM - 11:30 AM (Early Morning Slot)</option>
-              <option value="WINDOW_130_TO_430">🎯 01:30 PM - 04:30 PM (Afternoon Slot)</option>
-              <option value="WINDOW_300_TO_600">🎯 03:00 PM - 06:00 PM (Late Afternoon Slot)</option>
-              <option value="AVOID_MORNING">☀️ Avoid Morning (No 08:30 AM Classes)</option>
-              <option value="AVOID_LATE">🌇 Avoid Late Afternoon (No Post-04:30 PM Classes)</option>
-              <option value="CUSTOM">⚙️ Custom 12-Hour Time Window</option>
-            </select>
-
-            {timePreference === "CUSTOM" && (
-              <div className="p-3 rounded-2xl bg-slate-800/90 border border-slate-700 space-y-2 animate-in fade-in duration-150">
-                <span className="text-[11px] font-mono text-slate-300 font-bold block">
-                  Select Custom 12-Hour Window:
+        {/* ------------------------------------------------------------------------- */}
+        {/* TIER 1: TARGET CAMPUS DAYS BUILDER (THE STAR CONTROL)                     */}
+        {/* ------------------------------------------------------------------------- */}
+        <div className="rounded-2xl bg-slate-950/60 border border-slate-800/90 p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/60 pb-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-indigo-400" />
+                <h3 className="text-sm font-extrabold text-white">
+                  {language === "bn" ? "টার্গেট ক্যাম্পাস দিন (Target Campus Days)" : "Target Campus Days & Attendance"}
+                </h3>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-bold">
+                  {preferredDays.length} / 7 Days Active
                 </span>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+              </div>
+              <p className="text-xs text-slate-400">
+                {language === "bn"
+                  ? "যে যে বারে আপনি ক্যাম্পাসে ক্লাস করতে চান তা সিলেক্ট করুন। স্ট্রিক্ট ফিল্টারে অনির্বাচিত বারে ০% ক্লাস থাকবে।"
+                  : "Select the specific days you want to be on campus. Strict filter guarantees 100% zero classes on off-days."}
+              </p>
+            </div>
+
+            {/* Strict vs Flexible Filter Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                setStrictDayFilter((prev) => !prev);
+                setStrictDayConflict(null);
+              }}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 self-start sm:self-center shrink-0 ${
+                strictDayFilter
+                  ? "bg-emerald-950/80 border-emerald-500/60 text-emerald-300 shadow-sm shadow-emerald-500/20"
+                  : "bg-amber-950/80 border-amber-500/60 text-amber-300 shadow-sm shadow-amber-500/20"
+              }`}
+              title={
+                strictDayFilter
+                  ? "Strict Mode: Zero classes on unselected days guaranteed"
+                  : "Flexible Mode: Allows fallback days if required"
+              }
+            >
+              <ShieldCheck className={`w-3.5 h-3.5 ${strictDayFilter ? "text-emerald-400" : "text-amber-400"}`} />
+              <span>
+                {strictDayFilter
+                  ? language === "bn"
+                    ? "স্ট্রিক্ট ফিল্টার: সক্রিয় (১০০% নির্বাচিত দিন)"
+                    : "Strict Filter: ON (100% Strict)"
+                  : language === "bn"
+                  ? "ফ্লেক্সিবল মোড (প্রয়োজনে অতিরিক্ত দিন অনুমোদিত)"
+                  : "Flexible Mode (Extra Day Allowed)"}
+              </span>
+            </button>
+          </div>
+
+          {/* Quick Target Day Goals (Presets) */}
+          <div className="space-y-2">
+            <span className="text-[11px] font-mono text-slate-400 font-bold block">
+              {language === "bn" ? "ক্যাম্পাস দিনের লক্ষ্য (Quick Day Goals):" : "Target Days Goal (One-Click Presets):"}
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: "2DAYS" as const, label: "⚡ 2 Days", sub: "Sun+Tue", days: ["SUN", "TUE"] },
+                { id: "3DAYS" as const, label: "🎯 3 Days", sub: "Sun+Tue+Thu", days: ["SUN", "TUE", "THU"] },
+                { id: "4DAYS" as const, label: "🗓️ 4 Days", sub: "Sun - Wed", days: ["SUN", "MON", "TUE", "WED"] },
+                { id: "5DAYS" as const, label: "🏢 5 Days", sub: "Weekdays (Sun-Thu)", days: ["SUN", "MON", "TUE", "WED", "THU"] },
+                { id: "ALL" as const, label: "🌐 All 7 Days", sub: "Full Flexible", days: ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] },
+              ].map((goal) => {
+                const isActive =
+                  preferredDays.length === goal.days.length &&
+                  goal.days.every((d) => preferredDays.includes(d));
+
+                return (
+                  <button
+                    key={goal.id}
+                    type="button"
+                    onClick={() => handleApplyDayGoal(goal.id)}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                      isActive
+                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-400 shadow-md shadow-indigo-500/25 ring-1 ring-indigo-400"
+                        : "bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    <span>{goal.label}</span>
+                    <span className="text-[10px] text-slate-400 font-normal hidden sm:inline">({goal.sub})</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Multi-Additive Pair Combinations (Multi-Day '+' builder) */}
+          <div className="space-y-2 pt-1">
+            <span className="text-[11px] font-mono text-slate-400 font-bold block">
+              {language === "bn"
+                ? "মাল্টি-পেয়ার কম্বিনেশন (একসাথে একাধিক বার যুক্ত/বাদ দিতে '+' চাপুন):"
+                : "Multi-Day Combinations (Click '+' to add/toggle pairs cumulatively):"}
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: "SUN & TUE", days: ["SUN", "TUE"], desc: "Theory" },
+                { label: "MON & WED", days: ["MON", "WED"], desc: "Theory" },
+                { label: "THU & SAT", days: ["THU", "SAT"], desc: "Theory" },
+                { label: "FRI (2h)", days: ["FRI"], desc: "Labs" },
+              ].map((p) => {
+                const isFullyActive = p.days.every((d) => preferredDays.includes(d));
+                const isPartiallyActive = !isFullyActive && p.days.some((d) => preferredDays.includes(d));
+
+                return (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => handleToggleDayPair(p.days)}
+                    className={`px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                      isFullyActive
+                        ? "bg-indigo-600 text-white border-indigo-400 shadow-sm shadow-indigo-500/20"
+                        : isPartiallyActive
+                        ? "bg-indigo-950/60 text-indigo-300 border-indigo-600/50"
+                        : "bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    <span className="text-indigo-400 font-black">{isFullyActive ? "✓" : "+"}</span>
+                    <span>{p.label}</span>
+                    <span className="text-[10px] text-slate-400 font-sans">({p.desc})</span>
+                  </button>
+                );
+              })}
+
+              {preferredDays.length < 7 && (
+                <button
+                  type="button"
+                  onClick={() => handleApplyDayGoal("ALL")}
+                  className="px-2.5 py-2 rounded-xl text-xs font-mono text-slate-400 hover:text-white border border-dashed border-slate-800 hover:border-slate-700 bg-slate-900/40 transition-colors cursor-pointer"
+                >
+                  + Add All 7 Days
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 7 Interactive Day Tiles */}
+          <div className="space-y-2 pt-1">
+            <span className="text-[11px] font-mono text-slate-400 font-bold block">
+              {language === "bn" ? "স্বতন্ত্র বার নির্ধারণ (Click to Toggle):" : "Individual Day Toggles:"}
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+              {WEEK_DAYS.map((day) => {
+                const active = preferredDays.includes(day);
+                const bnNames: Record<string, string> = {
+                  SUN: "রবিবার",
+                  MON: "সোমবার",
+                  TUE: "মঙ্গলবার",
+                  WED: "বুধবার",
+                  THU: "বৃহস্পতিবার",
+                  FRI: "শুক্রবার",
+                  SAT: "শনিবার",
+                };
+                const dayTypes: Record<string, string> = {
+                  SUN: "Theory Pair",
+                  MON: "Theory Pair",
+                  TUE: "Theory Pair",
+                  WED: "Theory Pair",
+                  THU: "Theory Pair",
+                  FRI: "2h Lab",
+                  SAT: "Theory Pair",
+                };
+
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => handleToggleSingleDay(day)}
+                    className={`p-3 rounded-2xl text-left transition-all cursor-pointer border flex flex-col justify-between gap-2 ${
+                      active
+                        ? "bg-gradient-to-b from-indigo-950/80 to-slate-900/90 border-indigo-500/80 shadow-md shadow-indigo-500/15 ring-1 ring-indigo-500/40"
+                        : "bg-slate-900/40 border-slate-800/80 text-slate-500 hover:border-slate-700 hover:bg-slate-900/70"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={`font-mono font-black text-sm ${active ? "text-white" : "text-slate-400"}`}>
+                        {day}
+                      </span>
+                      <span
+                        className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full ${
+                          active
+                            ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+                            : "bg-slate-800 text-slate-500 border border-slate-700"
+                        }`}
+                      >
+                        {active ? "✓ On" : "✕ Off"}
+                      </span>
+                    </div>
+
+                    <div className="space-y-0.5">
+                      <span className={`text-[11px] font-bold block ${active ? "text-slate-200" : "text-slate-500"}`}>
+                        {bnNames[day] || day}
+                      </span>
+                      <span className={`text-[9px] font-mono block ${active ? "text-indigo-400" : "text-slate-600"}`}>
+                        {dayTypes[day]}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="text-[11px] text-slate-400 leading-relaxed pt-1">
+            {strictDayFilter && preferredDays.length < 7 ? (
+              <span className="text-emerald-400 font-medium flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 inline" />
+                <span>
+                  {language === "bn"
+                    ? `স্ট্রিক্ট ফিল্টার সক্রিয়: রুটিন ১০০% কেবল নির্বাচিত ${preferredDays.length} দিনেই সীমাবদ্ধ থাকবে। অনির্বাচিত দিনে কোনো ক্লাস পড়বে না।`
+                    : `Strict Filter Active: Guaranteed 100% zero classes on unselected days. Routines strictly fit within your ${preferredDays.length} selected days.`}
+                </span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0 inline" />
+                <span>
+                  {language === "bn"
+                    ? "ফ্লেক্সিবল ফিল্টার: নির্বাচিত দিনগুলোতে থাকা রুটিনগুলো ১ নম্বর র‍্যাংকে আসবে। কোনো কোর্সের ক্লাস না পেলে বিকল্প দিনে এলাউ করবে।"
+                    : "Flexible Filter: Routines on your selected days rank #1. If no combination exists, fallback options will be shown."}
+                </span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* ------------------------------------------------------------------------- */}
+        {/* TIER 2: TWO COLUMNS (TIME PREFERENCE WINDOW & GAP/BREAK STYLE CARDS)      */}
+        {/* ------------------------------------------------------------------------- */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Column A: Time Preference Window */}
+          <div className="rounded-2xl bg-slate-950/60 border border-slate-800/90 p-4 sm:p-5 space-y-4">
+            <div className="space-y-1 border-b border-slate-800/60 pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-blue-400" />
+                  <h3 className="text-sm font-extrabold text-white">
+                    {language === "bn" ? "ক্লাসের সময়সূচি (Class Timing Window)" : "Class Timing Window (12-Hour AM/PM)"}
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700">
+                  {timePreference === "ANY" ? "Flexible" : "Window Filter"}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                {language === "bn"
+                  ? "যে সময়ে আপনি ক্লাস করতে স্বাচ্ছন্দ্যবোধ করেন তা নির্বাচন করুন।"
+                  : "Choose your preferred daily class window or set a custom 12-hour AM/PM range."}
+              </p>
+            </div>
+
+            {/* Timing Quick Chips */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {[
+                { id: "ANY", label: "⚡ Any Time (Flexible)", sub: "All Slots (08:30-04:30)" },
+                { id: "WINDOW_10_TO_1", label: "🎯 Prime Daytime", sub: "10:00 AM - 01:00 PM" },
+                { id: "WINDOW_10_TO_3", label: "🌇 Full Daytime", sub: "10:00 AM - 03:00 PM" },
+                { id: "WINDOW_830_TO_1130", label: "☀️ Early Morning", sub: "08:30 AM - 11:30 AM" },
+                { id: "WINDOW_130_TO_430", label: "☕ Afternoon Slot", sub: "01:30 PM - 04:30 PM" },
+                { id: "WINDOW_300_TO_600", label: "🌙 Late Afternoon", sub: "03:00 PM - 06:00 PM" },
+                { id: "AVOID_MORNING", label: "🚫 Avoid 08:30 AM", sub: "No Early Morning Classes" },
+                { id: "CUSTOM", label: "⚙️ Custom Window", sub: "Set Specific AM/PM Hours" },
+              ].map((opt) => {
+                const isSelected = timePreference === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setTimePreference(opt.id)}
+                    className={`p-2.5 rounded-xl text-left transition-all cursor-pointer border flex flex-col justify-between gap-1 ${
+                      isSelected
+                        ? "bg-blue-600/20 border-blue-500/80 text-white shadow-sm shadow-blue-500/20 ring-1 ring-blue-500/40"
+                        : "bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    <span className="font-bold text-xs flex items-center justify-between">
+                      <span>{opt.label}</span>
+                      {isSelected && <span className="text-blue-400 font-mono text-[10px]">●</span>}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">{opt.sub}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Custom 12-Hour Range Selector */}
+            {timePreference === "CUSTOM" && (
+              <div className="p-3.5 rounded-xl bg-slate-900/90 border border-blue-500/40 space-y-3 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-blue-300">
+                    Custom 12-Hour AM/PM Window:
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950 text-blue-200 border border-blue-800">
+                    {customStartTime} to {customEndTime}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <span className="text-[10px] text-slate-400 block mb-1">Start Time:</span>
+                    <label className="text-[10px] text-slate-400 block mb-1 font-mono">Earliest Start:</label>
                     <select
                       value={customStartTime}
                       onChange={(e) => setCustomStartTime(e.target.value)}
-                      className="w-full text-xs bg-slate-900 border border-slate-700 rounded-xl p-2 text-white"
+                      className="w-full text-xs bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono"
                     >
                       {["08:00 AM", "08:30 AM", "09:00 AM", "10:00 AM", "11:30 AM", "01:00 PM", "01:30 PM", "03:00 PM"].map((t) => (
                         <option key={t} value={t}>{t}</option>
@@ -1673,11 +2027,11 @@ export default function SmartAdvisingRoutineTool() {
                     </select>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block mb-1">End Time:</span>
+                    <label className="text-[10px] text-slate-400 block mb-1 font-mono">Latest End:</label>
                     <select
                       value={customEndTime}
                       onChange={(e) => setCustomEndTime(e.target.value)}
-                      className="w-full text-xs bg-slate-900 border border-slate-700 rounded-xl p-2 text-white"
+                      className="w-full text-xs bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono"
                     >
                       {["11:30 AM", "01:00 PM", "01:30 PM", "02:50 PM", "04:30 PM", "06:00 PM", "07:00 PM"].map((t) => (
                         <option key={t} value={t}>{t}</option>
@@ -1687,177 +2041,87 @@ export default function SmartAdvisingRoutineTool() {
                 </div>
               </div>
             )}
-            <p className="text-[11px] text-slate-400">
-              {timePreference === "ANY"
-                ? "Flexible across all SEU slots: 08:30 AM, 10:00 AM, 11:30 AM, 01:30 PM, 03:00 PM."
-                : "Solver will heavily boost combinations that fit inside this time window."}
-            </p>
           </div>
 
-          {/* 2. Gap & Schedule Style */}
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-bold text-slate-300 flex items-center justify-between">
-              <span>Gap & Schedule Style</span>
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            </label>
-            <select
-              value={dayPreference}
-              onChange={(e) => setDayPreference(e.target.value as any)}
-              className="w-full text-xs font-bold py-2.5 px-3 rounded-2xl bg-slate-800/80 border border-slate-700 text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-            >
-              <option value="COMPACT_GAPS">🎯 Minimum Gap (Consecutive / Back-to-Back)</option>
-              <option value="MINIMIZE_DAYS">⚡ Minimize Campus Days (Compact 2-3 Days)</option>
-              <option value="ANY">🗓️ Balanced Spread Across Days</option>
-            </select>
-            <p className="text-[11px] text-slate-400">
-              {dayPreference === "COMPACT_GAPS"
-                ? "Option #1 maximizes back-to-back classes with 10-15m room transitions, eliminating multi-hour dead breaks."
-                : "Packs classes tightly into fewer campus days."}
-            </p>
-          </div>
-
-          {/* 3. Target Days */}
-          <div className="space-y-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono font-bold text-slate-300">
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Target Days</span>
-              </span>
-              <div className="flex items-center gap-2">
-                {preferredDays.length < 7 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStrictDayFilter((prev) => !prev);
-                      setStrictDayConflict(null);
-                    }}
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded-full border transition-all cursor-pointer flex items-center gap-1 ${
-                      strictDayFilter
-                        ? "bg-emerald-950/80 text-emerald-300 border-emerald-700/60 font-black shadow-sm shadow-emerald-500/20"
-                        : "bg-amber-950/80 text-amber-300 border-amber-700/60 font-medium"
-                    }`}
-                    title={
-                      strictDayFilter
-                        ? "Strict Filter: Zero classes on unselected days"
-                        : "Flexible Mode: Allow extra days if no clash-free combination exists"
-                    }
-                  >
-                    {strictDayFilter ? (
-                      <>
-                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                        <span>Strict Filter</span>
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="w-3 h-3 text-amber-400" />
-                        <span>Flexible</span>
-                      </>
-                    )}
-                  </button>
-                )}
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 font-bold">
-                  {preferredDays.length === 7
-                    ? "All 7 Days (Flexible)"
-                    : `${preferredDays.length} / 7 Days Active`}
+          {/* Column B: Gap & Break Style (4 Interactive Cards) */}
+          <div className="rounded-2xl bg-slate-950/60 border border-slate-800/90 p-4 sm:p-5 space-y-4">
+            <div className="space-y-1 border-b border-slate-800/60 pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                  <h3 className="text-sm font-extrabold text-white">
+                    {language === "bn" ? "ক্লাসের গ্যাপ ও শিডিউল স্টাইল" : "Gap & Break Style"}
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700">
+                  Break Solver
                 </span>
               </div>
+              <p className="text-xs text-slate-400">
+                {language === "bn"
+                  ? "ক্লাসগুলোর মধ্যকার বিরতি ও রুটিনের ধরণ পছন্দ করুন।"
+                  : "Choose how waiting breaks and daily course density are optimized."}
+              </p>
             </div>
 
-            {/* Quick SEU Presets */}
-            <div className="flex flex-wrap gap-1.5">
+            {/* 4 Rich Interactive Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
-                { label: "SUN+TUE", days: ["SUN", "TUE"] },
-                { label: "MON+WED", days: ["MON", "WED"] },
-                { label: "THU+SAT", days: ["THU", "SAT"] },
-                { label: "+ FRI (2h)", days: ["FRI"], isToggle: true },
-                { label: "All 7d", days: ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] },
-              ].map((p) => {
-                const isActive = p.isToggle
-                  ? preferredDays.includes("FRI")
-                  : p.days.length === preferredDays.length && p.days.every((d) => preferredDays.includes(d));
-
+                {
+                  id: "COMPACT_GAPS" as const,
+                  title: "⚡ Back-to-Back (Min Gap)",
+                  tag: "Zero Wasted Hours",
+                  badgeColor: "bg-indigo-950 text-indigo-300 border-indigo-700",
+                  desc: "Consecutive classes with 10-15m room changes. Eliminates dead waiting hours on campus.",
+                },
+                {
+                  id: "BALANCED_BREAK" as const,
+                  title: "☕ Healthy Break (30-60m)",
+                  tag: "Lunch & Prayer",
+                  badgeColor: "bg-emerald-950 text-emerald-300 border-emerald-700",
+                  desc: "30-60 min relaxing gap between classes for lunch, prayer, and cafeteria study groups.",
+                },
+                {
+                  id: "MINIMIZE_DAYS" as const,
+                  title: "📅 Maximum Days Off",
+                  tag: "Compact 2-3 Days",
+                  badgeColor: "bg-purple-950 text-purple-300 border-purple-700",
+                  desc: "Cram courses tightly into fewer campus days (2-3 days) to maximize free days every week.",
+                },
+                {
+                  id: "ANY" as const,
+                  title: "🧘 Balanced Spread",
+                  tag: "Relaxed Pace",
+                  badgeColor: "bg-blue-950 text-blue-300 border-blue-700",
+                  desc: "Even distribution (1-2 classes per day) across active days, avoiding heavy 4-class fatigue.",
+                },
+              ].map((style) => {
+                const isSelected = dayPreference === style.id;
                 return (
                   <button
-                    key={p.label}
+                    key={style.id}
                     type="button"
-                    onClick={() => {
-                      setStrictDayConflict(null);
-                      if (p.isToggle) {
-                        if (preferredDays.includes("FRI")) {
-                          if (preferredDays.length > 1) {
-                            setPreferredDays(preferredDays.filter((d) => d !== "FRI"));
-                          }
-                        } else {
-                          setPreferredDays((prev) => Array.from(new Set([...prev, "FRI"])));
-                        }
-                      } else {
-                        setPreferredDays(p.days);
-                      }
-                    }}
-                    className={`px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold transition-all cursor-pointer border ${
-                      isActive
-                        ? "bg-indigo-600 text-white border-indigo-400 shadow-sm shadow-indigo-500/20"
-                        : "bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border-slate-700"
+                    onClick={() => setDayPreference(style.id)}
+                    className={`p-3.5 rounded-2xl text-left transition-all cursor-pointer border flex flex-col justify-between gap-2.5 ${
+                      isSelected
+                        ? "bg-gradient-to-br from-indigo-900/30 to-purple-900/20 border-indigo-500 text-white shadow-md shadow-indigo-500/20 ring-1 ring-indigo-500/40"
+                        : "bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-800 hover:border-slate-700"
                     }`}
                   >
-                    {p.label}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-extrabold text-xs text-white">{style.title}</span>
+                        {isSelected && <span className="text-indigo-400 font-mono text-[10px]">● Active</span>}
+                      </div>
+                      <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border inline-block ${style.badgeColor}`}>
+                        {style.tag}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">{style.desc}</p>
                   </button>
                 );
               })}
             </div>
-
-            {/* Individual Day Cards Grid */}
-            <div className="grid grid-cols-7 gap-1.5 pt-0.5">
-              {WEEK_DAYS.map((day) => {
-                const active = preferredDays.includes(day);
-                const isFriday = day === "FRI";
-                return (
-                  <button
-                    key={day}
-                    type="button"
-                    onClick={() => {
-                      setStrictDayConflict(null);
-                      if (active) {
-                        if (preferredDays.length <= 1) {
-                          toast.error("Please keep at least 1 day selected.");
-                          return;
-                        }
-                        setPreferredDays(preferredDays.filter((d) => d !== day));
-                      } else {
-                        setPreferredDays([...preferredDays, day]);
-                      }
-                    }}
-                    className={`py-2 px-1 rounded-xl text-center transition-all cursor-pointer border flex flex-col items-center justify-center gap-0.5 ${
-                      active
-                        ? "bg-gradient-to-b from-indigo-600 to-indigo-700 text-white border-indigo-400/90 shadow-md shadow-indigo-500/25 ring-1 ring-indigo-400"
-                        : "bg-slate-800/70 text-slate-400 border-slate-700/80 hover:bg-slate-800 hover:text-slate-200"
-                    }`}
-                  >
-                    <span className="text-[11px] font-mono font-black">{day}</span>
-                    <span className={`text-[8px] font-sans font-bold leading-none ${active ? "text-indigo-200" : "text-slate-500"}`}>
-                      {isFriday ? "2h" : active ? "✓" : "off"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <p className="text-[10px] text-slate-400 leading-relaxed pt-0.5">
-              {strictDayFilter && preferredDays.length < 7 ? (
-                <span className="text-emerald-400 font-medium flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0 inline" />
-                  {language === "bn"
-                    ? "কঠোর ফিল্টার সক্রিয়: অনির্বাচিত কোনো বারে ক্লাস থাকবে না। ১০০% নির্বাচিত দিনগুলোতেই রুটিন সীমাবদ্ধ থাকবে।"
-                    : "Strict Filter Active: Zero classes on unselected days guaranteed. Routines will strictly fit your selected days only."}
-                </span>
-              ) : (
-                <span>
-                  {language === "bn"
-                    ? "💡 নির্বাচিত দিনগুলোতে ক্লাস থাকা রুটিনগুলো ১০০% প্রায়োরিটি নিয়ে সবার উপরে রাংক করবে। অনির্বাচিত দিনগুলোকে অফ-ডে রাখা হবে।"
-                    : "💡 Routines fitting within your selected days rank #1. Unselected days are treated as off-campus days."}
-                </span>
-              )}
-            </p>
           </div>
         </div>
 
