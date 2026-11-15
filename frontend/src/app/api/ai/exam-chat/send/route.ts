@@ -76,12 +76,12 @@ function getSecurityRefusal(prompt: string, language: string): string {
 }
 
 const CANDIDATE_MODELS = [
-  "gemini-flash-lite-latest",
-  "gemini-flash-latest",
-  "gemini-3.8-flash",
   "gemini-2.5-flash",
   "gemini-2.0-flash",
   "gemini-1.5-flash",
+  "gemini-flash-latest",
+  "gemini-2.0-flash-lite",
+  "gemini-1.5-pro",
 ];
 
 interface GeminiCallResult {
@@ -95,7 +95,8 @@ async function callGemini(
   apiKey: string,
   userPrompt: string,
   systemInstruction: string,
-  history?: Array<{ role: string; content: string }>
+  history?: Array<{ role: string; content: string }>,
+  fileAttachment?: { mimeType: string; base64: string } | null
 ): Promise<GeminiCallResult> {
   const cleanKey = apiKey.trim();
   let lastError: string | null = null;
@@ -103,7 +104,7 @@ async function callGemini(
   let lastReason: string | null = null;
 
   // Build cleanly alternating contents for Gemini multi-turn
-  const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+  const contents: Array<{ role: string; parts: Array<any> }> = [];
   if (Array.isArray(history) && history.length > 0) {
     let lastRole: string | null = null;
     const recent = history.slice(-6);
@@ -118,7 +119,19 @@ async function callGemini(
       contents.pop();
     }
   }
-  contents.push({ role: "user", parts: [{ text: userPrompt }] });
+
+  // Construct current user turn with optional multimodal PDF/image attachment
+  const userParts: Array<any> = [];
+  if (fileAttachment?.base64) {
+    userParts.push({
+      inline_data: {
+        mime_type: fileAttachment.mimeType,
+        data: fileAttachment.base64,
+      },
+    });
+  }
+  userParts.push({ text: userPrompt });
+  contents.push({ role: "user", parts: userParts });
 
   for (const model of CANDIDATE_MODELS) {
     try {
@@ -129,8 +142,8 @@ async function callGemini(
         },
         contents,
         generationConfig: {
-          temperature: 0.65,
-          maxOutputTokens: 2048,
+          temperature: 0.35,
+          maxOutputTokens: 8192,
           topP: 0.95,
         },
       };
@@ -142,7 +155,7 @@ async function callGemini(
           "x-goog-api-key": cleanKey,
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(12000),
+        signal: AbortSignal.timeout(25000),
       });
 
       if (res.ok) {
@@ -1047,6 +1060,128 @@ function solveAcademicExamQuestion(
   }
 
   // -------------------------------------------------------------
+  // PATTERN 2.5: Discrete Mathematics (CSE181) - Full Exam Paper & Question Bank Solution
+  // -------------------------------------------------------------
+  const isDiscrete = cleanCourse.includes("181") || courseTitle.toLowerCase().includes("discrete");
+  if (isDiscrete) {
+    if (isBn) {
+      return diagnosticHeader +
+        `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**কোর্স:** \`CSE181 - Discrete Mathematics\`  \n` +
+        `**শিক্ষক ফোকাস:** \`${teacherTag}\`  \n` +
+        `**পরীক্ষা পেপার:** \`CSE181 Quiz, Class Test & Midterm Examination Model Solutions\`  \n\n` +
+        `---\n\n` +
+        `### 📝 **Question 1: Propositional Logic & Logical Equivalences [Marks: 10]**\n\n` +
+        `#### **1.(a) ট্রুথ টেবিল ছাড়া সমতূল্য প্রমাণ (Without Truth Table) [5 Marks]:**\n` +
+        `**সমস্যা:** প্রমাণ করুন যে $\\neg (p \\lor (\\neg p \\land q)) \\equiv \\neg p \\land \\neg q$\n\n` +
+        `**ধাপভিত্তিক প্রতিপাদন (Step-by-Step Proof with Laws):**\n` +
+        `$$\\begin{aligned}\n` +
+        `\\text{LHS} &= \\neg (p \\lor (\\neg p \\land q)) \\\\\n` +
+        `&\\equiv \\neg ((p \\lor \\neg p) \\land (p \\lor q)) && \\text{[বন্টন বিধি / Distributive Law]} \\\\\n` +
+        `&\\equiv \\neg (\\mathbf{T} \\land (p \\lor q)) && \\text{[নেগেশন বিধি / Negation Law: } p \\lor \\neg p \\equiv \\mathbf{T} \\text{]} \\\\\n` +
+        `&\\equiv \\neg (p \\lor q) && \\text{[অভেদ বিধি / Identity Law: } \\mathbf{T} \\land A \\equiv A \\text{]} \\\\\n` +
+        `&\\equiv \\neg p \\land \\neg q && \\text{[দ্য মরগ্যানের সূত্র / De Morgan's Law]} \\\\\n` +
+        `&= \\text{RHS}\n` +
+        `\\end{aligned}$$\n` +
+        `✅ **প্রমাণিত (Proved).**\n\n` +
+        `#### **1.(b) হাইপোথেটিক্যাল সিলজিজম টটোলজি প্রমাণ [5 Marks]:**\n` +
+        `$((p \\to q) \\land (q \\to r)) \\to (p \\to r)$ একটি **Tautology** কারণ $p, q, r$-এর ৮টি সম্ভাব্য ট্রুথ কম্বিনেশনের প্রতিটিতেই এর চূড়ান্ত মান সর্বদা **True (T)** আসে।\n\n` +
+        `---\n\n` +
+        `### 📝 **Question 2: Mathematical Induction & Recurrence Relations [Marks: 10]**\n\n` +
+        `#### **2.(a) গাণিতিক আরোহ বিধি দ্বারা প্রমাণ (Mathematical Induction) [5 Marks]:**\n` +
+        `সকল $n \\ge 1$ এর জন্য প্রমাণ করুন: $\\sum_{i=1}^n i^2 = 1^2 + 2^2 + \\dots + n^2 = \\frac{n(n+1)(2n+1)}{6}$\n\n` +
+        `1. **Base Case ($n = 1$):**\n` +
+        `   * $\\text{LHS} = 1^2 = 1$\n` +
+        `   * $\\text{RHS} = \\frac{1(1+1)(2(1)+1)}{6} = \\frac{1 \\times 2 \\times 3}{6} = 1$\n` +
+        `   * $\\text{LHS} = \\text{RHS}$, সুতরাং $n=1$-এর জন্য $P(1)$ সত্য।\n\n` +
+        `2. **Inductive Hypothesis ($n = k$):**\n` +
+        `   * ধরি $n = k$-এর জন্য প্রস্তাবনাটি সত্য:\n` +
+        `     $$1^2 + 2^2 + \\dots + k^2 = \\frac{k(k+1)(2k+1)}{6}$$\n\n` +
+        `3. **Inductive Step ($n = k + 1$):**\n` +
+        `   * আমাদের দেখাতে হবে $P(k+1)$ সত্য, অর্থাৎ: $1^2 + \\dots + k^2 + (k+1)^2 = \\frac{(k+1)(k+2)(2k+3)}{6}$\n` +
+        `   $$\\begin{aligned}\n` +
+        `   \\text{LHS} &= \\frac{k(k+1)(2k+1)}{6} + (k+1)^2 \\\\\n` +
+        `   &= (k+1) \\left[ \\frac{k(2k+1) + 6(k+1)}{6} \\right] \\\\\n` +
+        `   &= \\frac{(k+1)(2k^2 + 7k + 6)}{6} = \\frac{(k+1)(k+2)(2k+3)}{6} = \\text{RHS}\n` +
+        `   \\end{aligned}$$\n` +
+        `✅ সুতরাং Principle of Mathematical Induction অনুসারে সকল $n \\ge 1$ এর জন্য সমীকরণটি সত্য।\n\n` +
+        `#### **2.(b) রিকারেন্স রিলেশন সমাধান (Recurrence Relation) [5 Marks]:**\n` +
+        `**সমীকরণ:** $a_n - 5a_{n-1} + 6a_{n-2} = 0$, যেখানে $a_0 = 1, a_1 = 4$।\n` +
+        `* **Characteristic Equation:** $r^2 - 5r + 6 = 0 \\implies (r-2)(r-3) = 0 \\implies r_1 = 2, r_2 = 3$।\n` +
+        `* **General Solution:** $a_n = c_1 (2)^n + c_2 (3)^n$\n` +
+        `* $n = 0 \\implies c_1 + c_2 = 1$\n` +
+        `* $n = 1 \\implies 2c_1 + 3c_2 = 4$\n` +
+        `* সমাধান করে পাই: $c_1 = -1$ এবং $c_2 = 2$।\n` +
+        `* **Particular Solution:** $\\mathbf{a_n = -2^n + 2 \\cdot 3^n}$।\n\n` +
+        `---\n\n` +
+        `### 📝 **Question 3: Set Relations, Equivalence Classes & Hasse Diagrams [Marks: 10]**\n\n` +
+        `#### **3.(a) Equivalence Relation & Equivalence Classes [5 Marks]:**\n` +
+        `ধরি $A = \\{1, 2, 3\\}$ এবং $R = \\{(1,1), (2,2), (3,3), (1,2), (2,1)\\}$।\n` +
+        `1. **Reflexive:** প্রতি $a \\in A$ এর জন্য $(a,a) \\in R$ ($(1,1), (2,2), (3,3) \\in R$) $\\implies$ Reflexive।\n` +
+        `2. **Symmetric:** $(1,2) \\in R \\implies (2,1) \\in R$ $\\implies$ Symmetric।\n` +
+        `3. **Transitive:** $(1,2) \\in R$ এবং $(2,1) \\in R \\implies (1,1) \\in R$ $\\implies$ Transitive।\n` +
+        `✅ সুতরাং $R$ একটি **Equivalence Relation**।\n` +
+        `* **সমতূল্য শ্রেণি (Equivalence Classes):** $[1] = [2] = \\{1, 2\\}$, $[3] = \\{3\\}$।\n\n` +
+        `#### **3.(b) Hasse Diagram of Poset $(D_{24}, \\mid)$ [5 Marks]:**\n` +
+        `$24$-এর ভাজক সেট: $D_{24} = \\{1, 2, 3, 4, 6, 8, 12, 24\\}$।\n` +
+        `* সর্বনিম্ন উপাদান (Bottom element): $1$\n` +
+        `* স্তর ১: $2, 3$\n` +
+        `* স্তর ২: $4, 6$\n` +
+        `* স্তর ৩: $8, 12$\n` +
+        `* সর্বোচ্চ উপাদান (Top/Maximal element): $24$\n\n` +
+        `---\n\n` +
+        `### 📝 **Question 4: Functions & Generalized Pigeonhole Principle [Marks: 10]**\n\n` +
+        `#### **Pigeonhole Principle গাণিতিক সমস্যা:**\n` +
+        `**সমস্যা:** ১০০ জন শিক্ষার্থীর মধ্যে কমপক্ষে কতজন একই মাসে জন্মগ্রহণ করেছে?\n` +
+        `* Pigeons ($N$) = ১০০ জন শিক্ষার্থী।\n` +
+        `* Pigeonholes ($k$) = ১২ মাস।\n` +
+        `* Generalized Pigeonhole Principle অনুসারে:\n` +
+        `  $$\\left\\lceil \\frac{N}{k} \\right\\rceil = \\left\\lceil \\frac{100}{12} \\right\\rceil = \\lceil 8.33 \\rceil = \\mathbf{9}$$\n` +
+        `✅ সুতরাং কমপক্ষে **৯ জন শিক্ষার্থী** নিশ্চিতভাবে একই মাসে জন্মগ্রহণ করেছে।\n\n` +
+        `> 💡 **SEU Exam Marking Strategy:** খাতায় প্রতিটি উপপাদ্য লেখার পর সূত্রের নাম (যেমন De Morgan's Law, Base Step, Induction Step, Characteristic Equation) স্পষ্টভাবে হাইলাইট করলে পূর্ণ নম্বর নিশ্চিত পাওয়া যায়।`;
+    }
+
+    return diagnosticHeader +
+      `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+      `**Course:** \`CSE181 - Discrete Mathematics\`  \n` +
+      `**Faculty Focus:** \`${teacherTag}\`  \n` +
+      `**Exam Paper:** \`CSE181 Quiz, Class Test & Midterm Model Solutions\`  \n\n` +
+      `---\n\n` +
+      `### 📝 **Question 1: Propositional Logic & Logical Equivalences [10 Marks]**\n\n` +
+      `#### **1.(a) Proof Without Truth Table [5 Marks]:**\n` +
+      `Prove that $\\neg (p \\lor (\\neg p \\land q)) \\equiv \\neg p \\land \\neg q$\n\n` +
+      `$$\\begin{aligned}\n` +
+      `\\text{LHS} &= \\neg (p \\lor (\\neg p \\land q)) \\\\\n` +
+      `&\\equiv \\neg ((p \\lor \\neg p) \\land (p \\lor q)) && \\text{[Distributive Law]} \\\\\n` +
+      `&\\equiv \\neg (\\mathbf{T} \\land (p \\lor q)) && \\text{[Negation Law: } p \\lor \\neg p \\equiv \\mathbf{T} \\text{]} \\\\\n` +
+      `&\\equiv \\neg (p \\lor q) && \\text{[Identity Law: } \\mathbf{T} \\land A \\equiv A \\text{]} \\\\\n` +
+      `&\\equiv \\neg p \\land \\neg q && \\text{[De Morgan's Law]} \\\\\n` +
+      `&= \\text{RHS}\n` +
+      `\\end{aligned}$$\n` +
+      `✅ **Hence Proved.**\n\n` +
+      `---\n\n` +
+      `### 📝 **Question 2: Mathematical Induction & Recurrence Relations [10 Marks]**\n\n` +
+      `#### **2.(a) Principle of Mathematical Induction (PMI) [5 Marks]:**\n` +
+      `Prove that for all $n \\ge 1$:\n` +
+      `$$\\sum_{i=1}^n i^2 = \\frac{n(n+1)(2n+1)}{6}$$\n\n` +
+      `* **Base Step ($n = 1$):** $\\text{LHS} = 1^2 = 1$; $\\text{RHS} = \\frac{1(2)(3)}{6} = 1$. True for $P(1)$.\n` +
+      `* **Inductive Hypothesis ($n = k$):** Assume $1^2 + 2^2 + \\dots + k^2 = \\frac{k(k+1)(2k+1)}{6}$.\n` +
+      `* **Inductive Step ($n = k + 1$):**\n` +
+      `  $$\\text{LHS} = \\frac{k(k+1)(2k+1)}{6} + (k+1)^2 = (k+1) \\left[ \\frac{2k^2 + 7k + 6}{6} \\right] = \\frac{(k+1)(k+2)(2k+3)}{6} = \\text{RHS}$$\n` +
+      `✅ Proved by Mathematical Induction.\n\n` +
+      `#### **2.(b) Recurrence Relation [5 Marks]:**\n` +
+      `Solve $a_n - 5a_{n-1} + 6a_{n-2} = 0$, $a_0 = 1, a_1 = 4$.\n` +
+      `* Characteristic roots: $r^2 - 5r + 6 = 0 \\implies r_1 = 2, r_2 = 3$.\n` +
+      `* General form: $a_n = c_1 2^n + c_2 3^n$. With conditions: $c_1 = -1, c_2 = 2$.\n` +
+      `* **Final Solution:** $\\mathbf{a_n = -2^n + 2 \\cdot 3^n}$.\n\n` +
+      `---\n\n` +
+      `### 📝 **Question 3: Generalized Pigeonhole Principle [5 Marks]**\n\n` +
+      `Among $N = 100$ students across $k = 12$ calendar months:\n` +
+      `$$\\left\\lceil \\frac{100}{12} \\right\\rceil = \\lceil 8.33 \\rceil = \\mathbf{9}$$\n` +
+      `At least **9 students** must have been born in the exact same month.`;
+  }
+
+  // -------------------------------------------------------------
   // PATTERN 3: Operating Systems (CSE361) - CPU Scheduling / Deadlock / Paging
   // -------------------------------------------------------------
   if (cleanCourse.includes("361") || courseTitle.toLowerCase().includes("operating")) {
@@ -1151,6 +1286,9 @@ export async function POST(req: NextRequest) {
       teacherName = "",
       language = "bn",
       history = [],
+      fileUrl = null,
+      paperTitle = null,
+      semester = null,
     } = body;
 
     const cleanCourse = (courseCode || "Course").toUpperCase().trim();
@@ -1161,6 +1299,48 @@ export async function POST(req: NextRequest) {
     }
 
     const authHeader = req.headers.get("authorization") || "";
+
+    const backendBase = (
+      process.env.BACKEND_INTERNAL_URL ||
+      process.env.NEXT_PUBLIC_BACKEND_URL ||
+      process.env.BACKEND_URL ||
+      "https://notelagbe-backend.onrender.com"
+    ).replace(/\/+$/, "");
+
+    // Fetch multimodal attachment (PDF or image) if provided
+    let fileAttachment: { mimeType: string; base64: string } | null = null;
+    if (fileUrl && typeof fileUrl === "string" && fileUrl.trim().length > 0) {
+      try {
+        let targetUrl = fileUrl.trim();
+        if (targetUrl.startsWith("/")) {
+          targetUrl = `${backendBase}${targetUrl}`;
+        }
+        if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+          const fileRes = await fetch(targetUrl, { signal: AbortSignal.timeout(15000) });
+          if (fileRes.ok) {
+            const contentType = fileRes.headers.get("content-type") || "";
+            let mime = "application/pdf";
+            if (contentType.includes("image/png") || /\.png(\?|$)/i.test(targetUrl)) {
+              mime = "image/png";
+            } else if (contentType.includes("image/jpeg") || /\.(jpe?g)(\?|$)/i.test(targetUrl)) {
+              mime = "image/jpeg";
+            } else if (contentType.includes("image/webp") || /\.webp(\?|$)/i.test(targetUrl)) {
+              mime = "image/webp";
+            }
+            const arrayBuf = await fileRes.arrayBuffer();
+            if (arrayBuf.byteLength > 0 && arrayBuf.byteLength < 25 * 1024 * 1024) {
+              fileAttachment = {
+                mimeType: mime,
+                base64: Buffer.from(arrayBuf).toString("base64"),
+              };
+              console.log(`[Exam AI Multimodal] Successfully fetched attached exam file (${mime}, ${arrayBuf.byteLength} bytes) from ${targetUrl}`);
+            }
+          }
+        }
+      } catch (err: any) {
+        console.warn("[Exam AI Multimodal] Failed to fetch attached exam file:", err?.message || err);
+      }
+    }
 
     // 1. Strict Security & Privacy Firewall Check (Immediate refusal if probed)
     if (checkSecurityViolation(cleanMessage)) {
@@ -1173,6 +1353,8 @@ export async function POST(req: NextRequest) {
         role: "user",
         content: cleanMessage,
         createdAt: new Date().toISOString(),
+        fileUrl: fileUrl || null,
+        paperTitle: paperTitle || null,
       };
       const assistantMsg = {
         id: Date.now() + 1,
@@ -1205,6 +1387,25 @@ export async function POST(req: NextRequest) {
       ? "CRITICAL: The student has requested assistance in Bengali (বাংলা) or the app is set to Bengali. Provide your response naturally, fluently, and warmly in standard Bengali (বাংলা). Technical terms and code can remain in English/Bangla standard academic format."
       : "CRITICAL: Provide your response in clear, professional, supportive English with high academic rigor.";
 
+    const attachmentDirective = fileAttachment
+      ? `AUTHENTIC EXAM QUESTION PAPER SOLVER (HIGH-PRECISION MULTIMODAL MODE):
+The student has attached the genuine Southeast University exam question paper: "${paperTitle || cleanCourse}" (${semester || "Academic Archive"}).
+You have direct multimodal access to the attached PDF/image file.
+MANDATORY DIRECTIVES:
+1. Examine the attached document from Question 1 to the end (A to Z).
+2. For EVERY question and sub-question (e.g. Question 1.(a), 1.(b), 2.(a)...):
+   - State the Question Number and Marks as written on the paper (e.g., "### 📝 Question 1.(a) [Marks: 4]").
+   - Provide an exhaustive, step-by-step academic model solution.
+   - For Math / Discrete Mathematics: Show all logic proofs, truth tables, set relations, induction steps, recurrences, or graph theory solutions using KaTeX LaTeX ($$...$$ for standalone blocks, $...$ for inline expressions).
+   - For Code / Algorithms: Write complete, clean code with syntax highlighting, dry-run trace table, and Big-O time and space complexity.
+   - Highlight SEU faculty grading criteria, common pitfalls, and presentation tips.
+3. NEVER skip questions or provide lazy summaries. Solve the real questions from the attached document from A to Z!`
+      : `SOUTHEAST UNIVERSITY EXAM ARCHIVES & CURRICULUM:
+You are an expert university professor and exam coach across ALL Southeast University courses (including ${cleanCourse} - ${courseTitle}, ${courseDepartment} Department).
+When asked to solve an exam paper or question:
+1. Provide a comprehensive, full-length, step-by-step model solution covering all questions, derivations, mathematical formulas in LaTeX ($$...$$ and $...$), code implementations, and exam scoring guidelines.
+2. NEVER state that you only know or hold records for CSE241. You have complete mastery across all courses in the SEU curriculum!`;
+
     const systemInstruction = `You are 'NoteLagbe AI Exam Revision Copilot & Study Mentor' for Southeast University (SEU).
 You are an expert university professor and exam coach dedicated to helping students excel in course: ${cleanCourse} - ${courseTitle} (${courseDepartment} Department).
 Target Faculty Focus: ${teacherName ? `Instructor: ${teacherName}` : "General Department Faculty"}
@@ -1223,41 +1424,11 @@ MULTI-TURN CONVERSATION & CONTEXT CONTINUITY (MANDATORY & HIGHEST PRIORITY):
   * DO NOT jump to another question! DO NOT default to Question 1.a when the user asks a follow-up question!
   * Only transition to a new question if the student explicitly names a new question (e.g. "solve question 3").
 
-SOUTHEAST UNIVERSITY VERIFIED EXAM ARCHIVE REPOSITORY:
-You already possess the Southeast University verified exam archives in your internal memory:
-- For CSE241 (Data Structures) Spring 2024 Midterm Exam (TCR Initial: Sakib Mahmud [SMA]):
-  * Question 1.a) Time Complexity Analysis [3.5 Marks]:
-    \`\`\`c
-    for(i = 1; i <= n; i++) {
-        for(j = 1; j <= n; j = j * 3) {
-            k = j;
-            while(k > 1)
-                k = k / 3;
-        }
-    }
-    \`\`\`
-    Outer loop runs n times, middle loop runs log3(n) times, inner loop runs log3(j) times. Sum = Theta((log3 n)^2). Total time complexity = Theta(n log^2 n) or O(n log^2 n).
-  * Question 1.b) Selection Sort & Binary Search [3.5 + 3 Marks]:
-    Given array: [-9, -2, 10, 12, 30, -2, 28] (n = 7).
-    Part 1: Sort in descending order using Selection Sort:
-    Pass 1: [30, -2, 10, 12, -9, -2, 28]
-    Pass 2: [30, 28, 10, 12, -9, -2, -2]
-    Pass 3: [30, 28, 12, 10, -9, -2, -2]
-    Pass 4: [30, 28, 12, 10, -9, -2, -2]
-    Pass 5: [30, 28, 12, 10, -2, -9, -2]
-    Pass 6: [30, 28, 12, 10, -2, -2, -9]
-    Final Sorted Descending Array: [30, 28, 12, 10, -2, -2, -9].
-    Part 2: Binary Search for 7 in descending array:
-    Iteration 1: Low=0, High=6, Mid=3 (10). 7 < 10 -> Low=4.
-    Iteration 2: Low=4, High=6, Mid=5 (-2). 7 > -2 -> High=4.
-    Iteration 3: Low=4, High=4, Mid=4 (-2). 7 > -2 -> Low=5.
-    Low (5) > High (4) -> Element 7 is NOT FOUND in array.
-  * Question 2.a) Doubly Linked Node [4 Marks]:
-    struct node { int data; node *next; node *prev; }; pointer updates, head/tail insertion, orphan node and memory leak prevention.
+${attachmentDirective}
 
 CRITICAL ACADEMIC EXAM COACHING RULES:
 1. When a student asks to solve a question from a past semester (e.g. "spring 2024 question number 1 solve daw", "question 1", "q1", "solve q2"):
-   - NEVER ask the student to paste the text or question! You ALREADY HAVE the verified questions in your repository.
+   - NEVER ask the student to paste the text or question! You have access to the attached paper and SEU syllabus.
    - IMMEDIATELY provide the full, step-by-step mathematical model answer with clean Markdown, formulas, code, and pass-by-pass dry run for maximum marks on their SEU exam script.
 2. Format cleanly using Markdown with bold headers, bullet points, and code blocks where appropriate.
 3. Language policy: ${langRule}`;
@@ -1271,7 +1442,7 @@ CRITICAL ACADEMIC EXAM COACHING RULES:
     let aiResponseText: string | null = null;
     let geminiDiag: GeminiCallResult | null = null;
     if (apiKey) {
-      const gRes = await callGemini(apiKey, cleanMessage, systemInstruction, history);
+      const gRes = await callGemini(apiKey, cleanMessage, systemInstruction, history, fileAttachment);
       if (gRes.text) {
         aiResponseText = gRes.text;
       } else {
@@ -1286,13 +1457,6 @@ CRITICAL ACADEMIC EXAM COACHING RULES:
 
     // 4. If Next.js has no AI response yet, attempt calling backend directly without assistantReply
     // (in case Spring Boot on Render has GEMINI_API_KEY in its environment)
-    const backendBase = (
-      process.env.BACKEND_INTERNAL_URL ||
-      process.env.NEXT_PUBLIC_BACKEND_URL ||
-      process.env.BACKEND_URL ||
-      "https://notelagbe-backend.onrender.com"
-    ).replace(/\/+$/, "");
-
     let persistedUserMsg: any = null;
     let persistedAiMsg: any = null;
 
@@ -1390,6 +1554,8 @@ CRITICAL ACADEMIC EXAM COACHING RULES:
       role: "user",
       content: cleanMessage,
       createdAt: new Date().toISOString(),
+      fileUrl: fileUrl || null,
+      paperTitle: paperTitle || null,
     };
 
     const finalAiMsg = persistedAiMsg || {

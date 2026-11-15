@@ -253,6 +253,11 @@ export default function CheatSheetModal({
 
   // Question Linker States
   const [isQuestionLinkerOpen, setIsQuestionLinkerOpen] = useState(false);
+  const [pendingAttachment, setPendingAttachment] = useState<{
+    fileUrl?: string;
+    paperTitle?: string;
+    semester?: string;
+  } | null>(null);
 
   // Clear Chat Confirmation Modal States
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
@@ -344,7 +349,10 @@ export default function CheatSheetModal({
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const handleSendMessage = async (textToSend?: string) => {
+  const handleSendMessage = async (
+    textToSend?: string,
+    paperAttachment?: { fileUrl?: string; paperTitle?: string; semester?: string } | null
+  ) => {
     const text = (textToSend || inputMessage).trim();
     if (!text || sending) return;
 
@@ -357,6 +365,8 @@ export default function CheatSheetModal({
       return;
     }
 
+    const activeAttachment = paperAttachment !== undefined ? paperAttachment : pendingAttachment;
+
     const optimisticUserMsg = {
       id: Date.now(),
       role: "user",
@@ -364,10 +374,13 @@ export default function CheatSheetModal({
       createdAt: new Date().toISOString(),
       courseCode,
       teacherId: selectedTeacherId,
+      fileUrl: activeAttachment?.fileUrl || null,
+      paperTitle: activeAttachment?.paperTitle || null,
     };
 
     setMessages((prev) => [...prev, optimisticUserMsg]);
     setInputMessage("");
+    setPendingAttachment(null);
     setSending(true);
 
     // Build conversation history to send (excluding the current optimistic message)
@@ -386,6 +399,9 @@ export default function CheatSheetModal({
         teacherId: selectedTeacherId,
         language,
         history: conversationHistory,
+        fileUrl: activeAttachment?.fileUrl || null,
+        paperTitle: activeAttachment?.paperTitle || null,
+        semester: activeAttachment?.semester || null,
       });
 
       if (res && res.assistantMessage) {
@@ -1067,7 +1083,13 @@ export default function CheatSheetModal({
                         {allLinkedItems.slice(0, 4).map((paper) => (
                           <button
                             key={paper.id}
-                            onClick={() => handleSendMessage(paper.prompt)}
+                            onClick={() =>
+                              handleSendMessage(paper.prompt, {
+                                fileUrl: paper.fileUrl,
+                                paperTitle: paper.title,
+                                semester: paper.semester,
+                              })
+                            }
                             disabled={sending}
                             className="p-2.5 rounded-2xl bg-gradient-to-r from-blue-50/70 to-indigo-50/70 dark:from-slate-900 dark:to-indigo-950/40 hover:from-blue-100 hover:to-indigo-100 dark:hover:from-slate-800 dark:hover:to-indigo-900/60 border border-blue-200/60 dark:border-indigo-900/40 text-left text-xs font-semibold text-slate-800 dark:text-slate-200 transition-all shadow-sm flex items-center justify-between group cursor-pointer"
                           >
@@ -1133,7 +1155,22 @@ export default function CheatSheetModal({
                             )}
 
                             {isUser ? (
-                              <p className="whitespace-pre-wrap">{msg.content}</p>
+                              <div>
+                                {(msg.paperTitle || msg.fileUrl) && (
+                                  <div className="flex items-center gap-1.5 px-2.5 py-1 mb-2 rounded-xl bg-white/20 text-white text-[10px] font-semibold border border-white/20">
+                                    <FileText className="w-3 h-3 text-white shrink-0" />
+                                    <span className="truncate max-w-[240px] sm:max-w-md">
+                                      {language === "bn" ? "সংযুক্ত প্রশ্নপত্র:" : "Attached Paper:"} {msg.paperTitle || "Exam Paper"}
+                                    </span>
+                                    {msg.fileUrl && (
+                                      <span className="ml-auto px-1.5 py-0.2 rounded bg-black/30 text-[9px] font-mono font-bold">
+                                        PDF
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                <p className="whitespace-pre-wrap">{msg.content}</p>
+                              </div>
                             ) : (
                               <div className="space-y-1">{renderFormattedContent(msg.content)}</div>
                             )}
@@ -1173,8 +1210,8 @@ export default function CheatSheetModal({
                         </div>
                         <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                           {language === "bn"
-                            ? "এআই পরীক্ষার ফাইল অ্যানালাইসিস করছে..."
-                            : "Analyzing exam papers and notes..."}
+                            ? "জেমিনাই এআই পরীক্ষার প্রশ্নপত্র ও নোটস সম্পূর্ণভাবে অ্যানালাইসিস করছে..."
+                            : "Gemini AI is analyzing the full exam question paper & materials..."}
                         </span>
                       </div>
                     </div>
@@ -1278,7 +1315,11 @@ export default function CheatSheetModal({
                             key={paper.id}
                             className="p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/80 dark:bg-slate-800/80 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 hover:border-blue-500/80 transition-all flex flex-col justify-between gap-2.5 group cursor-pointer shadow-sm"
                             onClick={() => {
-                              handleSendMessage(paper.prompt);
+                              handleSendMessage(paper.prompt, {
+                                fileUrl: paper.fileUrl,
+                                paperTitle: paper.title,
+                                semester: paper.semester,
+                              });
                               setIsQuestionLinkerOpen(false);
                             }}
                           >
@@ -1323,6 +1364,11 @@ export default function CheatSheetModal({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setInputMessage(paper.prompt);
+                                    setPendingAttachment({
+                                      fileUrl: paper.fileUrl,
+                                      paperTitle: paper.title,
+                                      semester: paper.semester,
+                                    });
                                     setIsQuestionLinkerOpen(false);
                                   }}
                                   className="p-1 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-700 transition-colors"
@@ -1336,7 +1382,11 @@ export default function CheatSheetModal({
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleSendMessage(paper.prompt);
+                                  handleSendMessage(paper.prompt, {
+                                    fileUrl: paper.fileUrl,
+                                    paperTitle: paper.title,
+                                    semester: paper.semester,
+                                  });
                                   setIsQuestionLinkerOpen(false);
                                 }}
                                 disabled={sending}
@@ -1392,6 +1442,27 @@ export default function CheatSheetModal({
 
             {/* Message Input Form */}
             <div className="p-3 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+              {pendingAttachment && (
+                <div className="flex items-center gap-2 px-3 py-1.5 mb-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900/60 text-blue-700 dark:text-blue-300 text-xs font-semibold w-fit animate-in fade-in">
+                  <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span className="truncate max-w-[240px] sm:max-w-md">
+                    {language === "bn" ? "সংযুক্ত প্রশ্নপত্র:" : "Attached Exam Paper:"} {pendingAttachment.paperTitle || "Past Paper"}
+                  </span>
+                  {pendingAttachment.fileUrl && (
+                    <span className="px-1.5 py-0.2 rounded bg-blue-600 text-white text-[9px] font-mono font-bold">
+                      PDF
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setPendingAttachment(null)}
+                    className="p-0.5 rounded-full hover:bg-blue-200 dark:hover:bg-blue-900 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer ml-1"
+                    title={language === "bn" ? "রিমুভ করুন" : "Remove attachment"}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();

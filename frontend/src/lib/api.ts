@@ -1180,6 +1180,9 @@ export const api = {
       teacherName?: string | null;
       language?: string;
       history?: Array<{ role: string; content: string }>;
+      fileUrl?: string | null;
+      paperTitle?: string | null;
+      semester?: string | null;
     }) => {
       const token = getToken();
       try {
