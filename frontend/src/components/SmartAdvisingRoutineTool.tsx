@@ -240,10 +240,12 @@ export default function SmartAdvisingRoutineTool() {
   const [isCoursesExpanded, setIsCoursesExpanded] = useState<boolean>(false);
   const [expandedCourseSections, setExpandedCourseSections] = useState<string | null>(null);
 
-  // Preferences: Default to ANY (Balanced / Any Time Slot Flexible)
+  // Preferences: Multi-Select Timing Filters & Windows
   const [timePreference, setTimePreference] = useState<string>("ANY");
+  const [avoidEarlyMorning, setAvoidEarlyMorning] = useState<boolean>(false); // Skip 08:00 Lab & 08:30 Theory
+  const [avoidLateEvening, setAvoidLateEvening] = useState<boolean>(false); // Skip after 04:30 PM (Theory & Lab)
   const [customStartTime, setCustomStartTime] = useState<string>("10:00 AM");
-  const [customEndTime, setCustomEndTime] = useState<string>("01:00 PM");
+  const [customEndTime, setCustomEndTime] = useState<string>("02:50 PM");
   const [dayPreference, setDayPreference] = useState<
     "MINIMIZE_DAYS" | "COMPACT_GAPS" | "BALANCED_BREAK" | "ANY"
   >("COMPACT_GAPS");
@@ -544,16 +546,29 @@ export default function SmartAdvisingRoutineTool() {
     // Helper: count how many slots in a section violate the user's requested time window
     const getSectionTimePenalty = (sec: OfferedSectionItem) => {
       if (!sec.slots || sec.slots.length === 0) return 0;
-      return sec.slots.filter((sl) => {
+      let penalty = 0;
+      for (const sl of sec.slots) {
         const sm = sl.startMinutes ?? timeToMinutes(sl.start);
         const em = sl.endMinutes ?? timeToMinutes(sl.end);
-        if (targetStartMin >= 0 && targetEndMin > targetStartMin) {
-          return sm < targetStartMin || em > targetEndMin;
+
+        // 1. Avoid early morning: skip classes before 10:00 AM (08:00 lab, 08:30 theory)
+        if ((avoidEarlyMorning || timePreference === "AVOID_MORNING") && sm < 600) {
+          penalty += 3;
         }
-        if (timePreference === "AVOID_MORNING") return sm < 600;
-        if (timePreference === "AVOID_LATE") return em > 990;
-        return false;
-      }).length;
+
+        // 2. Avoid late evening: skip classes running after 04:30 PM (04:30 - 05:50 theory, 04:30 - 06:30 lab)
+        if ((avoidLateEvening || timePreference === "AVOID_LATE") && (em > 990 || sm >= 990)) {
+          penalty += 3;
+        }
+
+        // 3. Predefined window or custom window
+        if (targetStartMin >= 0 && targetEndMin > targetStartMin) {
+          if (sm < targetStartMin || em > targetEndMin) {
+            penalty += 1;
+          }
+        }
+      }
+      return penalty;
     };
 
     // 1. Prepare candidate sections for each selected course
@@ -570,20 +585,20 @@ export default function SmartAdvisingRoutineTool() {
 
       const prefFacs = facultyPreferences[cCode] || [];
 
-      // Sort candidate sections by time window penalty FIRST, then preferred faculty, then outside days
+      // Sort candidate sections: Preferred Faculty FIRST (High Priority), then Time Penalties, then Days
       const sortCandidates = (list: OfferedSectionItem[]) => {
         return [...list].sort((s1, s2) => {
-          // 1. Time Window Penalty: Sections that fit user's chosen hours come first!
-          const t1 = getSectionTimePenalty(s1);
-          const t2 = getSectionTimePenalty(s2);
-          if (t1 !== t2) return t1 - t2;
-
-          // 2. Preferred Faculty Priority
+          // 1. Preferred Faculty Priority (Highest Priority when selected by user!)
           if (prefFacs.length > 0) {
             const p1 = prefFacs.includes(s1.facultyInitial);
             const p2 = prefFacs.includes(s2.facultyInitial);
             if (p1 !== p2) return p1 ? -1 : 1;
           }
+
+          // 2. Time Window & Multi-Filter Penalty: Sections that fit user's chosen hours come first!
+          const t1 = getSectionTimePenalty(s1);
+          const t2 = getSectionTimePenalty(s2);
+          if (t1 !== t2) return t1 - t2;
 
           // 3. Outside Days Priority (if not in strict mode)
           if (isDayFilterActive) {
@@ -856,19 +871,34 @@ export default function SmartAdvisingRoutineTool() {
 
       let outsideWindowCount = 0;
       let totalSlotsCount = 0;
+      let morningViolationCount = 0;
+      let eveningViolationCount = 0;
+
       combo.forEach((sec) => {
         sec.slots.forEach((slot) => {
           totalSlotsCount++;
           const sm = slot.startMinutes ?? timeToMinutes(slot.start);
           const em = slot.endMinutes ?? timeToMinutes(slot.end);
+
+          let hasViolation = false;
+          // Avoid early morning (08:00 lab, 08:30 theory)
+          if ((avoidEarlyMorning || timePreference === "AVOID_MORNING") && sm < 600) {
+            morningViolationCount++;
+            hasViolation = true;
+          }
+          // Avoid late evening (after 04:30 PM)
+          if ((avoidLateEvening || timePreference === "AVOID_LATE") && (em > 990 || sm >= 990)) {
+            eveningViolationCount++;
+            hasViolation = true;
+          }
+          // Window filter
           if (targetStartMin >= 0 && targetEndMin > targetStartMin) {
             if (sm < targetStartMin || em > targetEndMin) {
-              outsideWindowCount++;
+              hasViolation = true;
             }
-          } else if (timePreference === "AVOID_MORNING") {
-            if (sm < 600) outsideWindowCount++;
-          } else if (timePreference === "AVOID_LATE") {
-            if (em > 990) outsideWindowCount++;
+          }
+          if (hasViolation) {
+            outsideWindowCount++;
           }
         });
       });
@@ -881,21 +911,25 @@ export default function SmartAdvisingRoutineTool() {
           score -= outsideWindowCount * 120;
           highlights.push(`⚠️ ${outsideWindowCount} class(es) outside ${windowLabel}`);
         }
-      } else if (timePreference === "AVOID_MORNING") {
-        if (outsideWindowCount === 0) {
+      }
+      if (avoidEarlyMorning || timePreference === "AVOID_MORNING") {
+        if (morningViolationCount === 0) {
           score += 200;
-          highlights.push("☀️ No Early 08:30 Classes");
+          highlights.push("☀️ No Early 08:00/08:30 Classes");
         } else {
-          score -= outsideWindowCount * 120;
+          score -= morningViolationCount * 150;
         }
-      } else if (timePreference === "AVOID_LATE") {
-        if (outsideWindowCount === 0) {
-          score += 150;
-          highlights.push("🌇 No Late Afternoon Classes");
+      }
+      if (avoidLateEvening || timePreference === "AVOID_LATE") {
+        if (eveningViolationCount === 0) {
+          score += 180;
+          highlights.push("🌇 No Late Afternoon (4:30 PM+) Classes");
         } else {
-          score -= outsideWindowCount * 100;
+          score -= eveningViolationCount * 150;
         }
-      } else if (timePreference === "PREFER_MORNING") {
+      }
+
+      if (timePreference === "PREFER_MORNING") {
         score += morningCount * 15;
         if (morningCount > afternoonCount) highlights.push("🌅 Morning Focused");
       } else if (timePreference === "PREFER_AFTERNOON") {
@@ -912,13 +946,13 @@ export default function SmartAdvisingRoutineTool() {
           targetFacTotal++;
           const idx = pref.indexOf(sec.facultyInitial);
           if (idx === 0) {
-            score += 250; // Top preferred faculty matched!
+            score += 350; // Top preferred faculty matched!
             facMatchCount++;
           } else if (idx > 0) {
-            score += 180; // Alternate preferred faculty matched!
+            score += 220; // Alternate preferred faculty matched!
             facMatchCount++;
           } else {
-            score -= 100; // Did not match preferred faculty when one was requested
+            score -= 150; // Did not match preferred faculty when one was requested
           }
         }
       });
@@ -937,12 +971,11 @@ export default function SmartAdvisingRoutineTool() {
       });
 
       const totalCredits = combo.reduce((sum, s) => sum + s.credits, 0);
-      const matchPercentage = Math.min(100, Math.max(60, Math.round((score / 280) * 100)));
 
       return {
         sections: combo,
         score,
-        matchPercentage,
+        matchPercentage: 100, // Calculated progressively in top10
         rank: 0,
         activeDaysCount: dayCount,
         activeDays,
@@ -957,11 +990,10 @@ export default function SmartAdvisingRoutineTool() {
     });
 
     // Multi-Objective Hierarchy Master Sort:
-    // 1. Outside Days: 0 outside days ALWAYS comes first!
-    // 2. Strict Timing Window Compliance: routines with 0 outside-window classes ALWAYS rank first!
-    // 3. Preferred Faculty Priority: routines with MORE preferred faculty matches rank strictly higher!
+    // 1. Outside Days Strictness (0 outside days ALWAYS comes first!)
+    // 2. Preferred Faculty Priority: routines with MORE preferred faculty matches rank strictly higher!
+    // 3. Strict Timing Window Compliance: routines with 0 outside-window classes ALWAYS rank first!
     // 4. Minimum Dead Gap Priority (Top options guarantee minimal gap!):
-    //    Routines with 0m or 10-15m gap strictly rank in Top 5!
     // 5. Composite score
     scored.sort((a, b) => {
       // 1. Outside Days Strictness (if user selected specific days)
@@ -973,16 +1005,14 @@ export default function SmartAdvisingRoutineTool() {
         }
       }
 
-      // 2. Strict Timing Window Compliance:
-      // When a user selects a timing window (Custom, Prime, Early Morning, Afternoon, Avoid 08:30, etc.),
-      // routines with 0 classes outside that window MUST rank ahead of routines that have outside classes!
-      if (a.outsideWindowCount !== b.outsideWindowCount) {
-        return a.outsideWindowCount - b.outsideWindowCount;
-      }
-
-      // 3. Preferred Faculty Priority:
+      // 2. Preferred Faculty Priority (Highest priority when user starred a favorite teacher!)
       if (a.facultyMatchCount !== b.facultyMatchCount) {
         return b.facultyMatchCount - a.facultyMatchCount; // More preferred faculty first!
+      }
+
+      // 3. Strict Timing Filter Compliance:
+      if (a.outsideWindowCount !== b.outsideWindowCount) {
+        return a.outsideWindowCount - b.outsideWindowCount;
       }
 
       // 4. Minimum Dead Gap Priority (Top options guarantee minimal gap!):
@@ -996,10 +1026,27 @@ export default function SmartAdvisingRoutineTool() {
       return b.score - a.score;
     });
 
-    const top10 = scored.slice(0, 10).map((opt, idx) => ({
-      ...opt,
-      rank: idx + 1,
-    }));
+    const top10 = scored.slice(0, 10).map((opt, idx) => {
+      // Progressive, realistic match percentage:
+      // Option 1 has highest efficiency (e.g. 98% - 100% if 0 gap, 0 time violation)
+      // Subsequent options decline progressively (e.g. 98%, 95%, 92%, 89%, 86%, 83%, 80%, 77%, 74%, 71%)
+      let eff = 98 - idx * 3;
+      if (idx === 0 && opt.totalGapMinutes === 0 && opt.outsideWindowCount === 0) {
+        eff = 100;
+      }
+      if (opt.totalGapMinutes > 30) {
+        eff -= Math.min(6, Math.floor(opt.totalGapMinutes / 30) * 2);
+      }
+      if (opt.outsideWindowCount > 0) {
+        eff -= opt.outsideWindowCount * 4;
+      }
+      const matchPercentage = Math.max(65, Math.min(100, eff));
+      return {
+        ...opt,
+        rank: idx + 1,
+        matchPercentage,
+      };
+    });
 
     setRoutines(top10);
     setSelectedRoutineIndex(0);
@@ -1972,40 +2019,109 @@ export default function SmartAdvisingRoutineTool() {
               </span>
             </div>
 
-            {/* Timing Quick Chips */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
-              {[
-                { id: "ANY", label: "⚡ Any Time (Flexible)", sub: "08:00 AM - 06:30 PM", bnLabel: "⚡ যেকোনো সময় (ফ্লেক্সিবল)", bnSub: "সকাল ৮:০০ - সন্ধ্যা ৬:৩০" },
-                { id: "WINDOW_800_TO_1130", label: "☀️ Early Morning", sub: "08:00 AM - 11:30 AM (Lab)", bnLabel: "☀️ সকালের স্লট", bnSub: "সকাল ৮:০০ - ১১:৩০ (ল্যাব সহ)" },
-                { id: "WINDOW_10_TO_1", label: "🎯 Prime Daytime", sub: "10:00 AM - 01:00 PM", bnLabel: "🎯 প্রাইম ডে-টাইম", bnSub: "সকাল ১০:০০ - দুপুর ১:০০" },
-                { id: "WINDOW_10_TO_3", label: "🌇 Full Daytime", sub: "10:00 AM - 03:00 PM", bnLabel: "🌇 ফুল ডে-টাইম", bnSub: "সকাল ১০:০০ - বিকেল ৩:০০" },
-                { id: "WINDOW_130_TO_430", label: "☕ Afternoon Slot", sub: "01:30 PM - 04:30 PM", bnLabel: "☕ বিকেলের স্লট", bnSub: "দুপুর ১:৩০ - বিকেল ৪:৩০" },
-                { id: "WINDOW_300_TO_630", label: "🌙 Late Afternoon & Lab", sub: "03:00 PM - 06:30 PM", bnLabel: "🌙 লেট আফটারনুন & ল্যাব", bnSub: "বিকেল ৩:০০ - সন্ধ্যা ৬:৩০" },
-                { id: "AVOID_MORNING", label: "🚫 Avoid Early Morning", sub: "No 08:00 / 08:30 AM Classes", bnLabel: "🚫 সকালের ক্লাস বাদ", bnSub: "৮:০০ বা ৮:৩০-এর ক্লাস এড়িয়ে" },
-                { id: "CUSTOM", label: "⚙️ Custom Window", sub: "Set Specific AM/PM Range", bnLabel: "⚙️ কাস্টম রেঞ্জ", bnSub: "নির্দিষ্ট সময় নির্ধারণ করুন" },
-              ].map((opt) => {
-                const isSelected = timePreference === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setTimePreference(opt.id)}
-                    className={`p-2 rounded-xl text-left transition-all cursor-pointer border flex flex-col justify-between gap-0.5 ${
-                      isSelected
-                        ? "bg-blue-600/20 border-blue-500/80 text-white shadow-xs ring-1 ring-blue-500/40"
-                        : "bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-800 hover:border-slate-700"
-                    }`}
-                  >
-                    <span className="font-bold text-xs flex items-center justify-between">
-                      <span>{language === "bn" ? opt.bnLabel : opt.label}</span>
-                      {isSelected && <span className="text-blue-400 font-mono text-[10px]">●</span>}
+            {/* Multi-Select Smart Avoidance Toggles */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">
+                {language === "bn" ? "ক্লাস বর্জন ফিল্টার (মাল্টিপল নির্বাচনযোগ্য):" : "Avoidance Filters (Multi-Selectable):"}
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAvoidEarlyMorning((prev) => !prev)}
+                  className={`p-2 rounded-xl text-left transition-all cursor-pointer border flex items-center justify-between gap-2 ${
+                    avoidEarlyMorning
+                      ? "bg-rose-950/60 border-rose-500/80 text-white shadow-xs ring-1 ring-rose-500/50"
+                      : "bg-slate-900/80 hover:bg-slate-800 text-slate-400 border-slate-800 hover:border-slate-700"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span className="font-bold text-xs flex items-center gap-1.5">
+                      <span>🚫</span>
+                      <span>{language === "bn" ? "সকালের ক্লাস বাদ (৮:০০/৮:৩০)" : "Avoid Early Morning"}</span>
                     </span>
                     <span className="text-[10px] text-slate-400 font-mono">
-                      {language === "bn" ? opt.bnSub : opt.sub}
+                      {language === "bn" ? "০৮:০০ ল্যাব ও ০৮:৩০ থিওরি এড়িয়ে" : "Skip 08:00 Lab & 08:30 Theory"}
                     </span>
-                  </button>
-                );
-              })}
+                  </div>
+                  <span
+                    className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                      avoidEarlyMorning
+                        ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                        : "bg-slate-800 text-slate-500"
+                    }`}
+                  >
+                    {avoidEarlyMorning ? "✓ Active" : "+ Off"}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAvoidLateEvening((prev) => !prev)}
+                  className={`p-2 rounded-xl text-left transition-all cursor-pointer border flex items-center justify-between gap-2 ${
+                    avoidLateEvening
+                      ? "bg-purple-950/60 border-purple-500/80 text-white shadow-xs ring-1 ring-purple-500/50"
+                      : "bg-slate-900/80 hover:bg-slate-800 text-slate-400 border-slate-800 hover:border-slate-700"
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span className="font-bold text-xs flex items-center gap-1.5">
+                      <span>🌙</span>
+                      <span>{language === "bn" ? "বিকেল/সন্ধ্যার ক্লাস বাদ (৪:৩০+)" : "Avoid Late Evening"}</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {language === "bn" ? "০৪:৩০ এর পরের থিওরি ও ল্যাব এড়িয়ে" : "Skip slots running after 04:30 PM"}
+                    </span>
+                  </div>
+                  <span
+                    className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                      avoidLateEvening
+                        ? "bg-purple-500/20 text-purple-300 border border-purple-500/40"
+                        : "bg-slate-800 text-slate-500"
+                    }`}
+                  >
+                    {avoidLateEvening ? "✓ Active" : "+ Off"}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Preferred Window Chips */}
+            <div className="space-y-1.5 pt-1">
+              <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">
+                {language === "bn" ? "পছন্দের দৈনিক উইন্ডো:" : "Preferred Daily Window:"}
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
+                {[
+                  { id: "ANY", label: "⚡ Any Time", sub: "08:00 AM - 06:30 PM" },
+                  { id: "WINDOW_10_TO_1", label: "🎯 Prime", sub: "10:00 AM - 01:00 PM" },
+                  { id: "WINDOW_10_TO_3", label: "🌇 Full Day", sub: "10:00 AM - 03:00 PM" },
+                  { id: "WINDOW_130_TO_430", label: "☕ Afternoon", sub: "01:30 PM - 04:30 PM" },
+                  { id: "WINDOW_800_TO_1130", label: "☀️ Morning Slot", sub: "08:00 AM - 11:30 AM" },
+                  { id: "CUSTOM", label: "⚙️ Custom Window", sub: "Set Specific AM/PM" },
+                ].map((opt) => {
+                  const isSelected = timePreference === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setTimePreference(opt.id)}
+                      className={`p-2 rounded-xl text-left transition-all cursor-pointer border flex flex-col justify-between gap-0.5 ${
+                        isSelected
+                          ? "bg-blue-600/25 border-blue-500 text-white shadow-xs ring-1 ring-blue-500/50"
+                          : "bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      <span className="font-bold text-xs flex items-center justify-between">
+                        <span>{opt.label}</span>
+                        {isSelected && <span className="text-blue-400 font-mono text-[10px]">●</span>}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono truncate">
+                        {opt.sub}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Custom 12-Hour Range Selector (Compact) */}

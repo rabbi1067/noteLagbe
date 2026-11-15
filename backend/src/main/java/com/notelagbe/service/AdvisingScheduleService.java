@@ -441,8 +441,8 @@ public class AdvisingScheduleService {
 
         // Multi-Objective Hierarchy Master Sort:
         // 1. Outside Days: 0 outside days strictly first
-        // 2. Strict Timing Window Compliance: 0 outside-window classes strictly first
-        // 3. Preferred Faculty Priority: routines with more preferred faculty matches rank strictly higher
+        // 2. Preferred Faculty Priority: routines with more preferred faculty matches rank strictly higher
+        // 3. Strict Timing Window Compliance: 0 outside-window classes strictly first
         // 4. Minimum Dead Gap Priority: routines with minimal gap (<=15m) rank first in Top 5
         // 5. Composite score fallback
         scoredList.sort((a, b) -> {
@@ -454,14 +454,14 @@ public class AdvisingScheduleService {
                 }
             }
 
-            // 2. Strict Timing Window Compliance
-            if (a.outsideWindowCount != b.outsideWindowCount) {
-                return Integer.compare(a.outsideWindowCount, b.outsideWindowCount);
-            }
-
-            // 3. Preferred Faculty Priority
+            // 2. Preferred Faculty Priority
             if (a.facultyMatchCount != b.facultyMatchCount) {
                 return Integer.compare(b.facultyMatchCount, a.facultyMatchCount);
+            }
+
+            // 3. Strict Timing Window Compliance
+            if (a.outsideWindowCount != b.outsideWindowCount) {
+                return Integer.compare(a.outsideWindowCount, b.outsideWindowCount);
             }
 
             // 4. Minimum Dead Gap Priority (Top 5 guaranteed minimal waiting gaps)
@@ -473,11 +473,22 @@ public class AdvisingScheduleService {
             return Double.compare(b.score, a.score);
         });
 
-        // Limit top 10 routines and assign rank
+        // Limit top 10 routines and assign rank with realistic progressive percentage
         List<ScoredRoutine> topRoutines = new ArrayList<>();
         for (int i = 0; i < Math.min(10, scoredList.size()); i++) {
             ScoredRoutine sr = scoredList.get(i);
             sr.rank = i + 1;
+            int eff = 98 - i * 3;
+            if (i == 0 && sr.totalGapMinutes == 0 && sr.outsideWindowCount == 0) {
+                eff = 100;
+            }
+            if (sr.totalGapMinutes > 30) {
+                eff -= Math.min(6, (int)(sr.totalGapMinutes / 30) * 2);
+            }
+            if (sr.outsideWindowCount > 0) {
+                eff -= sr.outsideWindowCount * 4;
+            }
+            sr.matchPercentage = Math.max(65, Math.min(100, eff));
             topRoutines.add(sr);
         }
 
