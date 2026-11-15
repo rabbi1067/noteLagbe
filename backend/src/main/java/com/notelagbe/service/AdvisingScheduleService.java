@@ -617,18 +617,18 @@ public class AdvisingScheduleService {
             targetStartMin = 600;
             targetEndMin = 900;
             windowLabel = "10:00 AM - 03:00 PM";
-        } else if ("WINDOW_830_TO_1130".equalsIgnoreCase(timePref)) {
-            targetStartMin = 510;
+        } else if ("WINDOW_800_TO_1130".equalsIgnoreCase(timePref) || "WINDOW_830_TO_1130".equalsIgnoreCase(timePref)) {
+            targetStartMin = 480; // 08:00 AM accommodates 08:00 AM lab and 08:30 theory
             targetEndMin = 690;
-            windowLabel = "08:30 AM - 11:30 AM";
+            windowLabel = "08:00 AM - 11:30 AM";
         } else if ("WINDOW_130_TO_430".equalsIgnoreCase(timePref)) {
             targetStartMin = 810;
             targetEndMin = 990;
             windowLabel = "01:30 PM - 04:30 PM";
-        } else if ("WINDOW_300_TO_600".equalsIgnoreCase(timePref)) {
+        } else if ("WINDOW_300_TO_630".equalsIgnoreCase(timePref) || "WINDOW_300_TO_600".equalsIgnoreCase(timePref)) {
             targetStartMin = 900;
-            targetEndMin = 1080;
-            windowLabel = "03:00 PM - 06:00 PM";
+            targetEndMin = 1110; // 06:30 PM accommodates evening lab running up to 06:30 PM
+            windowLabel = "03:00 PM - 06:30 PM";
         } else if (timePref != null && timePref.toUpperCase().startsWith("CUSTOM_")) {
             try {
                 String[] parts = timePref.split("_");

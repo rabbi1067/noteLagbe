@@ -795,18 +795,18 @@ export default function SmartAdvisingRoutineTool() {
         targetStartMin = 600;
         targetEndMin = 900;
         windowLabel = "10:00 AM - 03:00 PM";
-      } else if (timePreference === "WINDOW_830_TO_1130") {
-        targetStartMin = 510;
+      } else if (timePreference === "WINDOW_800_TO_1130" || timePreference === "WINDOW_830_TO_1130") {
+        targetStartMin = 480; // 08:00 AM accommodates 08:00 AM early lab and 08:30 theory
         targetEndMin = 690;
-        windowLabel = "08:30 AM - 11:30 AM";
+        windowLabel = "08:00 AM - 11:30 AM";
       } else if (timePreference === "WINDOW_130_TO_430") {
         targetStartMin = 810;
         targetEndMin = 990;
         windowLabel = "01:30 PM - 04:30 PM";
-      } else if (timePreference === "WINDOW_300_TO_600") {
+      } else if (timePreference === "WINDOW_300_TO_630" || timePreference === "WINDOW_300_TO_600") {
         targetStartMin = 900;
-        targetEndMin = 1080;
-        windowLabel = "03:00 PM - 06:00 PM";
+        targetEndMin = 1110; // 06:30 PM accommodates evening lab class running until 6:30 PM
+        windowLabel = "03:00 PM - 06:30 PM";
       } else if (timePreference === "CUSTOM") {
         targetStartMin = time12ToMinutes(customStartTime);
         targetEndMin = time12ToMinutes(customEndTime);
@@ -1951,14 +1951,14 @@ export default function SmartAdvisingRoutineTool() {
             {/* Timing Quick Chips */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {[
-                { id: "ANY", label: "⚡ Any Time (Flexible)", sub: "All Slots (08:30-04:30)" },
-                { id: "WINDOW_10_TO_1", label: "🎯 Prime Daytime", sub: "10:00 AM - 01:00 PM" },
-                { id: "WINDOW_10_TO_3", label: "🌇 Full Daytime", sub: "10:00 AM - 03:00 PM" },
-                { id: "WINDOW_830_TO_1130", label: "☀️ Early Morning", sub: "08:30 AM - 11:30 AM" },
-                { id: "WINDOW_130_TO_430", label: "☕ Afternoon Slot", sub: "01:30 PM - 04:30 PM" },
-                { id: "WINDOW_300_TO_600", label: "🌙 Late Afternoon", sub: "03:00 PM - 06:00 PM" },
-                { id: "AVOID_MORNING", label: "🚫 Avoid 08:30 AM", sub: "No Early Morning Classes" },
-                { id: "CUSTOM", label: "⚙️ Custom Window", sub: "Set Specific AM/PM Hours" },
+                { id: "ANY", label: "⚡ Any Time (Flexible)", sub: "All Slots (08:00 AM - 06:30 PM)" },
+                { id: "WINDOW_800_TO_1130", label: "☀️ Early Morning (08:00 - 11:30 AM)", sub: "Starts 08:00 AM Lab / 08:30 Theory" },
+                { id: "WINDOW_10_TO_1", label: "🎯 Prime Daytime (10:00 AM - 01:00 PM)", sub: "10:00 AM - 01:00 PM" },
+                { id: "WINDOW_10_TO_3", label: "🌇 Full Daytime (10:00 AM - 03:00 PM)", sub: "10:00 AM - 03:00 PM" },
+                { id: "WINDOW_130_TO_430", label: "☕ Afternoon (01:30 - 04:30 PM)", sub: "01:30 PM - 04:30 PM" },
+                { id: "WINDOW_300_TO_630", label: "🌙 Late Afternoon (03:00 - 06:30 PM)", sub: "Runs up to 06:30 PM Lab Class" },
+                { id: "AVOID_MORNING", label: "🚫 Avoid Early Morning", sub: "No 08:00 AM / 08:30 AM Classes" },
+                { id: "CUSTOM", label: "⚙️ Custom 12-Hour Window", sub: "Set Specific AM/PM Hours" },
               ].map((opt) => {
                 const isSelected = timePreference === opt.id;
                 return (
@@ -2013,7 +2013,7 @@ export default function SmartAdvisingRoutineTool() {
                       onChange={(e) => setCustomEndTime(e.target.value)}
                       className="w-full text-xs bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white font-mono"
                     >
-                      {["11:30 AM", "01:00 PM", "01:30 PM", "02:50 PM", "04:30 PM", "06:00 PM", "07:00 PM"].map((t) => (
+                      {["11:30 AM", "01:00 PM", "01:30 PM", "02:50 PM", "04:30 PM", "06:00 PM", "06:30 PM", "07:00 PM"].map((t) => (
                         <option key={t} value={t}>{t}</option>
                       ))}
                     </select>
