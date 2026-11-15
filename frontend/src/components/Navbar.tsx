@@ -106,10 +106,12 @@ export default function Navbar() {
           {/* Right Action Icons & Auth */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             
-            {/* In-App Notifications Bell with Unread Badge */}
-            <div className="shrink-0">
-              <NotificationBell />
-            </div>
+            {/* In-App Notifications Bell with Unread Badge (Only for Logged-In Users) */}
+            {isAuthenticated && (
+              <div className="shrink-0">
+                <NotificationBell />
+              </div>
+            )}
 
             {/* Language Switcher Pill (EN | বাং) */}
             <button

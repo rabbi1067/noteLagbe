@@ -113,8 +113,9 @@ export default function NotificationBell() {
     }
   };
 
-  // Initial load: campus notices & read IDs
+  // Initial load: campus notices & read IDs (only for authenticated users)
   useEffect(() => {
+    if (!isAuthenticated) return;
     try {
       const storedRead = localStorage.getItem("notelagbe_read_campus_notices");
       if (storedRead) {
@@ -138,7 +139,7 @@ export default function NotificationBell() {
       }
     }, 60000);
     return () => clearInterval(noticeInterval);
-  }, []);
+  }, [isAuthenticated]);
 
   // Poll for personal notifications when authenticated
   useEffect(() => {
@@ -158,12 +159,13 @@ export default function NotificationBell() {
     }
   }, [isAuthenticated]);
 
-  // Real-time synchronization
+  // Real-time synchronization (only for authenticated users)
   useDataSync((payload) => {
+    if (!isAuthenticated) return;
     if (!payload || payload.entity === "notice" || payload.entity === "all") {
       fetchCampusNotices();
     }
-    if (isAuthenticated && (!payload || payload.entity === "notification" || payload.entity === "course_unlock" || payload.entity === "all")) {
+    if (!payload || payload.entity === "notification" || payload.entity === "course_unlock" || payload.entity === "all") {
       fetchUnreadCount();
       if (isOpen) fetchNotifications();
     }
@@ -313,6 +315,11 @@ export default function NotificationBell() {
     if (filterTab === "unread") return !isRead;
     return true;
   });
+
+  // Never render notifications bell for guest / unauthenticated users
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="relative shrink-0" ref={dropdownRef}>
