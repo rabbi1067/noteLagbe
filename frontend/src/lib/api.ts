@@ -1179,6 +1179,7 @@ export const api = {
       teacherId?: number | null;
       teacherName?: string | null;
       language?: string;
+      history?: Array<{ role: string; content: string }>;
     }) => {
       const token = getToken();
       try {

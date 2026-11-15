@@ -1179,6 +1179,12 @@ export default function CheatSheetModal({
     setInputMessage("");
     setSending(true);
 
+    // Build conversation history to send (excluding the current optimistic message)
+    const conversationHistory = messages.slice(-10).map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
     try {
       const res = await api.aiExamChat.sendMessage({
         courseCode,
@@ -1188,6 +1194,7 @@ export default function CheatSheetModal({
         message: text,
         teacherId: selectedTeacherId,
         language,
+        history: conversationHistory,
       });
 
       if (res && res.assistantMessage) {
