@@ -560,73 +560,456 @@ function solveAcademicExamQuestion(
     p.trim() === "2" ||
     p.trim() === "q2";
 
-  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && (isQ2a || isQ2General) && !isQ2b) {
+  const isQ2Full = (isQ2a && isQ2b) || (isQ2General && !isQ2a && !isQ2b) || p.includes("full question 2");
+
+  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && isQ2Full) {
     return isBn
       ? `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
         `**কোর্স:** \`${cleanCourse} - Data Structures\`  \n` +
-        `**পরীক্ষা:** \`Spring 2024 Midterm Examination - Question 2.(a)\`  \n` +
+        `**পরীক্ষা:** \`Midterm Examination - Question 2 সম্পূর্ণ নির্ভুল মডেল উত্তর [10 Marks]\`  \n` +
         `**শিক্ষক ফোকাস:** \`${teacherTag}\`  \n\n` +
         `---\n\n` +
-        `### 📝 **Question 2.(a): Doubly Linked List Node Manipulation [4 Marks]**\n\n` +
+        `### 📝 **Question 2.(a): Doubly Linked List Node Manipulation [4.0 Marks]**\n\n` +
         `**স্ট্রাকচার ডিক্লারেশন (Structure Declaration):**\n` +
-        `\`\`\`c\n` +
-        `struct node {\n` +
+        `\`\`\`cpp\n` +
+        `struct Node {\n` +
         `    int data;\n` +
-        `    struct node *next;\n` +
-        `    struct node *prev;\n` +
+        `    Node* next;\n` +
+        `    Node* prev;\n` +
         `};\n` +
         `\`\`\`\n\n` +
-        `**পয়েন্টার সংযোগ ও মেমোরি ম্যানিপুলেশন (Memory Insertion Rules):**\n` +
-        `1. **নতুন নোড ক্রিয়েশন ও ইনিশিয়ালাইজেশন:**\n` +
-        `   \`\`\`c\n` +
-        `   struct node *newNode = (struct node*)malloc(sizeof(struct node));\n` +
+        `**পয়েন্টার ম্যানিপুলেশন ও নোড ইনসার্ট করার গোল্ডেন রুল:**\n` +
+        `1. **নতুন নোড তৈরি ও মেমোরি অ্যালোকোশন:**\n` +
+        `   \`\`\`cpp\n` +
+        `   Node* newNode = new Node();\n` +
         `   newNode->data = val;\n` +
-        `   newNode->next = NULL;\n` +
-        `   newNode->prev = NULL;\n` +
+        `   newNode->next = nullptr;\n` +
+        `   newNode->prev = nullptr;\n` +
+        `   \`\`\`\n` +
+        `2. **বিদ্যমান দুই নোডের মাঝে ইনসার্ট করার সঠিক ক্রম:**\n` +
+        `   * **ধাপ ১:** নতুন নোডের দুই হাত আগে বাঁধুন: \`newNode->next = curr->next;\` এবং \`newNode->prev = curr;\`\n` +
+        `   * **ধাপ ২:** পেছনের নোডের ব্যাক লিংক বাঁধুন: \`if (curr->next != nullptr) curr->next->prev = newNode;\`\n` +
+        `   * **ধাপ ৩:** এবার বর্তমান নোডের ফরোয়ার্ড লিংক বাঁধুন: \`curr->next = newNode;\`\n` +
+        `3. **মেমোরি সেফটি ও অরফান নোড প্রতিরোধ:** \`curr->next\` কখনোই আগে ওভাররাইট করবেন না; অন্যথায় পুরো পরবর্তী চেইনের অ্যাড্রেস হারিয়ে যাবে (Memory Leak)।\n\n` +
+        `---\n\n` +
+        `### 📝 **Question 2.(b): Infix to Postfix Conversion using Stack [6.0 Marks]**\n\n` +
+        `**অপারেটর প্রেসিডেন্স ও অ্যাসোসিয়েটিভিটি টেবিল:**\n` +
+        `* $^$ (Exponentiation): সর্বোচ্চ অগ্রাধিকার (Right to Left)\n` +
+        `* $*, /$ (Multiplication, Division): মাঝারি অগ্রাধিকার (Left to Right)\n` +
+        `* $+ , -$ (Addition, Subtraction): সর্বনিম্ন অগ্রাধিকার (Left to Right)\n\n` +
+        `**অ্যালগরিদম ধাপসমূহ:**\n` +
+        `1. বাম থেকে ডানে এক্সপ্রেশন স্ক্যান করুন।\n` +
+        `2. অপারেন্ড আসলে সরাসরি আউটপুটে যোগ করুন।\n` +
+        `3. \`(\` পেলে স্ট্যাকে পুশ করুন; \`)\` পেলে \`(\` না পাওয়া পর্যন্ত সব অপারেটর পপ করে আউটপুটে দিন।\n` +
+        `4. অপারেটর আসলে, স্ট্যাকের শীর্ষে সমান বা বেশি প্রেসিডেন্সের অপারেটর থাকলে তা পপ করুন, তারপর নতুন অপারেটর পুশ করুন।\n` +
+        `5. স্ক্যান শেষে স্ট্যাকের সব উপাদান পপ করে আউটপুটে যোগ করুন।\n\n` +
+        `> 💡 **মার্কিং টিপ:** পরীক্ষায় স্টেপ-বাই-স্টেপ ট্রেস টেবিল বানালে ৬-এ ৬ পাওয়া নিশ্চিত!`
+      : `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**Course:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**Exam:** \`Midterm Examination - Question 2 Complete Model Answer [10 Marks]\`  \n` +
+        `**Faculty Focus:** \`${teacherTag}\`  \n\n` +
+        `---\n\n` +
+        `### 📝 **Question 2.(a): Doubly Linked List Node Manipulation [4.0 Marks]**\n\n` +
+        `\`\`\`cpp\n` +
+        `struct Node {\n` +
+        `    int data;\n` +
+        `    Node* next;\n` +
+        `    Node* prev;\n` +
+        `};\n` +
+        `\`\`\`\n` +
+        `* **Rule:** Always wire \`newNode->next = curr->next\` and \`newNode->prev = curr\` BEFORE modifying \`curr->next\` to avoid orphan chains.\n\n` +
+        `---\n\n` +
+        `### 📝 **Question 2.(b): Infix to Postfix Conversion using Stack [6.0 Marks]**\n\n` +
+        `* **Precedence:** $^ > (*, /) > (+, -)$\n` +
+        `* Scan left to right; operands go directly to output; operators pop higher/equal precedence operators from stack before being pushed.`;
+  }
+
+  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && isQ2a && !isQ2b) {
+    return isBn
+      ? `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**কোর্স:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**পরীক্ষা:** \`Midterm Examination - Question 2.(a)\`  \n` +
+        `**শিক্ষক ফোকাস:** \`${teacherTag}\`  \n\n` +
+        `---\n\n` +
+        `### 📝 **Question 2.(a): Doubly Linked List Node Manipulation [4.0 Marks]**\n\n` +
+        `**স্ট্রাকচার ডিক্লারেশন (Structure Declaration):**\n` +
+        `\`\`\`cpp\n` +
+        `struct Node {\n` +
+        `    int data;\n` +
+        `    Node* next;\n` +
+        `    Node* prev;\n` +
+        `};\n` +
+        `\`\`\`\n\n` +
+        `**পয়েন্টার সংযোগ ও মেমোরি ম্যানিপুলেশন (Memory Insertion Rules):**\n` +
+        `1. **নতুন নোড ক্রিয়েশন ও ইনিশিয়ালাইজেশন:**\n` +
+        `   \`\`\`cpp\n` +
+        `   Node* newNode = new Node();\n` +
+        `   newNode->data = val;\n` +
+        `   newNode->next = nullptr;\n` +
+        `   newNode->prev = nullptr;\n` +
         `   \`\`\`\n` +
         `2. **যেকোনো পজিশনে ইনসার্ট করার গোল্ডেন রুল:**\n` +
         `   * প্রথমে নতুন নোডের লিংক আগে বাঁধতে হবে: \`newNode->next = current->next;\` এবং \`newNode->prev = current;\`\n` +
-        `   * তারপর পূর্বের চেইনের নোড লিংক করতে হবে: \`if(current->next != NULL) current->next->prev = newNode;\` এবং \`current->next = newNode;\`\n` +
-        `   * **সাবধানতা:** কখনো \`current->next\` আগে ওভাররাইট করবেন না, করলে পরবর্তী নোডগুলোর সংযোগ হারিয়ে যাবে এবং মেমোরি লিক (orphan node) তৈরি হবে।`
+        `   * তারপর পূর্বের চেইনের নোড লিংক করতে হবে: \`if(current->next != nullptr) current->next->prev = newNode;\` এবং \`current->next = newNode;\`\n` +
+        `   * **সাবধানতা:** কখনো \`current->next\` আগে ওভাররাইট করবেন না, করলে পরবর্তী নোডগুলোর সংযোগ হারিয়ে যাবে এবং মেমোরি লিক (orphan node) তৈরি হবে।`
       : `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
         `**Course:** \`${cleanCourse} - Data Structures\`  \n` +
-        `**Exam:** \`Spring 2024 Midterm - Question 2.(a) Model Solution\`  \n\n` +
+        `**Exam:** \`Midterm - Question 2.(a) Model Solution\`  \n\n` +
         `**Doubly Linked List Structure & Pointer Safety Rules:**\n` +
-        `\`\`\`c\n` +
-        `struct node {\n` +
+        `\`\`\`cpp\n` +
+        `struct Node {\n` +
         `    int data;\n` +
-        `    struct node *next;\n` +
-        `    struct node *prev;\n` +
+        `    Node* next;\n` +
+        `    Node* prev;\n` +
         `};\n` +
         `\`\`\`\n` +
         `* **Rule:** Always wire up \`newNode->next\` and \`newNode->prev\` FIRST before altering \`current->next\` to preserve the forward pointer chain!`;
   }
 
-  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && isQ2b) {
+  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && isQ2b && !isQ2a) {
     return isBn
       ? `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
         `**কোর্স:** \`${cleanCourse} - Data Structures\`  \n` +
-        `**পরীক্ষা:** \`Spring 2024 Midterm Examination - Question 2.(b)\`  \n` +
+        `**পরীক্ষা:** \`Midterm Examination - Question 2.(b)\`  \n` +
         `**শিক্ষক ফোকাস:** \`${teacherTag}\`  \n\n` +
         `---\n\n` +
-        `### 📝 **Question 2.(b): Infix to Postfix Conversion using Stack [6 Marks]**\n\n` +
+        `### 📝 **Question 2.(b): Infix to Postfix Conversion using Stack [6.0 Marks]**\n\n` +
         `**অপারেটর প্রেসিডেন্স রুল:** \`^ > (*, /) > (+, -)\`\n\n` +
         `**অ্যালগরিদম ধাপসমূহ:**\n` +
         `1. বাম থেকে ডানে এক্সপ্রেশনটি স্ক্যান করুন।\n` +
         `2. অপারেন্ড (A, B, C, সংখ্যা) পেলে সরাসরি আউটপুটে বসান।\n` +
         `3. \`(\` পেলে স্ট্যাকে পুশ করুন।\n` +
-        `4. \`)\` পেলে যতক্ষণ না \`(\` পাওয়া যায়, স্ট্যাক থেকে পপ করে আউটপুটে দিন। এরপর \`(\` ফেলে দিন।\n` +
+        `4. \`)\` পেলে যতক্ষণ না \`(\` পাওয়া যায়, স্ট্যাক থেকে পপ করে আউটপুটে দিন। এরপর \`(\` ফেলে দিন।\n` +
         `5. যেকোনো অপারেটর ($+, -, *, /$) আসলে, স্ট্যাকের শীর্ষে যদি সমান বা উচ্চতর প্রেসিডেন্সের অপারেটর থাকে তাকে পপ করে আউটপুটে দিন, তারপর নতুন অপারেটর পুশ করুন।\n` +
         `6. স্ক্যান শেষ হলে স্ট্যাকের বাকি সব অপারেটর পপ করে আউটপুটে যুক্ত করুন।`
       : `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
         `**Course:** \`${cleanCourse} - Data Structures\`  \n` +
-        `**Exam:** \`Spring 2024 Midterm - Question 2.(b) Model Solution\`  \n\n` +
+        `**Exam:** \`Midterm - Question 2.(b) Model Solution\`  \n\n` +
         `**Infix to Postfix Conversion via Stack:**\n` +
         `1. Scan tokens from left to right.\n` +
         `2. Operands append directly to output.\n` +
         `3. \`(\` is pushed onto the stack.\n` +
         `4. \`)\` pops operators to output until matching \`(\` is discarded.\n` +
         `5. Operators pop higher or equal precedence operators from stack before being pushed.`;
+  }
+
+  // -------------------------------------------------------------
+  // PATTERN 3: CSE241 Midterm - Question 3 (Circular Queue & Singly Linked List Reversal)
+  // -------------------------------------------------------------
+  const isQ3a =
+    /3[\.\s]*\(?a\)?/i.test(p) ||
+    /৩[\.\s]*\(?ক\)?/i.test(p) ||
+    /\b(q3a|3a|q[\s\.]*3[\.\s]*a)\b/i.test(p) ||
+    p.includes("circular queue") ||
+    (p.includes("3") && (p.includes("(a)") || p.includes(".a") || p.includes(" a ")));
+
+  const isQ3b =
+    /3[\.\s]*\(?b\)?/i.test(p) ||
+    /৩[\.\s]*\(?খ\)?/i.test(p) ||
+    /\b(q3b|3b|q[\s\.]*3[\.\s]*b)\b/i.test(p) ||
+    p.includes("reversal") ||
+    p.includes("reverse") ||
+    (p.includes("3") && (p.includes("(b)") || p.includes(".b") || p.includes(" b ")));
+
+  const isQ3General =
+    p.includes("question 3") ||
+    p.includes("number 3") ||
+    p.includes("q3") ||
+    p.includes("3 no") ||
+    p.includes("3 er") ||
+    p.trim() === "3" ||
+    p.trim() === "q3";
+
+  const isQ3Full = (isQ3a && isQ3b) || (isQ3General && !isQ3a && !isQ3b) || p.includes("full question 3");
+
+  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && isQ3Full) {
+    return isBn
+      ? `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**কোর্স:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**পরীক্ষা:** \`Midterm Examination - Question 3 সম্পূর্ণ নির্ভুল সমাধান [10 Marks]\`  \n` +
+        `**শিক্ষক ফোকাস:** \`${teacherTag}\`  \n\n` +
+        `---\n\n` +
+        `### 📝 **Question 3.(a): Circular Queue using Array [5.0 Marks]**\n\n` +
+        `**সার্কুলার কিউয়ের প্রয়োজনীয়তা:** সাধারণ লিনিয়ার কিউতে ডিকিউ করার পর সামনে ফাঁকা জায়গা থাকলেও \`rear == SIZE - 1\` হলে False Overflow ঘটে। সার্কুলার কিউ মড্যুলো অ্যারিথমেটিক ব্যবহার করে এই ফাঁকা মেমোরি পুনরায় ব্যবহার করে।\n\n` +
+        `**মূল সমীকরণ ও শর্তাবলী:**\n` +
+        `* **ইনিশিয়ালাইজেশন:** $\\text{front} = -1, \\text{rear} = -1$\n` +
+        `* **IsFull শর্ত:** $(\\text{rear} + 1) \\% \\text{SIZE} == \\text{front}$\n` +
+        `* **IsEmpty শর্ত:** $\\text{front} == -1$\n` +
+        `* **Enqueue অপারেশন:**\n` +
+        `  $$\\text{rear} = (\\text{rear} + 1) \\% \\text{SIZE}; \\quad \\text{queue}[\\text{rear}] = \\text{item};$$\n` +
+        `* **Dequeue অপারেশন:**\n` +
+        `  যদি $\\text{front} == \\text{rear}$ হয় (শেষ এলিমেন্ট), তবে কিউ খালি করে $\\text{front} = \\text{rear} = -1$ করা হয়; অন্যথায় $\\text{front} = (\\text{front} + 1) \\% \\text{SIZE}$।\n\n` +
+        `\`\`\`cpp\n` +
+        `// C++ Circular Queue Enqueue & Dequeue\n` +
+        `void enqueue(int val) {\n` +
+        `    if ((rear + 1) % SIZE == front) { cout << "Queue Full!\\n"; return; }\n` +
+        `    if (front == -1) front = 0;\n` +
+        `    rear = (rear + 1) % SIZE;\n` +
+        `    arr[rear] = val;\n` +
+        `}\n` +
+        `int dequeue() {\n` +
+        `    if (front == -1) { cout << "Queue Empty!\\n"; return -1; }\n` +
+        `    int data = arr[front];\n` +
+        `    if (front == rear) { front = rear = -1; }\n` +
+        `    else { front = (front + 1) % SIZE; }\n` +
+        `    return data;\n` +
+        `}\n` +
+        `\`\`\`\n\n` +
+        `---\n\n` +
+        `### 📝 **Question 3.(b): Singly Linked List In-Place Reversal [5.0 Marks]**\n\n` +
+        `**অ্যালগরিদম (Three-Pointer Approach):**\n` +
+        `তিনটি পয়েন্টার ব্যবহার করে সিঙ্গলি লিংকড লিস্ট রিভার্স করা হয়: \`prev = nullptr\`, \`curr = head\`, \`next = nullptr\`।\n\n` +
+        `\`\`\`cpp\n` +
+        `Node* reverseList(Node* head) {\n` +
+        `    Node* prev = nullptr;\n` +
+        `    Node* curr = head;\n` +
+        `    Node* next = nullptr;\n` +
+        `    while (curr != nullptr) {\n` +
+        `        next = curr->next;  // ১. পরবর্তী নোড সেভ রাখি\n` +
+        `        curr->next = prev;  // ২. তীর উল্টো দিকে ঘুরিয়ে দেই\n` +
+        `        prev = curr;        // ৩. prev এক ধাপ সামনে নেই\n` +
+        `        curr = next;        // ৪. curr এক ধাপ সামনে নেই\n` +
+        `    }\n` +
+        `    return prev; // নতুন হেড\n` +
+        `}\n` +
+        `\`\`\`\n\n` +
+        `* **টাইম কমপ্লেক্সিটি:** $O(n)$ (লিস্ট একবার স্ক্যান হয়)\n` +
+        `* **স্পেস কমপ্লেক্সিটি:** $O(1)$ (ইন-প্লেস পয়েন্টার সোয়াপ, কোনো অতিরিক্ত মেমোরি লাগে না)\n\n` +
+        `> 💡 **মার্কিং টিপ:** পরীক্ষায় \`next = curr->next; curr->next = prev;\` লুপের চারটি লাইন ক্রমানুসারে লিখলে সম্পূর্ণ ৫ মার্কস নিশ্চিত!`
+      : `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**Course:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**Exam:** \`Midterm Examination - Question 3 Full Model Solution [10 Marks]\`  \n` +
+        `**Faculty Focus:** \`${teacherTag}\`  \n\n` +
+        `---\n\n` +
+        `### 📝 **Question 3.(a): Circular Queue using Array [5.0 Marks]**\n\n` +
+        `* **Full Condition:** $(\\text{rear} + 1) \\% \\text{SIZE} == \\text{front}$\n` +
+        `* **Enqueue:** $\\text{rear} = (\\text{rear} + 1) \\% \\text{SIZE}; \\quad \\text{arr}[\\text{rear}] = \\text{val};$\n` +
+        `* **Dequeue:** $\\text{front} = (\\text{front} + 1) \\% \\text{SIZE}$; reset to $-1$ if queue becomes empty.\n\n` +
+        `---\n\n` +
+        `### 📝 **Question 3.(b): Singly Linked List In-Place Reversal [5.0 Marks]**\n\n` +
+        `\`\`\`cpp\n` +
+        `Node* reverseList(Node* head) {\n` +
+        `    Node *prev = nullptr, *curr = head, *next = nullptr;\n` +
+        `    while (curr != nullptr) {\n` +
+        `        next = curr->next;\n` +
+        `        curr->next = prev;\n` +
+        `        prev = curr;\n` +
+        `        curr = next;\n` +
+        `    }\n` +
+        `    return prev;\n` +
+        `}\n` +
+        `\`\`\`\n` +
+        `* **Time Complexity:** $O(n)$, **Auxiliary Space:** $O(1)$.`;
+  }
+
+  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && isQ3a && !isQ3b) {
+    return isBn
+      ? `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**কোর্স:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**পরীক্ষা:** \`Midterm - Question 3.(a) Circular Queue [5.0 Marks]\`  \n` +
+        `**শিক্ষক ফোকাস:** \`${teacherTag}\`  \n\n` +
+        `---\n\n` +
+        `### 📝 **Circular Queue Array Implementation & Boundary Arithmetic**\n\n` +
+        `* **IsFull:** $(\\text{rear} + 1) \\% \\text{SIZE} == \\text{front}$\n` +
+        `* **IsEmpty:** $\\text{front} == -1$\n` +
+        `* **Enqueue:** \`rear = (rear + 1) % SIZE; queue[rear] = item;\`\n` +
+        `* **Dequeue:** \`front = (front + 1) % SIZE;\` (reset to -1 when single element emptied).\n` +
+        `* **সুবিধা:** সাধারণ কিউয়ের মেমোরি ওয়েস্টেজ (False Overflow) দূর করে পূর্ণ স্পেস ব্যবহার নিশ্চিত করে।`
+      : `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**Course:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**Exam:** \`Midterm - Question 3.(a) Circular Queue [5.0 Marks]\`  \n\n` +
+        `* **Full Condition:** $(\\text{rear} + 1) \\% \\text{SIZE} == \\text{front}$\n` +
+        `* **Modulo Pointer Updates:** $\\text{rear} = (\\text{rear} + 1) \\% \\text{SIZE}$, $\\text{front} = (\\text{front} + 1) \\% \\text{SIZE}$.`;
+  }
+
+  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && isQ3b && !isQ3a) {
+    return isBn
+      ? `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**কোর্স:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**পরীক্ষা:** \`Midterm - Question 3.(b) Linked List Reversal [5.0 Marks]\`  \n` +
+        `**শিক্ষক ফোকাস:** \`${teacherTag}\`  \n\n` +
+        `---\n\n` +
+        `### 📝 **Singly Linked List In-Place 3-Pointer Reversal**\n\n` +
+        `\`\`\`cpp\n` +
+        `Node* reverse(Node* head) {\n` +
+        `    Node* prev = nullptr;\n` +
+        `    Node* curr = head;\n` +
+        `    while (curr != nullptr) {\n` +
+        `        Node* next = curr->next;\n` +
+        `        curr->next = prev;\n` +
+        `        prev = curr;\n` +
+        `        curr = next;\n` +
+        `    }\n` +
+        `    return prev;\n` +
+        `}\n` +
+        `\`\`\`\n` +
+        `* **টাইম কমপ্লেক্সিটি:** $O(n)$\n` +
+        `* **অক্সিলিয়ারি স্পেস:** $O(1)$ (ইন-প্লেস পয়েন্টার রিভার্সাল)`
+      : `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**Course:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**Exam:** \`Midterm - Question 3.(b) Linked List Reversal [5.0 Marks]\`  \n\n` +
+        `* **In-place 3-pointer algorithm:** $O(n)$ time and $O(1)$ space.`;
+  }
+
+  // -------------------------------------------------------------
+  // PATTERN 4: CSE241 Midterm - Question 4 (Postfix Evaluation & Queue using Two Stacks)
+  // -------------------------------------------------------------
+  const isQ4a =
+    /4[\.\s]*\(?a\)?/i.test(p) ||
+    /৪[\.\s]*\(?ক\)?/i.test(p) ||
+    /\b(q4a|4a|q[\s\.]*4[\.\s]*a)\b/i.test(p) ||
+    p.includes("postfix expression evaluation") ||
+    p.includes("evaluate postfix") ||
+    (p.includes("4") && (p.includes("(a)") || p.includes(".a") || p.includes(" a ")));
+
+  const isQ4b =
+    /4[\.\s]*\(?b\)?/i.test(p) ||
+    /৪[\.\s]*\(?খ\)?/i.test(p) ||
+    /\b(q4b|4b|q[\s\.]*4[\.\s]*b)\b/i.test(p) ||
+    p.includes("two stacks") ||
+    p.includes("queue using stack") ||
+    (p.includes("4") && (p.includes("(b)") || p.includes(".b") || p.includes(" b ")));
+
+  const isQ4General =
+    p.includes("question 4") ||
+    p.includes("number 4") ||
+    p.includes("q4") ||
+    p.includes("4 no") ||
+    p.includes("4 er") ||
+    p.trim() === "4" ||
+    p.trim() === "q4";
+
+  const isQ4Full = (isQ4a && isQ4b) || (isQ4General && !isQ4a && !isQ4b) || p.includes("full question 4");
+
+  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && (isQ4Full || isQ4a || isQ4b)) {
+    return isBn
+      ? `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**কোর্স:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**পরীক্ষা:** \`Midterm Examination - Question 4 সম্পূর্ণ সমাধান [10 Marks]\`  \n` +
+        `**শিক্ষক ফোকাস:** \`${teacherTag}\`  \n\n` +
+        `---\n\n` +
+        `### 📝 **Question 4.(a): Postfix Expression Evaluation using Stack [5.0 Marks]**\n\n` +
+        `**অ্যালগরিদম (Algorithm):**\n` +
+        `1. পোস্টফিক্স এক্সপ্রেশনটি বাম থেকে ডানে একটি একটি টোকেন স্ক্যান করুন।\n` +
+        `2. অপারেন্ড (সংখ্যা) আসলে স্ট্যাকে পুশ করুন।\n` +
+        `3. অপারেটর ($+, -, *, /$) আসলে স্ট্যাক থেকে দুটি অপারেন্ড পপ করুন: $\\text{val}_2 = \\text{pop}()$, $\\text{val}_1 = \\text{pop}()$।\n` +
+        `4. হিসাব করুন: $\\text{result} = \\text{val}_1 \\text{ op } \\text{val}_2$ এবং ফলাফলটি আবার স্ট্যাকে পুশ করুন।\n` +
+        `5. স্ক্যান শেষ হলে স্ট্যাকের শীর্ষে থাকা মানটিই চূড়ান্ত উত্তর।\n\n` +
+        `**উদাহরণের স্টেপ-বাই-স্টেপ ট্রেস (Expression: \`5 3 + 8 2 - *\`):**\n` +
+        `* \`5\` $\\to$ Push 5 $\\implies$ Stack: \`[5]\`\n` +
+        `* \`3\` $\\to$ Push 3 $\\implies$ Stack: \`[5, 3]\`\n` +
+        `* \`+\` $\\to$ Pop 3, Pop 5 $\\implies 5 + 3 = 8 \\implies$ Stack: \`[8]\`\n` +
+        `* \`8\` $\\to$ Push 8 $\\implies$ Stack: \`[8, 8]\`\n` +
+        `* \`2\` $\\to$ Push 2 $\\implies$ Stack: \`[8, 8, 2]\`\n` +
+        `* \`-\` $\\to$ Pop 2, Pop 8 $\\implies 8 - 2 = 6 \\implies$ Stack: \`[8, 6]\`\n` +
+        `* \`*\` $\\to$ Pop 6, Pop 8 $\\implies 8 \\times 6 = 48 \\implies$ Stack: \`[48]\`\n` +
+        `✅ **চূড়ান্ত ফলাফল:** **\`48\`**\n\n` +
+        `---\n\n` +
+        `### 📝 **Question 4.(b): Queue Implementation using Two Stacks [5.0 Marks]**\n\n` +
+        `**মূল মেকানিজম (Two-Stack FIFO Simulation):**\n` +
+        `* \`Stack 1 (s1)\`: ইনপুট ও Enqueue অপারেশনের জন্য।\n` +
+        `* \`Stack 2 (s2)\`: আউটপুট ও Dequeue অপারেশনের জন্য।\n\n` +
+        `\`\`\`cpp\n` +
+        `class QueueUsingTwoStacks {\n` +
+        `    stack<int> s1, s2;\n` +
+        `public:\n` +
+        `    void enqueue(int x) {\n` +
+        `        s1.push(x); // O(1) Time\n` +
+        `    }\n` +
+        `    int dequeue() {\n` +
+        `        if (s1.empty() && s2.empty()) { cout << "Queue Empty!\\n"; return -1; }\n` +
+        `        if (s2.empty()) {\n` +
+        `            while (!s1.empty()) {\n` +
+        `                s2.push(s1.top());\n` +
+        `                s1.pop();\n` +
+        `            }\n` +
+        `        }\n` +
+        `        int topVal = s2.top();\n` +
+        `        s2.pop();\n` +
+        `        return topVal;\n` +
+        `    }\n` +
+        `};\n` +
+        `\`\`\`\n\n` +
+        `* **টাইম কমপ্লেক্সিটি বিশ্লেষণ:**\n` +
+        `  * Enqueue: $O(1)$\n` +
+        `  * Dequeue (Amortized): **$O(1)$** (প্রতিটি উপাদান s1-এ একবার ঢোকে এবং s2-তে একবার স্থানান্তরিত হয়, ফলে গড়ে প্রতিটি অপারেশনের খরচ ধ্রুবক)।`
+      : `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**Course:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**Exam:** \`Midterm Examination - Question 4 Solution [10 Marks]\`  \n\n` +
+        `* **Postfix Evaluation:** Push operands; on operator pop $v_2, v_1$ and push $v_1 \\text{ op } v_2$.\n` +
+        `* **Queue using Two Stacks:** $s_1$ for enqueue, $s_2$ for dequeue with amortized $O(1)$ complexity.`;
+  }
+
+  // -------------------------------------------------------------
+  // PATTERN 5: CSE241 Midterm - Question 5 (Recursion & Tower of Hanoi + Search/Sort)
+  // -------------------------------------------------------------
+  const isQ5a =
+    /5[\.\s]*\(?a\)?/i.test(p) ||
+    /৫[\.\s]*\(?ক\)?/i.test(p) ||
+    /\b(q5a|5a|q[\s\.]*5[\.\s]*a)\b/i.test(p) ||
+    p.includes("tower of hanoi") ||
+    p.includes("recursion") ||
+    (p.includes("5") && (p.includes("(a)") || p.includes(".a") || p.includes(" a ")));
+
+  const isQ5b =
+    /5[\.\s]*\(?b\)?/i.test(p) ||
+    /৫[\.\s]*\(?খ\)?/i.test(p) ||
+    /\b(q5b|5b|q[\s\.]*5[\.\s]*b)\b/i.test(p) ||
+    p.includes("linear search") ||
+    (p.includes("binary search") && p.includes("vs")) ||
+    p.includes("bubble sort") ||
+    (p.includes("5") && (p.includes("(b)") || p.includes(".b") || p.includes(" b ")));
+
+  const isQ5General =
+    p.includes("question 5") ||
+    p.includes("number 5") ||
+    p.includes("q5") ||
+    p.includes("5 no") ||
+    p.includes("5 er") ||
+    p.trim() === "5" ||
+    p.trim() === "q5";
+
+  const isQ5Full = (isQ5a && isQ5b) || (isQ5General && !isQ5a && !isQ5b) || p.includes("full question 5");
+
+  if ((cleanCourse.includes("241") || courseTitle.toLowerCase().includes("data struct")) && (isQ5Full || isQ5a || isQ5b)) {
+    return isBn
+      ? `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**কোর্স:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**পরীক্ষা:** \`Midterm Examination - Question 5 সম্পূর্ণ সমাধান [10 Marks]\`  \n` +
+        `**শিক্ষক ফোকাস:** \`${teacherTag}\`  \n\n` +
+        `---\n\n` +
+        `### 📝 **Question 5.(a): Recursion & Tower of Hanoi (Steps & Complexity) [5.0 Marks]**\n\n` +
+        `**সমস্যা ও নিয়মাবলী (Rules):**\n` +
+        `* তিনটি খুঁটি: Source ($A$), Auxiliary ($B$), Destination ($C$)।\n` +
+        `* একসাথে শুধুমাত্র ১টি ডিস্ক স্থানান্তর করা যাবে এবং কোনো ছোট ডিস্কের ওপর বড় ডিস্ক রাখা যাবে না।\n\n` +
+        `**রিক্যারেন্স রিলেশন ও সমাধান:**\n` +
+        `$$T(n) = 2T(n-1) + 1, \\quad T(1) = 1$$\n` +
+        `$$T(n) = 2^n - 1$$\n\n` +
+        `\`\`\`cpp\n` +
+        `void towerOfHanoi(int n, char from_rod, char to_rod, char aux_rod) {\n` +
+        `    if (n == 0) return;\n` +
+        `    towerOfHanoi(n - 1, from_rod, aux_rod, to_rod); // ধাপ ১\n` +
+        `    cout << "Move disk " << n << " from " << from_rod << " to " << to_rod << "\\n"; // ধাপ ২\n` +
+        `    towerOfHanoi(n - 1, aux_rod, to_rod, from_rod); // ধাপ ৩\n` +
+        `}\n` +
+        `\`\`\`\n\n` +
+        `* **টাইম কমপ্লেক্সিটি:** $\\mathbf{O(2^n)}$\n` +
+        `* **স্পেস কমপ্লেক্সিটি:** $\\mathbf{O(n)}$ (ফাংশন কল স্ট্যাকের গভীরতা)\n\n` +
+        `---\n\n` +
+        `### 📝 **Question 5.(b): Binary Search vs Linear Search & Bubble Sort [5.0 Marks]**\n\n` +
+        `| প্যারামিটার | Linear Search | Binary Search |\n` +
+        `| :--- | :--- | :--- |\n` +
+        `| **ডেটা শর্ত** | যেকোনো আনসর্টেড অ্যারেতে চলে | **অবশ্যই পূর্বে সর্টেড** হতে হবে |\n` +
+        `| **Best Case Time** | $O(1)$ (প্রথম এলিমেন্টে পেলে) | $O(1)$ (মাঝের এলিমেন্টে পেলে) |\n` +
+        `| **Worst Case Time** | $\\mathbf{O(n)}$ (সবগুলো চেক করতে হয়) | $\\mathbf{O(\\log_2 n)}$ (প্রতি ধাপে অর্ধেকে কমে) |\n` +
+        `| **অ্যালগরিদম অ্যাপ্রোচ** | Sequential Scan | Divide and Conquer |\n\n` +
+        `**Bubble Sort পাস-বাই-পাস মূলনীতি:**\n` +
+        `পাশাপাশি দুটি এলিমেন্ট তুলনা করে যদি \`arr[j] > arr[j+1]\` হয় তবে সোয়াপ করা হয়। প্রতিটি পাসে সবচেয়ে বড় উপাদানটি বুদবুদের মতো ডান প্রান্তে চলে যায়। মোট পাস লাগে $n-1$ টি এবং টাইম কমপ্লেক্সিটি $O(n^2)$।`
+      : `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**Course:** \`${cleanCourse} - Data Structures\`  \n` +
+        `**Exam:** \`Midterm Examination - Question 5 Solution [10 Marks]\`  \n\n` +
+        `* **Tower of Hanoi:** $T(n) = 2T(n-1) + 1 \\implies 2^n - 1$ moves, $O(2^n)$ time, $O(n)$ stack space.\n` +
+        `* **Binary Search vs Linear Search:** Binary Search requires sorted array, achieves $O(\\log n)$ versus Linear Search's $O(n)$.`;
   }
 
   // -------------------------------------------------------------

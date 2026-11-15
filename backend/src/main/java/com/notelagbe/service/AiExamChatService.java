@@ -1137,7 +1137,121 @@ public class AiExamChatService {
         }
 
         // -------------------------------------------------------------
-        // PATTERN 3: Operating Systems (CSE361) - CPU Scheduling / Deadlock / Memory
+        // PATTERN 3: CSE241 Midterm - Question 3 (Circular Queue & Singly Linked List Reversal)
+        // -------------------------------------------------------------
+        boolean isQ3a = p.contains("3.a") || p.contains("3(a)") || p.contains("3 a") || p.contains("q3a") || p.contains("circular queue");
+        boolean isQ3b = p.contains("3.b") || p.contains("3(b)") || p.contains("3 b") || p.contains("q3b") || p.contains("reversal") || p.contains("reverse");
+        boolean isQ3General = p.contains("question 3") || p.contains("number 3") || p.contains("q3") || p.contains("3 no") || p.contains("3 er") || p.equals("3") || p.equals("q3");
+
+        if ((codeUpper.contains("241") || titleLower.contains("data struct")) && (isQ3General || isQ3a || isQ3b)) {
+            return isBengali
+                    ? "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                    + "**কোর্স:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                    + "**পরীক্ষা:** `Midterm Examination - Question 3 সম্পূর্ণ নির্ভুল সমাধান [10 Marks]`  \n"
+                    + "**শিক্ষক ফোকাস:** `" + teacherLabel + "`  \n\n"
+                    + "---\n\n"
+                    + "### 📝 **3.(a) Circular Queue using Array [5.0 Marks]**\n\n"
+                    + "* **Full Condition:** `(rear + 1) % SIZE == front`\n"
+                    + "* **Empty Condition:** `front == -1`\n"
+                    + "* **Enqueue:** `rear = (rear + 1) % SIZE; queue[rear] = item;`\n"
+                    + "* **Dequeue:** `front = (front + 1) % SIZE;` (reset to -1 when single element emptied).\n\n"
+                    + "```cpp\n"
+                    + "void enqueue(int val) {\n"
+                    + "    if ((rear + 1) % SIZE == front) { cout << \"Queue Full!\\n\"; return; }\n"
+                    + "    if (front == -1) front = 0;\n"
+                    + "    rear = (rear + 1) % SIZE;\n"
+                    + "    arr[rear] = val;\n"
+                    + "}\n"
+                    + "```\n\n"
+                    + "---\n\n"
+                    + "### 📝 **3.(b) Singly Linked List In-Place Reversal [5.0 Marks]**\n\n"
+                    + "```cpp\n"
+                    + "Node* reverseList(Node* head) {\n"
+                    + "    Node *prev = nullptr, *curr = head, *next = nullptr;\n"
+                    + "    while (curr != nullptr) {\n"
+                    + "        next = curr->next;\n"
+                    + "        curr->next = prev;\n"
+                    + "        prev = curr;\n"
+                    + "        curr = next;\n"
+                    + "    }\n"
+                    + "    return prev;\n"
+                    + "}\n"
+                    + "```\n\n"
+                    + "* **টাইম কমপ্লেক্সিটি:** $O(n)$, **স্পেস:** $O(1)$ ইন-প্লেস।"
+                    : "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                    + "**Course:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                    + "**Exam:** `Midterm Examination - Question 3 Full Model Answer [10 Marks]`  \n\n"
+                    + "Full solution covering Circular Queue with modulo arithmetic and Singly Linked List 3-pointer reversal.";
+        }
+
+        // -------------------------------------------------------------
+        // PATTERN 4: CSE241 Midterm - Question 4 (Postfix Evaluation & Two-Stack Queue)
+        // -------------------------------------------------------------
+        boolean isQ4a = p.contains("4.a") || p.contains("4(a)") || p.contains("4 a") || p.contains("q4a") || p.contains("postfix expression") || p.contains("evaluate postfix");
+        boolean isQ4b = p.contains("4.b") || p.contains("4(b)") || p.contains("4 b") || p.contains("q4b") || p.contains("two stacks") || p.contains("queue using stack");
+        boolean isQ4General = p.contains("question 4") || p.contains("number 4") || p.contains("q4") || p.contains("4 no") || p.contains("4 er") || p.equals("4") || p.equals("q4");
+
+        if ((codeUpper.contains("241") || titleLower.contains("data struct")) && (isQ4General || isQ4a || isQ4b)) {
+            return isBengali
+                    ? "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                    + "**কোর্স:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                    + "**পরীক্ষা:** `Midterm Examination - Question 4 সম্পূর্ণ সমাধান [10 Marks]`  \n"
+                    + "**শিক্ষক ফোকাস:** `" + teacherLabel + "`  \n\n"
+                    + "---\n\n"
+                    + "### 📝 **4.(a) Postfix Expression Evaluation using Stack [5.0 Marks]**\n\n"
+                    + "1. বাম থেকে ডানে টোকেন স্ক্যান করুন।\n"
+                    + "2. অপারেন্ড আসলে স্ট্যাকে পুশ করুন।\n"
+                    + "3. অপারেটর আসলে স্ট্যাক থেকে দুটি অপারেন্ড পপ করে হিসাব করুন এবং ফলাফল পুশ করুন।\n"
+                    + "4. স্ক্যান শেষে স্ট্যাকটপই চূড়ান্ত মান।\n\n"
+                    + "---\n\n"
+                    + "### 📝 **4.(b) Queue Implementation using Two Stacks [5.0 Marks]**\n\n"
+                    + "* **Stack 1 (s1):** Enqueue অপারেশনের জন্য সরাসরি `s1.push(x)` ($O(1)$)।\n"
+                    + "* **Stack 2 (s2):** Dequeue করার সময় s2 খালি থাকলে s1 থেকে সব এলিমেন্ট পপ করে s2-তে পুশ করা হয় (FIFO অর্ডার উল্টায়), তারপর `s2.pop()` করা হয়।\n"
+                    + "* **অ্যামরটাইজড কমপ্লেক্সিটি:** **$O(1)$**।"
+                    : "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                    + "**Course:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                    + "**Exam:** `Midterm Examination - Question 4 Solution [10 Marks]`  \n\n"
+                    + "Full solution covering Postfix expression evaluation via stack and FIFO queue simulation with two stacks.";
+        }
+
+        // -------------------------------------------------------------
+        // PATTERN 5: CSE241 Midterm - Question 5 (Recursion & Tower of Hanoi + Search/Sort)
+        // -------------------------------------------------------------
+        boolean isQ5a = p.contains("5.a") || p.contains("5(a)") || p.contains("5 a") || p.contains("q5a") || p.contains("tower of hanoi") || p.contains("recursion");
+        boolean isQ5b = p.contains("5.b") || p.contains("5(b)") || p.contains("5 b") || p.contains("q5b") || p.contains("linear search") || (p.contains("binary search") && p.contains("vs")) || p.contains("bubble sort");
+        boolean isQ5General = p.contains("question 5") || p.contains("number 5") || p.contains("q5") || p.contains("5 no") || p.contains("5 er") || p.equals("5") || p.equals("q5");
+
+        if ((codeUpper.contains("241") || titleLower.contains("data struct")) && (isQ5General || isQ5a || isQ5b)) {
+            return isBengali
+                    ? "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                    + "**কোর্স:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                    + "**পরীক্ষা:** `Midterm Examination - Question 5 সম্পূর্ণ সমাধান [10 Marks]`  \n"
+                    + "**শিক্ষক ফোকাস:** `" + teacherLabel + "`  \n\n"
+                    + "---\n\n"
+                    + "### 📝 **5.(a) Recursion & Tower of Hanoi [5.0 Marks]**\n\n"
+                    + "* **রিক্যারেন্স সমীকরণ:** $T(n) = 2T(n-1) + 1 \\implies T(n) = 2^n - 1$\n"
+                    + "* **টাইম কমপ্লেক্সিটি:** $O(2^n)$, **স্পেস:** $O(n)$ রিকার্শন স্ট্যাক ফ্রেম।\n\n"
+                    + "```cpp\n"
+                    + "void towerOfHanoi(int n, char from, char to, char aux) {\n"
+                    + "    if (n == 0) return;\n"
+                    + "    towerOfHanoi(n - 1, from, aux, to);\n"
+                    + "    cout << \"Move disk \" << n << \" from \" << from << \" to \" << to << \"\\n\";\n"
+                    + "    towerOfHanoi(n - 1, aux, to, from);\n"
+                    + "}\n"
+                    + "```\n\n"
+                    + "---\n\n"
+                    + "### 📝 **5.(b) Binary Search vs Linear Search & Bubble Sort [5.0 Marks]**\n\n"
+                    + "* **Linear Search:** আনসর্টেড ডেটায় কাজ করে, Worst case $O(n)$।\n"
+                    + "* **Binary Search:** ডেটা অবশ্যই সর্টেড হতে হবে, Worst case $O(\\log n)$।\n"
+                    + "* **Bubble Sort:** প্রতি পাসে পাশাপাশি দুটি উপাদান তুলনা করে সোয়াপ করা হয়, মোট $n-1$ পাস এবং $O(n^2)$ সময় লাগে।"
+                    : "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                    + "**Course:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                    + "**Exam:** `Midterm Examination - Question 5 Solution [10 Marks]`  \n\n"
+                    + "Full solution covering Tower of Hanoi recursion relation and Binary Search vs Linear Search.";
+        }
+
+        // -------------------------------------------------------------
+        // PATTERN 6: Operating Systems (CSE361) - CPU Scheduling / Deadlock / Memory
         // -------------------------------------------------------------
         if (codeUpper.contains("361") || titleLower.contains("operating")) {
             if (p.contains("scheduling") || p.contains("round robin") || p.contains("fcfs") || p.contains("sjf") || p.contains("gantt")) {
