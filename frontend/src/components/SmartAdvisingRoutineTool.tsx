@@ -47,6 +47,13 @@ import {
   FileDown,
   Trophy,
   Award,
+  Lock,
+  Bookmark,
+  Sun,
+  Moon,
+  ArrowRight,
+  Eye,
+  Sliders,
 } from "lucide-react";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
@@ -123,98 +130,157 @@ export function doSectionsClash(s1: OfferedSectionItem, s2: OfferedSectionItem):
   return false;
 }
 
-// Visual color themes for individual courses
-const COURSE_THEMES: Record<string, { bg: string; border: string; text: string; badge: string; dot: string }> = {
-  CSE355: {
-    bg: "from-blue-900/80 to-blue-950/90",
-    border: "border-blue-500/50 hover:border-blue-400",
-    text: "text-blue-200",
-    badge: "bg-blue-950 text-blue-300 border-blue-800",
-    dot: "bg-blue-400",
-  },
-  CSE381: {
-    bg: "from-indigo-900/80 to-indigo-950/90",
-    border: "border-indigo-500/50 hover:border-indigo-400",
-    text: "text-indigo-200",
-    badge: "bg-indigo-950 text-indigo-300 border-indigo-800",
-    dot: "bg-indigo-400",
-  },
-  CSE382: {
-    bg: "from-cyan-900/80 to-cyan-950/90",
-    border: "border-cyan-500/50 hover:border-cyan-400",
-    text: "text-cyan-200",
-    badge: "bg-cyan-950 text-cyan-300 border-cyan-800",
-    dot: "bg-cyan-400",
-  },
-  CSE443: {
-    bg: "from-purple-900/80 to-purple-950/90",
-    border: "border-purple-500/50 hover:border-purple-400",
-    text: "text-purple-200",
-    badge: "bg-purple-950 text-purple-300 border-purple-800",
-    dot: "bg-purple-400",
-  },
-  CSE444: {
-    bg: "from-pink-900/80 to-pink-950/90",
-    border: "border-pink-500/50 hover:border-pink-400",
-    text: "text-pink-200",
-    badge: "bg-pink-950 text-pink-300 border-pink-800",
-    dot: "bg-pink-400",
-  },
-  CSE472: {
-    bg: "from-emerald-900/80 to-emerald-950/90",
-    border: "border-emerald-500/50 hover:border-emerald-400",
-    text: "text-emerald-200",
-    badge: "bg-emerald-950 text-emerald-300 border-emerald-800",
-    dot: "bg-emerald-400",
-  },
-};
+// Visual color themes for courses (vibrant, modern dark palette matching the demo)
+export interface CourseTheme {
+  name: string;
+  cardBg: string;
+  border: string;
+  text: string;
+  badge: string;
+  accent: string;
+  dot: string;
+  sidebarBg: string;
+}
 
-const DEFAULT_THEME = {
-  bg: "from-slate-800/80 to-slate-900/90",
-  border: "border-slate-600 hover:border-slate-500",
-  text: "text-slate-200",
-  badge: "bg-slate-900 text-slate-300 border-slate-700",
-  dot: "bg-slate-400",
-};
+const COURSE_PALETTES: CourseTheme[] = [
+  {
+    name: "emerald",
+    cardBg: "bg-emerald-950/85 hover:bg-emerald-900/90",
+    border: "border-emerald-500/60 hover:border-emerald-400",
+    text: "text-emerald-100",
+    badge: "bg-emerald-950 text-emerald-300 border-emerald-700",
+    accent: "text-emerald-400",
+    dot: "bg-emerald-400",
+    sidebarBg: "from-emerald-950/40 via-emerald-900/20 to-slate-900/90 border-emerald-500/40",
+  },
+  {
+    name: "indigo",
+    cardBg: "bg-indigo-950/85 hover:bg-indigo-900/90",
+    border: "border-indigo-500/60 hover:border-indigo-400",
+    text: "text-indigo-100",
+    badge: "bg-indigo-950 text-indigo-300 border-indigo-700",
+    accent: "text-indigo-400",
+    dot: "bg-indigo-400",
+    sidebarBg: "from-indigo-950/40 via-indigo-900/20 to-slate-900/90 border-indigo-500/40",
+  },
+  {
+    name: "purple",
+    cardBg: "bg-purple-950/85 hover:bg-purple-900/90",
+    border: "border-purple-500/60 hover:border-purple-400",
+    text: "text-purple-100",
+    badge: "bg-purple-950 text-purple-300 border-purple-700",
+    accent: "text-purple-400",
+    dot: "bg-purple-400",
+    sidebarBg: "from-purple-950/40 via-purple-900/20 to-slate-900/90 border-purple-500/40",
+  },
+  {
+    name: "teal",
+    cardBg: "bg-teal-950/85 hover:bg-teal-900/90",
+    border: "border-teal-500/60 hover:border-teal-400",
+    text: "text-teal-100",
+    badge: "bg-teal-950 text-teal-300 border-teal-700",
+    accent: "text-teal-400",
+    dot: "bg-teal-400",
+    sidebarBg: "from-teal-950/40 via-teal-900/20 to-slate-900/90 border-teal-500/40",
+  },
+  {
+    name: "blue",
+    cardBg: "bg-blue-950/85 hover:bg-blue-900/90",
+    border: "border-blue-500/60 hover:border-blue-400",
+    text: "text-blue-100",
+    badge: "bg-blue-950 text-blue-300 border-blue-700",
+    accent: "text-blue-400",
+    dot: "bg-blue-400",
+    sidebarBg: "from-blue-950/40 via-blue-900/20 to-slate-900/90 border-blue-500/40",
+  },
+  {
+    name: "rose",
+    cardBg: "bg-rose-950/85 hover:bg-rose-900/90",
+    border: "border-rose-500/60 hover:border-rose-400",
+    text: "text-rose-100",
+    badge: "bg-rose-950 text-rose-300 border-rose-700",
+    accent: "text-rose-400",
+    dot: "bg-rose-400",
+    sidebarBg: "from-rose-950/40 via-rose-900/20 to-slate-900/90 border-rose-500/40",
+  },
+  {
+    name: "amber",
+    cardBg: "bg-amber-950/85 hover:bg-amber-900/90",
+    border: "border-amber-500/60 hover:border-amber-400",
+    text: "text-amber-100",
+    badge: "bg-amber-950 text-amber-300 border-amber-700",
+    accent: "text-amber-400",
+    dot: "bg-amber-400",
+    sidebarBg: "from-amber-950/40 via-amber-900/20 to-slate-900/90 border-amber-500/40",
+  },
+  {
+    name: "cyan",
+    cardBg: "bg-cyan-950/85 hover:bg-cyan-900/90",
+    border: "border-cyan-500/60 hover:border-cyan-400",
+    text: "text-cyan-100",
+    badge: "bg-cyan-950 text-cyan-300 border-cyan-700",
+    accent: "text-cyan-400",
+    dot: "bg-cyan-400",
+    sidebarBg: "from-cyan-950/40 via-cyan-900/20 to-slate-900/90 border-cyan-500/40",
+  },
+];
+
+export function getCourseTheme(code: string): CourseTheme {
+  let hash = 0;
+  for (let i = 0; i < code.length; i++) {
+    hash = code.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const idx = Math.abs(hash) % COURSE_PALETTES.length;
+  return COURSE_PALETTES[idx];
+}
 
 const WEEK_DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-// 12-hour Time Header Axis from 08:00 AM to 07:00 PM (480m to 1140m = 660m total span)
-const TIMELINE_START_MINUTES = 480; // 08:00 AM
-const TIMELINE_END_MINUTES = 1140; // 07:00 PM
-const TIMELINE_TOTAL_MINUTES = TIMELINE_END_MINUTES - TIMELINE_START_MINUTES; // 660 mins
 
-const TIME_12_AXIS = [
-  "08:00 AM",
-  "09:00 AM",
-  "10:00 AM",
-  "11:00 AM",
-  "12:00 PM",
-  "01:00 PM",
-  "02:00 PM",
-  "03:00 PM",
-  "04:00 PM",
-  "05:00 PM",
-  "06:00 PM",
-  "07:00 PM",
+// Timetable runs from 08:00 AM (480 mins) to 06:00 PM (1080 mins) -> 600 mins total
+const TIMELINE_START_MINUTES = 480;
+const TIMELINE_END_MINUTES = 1080;
+const TIMELINE_TOTAL_MINUTES = TIMELINE_END_MINUTES - TIMELINE_START_MINUTES; // 600 mins
+
+const TIME_HOURS = [
+  "08:00",
+  "09:00",
+  "10:00",
+  "11:00",
+  "12:00",
+  "13:00",
+  "14:00",
+  "15:00",
+  "16:00",
+  "17:00",
 ];
 
 export default function SmartAdvisingRoutineTool() {
   const { user } = useAuth();
   const { language } = useLanguage();
 
+  // App Top Navigation State
+  const [activeAppTab, setActiveAppTab] = useState<"routine" | "compare" | "saved">("routine");
+
   // State: Sections loaded from verified real SEU dataset
   const [sections, setSections] = useState<OfferedSectionItem[]>(REAL_SEU_OFFERED_SECTIONS);
   const [semester, setSemester] = useState<string>("Spring 2026");
 
-  // Selection: Starts EMPTY (Manual course selection by student)
-  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
-  const [courseSearchQuery, setCourseSearchQuery] = useState<string>("");
-  const [isCoursesExpanded, setIsCoursesExpanded] = useState<boolean>(false);
+  // Selection: Starts with 5 standard courses from catalog on load
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([
+    "CSE355",
+    "CSE381",
+    "CSE382",
+    "CSE443",
+    "CSE444",
+  ]);
+  const [sidebarCourseSearch, setSidebarCourseSearch] = useState<string>("");
+  const [expandedFacultyCourse, setExpandedFacultyCourse] = useState<string | null>(null);
 
-  // Preferences: Default to ANY (Balanced / Any Time Slot Flexible)
+  // Preferences
   const [timePreference, setTimePreference] = useState<string>("ANY");
   const [customStartTime, setCustomStartTime] = useState<string>("10:00 AM");
   const [customEndTime, setCustomEndTime] = useState<string>("01:00 PM");
+  const [showCustomTimeInput, setShowCustomTimeInput] = useState<boolean>(false);
   const [dayPreference, setDayPreference] = useState<
     "MINIMIZE_DAYS" | "COMPACT_GAPS" | "ANY"
   >("COMPACT_GAPS");
@@ -228,20 +294,27 @@ export default function SmartAdvisingRoutineTool() {
     "SAT",
   ]);
   const [facultyPreferences, setFacultyPreferences] = useState<Record<string, string[]>>({});
-  const [isFacultyExpanded, setIsFacultyExpanded] = useState<boolean>(false);
 
-  // Generated Routines (Top 10 options)
+  // Generated Routines & Sorting
   const [routines, setRoutines] = useState<GeneratedRoutineOption[]>([]);
   const [selectedRoutineIndex, setSelectedRoutineIndex] = useState<number>(0);
+  const [sortBy, setSortBy] = useState<"fewest_days" | "lowest_gap" | "highest_score">("fewest_days");
   const [generating, setGenerating] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
-  // Layout Mode: Always full width for uncompressed, clear timetable
-  const [layoutMode, setLayoutMode] = useState<"split" | "full">("full");
+  // Timetable View Mode (Week vs Day)
+  const [viewMode, setViewMode] = useState<"Week" | "Day">("Week");
+  const [dayViewSelectedDay, setDayViewSelectedDay] = useState<string>("MON");
 
-  // Timetable View Mode (Weekly, Daily, Overview)
-  const [viewMode, setViewMode] = useState<"Weekly" | "Daily" | "Overview">("Weekly");
-  const [dailyDay, setDailyDay] = useState<string>("SUN");
+  // Saved / Bookmarked Routines
+  const [savedRoutines, setSavedRoutines] = useState<
+    Array<{ id: string; routine: GeneratedRoutineOption; name: string; date: string }>
+  >([]);
+
+  // Course Catalog Modal State
+  const [isCatalogModalOpen, setIsCatalogModalOpen] = useState<boolean>(false);
+  const [catalogSearchQuery, setCatalogSearchQuery] = useState<string>("");
+  const [catalogFilterTab, setCatalogFilterTab] = useState<"all" | "theory" | "lab">("all");
 
   // Upload Modal State (Dual-mode: File or Direct Text/HTML Paste)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
@@ -254,54 +327,6 @@ export default function SmartAdvisingRoutineTool() {
 
   // Export Timetable Ref
   const routineContainerRef = useRef<HTMLDivElement>(null);
-
-  // Load sections from backend on mount (or use built-in real sections)
-  useEffect(() => {
-    fetchBackendSections();
-  }, [semester]);
-
-  const fetchBackendSections = async () => {
-    try {
-      const res = await api.advising.getSections(semester);
-      if (res && res.courses && Object.keys(res.courses).length > 0) {
-        const flat: OfferedSectionItem[] = [];
-        Object.entries(res.courses).forEach(([code, secList]) => {
-          (secList as any[]).forEach((s) => {
-            let parsedSlots: TimeSlot[] = [];
-            if (s.scheduleJson) {
-              try {
-                parsedSlots = JSON.parse(s.scheduleJson);
-              } catch (e) {
-                parsedSlots = [];
-              }
-            }
-            flat.push({
-              id: s.id,
-              courseCode: s.courseCode,
-              sectionNumber: String(s.sectionNumber),
-              courseTitle: s.courseTitle || s.courseCode,
-              credits: s.credits || 3.0,
-              facultyInitial: s.facultyInitial || "TBA",
-              facultyName: s.facultyName || "TBA",
-              availableSeats: s.availableSeats,
-              scheduleText: s.scheduleText,
-              slots: parsedSlots.map((sl) => ({
-                ...sl,
-                startMinutes: timeToMinutes(sl.start),
-                endMinutes: timeToMinutes(sl.end),
-              })),
-              semester: s.semester,
-            });
-          });
-        });
-        if (flat.length >= 60) {
-          setSections(flat);
-        }
-      }
-    } catch (err) {
-      console.warn("Backend advising fetch fallback to verified static data:", err);
-    }
-  };
 
   // Group sections by Course Code and categorize Theory vs Lab
   const coursesCatalog = useMemo(() => {
@@ -378,22 +403,18 @@ export default function SmartAdvisingRoutineTool() {
     }
   };
 
-  // Search-filtered theory & lab courses
-  const filteredTheoryCourses = useMemo(() => {
-    const list = coursesCatalog.filter((c) => !c.isLab);
-    if (!courseSearchQuery.trim()) return list;
-    const q = courseSearchQuery.toLowerCase();
-    return list.filter((c) => c.code.toLowerCase().includes(q) || c.title.toLowerCase().includes(q));
-  }, [coursesCatalog, courseSearchQuery]);
+  // Toggle preferred faculty for a course
+  const handleToggleFacultyPref = (courseCode: string, initial: string) => {
+    setFacultyPreferences((prev) => {
+      const current = prev[courseCode] || [];
+      const updated = current.includes(initial)
+        ? current.filter((i) => i !== initial)
+        : [...current, initial];
+      return { ...prev, [courseCode]: updated };
+    });
+  };
 
-  const filteredLabCourses = useMemo(() => {
-    const list = coursesCatalog.filter((c) => c.isLab);
-    if (!courseSearchQuery.trim()) return list;
-    const q = courseSearchQuery.toLowerCase();
-    return list.filter((c) => c.code.toLowerCase().includes(q) || c.title.toLowerCase().includes(q));
-  }, [coursesCatalog, courseSearchQuery]);
-
-  // Generate Routines Handler (Client-side fast solver with back-to-back gap minimization)
+  // Generate Routines Handler (Fast solver with back-to-back gap minimization)
   const handleGenerateRoutines = async () => {
     if (selectedCourses.length === 0) {
       toast.error(language === "bn" ? "কমপক্ষে ১টি কোর্স নির্বাচন করুন!" : "Please select at least 1 course!");
@@ -403,7 +424,6 @@ export default function SmartAdvisingRoutineTool() {
     setGenerating(true);
 
     try {
-      // 1. Try Backend API
       const effectiveTimePref = timePreference === "CUSTOM"
         ? `CUSTOM_${time12ToMinutes(customStartTime)}_${time12ToMinutes(customEndTime)}`
         : timePreference;
@@ -448,7 +468,7 @@ export default function SmartAdvisingRoutineTool() {
       console.warn("Backend routine generation fallback to local solver:", err);
     }
 
-    // 2. Client-side local multi-objective solver
+    // Client-side solver
     runClientSideRoutineSolver();
   };
 
@@ -501,7 +521,7 @@ export default function SmartAdvisingRoutineTool() {
       return;
     }
 
-    // Score client combinations with back-to-back consecutive class optimization & gap minimization
+    // Score client combinations
     const scored: GeneratedRoutineOption[] = validCombos.map((combo) => {
       let score = 100;
       const highlights: string[] = [];
@@ -520,14 +540,14 @@ export default function SmartAdvisingRoutineTool() {
           const sm = slot.startMinutes ?? timeToMinutes(slot.start);
           const em = slot.endMinutes ?? timeToMinutes(slot.end);
 
-          if (sm < 600) hasEarly = true; // before 10:00 (e.g. 08:00 or 08:30)
-          if (em > 990) hasLate = true; // after 16:30 (4:30 PM)
+          if (sm < 600) hasEarly = true; // before 10:00 (e.g. 08:30)
+          if (em > 990) hasLate = true;  // after 16:30 (4:30 PM)
           if (sm >= 480 && sm <= 720) morningCount++;
           if (sm >= 690 && sm <= 1080) afternoonCount++;
         });
       });
 
-      // 1. GAP ANALYSIS & CONSECUTIVE CLASS REWARDS
+      // 1. GAP ANALYSIS & BACK-TO-BACK BONUS
       let totalGapMinutes = 0;
       let consecutiveBonus = 0;
       let longGapPenalty = 0;
@@ -540,14 +560,11 @@ export default function SmartAdvisingRoutineTool() {
           const gap = (s2.startMinutes ?? 0) - (s1.endMinutes ?? 0);
 
           if (gap <= 15) {
-            // Direct back-to-back classes (10-15m transition between classrooms) - IDEAL!
             consecutiveBonus += 45;
           } else if (gap <= 50) {
-            // Normal lunch / prayer break (e.g. 12:50 PM to 01:30 PM is 40 min)
             consecutiveBonus += 20;
             totalGapMinutes += gap;
           } else {
-            // Unwanted dead waiting time (e.g. 2-4 hours break between classes)
             totalGapMinutes += gap;
             longGapPenalty += Math.floor(gap / 15) * 14;
           }
@@ -571,7 +588,7 @@ export default function SmartAdvisingRoutineTool() {
         highlights.push(`⚠️ Includes ${outsideDays.join(", ")}`);
       }
 
-      // Campus Days bonus according to dayPreference
+      // Campus Days bonus
       if (dayPreference === "MINIMIZE_DAYS") {
         if (dayCount <= 2) {
           score += 90;
@@ -579,8 +596,6 @@ export default function SmartAdvisingRoutineTool() {
         } else if (dayCount === 3) {
           score += 50;
           highlights.push(`🗓️ Balanced 3 Campus Days`);
-        } else if (dayCount === 4) {
-          score -= 20;
         } else if (dayCount >= 5) {
           score -= 60;
         }
@@ -607,81 +622,29 @@ export default function SmartAdvisingRoutineTool() {
         highlights.push(`⏱️ ${totalGapMinutes}m Total Gap`);
       }
 
-      // 4. TIME PREFERENCES & DEDICATED WINDOW SCORING
-      let targetStartMin = -1;
-      let targetEndMin = -1;
-      let windowLabel = "";
-
+      // 4. TIME PREFERENCES
       if (timePreference === "WINDOW_10_TO_1") {
-        targetStartMin = 600; // 10:00 AM
-        targetEndMin = 780;   // 01:00 PM
-        windowLabel = "10:00 AM - 01:00 PM";
-      } else if (timePreference === "WINDOW_10_TO_3") {
-        targetStartMin = 600; // 10:00 AM
-        targetEndMin = 900;   // 03:00 PM
-        windowLabel = "10:00 AM - 03:00 PM";
-      } else if (timePreference === "WINDOW_830_TO_1130") {
-        targetStartMin = 510; // 08:30 AM
-        targetEndMin = 690;   // 11:30 AM
-        windowLabel = "08:30 AM - 11:30 AM";
-      } else if (timePreference === "WINDOW_130_TO_430") {
-        targetStartMin = 810; // 01:30 PM
-        targetEndMin = 990;   // 04:30 PM
-        windowLabel = "01:30 PM - 04:30 PM";
-      } else if (timePreference === "WINDOW_300_TO_600") {
-        targetStartMin = 900; // 03:00 PM
-        targetEndMin = 1080;  // 06:00 PM
-        windowLabel = "03:00 PM - 06:00 PM";
-      } else if (timePreference === "CUSTOM") {
-        targetStartMin = time12ToMinutes(customStartTime);
-        targetEndMin = time12ToMinutes(customEndTime);
-        windowLabel = `${customStartTime} - ${customEndTime}`;
-      }
-
-      if (targetStartMin >= 0 && targetEndMin > targetStartMin) {
         let insideCount = 0;
-        let totalSlotsCount = 0;
+        let totalSlots = 0;
         combo.forEach((sec) => {
-          sec.slots.forEach((slot) => {
-            totalSlotsCount++;
-            const sm = slot.startMinutes ?? timeToMinutes(slot.start);
-            const em = slot.endMinutes ?? timeToMinutes(slot.end);
-            if (sm >= targetStartMin && em <= targetEndMin) {
-              insideCount++;
-            }
+          sec.slots.forEach((s) => {
+            totalSlots++;
+            const sm = s.startMinutes ?? timeToMinutes(s.start);
+            const em = s.endMinutes ?? timeToMinutes(s.end);
+            if (sm >= 600 && em <= 780) insideCount++;
           });
         });
-
-        if (insideCount === totalSlotsCount) {
-          score += 90;
-          highlights.push(`🎯 100% Fits ${windowLabel} Window`);
-        } else if (insideCount > 0) {
-          score += (insideCount / totalSlotsCount) * 50;
-          score -= (totalSlotsCount - insideCount) * 20;
-          highlights.push(`🎯 ${insideCount}/${totalSlotsCount} Classes in ${windowLabel}`);
-        } else {
-          score -= 60;
-        }
-      } else if (timePreference === "AVOID_MORNING") {
-        if (!hasEarly) {
-          score += 45;
-          highlights.push("☀️ No Early 08:30 Classes");
-        } else {
-          score -= 40;
-        }
-      } else if (timePreference === "AVOID_LATE") {
-        if (!hasLate) {
-          score += 35;
-          highlights.push("🌇 No Late Afternoon Classes");
-        } else {
-          score -= 30;
+        if (insideCount === totalSlots) {
+          score += 80;
+          highlights.push("🎯 10:00 AM - 01:00 PM Fit");
         }
       } else if (timePreference === "PREFER_MORNING") {
         score += morningCount * 12;
-        if (morningCount > afternoonCount) highlights.push("🌅 Morning Focused");
+        if (!hasEarly) score += 20;
+        highlights.push("🌅 Morning Focus");
       } else if (timePreference === "PREFER_AFTERNOON") {
         score += afternoonCount * 12;
-        if (afternoonCount > morningCount) highlights.push("☕ Afternoon Focused");
+        highlights.push("☕ Afternoon Focus");
       }
 
       // 5. FACULTY PREFERENCES
@@ -700,7 +663,9 @@ export default function SmartAdvisingRoutineTool() {
         highlights.push(`⭐ ${facMatchCount} Preferred Faculty`);
       }
 
-      const matchPercentage = Math.min(99, Math.max(68, Math.round((score / 280) * 100)));
+      // Credits & Score normalization
+      const totalCredits = combo.reduce((sum, s) => sum + s.credits, 0);
+      const matchPercentage = Math.min(100, Math.max(65, Math.round((score / 280) * 100)));
 
       return {
         sections: combo,
@@ -709,7 +674,7 @@ export default function SmartAdvisingRoutineTool() {
         rank: 0,
         activeDaysCount: dayCount,
         activeDays,
-        totalCredits: combo.reduce((acc, s) => acc + s.credits, 0),
+        totalCredits,
         totalGapMinutes,
         facultyMatchCount: facMatchCount,
         hasEarlyMorning: hasEarly,
@@ -718,157 +683,199 @@ export default function SmartAdvisingRoutineTool() {
       };
     });
 
-    // Sort descending: strictly prioritize options matching user's selected preferred days, then highest score & minimal gap
-    scored.sort((a, b) => {
-      // 1. Fewer outside days first
-      const aOutside = a.activeDays.filter((d) => !preferredDays.includes(d)).length;
-      const bOutside = b.activeDays.filter((d) => !preferredDays.includes(d)).length;
-      if (aOutside !== bOutside) {
-        return aOutside - bOutside;
-      }
-      // 2. Score descending
-      if (b.score !== a.score) return b.score - a.score;
-      // 3. Gap minutes ascending
-      return a.totalGapMinutes - b.totalGapMinutes;
-    });
+    // Sort descending by score
+    scored.sort((a, b) => b.score - a.score);
 
-    // Provide Top 10 ranked options (Option 1 = Best Match, Option 2, etc.)
-    const top = scored.slice(0, 10).map((opt, i) => ({
+    const topOptions = scored.slice(0, 10).map((opt, idx) => ({
       ...opt,
-      rank: i + 1,
+      rank: idx + 1,
     }));
 
-    setRoutines(top);
+    setRoutines(topOptions);
     setSelectedRoutineIndex(0);
-    triggerSuccessFeedback(top.length);
     setGenerating(false);
+    triggerSuccessFeedback(topOptions.length);
   };
 
   const triggerSuccessFeedback = (count: number) => {
     toast.success(
       language === "bn"
-        ? `🎉 সেরা ${count}টি শূন্য-ক্ল্যাশ (Zero Clash) রুটিন সাজানো হয়েছে! ১ নাম্বার রুটিনটি সেরা।`
-        : `🎉 Generated ${count} conflict-free routines! Option #1 has the highest efficiency & least gaps.`
+        ? `🎉 সেরা ${count}টি শূন্য-ক্ল্যাশ (Zero Clash) রুটিন তৈরি হয়েছে!`
+        : `🎉 Generated ${count} conflict-free routine options!`
     );
     try {
       confetti({
-        particleCount: 45,
-        spread: 65,
-        origin: { y: 0.7 },
+        particleCount: 35,
+        spread: 60,
+        origin: { y: 0.6 },
       });
     } catch (e) {}
   };
 
-  // Run initial solve on mount ONLY if courses are already selected
+  // Run initial solve on mount if selectedCourses has courses
   useEffect(() => {
     if (sections.length > 0 && selectedCourses.length > 0 && routines.length === 0) {
       runClientSideRoutineSolver();
     }
   }, [sections]);
 
-  // Reset from custom student upload back to official SEU master catalog
-  const handleResetToOfficial = () => {
-    setSections(REAL_SEU_OFFERED_SECTIONS);
-    setSelectedCourses([]);
-    setRoutines([]);
-    setIsCustomUpload(false);
-    setCustomUploadName("");
+  // Sorted routine options according to sortBy selection
+  const sortedRoutines = useMemo(() => {
+    if (routines.length === 0) return [];
+    const list = [...routines];
+    if (sortBy === "fewest_days") {
+      list.sort((a, b) => a.activeDaysCount - b.activeDaysCount || b.score - a.score);
+    } else if (sortBy === "lowest_gap") {
+      list.sort((a, b) => a.totalGapMinutes - b.totalGapMinutes || b.score - a.score);
+    } else {
+      list.sort((a, b) => b.score - a.score);
+    }
+    return list;
+  }, [routines, sortBy]);
+
+  // Currently active routine
+  const activeRoutine = sortedRoutines[selectedRoutineIndex] || sortedRoutines[0] || null;
+
+  // Day header span mapping for the active routine (e.g. SUN: Free, MON: 08:30-13:30)
+  const dayTimeSpanMap = useMemo(() => {
+    const map: Record<string, { start: string; end: string; count: number; spanText: string }> = {};
+    WEEK_DAYS.forEach((d) => {
+      map[d] = { start: "", end: "", count: 0, spanText: "Free" };
+    });
+
+    if (!activeRoutine) return map;
+
+    activeRoutine.sections.forEach((sec) => {
+      sec.slots.forEach((sl) => {
+        const day = sl.day.toUpperCase();
+        if (map[day]) {
+          map[day].count++;
+          const sm = sl.startMinutes ?? timeToMinutes(sl.start);
+          const em = sl.endMinutes ?? timeToMinutes(sl.end);
+          if (!map[day].start || sm < timeToMinutes(map[day].start)) {
+            map[day].start = sl.start;
+          }
+          if (!map[day].end || em > timeToMinutes(map[day].end)) {
+            map[day].end = sl.end;
+          }
+        }
+      });
+    });
+
+    WEEK_DAYS.forEach((d) => {
+      if (map[d].count > 0 && map[d].start && map[d].end) {
+        map[d].spanText = `${map[d].start}-${map[d].end}`;
+      }
+    });
+
+    return map;
+  }, [activeRoutine]);
+
+  // Check if active routine is saved
+  const isCurrentRoutineSaved = useMemo(() => {
+    if (!activeRoutine) return false;
+    return savedRoutines.some(
+      (r) =>
+        r.routine.sections.length === activeRoutine.sections.length &&
+        r.routine.sections.every((s) =>
+          activeRoutine.sections.some(
+            (os) => os.courseCode === s.courseCode && os.sectionNumber === s.sectionNumber
+          )
+        )
+    );
+  }, [savedRoutines, activeRoutine]);
+
+  // Toggle Save Routine
+  const handleToggleSaveRoutine = () => {
+    if (!activeRoutine) return;
+    if (isCurrentRoutineSaved) {
+      setSavedRoutines((prev) =>
+        prev.filter(
+          (r) =>
+            !(
+              r.routine.sections.length === activeRoutine.sections.length &&
+              r.routine.sections.every((s) =>
+                activeRoutine.sections.some(
+                  (os) => os.courseCode === s.courseCode && os.sectionNumber === s.sectionNumber
+                )
+              )
+            )
+        )
+      );
+      toast.info(language === "bn" ? "রুটিন সেভ লিস্ট থেকে মুছে ফেলা হয়েছে" : "Routine removed from Saved");
+    } else {
+      setSavedRoutines((prev) => [
+        ...prev,
+        {
+          id: `routine-${Date.now()}`,
+          routine: activeRoutine,
+          name: `Option #${activeRoutine.rank || selectedRoutineIndex + 1}`,
+          date: new Date().toLocaleDateString(),
+        },
+      ]);
+      toast.success(language === "bn" ? "✅ রুটিন সফলভাবে সেভ হয়েছে!" : "✅ Routine saved to your list!");
+    }
+  };
+
+  // Copy advising section codes
+  const handleCopySectionCodes = () => {
+    if (!activeRoutine) return;
+    const codes = activeRoutine.sections.map((s) => `${s.courseCode}.${s.sectionNumber}`).join(", ");
+    navigator.clipboard.writeText(codes);
     toast.success(
-      language === "bn"
-        ? "↺ বিশ্ববিদ্যালয়ের অফিসিয়াল মাস্টার রুটিনে ফিরে যাওয়া হয়েছে!"
-        : "↺ Restored to Official University Master Routine!"
+      language === "bn" ? `📋 সেকশন কোড কপি হয়েছে: ${codes}` : `📋 Copied section codes: ${codes}`
     );
   };
 
-  // Handle UMS HTML File Upload (Isolated to student session; will never merge into admin master table)
-  const handleFileUpload = async (file: File) => {
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error(language === "bn" ? "ফাইলের সাইজ ১০ মেগাবাইটের কম হতে হবে!" : "File size must be under 10MB!");
-      return;
-    }
-
-    setUploadingFile(true);
+  // Download Class Routine as PNG
+  const handleDownloadPNG = async () => {
+    if (!routineContainerRef.current) return;
+    setIsExporting(true);
+    const toastId = toast.loading(language === "bn" ? "রুটিন ইমেজ (PNG) তৈরি হচ্ছে..." : "Exporting Class Routine as PNG...");
     try {
-      const text = await file.text();
-      const parsedList = parseHtmlClientSide(text);
-      if (parsedList.length > 0) {
-        setSections(parsedList);
-        setIsCustomUpload(true);
-        setCustomUploadName(file.name);
-        setSelectedCourses([]);
-        setRoutines([]);
-        toast.success(
-          language === "bn"
-            ? `✅ আপনার ফাইলের ${parsedList.length}টি সেকশন আলাদাভাবে লোড করা হয়েছে! এবার আপনার পছন্দের কোর্স সিলেক্ট করুন।`
-            : `✅ Successfully extracted ${parsedList.length} sections from your file! Now select your target courses.`
-        );
-      } else {
-        toast.error("Could not extract sections. Please check your HTML file format.");
-      }
-
-      // Safe isolated backend upload call (never merges into admin master catalog)
-      await api.advising.uploadAdvisingTable(file, semester).catch(() => {});
-      setIsUploadModalOpen(false);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to process advising HTML file.");
-    } finally {
-      setUploadingFile(false);
-    }
-  };
-
-  const handlePasteFromClipboard = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text && text.trim()) {
-        setPastedText(text);
-        toast.success("Pasted content from clipboard!");
-      } else {
-        toast.error("Clipboard is empty or contains no text.");
-      }
-    } catch (e) {
-      toast.error("Please press Ctrl+V inside the text box to paste.");
-    }
-  };
-
-  const handleApplyPastedText = async () => {
-    if (!pastedText.trim()) {
-      toast.error("Please paste your UMS table text or HTML first!");
-      return;
-    }
-
-    setUploadingFile(true);
-    try {
-      const parsedList = parseHtmlClientSide(pastedText);
-      if (parsedList.length === 0) {
-        toast.error(
-          "Could not detect valid course sections. Please ensure you copied table rows containing course codes (e.g. CSE355.1) and schedule times."
-        );
-        return;
-      }
-
-      setSections(parsedList);
-      setIsCustomUpload(true);
-      setCustomUploadName(`Pasted Table (${parsedList.length} sections)`);
-      setSelectedCourses([]);
-      setRoutines([]);
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(routineContainerRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#0B0F19",
+        logging: false,
+      });
+      const url = canvas.toDataURL("image/png");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `SEU_Class_Routine_Option_${selectedRoutineIndex + 1}_${semester.replace(/\s+/g, "_")}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       toast.success(
-        language === "bn"
-          ? `✅ পেস্ট করা টেবিল থেকে ${parsedList.length}টি সেকশন সফলভাবে লোড হয়েছে! এবার আপনার পছন্দের কোর্স সিলেক্ট করুন।`
-          : `✅ Successfully extracted ${parsedList.length} sections from pasted data! Now select your target courses.`
+        language === "bn" ? "✅ ক্লাস রুটিন PNG ডাউনলোড সম্পন্ন হয়েছে!" : "✅ Class Routine PNG downloaded successfully!",
+        { id: toastId }
       );
-
-      // Safe isolated backend upload call (never merges into admin master catalog)
-      api.advising.uploadAdvisingTable(pastedText, semester).catch(() => {});
-      setIsUploadModalOpen(false);
-      setPastedText("");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to parse pasted table.");
+    } catch (err) {
+      console.error("Failed to export routine PNG:", err);
+      toast.error("Failed to export routine PNG.", { id: toastId });
     } finally {
-      setUploadingFile(false);
+      setIsExporting(false);
     }
   };
 
+  // Print Routine
+  const handlePrintRoutine = () => {
+    window.print();
+  };
+
+  // Reset to official routine
+  const handleResetToOfficial = () => {
+    setSections(REAL_SEU_OFFERED_SECTIONS);
+    setSelectedCourses(["CSE355", "CSE381", "CSE382", "CSE443", "CSE444"]);
+    setIsCustomUpload(false);
+    setCustomUploadName("");
+    toast.success(
+      language === "bn" ? "↺ বিশ্ববিদ্যালয়ের অফিসিয়াল মাস্টার রুটিনে ফিরে যাওয়া হয়েছে!" : "↺ Restored to Official SEU Routine!"
+    );
+  };
+
+  // Parsing UMS HTML or raw text
   const parseRawTextOrGenericTableClient = (input: string): OfferedSectionItem[] => {
     const list: OfferedSectionItem[] = [];
     if (!input || !input.trim()) return list;
@@ -948,37 +955,7 @@ export default function SmartAdvisingRoutineTool() {
         if (!isNaN(parsedCred)) credits = parsedCred;
       }
 
-      let title = "";
-      const afterSec = chunk.replace(/^[A-Z]{3,4}\d{3}\.\d+/, "").trim();
-      const lines = afterSec.split(/[\r\n]+/);
-      for (const line of lines) {
-        const candidate = line
-          .replace(/\[.*?\]/g, "")
-          .replace(/\d+\s*(?:Cr|cr|Credits)?/g, "")
-          .replace(/&amp;/g, "&")
-          .trim();
-        if (!candidate) continue;
-        const upper = candidate.toUpperCase();
-        if (
-          upper === "CSE." || upper === "CSE" ||
-          upper === "EEE." || upper === "EEE" ||
-          upper === "BBA." || upper === "BBA" ||
-          upper === "TEXTILE" || upper === "LAW" || upper === "PHR" || upper === "ENG" ||
-          upper === "B.SC." || upper === "B.SC" || upper.startsWith("B.SC IN") ||
-          upper.startsWith("DEPARTMENT") || upper.startsWith("DEPT") || upper.startsWith("PROGRAM") ||
-          upper === "SL" || upper === "COURSE" || upper === "SECTION" ||
-          upper.includes("SUN") || upper.includes("MON") || upper.includes("TUE") ||
-          upper.includes("WED") || upper.includes("THU") || upper.includes("FRI") || upper.includes("SAT")
-        ) {
-          continue;
-        }
-        if (candidate.length >= 3) {
-          title = candidate;
-          break;
-        }
-      }
-
-      title = getSeuCourseTitle(courseCode, title);
+      const title = getSeuCourseTitle(courseCode, "");
 
       list.push({
         courseCode,
@@ -1062,1651 +1039,1249 @@ export default function SmartAdvisingRoutineTool() {
     return list;
   };
 
-  // Current active routine
-  const activeRoutine = routines[selectedRoutineIndex] || routines[0] || null;
-
-  // Copy routine section codes to clipboard
-  const handleCopySectionCodes = () => {
-    if (!activeRoutine) return;
-    const codes = activeRoutine.sections.map((s) => `${s.courseCode}.${s.sectionNumber}`).join(", ");
-    navigator.clipboard.writeText(codes);
-    toast.success(
-      language === "bn"
-        ? `📋 সেকশন কোড কপি হয়েছে: ${codes}`
-        : `📋 Copied section codes: ${codes}`
-    );
-  };
-
-  // Download Class Routine as High-Quality PNG Image
-  const handleDownloadPNG = async () => {
-    if (!routineContainerRef.current) return;
-    setIsExporting(true);
-    const toastId = toast.loading(language === "bn" ? "রুটিন ইমেজ (PNG) তৈরি হচ্ছে..." : "Exporting Class Routine as PNG image...");
+  const handleFileUpload = async (file: File) => {
+    if (!file) return;
+    setUploadingFile(true);
     try {
-      const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(routineContainerRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#0B0F19",
-        logging: false,
-      });
-      const url = canvas.toDataURL("image/png");
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `SEU_Class_Routine_Option_${selectedRoutineIndex + 1}_${semester.replace(/\s+/g, "_")}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      toast.success(
-        language === "bn"
-          ? "✅ ক্লাস রুটিন PNG সফলভাবে ডাউনলোড হয়েছে!"
-          : "✅ Class Routine PNG downloaded successfully!",
-        { id: toastId }
-      );
+      const text = await file.text();
+      const parsedList = parseHtmlClientSide(text);
+      if (parsedList.length > 0) {
+        setSections(parsedList);
+        setIsCustomUpload(true);
+        setCustomUploadName(file.name);
+        setSelectedCourses(parsedList.slice(0, 5).map((s) => s.courseCode));
+        toast.success(`Loaded ${parsedList.length} sections from ${file.name}!`);
+        setIsUploadModalOpen(false);
+      } else {
+        toast.error("Could not extract sections from file.");
+      }
     } catch (err: any) {
-      console.error("Failed to export routine PNG:", err);
-      toast.error("Failed to export routine PNG. Please try again or use Print.", { id: toastId });
+      toast.error(err.message || "Failed to process file.");
     } finally {
-      setIsExporting(false);
+      setUploadingFile(false);
     }
   };
 
-  // Download Class Routine as Landscape A4 PDF Document
-  const handleDownloadPDF = async () => {
-    if (!routineContainerRef.current) return;
-    setIsExporting(true);
-    const toastId = toast.loading(language === "bn" ? "রুটিন PDF তৈরি হচ্ছে..." : "Generating landscape PDF document...");
+  const handleApplyPastedText = async () => {
+    if (!pastedText.trim()) return;
+    setUploadingFile(true);
     try {
-      const html2canvas = (await import("html2canvas")).default;
-      const { jsPDF } = await import("jspdf");
-
-      const canvas = await html2canvas(routineContainerRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#0B0F19",
-        logging: false,
-      });
-
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: "a4",
-      });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const ratio = Math.min((pdfWidth - 16) / imgWidth, (pdfHeight - 16) / imgHeight);
-      const canvasScaledWidth = imgWidth * ratio;
-      const canvasScaledHeight = imgHeight * ratio;
-      const marginX = (pdfWidth - canvasScaledWidth) / 2;
-      const marginY = (pdfHeight - canvasScaledHeight) / 2;
-
-      // Dark background for PDF
-      pdf.setFillColor(11, 15, 25);
-      pdf.rect(0, 0, pdfWidth, pdfHeight, "F");
-      pdf.addImage(imgData, "PNG", marginX, marginY, canvasScaledWidth, canvasScaledHeight);
-      pdf.save(`SEU_Class_Routine_Option_${selectedRoutineIndex + 1}_${semester.replace(/\s+/g, "_")}.pdf`);
-
-      toast.success(
-        language === "bn"
-          ? "✅ ক্লাস রুটিন PDF সফলভাবে ডাউনলোড হয়েছে!"
-          : "✅ Class Routine PDF downloaded successfully!",
-        { id: toastId }
-      );
+      const parsedList = parseHtmlClientSide(pastedText);
+      if (parsedList.length > 0) {
+        setSections(parsedList);
+        setIsCustomUpload(true);
+        setCustomUploadName(`Pasted Table (${parsedList.length} sections)`);
+        setSelectedCourses(parsedList.slice(0, 5).map((s) => s.courseCode));
+        toast.success(`Loaded ${parsedList.length} sections from pasted text!`);
+        setIsUploadModalOpen(false);
+        setPastedText("");
+      } else {
+        toast.error("Could not detect valid course sections.");
+      }
     } catch (err: any) {
-      console.error("Failed to export routine PDF:", err);
-      toast.error("Failed to export routine PDF. Please try again or use Print.", { id: toastId });
+      toast.error(err.message || "Failed to parse text.");
     } finally {
-      setIsExporting(false);
+      setUploadingFile(false);
     }
   };
+
+  // Filtered sidebar selected courses
+  const filteredSidebarCourses = useMemo(() => {
+    if (!sidebarCourseSearch.trim()) return selectedCourses;
+    const q = sidebarCourseSearch.toLowerCase();
+    return selectedCourses.filter((code) => {
+      const cObj = coursesCatalog.find((c) => c.code === code);
+      const title = cObj?.title || "";
+      const facs = courseFaculties[code]?.map((f) => f.initial.toLowerCase()).join(" ") || "";
+      return code.toLowerCase().includes(q) || title.toLowerCase().includes(q) || facs.includes(q);
+    });
+  }, [selectedCourses, sidebarCourseSearch, coursesCatalog, courseFaculties]);
+
+  // Catalog filtered list for Modal
+  const catalogModalCourses = useMemo(() => {
+    let list = coursesCatalog;
+    if (catalogFilterTab === "theory") list = list.filter((c) => !c.isLab);
+    if (catalogFilterTab === "lab") list = list.filter((c) => c.isLab);
+    if (!catalogSearchQuery.trim()) return list;
+    const q = catalogSearchQuery.toLowerCase();
+    return list.filter((c) => c.code.toLowerCase().includes(q) || c.title.toLowerCase().includes(q));
+  }, [coursesCatalog, catalogFilterTab, catalogSearchQuery]);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-5 animate-in fade-in duration-300">
       {/* ========================================================================= */}
-      {/* 1. HERO HEADER WITH SEU THEME & UPLOAD CALLOUT */}
+      {/* 1. TOP NAVBAR (Exact match to seu-routine-builder.ai.studio)              */}
       {/* ========================================================================= */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950/70 to-slate-950 border border-indigo-500/30 p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
-        <div className="absolute -right-20 -top-20 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-3 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-mono font-bold tracking-wider uppercase">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Southeast University Advising Engine • Zero-Clash Guarantee</span>
-            </div>
-            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight">
-              {language === "bn"
-                ? "স্মার্ট অ্যাডভাইজিং রুটিন প্ল্যানার & ক্ল্যাশ অপটিমাইজার"
-                : "Smart Advising Routine Generator & Timetable"}
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
+        {/* Brand / Logo */}
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-blue-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 text-white font-black text-base">
+            S
+          </div>
+          <div>
+            <h1 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
+              <span>SEU Routine Builder</span>
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              {language === "bn"
-                ? "সাউথইস্ট ইউনিভার্সিটির UMS অ্যাডভাইজিং টেবিল থেকে শূন্য-ক্ল্যাশ (0% Conflict) সহ ন্যূনতম টাইম গ্যাপ, কাঙ্ক্ষিত শিক্ষক ও সুবিধাজনক সময়ে সেরা ১০টি বিকল্প রুটিন এক্সপ্লোর ও ডাউনলোড করুন।"
-                : "Instantly computes conflict-free class combinations from SEU UMS advising tables. Optimize for minimal gaps, back-to-back classes, preferred teachers, and export as PNG/PDF."}
+            <p className="text-[11px] font-mono text-slate-400">
+              Southeast University Advising Engine
             </p>
           </div>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <button
-              onClick={() => setIsUploadModalOpen(true)}
-              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-500/25 transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+        {/* Center Tabs: Routine | Compare | Saved (X) */}
+        <div className="flex items-center p-1 rounded-2xl bg-slate-900 border border-slate-800 shadow-inner">
+          <button
+            type="button"
+            onClick={() => setActiveAppTab("routine")}
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeAppTab === "routine"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Routine
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveAppTab("compare")}
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeAppTab === "compare"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Compare
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveAppTab("saved")}
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeAppTab === "saved"
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/25"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <span>Saved</span>
+            <span
+              className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
+                savedRoutines.length > 0 ? "bg-amber-500 text-black" : "bg-slate-800 text-slate-400"
+              }`}
             >
-              <Upload className="w-4 h-4" />
-              <span>{language === "bn" ? "UMS টেবিল আপলোড (.html)" : "Upload UMS Table (.html)"}</span>
+              {savedRoutines.length}
+            </span>
+          </button>
+        </div>
+
+        {/* Right CTA: Advising Data Button */}
+        <div className="flex items-center gap-2.5">
+          {isCustomUpload && (
+            <button
+              type="button"
+              onClick={handleResetToOfficial}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+              title="Reset to official master routine"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
+              <span className="hidden sm:inline">Reset to Official</span>
             </button>
-          </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setIsUploadModalOpen(true)}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Advising Data</span>
+          </button>
         </div>
       </div>
 
-      {/* Custom Student Upload Active Banner */}
-      {isCustomUpload && (
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-900/30 via-indigo-900/30 to-slate-900 border border-blue-500/40 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 text-white">
-            <FileText className="w-4 h-4 text-blue-400 shrink-0" />
-            <span>
-              <strong>Custom Student Schedule Active:</strong> {customUploadName} ({sections.length} sections loaded)
-            </span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">
-              Private Session Sandbox
-            </span>
-          </div>
-          <button
-            onClick={handleResetToOfficial}
-            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
-            <span>Reset to Official SEU Routine</span>
-          </button>
-        </div>
-      )}
-
       {/* ========================================================================= */}
-      {/* 1. TARGET COURSE SELECTOR (SEARCH-TO-ADD & SEE MORE / SEE LESS)           */}
+      {/* TAB 1: MAIN ROUTINE BUILDER (Exact 2-Column Demo Layout)                  */}
       {/* ========================================================================= */}
-      {(() => {
-        const isSearching = courseSearchQuery.trim().length > 0;
-        const theoryToShow = isSearching || isCoursesExpanded ? filteredTheoryCourses : filteredTheoryCourses.slice(0, 6);
-        const labToShow = isSearching || isCoursesExpanded ? filteredLabCourses : filteredLabCourses.slice(0, 4);
-        const totalAvailable = filteredTheoryCourses.length + filteredLabCourses.length;
-        const totalShown = theoryToShow.length + labToShow.length;
-        const hasMore = !isSearching && totalShown < totalAvailable;
+      {activeAppTab === "routine" && (
+        <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] xl:grid-cols-[360px_1fr] gap-5 items-start">
+          {/* ===================================================================== */}
+          {/* LEFT SIDEBAR (~350px)                                                 */}
+          {/* ===================================================================== */}
+          <div className="space-y-4">
+            {/* Top Purple CTA Button: Re-Build Routine */}
+            <button
+              type="button"
+              onClick={handleGenerateRoutines}
+              disabled={generating || selectedCourses.length === 0}
+              className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-600 text-white font-black text-sm shadow-xl shadow-purple-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40"
+            >
+              <Sparkles className={`w-4 h-4 text-purple-200 ${generating ? "animate-spin" : ""}`} />
+              <span>{generating ? "Solving Zero-Clash Routines..." : "Re-Build Routine"}</span>
+            </button>
 
-        return (
-          <div className="rounded-3xl bg-slate-900/60 border border-slate-800 p-5 sm:p-6 backdrop-blur-md space-y-5">
-            {/* Header: Title, Credit Tracker Badge, Search Bar & Quick Actions */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
-              <div className="flex items-start gap-3">
-                <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0 mt-0.5">
-                  <BookOpen className="w-5 h-5" />
-                </div>
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-base sm:text-lg font-black text-white">
-                      {language === "bn" ? "১. টার্গেট কোর্স নির্বাচন করুন" : "1. Select Target Courses"}
-                    </h2>
-                    <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                      {selectedCourses.length} {language === "bn" ? "টি কোর্স" : "Courses"}
-                    </span>
-                    {/* Max 17-Credit Limit Badge */}
-                    <span className={`text-xs font-mono font-bold px-3 py-0.5 rounded-full border transition-all ${
-                      selectedCreditsTotal >= 17
-                        ? "bg-amber-950/70 text-amber-300 border-amber-500/60 shadow-sm"
-                        : selectedCreditsTotal > 0
-                        ? "bg-blue-950/70 text-blue-300 border-blue-500/40"
-                        : "bg-slate-800 text-slate-400 border-slate-700"
-                    }`}>
-                      {selectedCreditsTotal} / 17 Credits
-                      {selectedCreditsTotal >= 17 && (
-                        <span className="ml-1 text-[10px] text-amber-400 font-sans font-bold">
-                          ({language === "bn" ? "সর্বোচ্চ সীমা" : "Max Reached"})
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    {language === "bn"
-                      ? "থিয়োরি ও ল্যাব মিলিয়ে সর্বোচ্চ ১৭ ক্রেডিট পর্যন্ত নির্বাচন করা যাবে। সার্চ করে সহজে যেকোনো কোর্স যুক্ত করুন।"
-                      : "Select Theory and Lab courses (max 17 credits combined). Search to quickly add courses."}
-                  </p>
-                </div>
-              </div>
-
-              {/* Quick Actions & Live Search-to-Add Input */}
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="relative min-w-[210px] sm:min-w-[260px] flex-1">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={courseSearchQuery}
-                    onChange={(e) => setCourseSearchQuery(e.target.value)}
-                    placeholder={language === "bn" ? "কোর্স সার্চ করে যুক্ত করুন (e.g. CSE4, Compiler)..." : "Search to add (e.g. CSE4, Compiler, Lab)..."}
-                    className="w-full text-xs py-2 pl-8 pr-7 rounded-xl bg-slate-800/90 border border-slate-700 text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
-                  />
-                  {courseSearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setCourseSearchQuery("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 cursor-pointer"
-                      title="Clear search"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-
+            {/* PREFERENCES Card */}
+            <div className="rounded-2xl bg-[#0d1322] border border-slate-800/90 p-4 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between text-xs font-mono font-bold tracking-wider text-slate-400 uppercase">
+                <span>PREFERENCES</span>
                 <button
                   type="button"
                   onClick={() => {
-                    const sample = ["CSE355", "CSE381", "CSE382", "CSE443", "CSE444"].filter(c => coursesCatalog.some(cat => cat.code === c));
-                    const targetList = sample.length > 0 ? sample : coursesCatalog.slice(0, 5).map(c => c.code);
-                    let total = 0;
-                    const capped: string[] = [];
-                    for (const code of targetList) {
-                      const cObj = coursesCatalog.find(c => c.code === code);
-                      const cred = cObj?.credits || 3.0;
-                      if (total + cred <= 17) {
-                        capped.push(code);
-                        total += cred;
-                      }
-                    }
-                    setSelectedCourses(capped);
-                    toast.success(
-                      language === "bn"
-                        ? `৫টি রেকমেন্ডেড কোর্স (${total} ক্রেডিট) সিলেক্ট করা হয়েছে!`
-                        : `Loaded recommended standard courses (${total} credits)!`
-                    );
+                    setTimePreference("ANY");
+                    setDayPreference("COMPACT_GAPS");
+                    setPreferredDays(["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]);
+                    setFacultyPreferences({});
                   }}
-                  className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="text-[11px] font-sans font-normal text-slate-500 hover:text-slate-300 flex items-center gap-1 cursor-pointer transition-colors"
                 >
-                  <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                  <span>Recommend 5 (11 Cr)</span>
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Reset</span>
                 </button>
-
-                {selectedCourses.length > 0 && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCourses([])}
-                      className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-mono font-bold transition-all cursor-pointer"
-                    >
-                      Clear ({selectedCourses.length})
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleGenerateRoutines}
-                      disabled={generating}
-                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black shadow-lg shadow-emerald-500/25 transition-all flex items-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-                    >
-                      <Sparkles className={`w-3.5 h-3.5 ${generating ? "animate-spin" : ""}`} />
-                      <span>
-                        {generating
-                          ? "Solving..."
-                          : language === "bn"
-                          ? `১০টি রুটিন সাজান (${selectedCourses.length}টি কোর্স) 🚀`
-                          : `Generate 10 Routines 🚀`}
-                      </span>
-                    </button>
-                  </>
-                )}
               </div>
-            </div>
 
-            {/* Active Selected Target Courses Shelf */}
-            {selectedCourses.length > 0 && (
-              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-slate-900 border border-blue-500/30 space-y-2.5 animate-in fade-in duration-200">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <span className="font-bold text-blue-300 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-blue-400" />
-                    <span>{language === "bn" ? "সিলেক্ট করা টার্গেট কোর্সসমূহ:" : "Active Selected Target Courses:"}</span>
-                    <span className="font-mono text-[11px] text-slate-400">({selectedCourses.length})</span>
-                  </span>
-                  <span className="text-[11px] font-mono font-bold text-slate-300">
-                    {selectedCreditsTotal} / 17 Credits
-                    {selectedCreditsTotal < 17 ? (
-                      <span className="text-emerald-400 font-normal ml-1">
-                        ({17 - selectedCreditsTotal} Cr remaining)
-                      </span>
-                    ) : (
-                      <span className="text-amber-400 font-bold ml-1">
-                        ({language === "bn" ? "১৭ ক্রেডিট পূর্ণ" : "17 Cr Full"})
-                      </span>
-                    )}
-                  </span>
+              {/* Time Slot (2x2 Grid) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span>Time Slot</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomTimeInput(!showCustomTimeInput)}
+                    className="text-[10px] text-indigo-400 hover:underline cursor-pointer"
+                  >
+                    {showCustomTimeInput ? "Presets" : "Custom Window"}
+                  </button>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {selectedCourses.map((cCode) => {
-                    const cObj = coursesCatalog.find((c) => c.code === cCode);
-                    const isLab = cObj?.isLab || false;
-                    const cred = cObj?.credits || 3.0;
+                {!showCustomTimeInput ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: "ANY", label: "Any Time" },
+                      { id: "PREFER_MORNING", label: "Morning" },
+                      { id: "WINDOW_10_TO_1", label: "Late Morning" },
+                      { id: "PREFER_AFTERNOON", label: "Afternoon" },
+                    ].map((slot) => {
+                      const isActive = timePreference === slot.id;
+                      return (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          onClick={() => setTimePreference(slot.id)}
+                          className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer text-center border ${
+                            isActive
+                              ? "bg-indigo-600 text-white border-indigo-400/40 shadow-md shadow-indigo-500/25"
+                              : "bg-slate-850/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-800"
+                          }`}
+                        >
+                          {slot.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                    <span className="text-[11px] text-slate-400 block font-mono">Custom 12-Hour Window:</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        value={customStartTime}
+                        onChange={(e) => {
+                          setCustomStartTime(e.target.value);
+                          setTimePreference("CUSTOM");
+                        }}
+                        className="text-xs bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-white"
+                      >
+                        {["08:00 AM", "08:30 AM", "10:00 AM", "11:30 AM", "01:30 PM", "03:00 PM"].map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={customEndTime}
+                        onChange={(e) => {
+                          setCustomEndTime(e.target.value);
+                          setTimePreference("CUSTOM");
+                        }}
+                        className="text-xs bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-white"
+                      >
+                        {["11:30 AM", "01:00 PM", "02:50 PM", "04:30 PM", "06:00 PM"].map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Time Gap (Segmented Pills: No Gap vs No Problem) */}
+              <div className="space-y-2">
+                <span className="text-xs text-slate-400 block">Time Gap</span>
+                <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-900/90 border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setDayPreference("COMPACT_GAPS")}
+                    className={`py-2 px-3 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                      dayPreference === "COMPACT_GAPS"
+                        ? "bg-amber-500 text-black shadow-md shadow-amber-500/20"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    No Gap
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDayPreference("ANY")}
+                    className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      dayPreference === "ANY"
+                        ? "bg-slate-700 text-white shadow-md"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    No Problem
+                  </button>
+                </div>
+              </div>
+
+              {/* Preferred Days (7 rounded pills, cyan highlighted when active) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400">Preferred Days</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (preferredDays.length === 7) {
+                        setPreferredDays(["SUN", "MON", "TUE", "WED"]);
+                      } else {
+                        setPreferredDays(["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]);
+                      }
+                    }}
+                    className="text-cyan-400 hover:underline cursor-pointer text-[11px] font-semibold"
+                  >
+                    {preferredDays.length === 7 ? "Reset" : "All Days"}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-1">
+                  {WEEK_DAYS.map((day) => {
+                    const isSelected = preferredDays.includes(day);
                     return (
-                      <div
-                        key={cCode}
-                        className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-2 shadow-sm transition-all ${
-                          isLab
-                            ? "bg-cyan-950/70 border-cyan-500/40 text-cyan-200"
-                            : "bg-blue-950/70 border-blue-500/40 text-blue-200"
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => {
+                          setPreferredDays((prev) =>
+                            prev.includes(day)
+                              ? prev.length > 1
+                                ? prev.filter((d) => d !== day)
+                                : prev
+                              : [...prev, day]
+                          );
+                        }}
+                        className={`w-9 h-9 rounded-xl text-[11px] font-mono font-bold transition-all cursor-pointer flex items-center justify-center border ${
+                          isSelected
+                            ? "bg-cyan-400 text-slate-950 border-cyan-300 shadow-md shadow-cyan-400/20 font-black scale-[1.02]"
+                            : "bg-slate-800/80 text-slate-400 border-slate-700/60 hover:text-slate-200 hover:border-slate-600"
                         }`}
                       >
-                        <span className="font-mono font-black">{cCode}</span>
-                        <span className="text-slate-300 text-[11px] truncate max-w-[130px] sm:max-w-[200px]" title={cObj?.title}>
-                          {cObj?.title || cCode}
-                        </span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-black/40 text-slate-300 border border-white/10 font-bold">
-                          {cred} Cr
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleCourse(cCode, cred)}
-                          className="p-0.5 rounded-md hover:bg-white/20 text-slate-400 hover:text-white transition-colors cursor-pointer"
-                          title={`Remove ${cCode}`}
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                        {day}
+                      </button>
                     );
                   })}
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Courses Groups (Theory & Lab) */}
-            <div className="space-y-5">
-              {/* Theory Courses Group */}
-              {theoryToShow.length > 0 && (
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-300">
-                    <div className="flex items-center gap-2">
-                      <GraduationCap className="w-4 h-4 text-indigo-400" />
-                      <span>Theory Courses (Paired Days • SUN+TUE / MON+WED / THU+SAT)</span>
-                    </div>
-                    <span className="text-[11px] text-slate-400 font-normal">
-                      {isSearching
-                        ? `${theoryToShow.length} matches`
-                        : `${theoryToShow.length} of ${filteredTheoryCourses.length} shown`}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                    {theoryToShow.map((c) => {
-                      const isSelected = selectedCourses.includes(c.code);
-                      const exceedsLimit = !isSelected && selectedCreditsTotal + c.credits > 17;
-
-                      return (
-                        <div
-                          key={c.code}
-                          onClick={() => handleToggleCourse(c.code, c.credits)}
-                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-start justify-between gap-3 group ${
-                            isSelected
-                              ? "bg-blue-600/15 border-blue-500/60 shadow-md shadow-blue-500/15 scale-[1.01]"
-                              : exceedsLimit
-                              ? "bg-slate-900/40 border-slate-800/80 text-slate-500 opacity-60 hover:border-amber-500/40"
-                              : "bg-slate-800/40 border-slate-700/60 hover:border-slate-500 hover:bg-slate-800/70"
-                          }`}
-                        >
-                          <div className="space-y-1 min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-black text-sm text-white">{c.code}</span>
-                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                                {c.credits} Cr
-                              </span>
-                              <span className="text-[10px] text-slate-400 font-mono">
-                                ({c.sections.length} sec)
-                              </span>
-                            </div>
-                            {/* Real Course Title! */}
-                            <p className="text-xs font-bold text-slate-200 line-clamp-1 group-hover:text-blue-300 transition-colors" title={c.title}>
-                              {c.title}
-                            </p>
-                            <div className="flex items-center justify-between text-[9px] font-mono">
-                              <span className="text-indigo-400 block">
-                                Paired 80m Slots
-                              </span>
-                              {exceedsLimit && !isSelected && (
-                                <span className="text-amber-400 font-bold">
-                                  {language === "bn" ? ">১৭ ক্রেডিট" : ">17 Cr"}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div
-                            className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
-                              isSelected
-                                ? "bg-blue-600 border-blue-500 text-white"
-                                : "border-slate-600 bg-slate-800/80 text-transparent"
-                            }`}
-                          >
-                            <Check className="w-3.5 h-3.5 stroke-[3]" />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+            {/* COURSES Card */}
+            <div className="rounded-2xl bg-[#0d1322] border border-slate-800/90 p-4 space-y-3.5 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold tracking-wider text-slate-300 uppercase">
+                    COURSES ({selectedCourses.length})
+                  </span>
+                  <span
+                    className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                      selectedCreditsTotal >= 17
+                        ? "bg-amber-950 text-amber-300 border-amber-500/50"
+                        : "bg-slate-800 text-slate-300 border-slate-700"
+                    }`}
+                  >
+                    {selectedCreditsTotal}/17 Cr
+                  </span>
                 </div>
-              )}
 
-              {/* Practical Lab Courses Group */}
-              {labToShow.length > 0 && (
-                <div className="space-y-2.5 pt-3 border-t border-slate-800/80">
-                  <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-300">
-                    <div className="flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-cyan-400" />
-                      <span>Lab Courses (Single Day • 2-Hour Practical Sessions)</span>
-                    </div>
-                    <span className="text-[11px] text-slate-400 font-normal">
-                      {isSearching
-                        ? `${labToShow.length} matches`
-                        : `${labToShow.length} of ${filteredLabCourses.length} shown`}
-                    </span>
-                  </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCatalogModalOpen(true)}
+                  className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Catalog</span>
+                </button>
+              </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                    {labToShow.map((c) => {
-                      const isSelected = selectedCourses.includes(c.code);
-                      const exceedsLimit = !isSelected && selectedCreditsTotal + c.credits > 17;
-
-                      return (
-                        <div
-                          key={c.code}
-                          onClick={() => handleToggleCourse(c.code, c.credits)}
-                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex items-start justify-between gap-3 group ${
-                            isSelected
-                              ? "bg-cyan-600/15 border-cyan-500/60 shadow-md shadow-cyan-500/15 scale-[1.01]"
-                              : exceedsLimit
-                              ? "bg-slate-900/40 border-slate-800/80 text-slate-500 opacity-60 hover:border-amber-500/40"
-                              : "bg-slate-800/40 border-slate-700/60 hover:border-slate-500 hover:bg-slate-800/70"
-                          }`}
-                        >
-                          <div className="space-y-1 min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-black text-sm text-white">{c.code}</span>
-                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                                {c.credits} Cr
-                              </span>
-                              <span className="text-[10px] text-slate-400 font-mono">
-                                ({c.sections.length} sec)
-                              </span>
-                            </div>
-                            {/* Real Course Title! */}
-                            <p className="text-xs font-bold text-slate-200 line-clamp-1 group-hover:text-cyan-300 transition-colors" title={c.title}>
-                              {c.title}
-                            </p>
-                            <div className="flex items-center justify-between text-[9px] font-mono">
-                              <span className="text-cyan-400 block">
-                                Single Day 120m Lab
-                              </span>
-                              {exceedsLimit && !isSelected && (
-                                <span className="text-amber-400 font-bold">
-                                  {language === "bn" ? ">১৭ ক্রেডিট" : ">17 Cr"}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div
-                            className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
-                              isSelected
-                                ? "bg-cyan-600 border-cyan-500 text-white"
-                                : "border-slate-600 bg-slate-800/80 text-transparent"
-                            }`}
-                          >
-                            <Check className="w-3.5 h-3.5 stroke-[3]" />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* No Courses Match Search Feedback */}
-              {isSearching && theoryToShow.length === 0 && labToShow.length === 0 && (
-                <div className="p-8 rounded-2xl bg-slate-800/40 border border-slate-700/60 text-center space-y-2">
-                  <p className="text-sm font-bold text-slate-300">
-                    {language === "bn"
-                      ? `"${courseSearchQuery}" দিয়ে কোনো কোর্স পাওয়া যায়নি`
-                      : `No courses found matching "${courseSearchQuery}"`}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {language === "bn"
-                      ? "কোর্স কোড (e.g. CSE355, CSE4) বা বিষয়ের নাম দিয়ে সার্চ করুন।"
-                      : "Try searching by course code (e.g. CSE355, CSE4) or title keywords."}
-                  </p>
+              {/* Course Search */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={sidebarCourseSearch}
+                  onChange={(e) => setSidebarCourseSearch(e.target.value)}
+                  placeholder="Search courses or faculty..."
+                  className="w-full text-xs py-2 pl-8 pr-7 rounded-xl bg-slate-800/80 border border-slate-700/80 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                {sidebarCourseSearch && (
                   <button
                     type="button"
-                    onClick={() => setCourseSearchQuery("")}
-                    className="px-4 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-bold cursor-pointer"
+                    onClick={() => setSidebarCourseSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 cursor-pointer"
                   >
-                    {language === "bn" ? "সার্চ ক্লিয়ার করুন" : "Clear Search Filter"}
+                    <X className="w-3 h-3" />
                   </button>
-                </div>
-              )}
-
-              {/* See More / See Less Toggle Button */}
-              {!isSearching && (
-                <div className="pt-2 flex justify-center">
-                  {!isCoursesExpanded && hasMore ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsCoursesExpanded(true)}
-                      className="w-full sm:w-auto px-6 py-2.5 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 hover:border-blue-500 text-blue-400 hover:text-blue-300 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md hover:scale-[1.01]"
-                    >
-                      <span>
-                        {language === "bn"
-                          ? `সকল কোর্স দেখুন (${totalAvailable}টি কোর্স উপলব্ধ) ↓`
-                          : `See More Courses (${totalAvailable} available) ↓`}
-                      </span>
-                      <ChevronDown className="w-4 h-4" />
-                    </button>
-                  ) : isCoursesExpanded ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsCoursesExpanded(false)}
-                      className="w-full sm:w-auto px-6 py-2 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
-                    >
-                      <span>
-                        {language === "bn" ? "কোর্স তালিকা সংক্ষেপ করুন ↑" : "See Less (Collapse) ↑"}
-                      </span>
-                      <ChevronUp className="w-4 h-4" />
-                    </button>
-                  ) : null}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ========================================================================= */}
-      {/* 2 & 3. WORKSPACE: PRIORITIES & GENERATED ROUTINES (SIDE-BY-SIDE / FULL)   */}
-      {/* ========================================================================= */}
-      {(() => {
-        // RENDER HELPER: 2. Priorities & Gap Control Card (Clean, Full-Width 3-Column Layout)
-        const renderPrioritiesCard = () => (
-          <div className="rounded-3xl bg-slate-900/60 border border-slate-800 backdrop-blur-md p-5 sm:p-6 space-y-6 transition-all">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shrink-0">
-                  <SlidersHorizontal className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-base sm:text-lg font-black text-white">
-                    {language === "bn" ? "২. প্রায়োরিটি ও গ্যাপ কন্ট্রোল" : "2. Priorities & Gap Control"}
-                  </h2>
-                  <p className="text-xs text-slate-400">
-                    {language === "bn"
-                      ? "ক্লাসের সময় পছন্দ, ক্যাম্পাসে আসার দিন এবং পছন্দের শিক্ষকদের সিলেক্ট করে রুটিনের কোয়ালিটি নিয়ন্ত্রণ করুন।"
-                      : "Fine-tune preferred 12-hour AM/PM time slots, back-to-back class gaps, and prioritized teachers."}
-                  </p>
-                </div>
+                )}
               </div>
 
-              <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 shrink-0 hidden sm:inline-block">
-                Smart Routine Optimizer
-              </span>
-            </div>
-
-            {/* Control Groups: Clean 3-Column Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {/* Time Priority (12-Hour AM/PM) - Default is ANY Balanced */}
-              <div className="space-y-2.5 p-4 rounded-2xl bg-slate-800/40 border border-slate-700/60 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-blue-400" />
-                      <span>{language === "bn" ? "ক্লাসের সময় পছন্দ" : "Time Preference (12-Hour AM/PM)"}</span>
-                    </label>
-                    {timePreference === "CUSTOM" && (
-                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                        {customStartTime} - {customEndTime}
-                      </span>
-                    )}
-                  </div>
-
-                  <select
-                    value={timePreference}
-                    onChange={(e) => setTimePreference(e.target.value as any)}
-                    className="w-full text-xs font-semibold py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                  >
-                    <option value="ANY">⚡ Balanced / Any Time Slot (Flexible - Default)</option>
-                    <option value="WINDOW_10_TO_1">🎯 10:00 AM - 01:00 PM (Midday Window)</option>
-                    <option value="WINDOW_10_TO_3">☀️ 10:00 AM - 03:00 PM (Comfortable Day)</option>
-                    <option value="WINDOW_830_TO_1130">🌅 08:30 AM - 11:30 AM (Early Morning Focus)</option>
-                    <option value="WINDOW_130_TO_430">☕ 01:30 PM - 04:30 PM (Afternoon Focus)</option>
-                    <option value="WINDOW_300_TO_600">🌇 03:00 PM - 06:00 PM (Late Afternoon)</option>
-                    <option value="AVOID_MORNING">☀️ Avoid Morning (No 08:30 AM Classes)</option>
-                    <option value="AVOID_LATE">🌇 Avoid Late Afternoon (Finish by 04:30 PM)</option>
-                    <option value="CUSTOM">⚙️ Custom User Selection (নিজের পছন্দমতো সময় নির্ধারণ)...</option>
-                  </select>
-
-                  {/* Dedicated Custom Time Selection System */}
-                  {timePreference === "CUSTOM" && (
-                    <div className="mt-2.5 p-3 rounded-xl bg-slate-900/90 border border-blue-500/30 space-y-2.5 animate-in fade-in duration-200">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-300 font-medium">
-                          {language === "bn" ? "নিজের সময় নির্ধারণ:" : "Set Custom Time Window:"}
-                        </span>
-                        <span className="text-blue-400 font-mono font-bold text-[10px]">
-                          {customStartTime} ➔ {customEndTime}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[10px] text-slate-400 block mb-1 font-mono">
-                            {language === "bn" ? "শুরুর সময়" : "Start Time"}
-                          </label>
-                          <select
-                            value={customStartTime}
-                            onChange={(e) => setCustomStartTime(e.target.value)}
-                            className="w-full text-xs font-mono font-bold py-1.5 px-2.5 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                          >
-                            <option value="08:00 AM">08:00 AM</option>
-                            <option value="08:30 AM">08:30 AM</option>
-                            <option value="09:00 AM">09:00 AM</option>
-                            <option value="10:00 AM">10:00 AM</option>
-                            <option value="11:00 AM">11:00 AM</option>
-                            <option value="11:30 AM">11:30 AM</option>
-                            <option value="01:00 PM">01:00 PM</option>
-                            <option value="01:30 PM">01:30 PM</option>
-                            <option value="02:00 PM">02:00 PM</option>
-                            <option value="03:00 PM">03:00 PM</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] text-slate-400 block mb-1 font-mono">
-                            {language === "bn" ? "শেষের সময়" : "End Time"}
-                          </label>
-                          <select
-                            value={customEndTime}
-                            onChange={(e) => setCustomEndTime(e.target.value)}
-                            className="w-full text-xs font-mono font-bold py-1.5 px-2.5 rounded-lg bg-slate-800 border border-slate-700 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                          >
-                            <option value="11:30 AM">11:30 AM</option>
-                            <option value="01:00 PM">01:00 PM</option>
-                            <option value="02:00 PM">02:00 PM</option>
-                            <option value="03:00 PM">03:00 PM</option>
-                            <option value="04:30 PM">04:30 PM</option>
-                            <option value="05:00 PM">05:00 PM</option>
-                            <option value="06:00 PM">06:00 PM</option>
-                            <option value="07:00 PM">07:00 PM</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Quick 1-Click Time Chip Presets */}
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-slate-400 block">
-                          {language === "bn" ? "কুইক টাইম প্রিসেট:" : "Quick Time Presets:"}
-                        </span>
-                        <div className="flex flex-wrap gap-1">
-                          {[
-                            { label: "10 AM - 1 PM", start: "10:00 AM", end: "01:00 PM" },
-                            { label: "10 AM - 3 PM", start: "10:00 AM", end: "03:00 PM" },
-                            { label: "8:30 AM - 1 PM", start: "08:30 AM", end: "01:00 PM" },
-                            { label: "1:30 PM - 4:30 PM", start: "01:30 PM", end: "04:30 PM" },
-                            { label: "3 PM - 6 PM", start: "03:00 PM", end: "06:00 PM" },
-                          ].map((preset) => (
-                            <button
-                              key={preset.label}
-                              type="button"
-                              onClick={() => {
-                                setCustomStartTime(preset.start);
-                                setCustomEndTime(preset.end);
-                                toast.success(`Custom window set to ${preset.label}!`);
-                              }}
-                              className={`px-2 py-0.5 rounded text-[10px] font-mono border transition-all cursor-pointer ${
-                                customStartTime === preset.start && customEndTime === preset.end
-                                  ? "bg-blue-600/30 border-blue-400 text-blue-200 font-bold"
-                                  : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
-                              }`}
-                            >
-                              {preset.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <p className="text-[11px] text-slate-400 leading-tight mt-2">
-                  {timePreference === "ANY"
-                    ? "Flexible across all SEU slots: 08:30 AM, 10:00 AM, 11:30 AM, 01:30 PM, 03:00 PM."
-                    : timePreference === "WINDOW_10_TO_1"
-                    ? "Prioritizes classes strictly between 10:00 AM and 01:00 PM."
-                    : timePreference === "WINDOW_10_TO_3"
-                    ? "Prioritizes daytime classes between 10:00 AM and 03:00 PM."
-                    : timePreference === "CUSTOM"
-                    ? `Solver strictly optimizes routine combinations to fit within ${customStartTime} - ${customEndTime}.`
-                    : "Optimizes class combinations according to your selected daytime window."}
-                </p>
-              </div>
-
-              {/* Day & Gap Priority */}
-              <div className="space-y-2.5 p-4 rounded-2xl bg-slate-800/40 border border-slate-700/60 flex flex-col justify-between">
-                <div>
-                  <label className="text-xs font-semibold text-slate-200 flex items-center justify-between mb-2">
-                    <span>{language === "bn" ? "টাইম গ্যাপ অপটিমাইজেশন" : "Gap & Schedule Style"}</span>
-                    <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                  </label>
-                  <select
-                    value={dayPreference}
-                    onChange={(e) => setDayPreference(e.target.value as any)}
-                    className="w-full text-xs font-semibold py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                  >
-                    <option value="COMPACT_GAPS">⏱️ Minimum Gap (Consecutive / Back-to-Back Classes)</option>
-                    <option value="MINIMIZE_DAYS">⚡ Minimize Campus Days (Pack into 2 or 3 Days)</option>
-                    <option value="ANY">🗓️ Any Day Distribution</option>
-                  </select>
-                </div>
-                <p className="text-[11px] text-slate-400 leading-tight mt-2">
-                  Option #1 maximizes back-to-back classes with 10-15m room transitions, eliminating multi-hour dead breaks.
-                </p>
-              </div>
-
-              {/* Preferred Days Toggle with 1-Click Presets */}
-              <div className="space-y-2.5 p-4 rounded-2xl bg-slate-800/40 border border-slate-700/60 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs font-semibold text-slate-200 block">
-                      {language === "bn" ? "পছন্দের বারসমূহ (Target Days)" : "Target Days (Strict Filter)"}
-                    </span>
-                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">
-                      {preferredDays.length} / 7 Days Active
-                    </span>
-                  </div>
-
-                  {/* Quick Presets for University Open-Credit Routines */}
-                  <div className="flex flex-wrap gap-1 mb-2">
+              {/* Selected Courses List */}
+              <div className="space-y-2 max-h-[380px] overflow-y-auto pr-0.5">
+                {filteredSidebarCourses.length === 0 ? (
+                  <div className="text-center py-6 space-y-2 text-slate-500">
+                    <p className="text-xs">No courses selected.</p>
                     <button
                       type="button"
-                      onClick={() => {
-                        setPreferredDays(["SUN", "TUE"]);
-                        toast.success("Set Target Days to SUN+TUE (2 Days)!");
-                      }}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border transition-all cursor-pointer ${
-                        preferredDays.length === 2 && preferredDays.includes("SUN") && preferredDays.includes("TUE")
-                          ? "bg-indigo-600/30 border-indigo-400 text-indigo-200 shadow-sm"
-                          : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
-                      }`}
+                      onClick={() => setIsCatalogModalOpen(true)}
+                      className="text-xs text-indigo-400 hover:underline font-bold"
                     >
-                      ⚡ SUN+TUE
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPreferredDays(["MON", "WED"]);
-                        toast.success("Set Target Days to MON+WED (2 Days)!");
-                      }}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border transition-all cursor-pointer ${
-                        preferredDays.length === 2 && preferredDays.includes("MON") && preferredDays.includes("WED")
-                          ? "bg-indigo-600/30 border-indigo-400 text-indigo-200 shadow-sm"
-                          : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
-                      }`}
-                    >
-                      ⚡ MON+WED
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPreferredDays(["THU", "SAT"]);
-                        toast.success("Set Target Days to THU+SAT (2 Days)!");
-                      }}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border transition-all cursor-pointer ${
-                        preferredDays.length === 2 && preferredDays.includes("THU") && preferredDays.includes("SAT")
-                          ? "bg-indigo-600/30 border-indigo-400 text-indigo-200 shadow-sm"
-                          : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
-                      }`}
-                    >
-                      ⚡ THU+SAT
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (preferredDays.includes("FRI")) {
-                          setPreferredDays(preferredDays.filter((d) => d !== "FRI"));
-                        } else {
-                          setPreferredDays([...preferredDays, "FRI"]);
-                          toast.success("Included Friday for 2-hour practical lab sessions!");
-                        }
-                      }}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold border transition-all cursor-pointer ${
-                        preferredDays.includes("FRI")
-                          ? "bg-emerald-600/30 border-emerald-400 text-emerald-200"
-                          : "bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white"
-                      }`}
-                    >
-                      + FRI (2h)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPreferredDays(["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"])}
-                      className="px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-slate-800/80 border border-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer"
-                    >
-                      All 7d
+                      Browse Catalog to Add Courses
                     </button>
                   </div>
+                ) : (
+                  filteredSidebarCourses.map((cCode) => {
+                    const cObj = coursesCatalog.find((c) => c.code === cCode);
+                    const theme = getCourseTheme(cCode);
+                    const isExpanded = expandedFacultyCourse === cCode;
+                    const preferredFacs = facultyPreferences[cCode] || [];
+                    const facList = courseFaculties[cCode] || [];
 
-                  {/* Individual 7 Day Pills */}
-                  <div className="flex flex-wrap gap-1">
-                    {WEEK_DAYS.map((day) => {
-                      const active = preferredDays.includes(day);
-                      return (
-                        <button
-                          key={day}
-                          type="button"
-                          onClick={() => {
-                            if (active) {
-                              if (preferredDays.length <= 1) {
-                                toast.error("Please keep at least 1 day selected.");
-                                return;
-                              }
-                              setPreferredDays(preferredDays.filter((d) => d !== day));
-                            } else {
-                              setPreferredDays([...preferredDays, day]);
-                            }
-                          }}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                            active
-                              ? "bg-indigo-600 text-white shadow-sm shadow-indigo-500/30 ring-1 ring-indigo-400"
-                              : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200"
-                          }`}
-                        >
-                          {day}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-400 leading-tight mt-2">
-                  {preferredDays.length < 7
-                    ? `Solver prioritizes combos fitting into: ${preferredDays.join(", ")}.`
-                    : "Flexible across all days. Click presets to restrict campus visits."}
-                </p>
-              </div>
-            </div>
-
-            {/* Expandable Preferred Faculty Selection Accordion (Clean & Non-Intrusive) */}
-            <div className="pt-2 border-t border-slate-800/80">
-              <button
-                type="button"
-                onClick={() => setIsFacultyExpanded((prev) => !prev)}
-                className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-slate-800/40 hover:bg-slate-800/70 border border-slate-700/60 transition-all cursor-pointer text-left group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <Star className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
-                  <div>
-                    <span className="text-xs sm:text-sm font-bold text-white group-hover:text-amber-300 transition-colors">
-                      {language === "bn" ? "পছন্দের শিক্ষক নির্বাচন (ঐচ্ছিক)" : "Preferred Faculty Selection (Optional)"}
-                    </span>
-                    <span className="text-[11px] text-slate-400 block">
-                      {language === "bn"
-                        ? "নির্দিষ্ট শিক্ষকদের অগ্রাধিকার দিতে ক্লিক করে ওপেন করুন"
-                        : "Click to prioritize specific instructors for your courses"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2.5">
-                  {Object.values(facultyPreferences).some((arr) => arr.length > 0) ? (
-                    <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      {Object.values(facultyPreferences).reduce((sum, arr) => sum + arr.length, 0)} Starred
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-mono text-slate-400">
-                      (Any Faculty)
-                    </span>
-                  )}
-                  <div className={`p-1 rounded-lg bg-slate-800 text-slate-300 transition-transform duration-200 ${isFacultyExpanded ? "rotate-180 text-amber-400" : ""}`}>
-                    <ChevronDown className="w-4 h-4" />
-                  </div>
-                </div>
-              </button>
-
-              {/* Expanded Faculty Selector Panel */}
-              {isFacultyExpanded && (
-                <div className="pt-4 space-y-3 animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">
-                      {language === "bn"
-                        ? "কোর্সের বিপরীতে পছন্দের শিক্ষকদের স্টার করুন:"
-                        : "Click stars next to instructor initials to prioritize them:"}
-                    </span>
-                    {Object.values(facultyPreferences).some((arr) => arr.length > 0) && (
-                      <button
-                        type="button"
-                        onClick={() => setFacultyPreferences({})}
-                        className="text-[11px] font-mono text-slate-400 hover:text-amber-400 underline transition-colors cursor-pointer"
+                    return (
+                      <div
+                        key={cCode}
+                        className={`rounded-xl border p-2.5 bg-gradient-to-r ${theme.sidebarBg} transition-all space-y-1.5`}
                       >
-                        Clear all faculty stars
-                      </button>
-                    )}
-                  </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {/* Checkbox (toggle) */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCourse(cCode, cObj?.credits || 3.0)}
+                              className="w-4 h-4 rounded-md bg-indigo-600 border border-indigo-500 text-white flex items-center justify-center shrink-0 cursor-pointer"
+                            >
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </button>
 
-                  {selectedCourses.length === 0 ? (
-                    <div className="p-4 rounded-2xl bg-slate-800/20 border border-dashed border-slate-700 text-center text-xs text-slate-400">
-                      👉 Please select your courses in Section 1 to view and choose available faculty members.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                      {selectedCourses.map((code) => {
-                        const courseInfo = coursesCatalog.find((c) => c.code === code);
-                        const facs = courseFaculties[code] || [];
-                        const currentFav = facultyPreferences[code] || [];
-                        const isAny = currentFav.length === 0;
+                            {/* Code */}
+                            <span className="font-mono font-black text-xs text-white">
+                              {cCode}
+                            </span>
 
-                        return (
-                          <div
-                            key={code}
-                            className="p-3.5 rounded-2xl bg-slate-800/40 border border-slate-700/70 hover:border-slate-600 transition-all space-y-2.5"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="min-w-0">
-                                <span className="font-mono font-black text-xs text-blue-400 mr-2">{code}</span>
-                                <span className="text-[11px] text-slate-300 font-medium truncate block">
-                                  {courseInfo?.title || code}
-                                </span>
-                              </div>
-                              <span
-                                className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                                  isAny
-                                    ? "bg-slate-700/60 text-slate-400"
-                                    : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                                }`}
+                            {/* Faculty badges preview */}
+                            {facList.length > 0 && (
+                              <div
+                                onClick={() =>
+                                  setExpandedFacultyCourse(isExpanded ? null : cCode)
+                                }
+                                className="flex items-center gap-1 text-[10px] font-mono text-amber-300/90 truncate cursor-pointer hover:underline"
+                                title="Click to pick preferred faculty"
                               >
-                                {isAny ? "Any Faculty" : `${currentFav.length} Fav`}
-                              </span>
-                            </div>
-
-                            {facs.length === 0 ? (
-                              <p className="text-xs text-slate-500 italic">No specific faculty assigned yet (TBA)</p>
-                            ) : (
-                              <div className="flex flex-wrap gap-1.5">
-                                {facs.map((f) => {
-                                  const isFav = currentFav.includes(f.initial);
-                                  const secCount =
-                                    courseInfo?.sections.filter((s) => s.facultyInitial === f.initial).length || 0;
-                                  return (
-                                    <button
-                                      key={f.initial}
-                                      type="button"
-                                      onClick={() => {
-                                        setFacultyPreferences({
-                                          ...facultyPreferences,
-                                          [code]: isFav
-                                            ? currentFav.filter((x) => x !== f.initial)
-                                            : [...currentFav, f.initial],
-                                        });
-                                      }}
-                                      className={`group px-2.5 py-1 rounded-xl text-xs font-mono transition-all cursor-pointer flex items-center gap-1.5 border ${
-                                        isFav
-                                          ? "bg-amber-500/20 border-amber-500/60 text-amber-200 shadow-md shadow-amber-500/10 font-bold"
-                                          : "bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white"
-                                      }`}
-                                      title={`${f.name} (${secCount} sections)`}
-                                    >
-                                      <Star
-                                        className={`w-3 h-3 shrink-0 ${
-                                          isFav ? "text-amber-400 fill-amber-400" : "text-slate-500 group-hover:text-slate-400"
-                                        }`}
-                                      />
-                                      <span className="font-bold">[{f.initial}]</span>
-                                      <span className="text-[10px] font-sans truncate max-w-[100px]">
-                                        {f.name.split(" ").slice(-1)[0]}
-                                      </span>
-                                    </button>
-                                  );
-                                })}
+                                <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400 shrink-0" />
+                                <span>
+                                  {preferredFacs.length > 0
+                                    ? preferredFacs.join(", ")
+                                    : facList.slice(0, 3).map((f) => f.initial).join(", ")}
+                                </span>
                               </div>
                             )}
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
 
-            {/* MASTER GENERATE BUTTON (Prominent, High-Contrast Hero CTA) */}
-            <div className="pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-xs text-slate-400">
-                {selectedCourses.length === 0 ? (
-                  <span className="text-amber-400 font-medium flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span>{language === "bn" ? "প্রথমে ধাপ ১ থেকে কোর্স সিলেক্ট করুন" : "Please select your courses in Step 1 first"}</span>
-                  </span>
-                ) : (
-                  <span className="text-slate-300 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>
-                      <strong>{selectedCourses.length}</strong> {language === "bn" ? "টি কোর্স রেডি" : "courses selected"} • <strong>{selectedCreditsTotal}</strong> / 17 {language === "bn" ? "ক্রেডিট" : "Credits"}
-                    </span>
-                  </span>
-                )}
-              </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {facList.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedFacultyCourse(isExpanded ? null : cCode)
+                                }
+                                className="p-1 rounded text-slate-400 hover:text-white cursor-pointer"
+                                title="Pick faculty"
+                              >
+                                {isExpanded ? (
+                                  <ChevronUp className="w-3.5 h-3.5" />
+                                ) : (
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            )}
 
-              <button
-                type="button"
-                onClick={handleGenerateRoutines}
-                disabled={generating || selectedCourses.length === 0}
-                className="w-full sm:w-auto min-w-[280px] py-4 px-8 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-black text-sm shadow-xl shadow-indigo-500/25 transition-all flex items-center justify-center gap-2.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:hover:scale-100"
-              >
-                {generating ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                    <span>{language === "bn" ? "সেরা ১০টি রুটিন সাজানো হচ্ছে..." : "Computing Routines..."}</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
-                    <span>
-                      {selectedCourses.length === 0
-                        ? (language === "bn" ? "কোর্স সিলেক্ট করুন" : "Select Courses to Generate")
-                        : (language === "bn" ? `১০টি সেরা রুটিন সাজান (${selectedCourses.length}টি কোর্স) 🚀` : `Generate 10 Conflict-Free Routines 🚀`)}
-                    </span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        );
-
-        // RENDER HELPER: 3 & 4. Generated Routines & Full-Width Timetable Workspace
-        const renderRoutineResults = () => {
-          if (routines.length === 0) return null;
-
-          return (
-            <div
-              ref={routineContainerRef}
-              id="routine-timetable-container"
-              className="rounded-3xl bg-[#0B0F19] border border-slate-800 p-5 sm:p-7 shadow-2xl space-y-6 backdrop-blur-xl animate-in fade-in duration-300"
-            >
-              {/* Header: Title, Zero-Clash Badge, Option Navigation & Action Controls */}
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
-                <div className="flex items-start gap-3">
-                  <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0 mt-0.5">
-                    <Trophy className="w-6 h-6" />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-lg sm:text-xl font-black text-white tracking-wide">
-                        {language === "bn" ? "সেরা ১০টি ক্ল্যাশ-মুক্ত রুটিন" : "Top 10 Ranked Clash-Free Routines"}
-                      </h2>
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono font-bold">
-                        100% Zero-Clash Guarantee
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400">
-                      {language === "bn"
-                        ? "১ নাম্বার অপশনটি সর্বনিম্ন টাইম গ্যাপ (ব্যাক-টু-ব্যাক) সহ সর্বাধিক প্রায়োরিটি প্রাপ্ত।"
-                        : "Option 1 has the absolute highest priority score with minimal gaps and optimized timings."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
-                  {/* Prev / Next Controls */}
-                  <div className="inline-flex items-center gap-1 rounded-xl bg-slate-900 border border-slate-800 p-1">
-                    <button
-                      onClick={() => setSelectedRoutineIndex((prev) => Math.max(0, prev - 1))}
-                      disabled={selectedRoutineIndex === 0}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all disabled:opacity-30 cursor-pointer"
-                      title="Previous Option"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className="text-xs font-mono font-bold text-slate-300 px-2 shrink-0">
-                      Option {selectedRoutineIndex + 1} of {routines.length}
-                    </span>
-                    <button
-                      onClick={() => setSelectedRoutineIndex((prev) => Math.min(routines.length - 1, prev + 1))}
-                      disabled={selectedRoutineIndex === routines.length - 1}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all disabled:opacity-30 cursor-pointer"
-                      title="Next Option"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* View Switcher: Weekly / Daily / Overview */}
-                  <div className="inline-flex rounded-xl bg-slate-900 border border-slate-800 p-1">
-                    {(["Weekly", "Daily", "Overview"] as const).map((tab) => (
-                      <button
-                        key={tab}
-                        type="button"
-                        onClick={() => setViewMode(tab)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          viewMode === tab
-                            ? "bg-blue-600 text-white shadow-md shadow-blue-500/25"
-                            : "text-slate-400 hover:text-white"
-                        }`}
-                      >
-                        {tab === "Weekly" ? (language === "bn" ? "সাপ্তাহিক রুটিন" : "Weekly Grid") : tab === "Daily" ? (language === "bn" ? "দৈনিক ভিউ" : "Daily Agenda") : (language === "bn" ? "কোর্স লিস্ট" : "Section List")}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Export Controls */}
-                  <button
-                    type="button"
-                    onClick={handleDownloadPNG}
-                    disabled={isExporting}
-                    className="px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    title="Download Class Routine as PNG"
-                  >
-                    <ImageIcon className="w-3.5 h-3.5" />
-                    <span>PNG</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleDownloadPDF}
-                    disabled={isExporting}
-                    className="px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    title="Download Class Routine as PDF"
-                  >
-                    <FileDown className="w-3.5 h-3.5" />
-                    <span>PDF</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 10 Option Tabs Selector Strip */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
-                {routines.map((opt, idx) => {
-                  const isActive = selectedRoutineIndex === idx;
-                  const isBest = idx === 0;
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setSelectedRoutineIndex(idx)}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-mono font-bold transition-all shrink-0 cursor-pointer flex items-center gap-2 border ${
-                        isActive
-                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-400 shadow-lg shadow-blue-500/30 scale-105"
-                          : isBest
-                          ? "bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20"
-                          : "bg-slate-900/80 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white"
-                      }`}
-                    >
-                      {isBest && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />}
-                      <span>Option {idx + 1}</span>
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded-md ${
-                          isActive ? "bg-blue-900/80 text-blue-100" : "bg-slate-800 text-slate-300"
-                        }`}
-                      >
-                        {opt.matchPercentage}%
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Active Option Highlight Banner with Badges & Copy Section Codes Button */}
-              {activeRoutine && (
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/40 to-slate-900 border border-blue-500/30 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono font-black text-sm text-white flex items-center gap-1.5">
-                        <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs">
-                          #{selectedRoutineIndex + 1}
-                        </span>
-                        <span>Option {selectedRoutineIndex + 1}</span>
-                      </span>
-                      <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                        {activeRoutine.matchPercentage}% Efficiency Score
-                      </span>
-                      {selectedRoutineIndex === 0 && (
-                        <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                          <Star className="w-3 h-3 fill-amber-300" />
-                          <span>Best Choice (Lowest Gap)</span>
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      {activeRoutine.highlights.map((h, i) => (
-                        <span
-                          key={i}
-                          className="px-2.5 py-1 rounded-lg bg-slate-800/90 text-slate-200 border border-slate-700/80 font-medium text-[11px]"
-                        >
-                          {h}
-                        </span>
-                      ))}
-                      <span className="px-2.5 py-1 rounded-lg bg-indigo-950/80 text-indigo-300 border border-indigo-800 font-mono text-[11px]">
-                        🎓 {activeRoutine.totalCredits} Cr
-                      </span>
-                      <span className="px-2.5 py-1 rounded-lg bg-blue-950/80 text-blue-300 border border-blue-800 font-mono text-[11px]">
-                        🗓️ {activeRoutine.activeDaysCount} Days ({activeRoutine.activeDays.join(", ")})
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleCopySectionCodes}
-                    className="self-start md:self-auto px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 text-xs font-mono font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm hover:border-slate-500"
-                  >
-                    <Copy className="w-4 h-4 text-blue-400" />
-                    <span>{language === "bn" ? "সেকশন কোড কপি করুন" : "Copy Advising Codes"}</span>
-                  </button>
-                </div>
-              )}
-
-              {/* TIMETABLE CONTENT: Weekly / Daily / Overview Views */}
-              {activeRoutine && (
-                <div className="pt-2 space-y-4">
-                  {/* VIEW: WEEKLY TIMETABLE GRID (All 7 Days including Friday with 2h sessions) */}
-                  {viewMode === "Weekly" && (
-                    <div className="overflow-x-auto scrollbar-thin pb-2">
-                      <div className="min-w-[860px] space-y-2.5">
-                        {/* 12-Hour Time Axis Header (08:00 AM to 07:00 PM) */}
-                        <div className="grid grid-cols-12 pl-14 pr-2 text-slate-400 font-mono text-[11px] font-bold border-b border-slate-800 pb-2">
-                          {TIME_12_AXIS.map((hourLabel) => (
-                            <div key={hourLabel} className="text-center truncate">
-                              {hourLabel}
-                            </div>
-                          ))}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCourse(cCode, cObj?.credits || 3.0)}
+                              className="p-1 rounded text-slate-500 hover:text-rose-400 cursor-pointer transition-colors"
+                              title={`Remove ${cCode}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
 
-                        {/* Day Rows: SUN, MON, TUE, WED, THU, FRI, SAT */}
-                        {WEEK_DAYS.map((day) => {
-                          const dayClasses: Array<{
-                            section: OfferedSectionItem;
-                            slot: TimeSlot;
-                          }> = [];
+                        {/* Title */}
+                        <p className="text-[11px] font-bold text-slate-300 truncate" title={cObj?.title}>
+                          {cObj?.title || cCode}
+                        </p>
 
-                          activeRoutine.sections.forEach((sec) => {
-                            sec.slots.forEach((sl) => {
-                              if (sl.day.toUpperCase() === day) {
-                                dayClasses.push({ section: sec, slot: sl });
-                              }
-                            });
-                          });
-
-                          return (
-                            <div
-                              key={day}
-                              className={`flex items-center min-h-[76px] rounded-xl border relative overflow-hidden transition-all ${
-                                dayClasses.length > 0
-                                  ? "bg-slate-900/60 border-slate-800/80"
-                                  : "bg-slate-900/30 border-slate-800/40"
-                              }`}
-                            >
-                              {/* Day Label Left Column */}
-                              <div className="w-14 shrink-0 font-mono font-bold text-xs text-slate-300 text-center select-none border-r border-slate-800/80 py-4">
-                                <div>{day}</div>
-                                {dayClasses.length === 0 && (
-                                  <span className="text-[9px] text-slate-500 block">Free</span>
-                                )}
-                              </div>
-
-                              {/* Timeline Area (Timeline span: 08:00 AM = 480m to 07:00 PM = 1140m => 660 mins total) */}
-                              <div className="relative flex-1 h-[70px] mx-2">
-                                {dayClasses.length === 0 && (
-                                  <div className="absolute inset-0 flex items-center justify-center text-slate-600 font-mono text-xs italic">
-                                    No classes scheduled
-                                  </div>
-                                )}
-
-                                {dayClasses.map((item, idx) => {
-                                  const sm = item.slot.startMinutes ?? timeToMinutes(item.slot.start);
-                                  const em = item.slot.endMinutes ?? timeToMinutes(item.slot.end);
-
-                                  const leftPct = Math.max(
-                                    0,
-                                    Math.min(100, ((sm - TIMELINE_START_MINUTES) / TIMELINE_TOTAL_MINUTES) * 100)
-                                  );
-                                  const widthPct = Math.max(
-                                    6,
-                                    Math.min(100 - leftPct, ((em - sm) / TIMELINE_TOTAL_MINUTES) * 100)
-                                  );
-
-                                  const theme = COURSE_THEMES[item.section.courseCode] || DEFAULT_THEME;
-
-                                  return (
-                                    <div
-                                      key={idx}
-                                      style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
-                                      className={`absolute top-1 bottom-1 rounded-xl bg-gradient-to-br ${theme.bg} border ${theme.border} p-2 shadow-md hover:scale-[1.01] transition-all flex flex-col justify-between overflow-hidden cursor-pointer group z-10`}
-                                      title={`${item.section.courseCode}.${item.section.sectionNumber} - ${item.section.courseTitle}\nTime: ${formatTime12(item.slot.start)} - ${formatTime12(item.slot.end)}\nRoom: ${item.slot.room}\nFaculty: ${item.section.facultyName} [${item.section.facultyInitial}]`}
-                                    >
-                                      <div className="flex items-center justify-between gap-1">
-                                        <span className="font-mono font-black text-xs text-white group-hover:text-blue-300 truncate">
-                                          {item.section.courseCode}.{item.section.sectionNumber}
-                                        </span>
-                                        <span className="text-[9px] font-mono px-1 rounded bg-black/40 text-slate-300 border border-slate-700/80 shrink-0">
-                                          [{item.section.facultyInitial}]
-                                        </span>
-                                      </div>
-
-                                      <div className="text-[10px] text-slate-300 font-medium truncate">
-                                        {item.section.courseTitle}
-                                      </div>
-
-                                      <div className="flex items-center justify-between text-[10px] font-mono text-slate-300">
-                                        <span className="font-semibold text-white/90">
-                                          {formatTime12(item.slot.start)} - {formatTime12(item.slot.end)}
-                                        </span>
-                                        <span className="flex items-center gap-0.5 text-slate-300 truncate font-semibold">
-                                          <MapPin className="w-2.5 h-2.5 text-indigo-400 shrink-0" />
-                                          <span>{item.slot.room}</span>
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                        {/* Expandable Faculty Picker */}
+                        {isExpanded && facList.length > 0 && (
+                          <div className="pt-2 border-t border-slate-800/80 space-y-1.5 animate-in fade-in duration-150">
+                            <span className="text-[10px] text-slate-400 font-mono block">
+                              Select preferred teachers for {cCode}:
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {facList.map((f) => {
+                                const isFav = preferredFacs.includes(f.initial);
+                                return (
+                                  <button
+                                    key={f.initial}
+                                    type="button"
+                                    onClick={() => handleToggleFacultyPref(cCode, f.initial)}
+                                    className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1 border ${
+                                      isFav
+                                        ? "bg-amber-500 text-black border-amber-400 font-black shadow-sm"
+                                        : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700"
+                                    }`}
+                                  >
+                                    <Star className={`w-2.5 h-2.5 ${isFav ? "fill-black" : "text-slate-400"}`} />
+                                    <span>[{f.initial}]</span>
+                                  </button>
+                                );
+                              })}
                             </div>
-                          );
-                        })}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
 
-                  {/* VIEW: DAILY SCHEDULE (All Days including Friday!) */}
-                  {viewMode === "Daily" && (
-                    <div className="space-y-4">
-                      <div className="flex flex-wrap gap-2">
-                        {WEEK_DAYS.map((d) => (
-                          <button
-                            key={d}
-                            type="button"
-                            onClick={() => setDailyDay(d)}
-                            className={`px-4 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
-                              dailyDay === d
-                                ? "bg-blue-600 text-white shadow-md shadow-blue-500/30"
-                                : "bg-slate-900 text-slate-400 border border-slate-800 hover:text-white"
+          {/* ===================================================================== */}
+          {/* RIGHT MAIN AREA: TIMETABLE & ROUTINE CONTROLS                         */}
+          {/* ===================================================================== */}
+          <div className="space-y-4">
+            {/* Top Toolbar Bar */}
+            <div className="rounded-2xl bg-[#0d1322] border border-slate-800/90 p-3 flex flex-wrap items-center justify-between gap-3 shadow-xl">
+              {/* Routine Pagination & Pills */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-1 rounded-xl bg-slate-900 border border-slate-800 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRoutineIndex((prev) => Math.max(0, prev - 1))}
+                    disabled={selectedRoutineIndex === 0}
+                    className="p-1 rounded-lg text-slate-300 hover:bg-slate-800 disabled:opacity-30 cursor-pointer"
+                    title="Previous Routine"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-xs font-mono font-bold text-slate-200 px-2 shrink-0">
+                    Routine {selectedRoutineIndex + 1} / {sortedRoutines.length || 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedRoutineIndex((prev) => Math.min(sortedRoutines.length - 1, prev + 1))
+                    }
+                    disabled={selectedRoutineIndex >= sortedRoutines.length - 1}
+                    className="p-1 rounded-lg text-slate-300 hover:bg-slate-800 disabled:opacity-30 cursor-pointer"
+                    title="Next Routine"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Direct #1 to #10 Pills */}
+                <div className="hidden sm:flex items-center gap-1">
+                  {sortedRoutines.slice(0, 10).map((r, idx) => {
+                    const isSelected = selectedRoutineIndex === idx;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setSelectedRoutineIndex(idx)}
+                        className={`w-7 h-7 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-indigo-600 text-white font-black shadow-md shadow-indigo-500/30 scale-105"
+                            : "bg-slate-850 text-slate-400 hover:text-white hover:bg-slate-800"
+                        }`}
+                      >
+                        #{idx + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Controls on the Right: Sort, View Switcher & Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Sort dropdown */}
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="text-xs font-bold py-1.5 px-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 cursor-pointer focus:outline-none"
+                >
+                  <option value="fewest_days">Fewest Days</option>
+                  <option value="lowest_gap">Lowest Gap</option>
+                  <option value="highest_score">Highest Score</option>
+                </select>
+
+                {/* Week / Day view toggle */}
+                <div className="inline-flex rounded-xl bg-slate-900 border border-slate-800 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("Week")}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      viewMode === "Week"
+                        ? "bg-indigo-600 text-white shadow-md"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Week
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("Day")}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      viewMode === "Day"
+                        ? "bg-indigo-600 text-white shadow-md"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Day
+                  </button>
+                </div>
+
+                {/* Save Routine */}
+                <button
+                  type="button"
+                  onClick={handleToggleSaveRoutine}
+                  className={`p-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    isCurrentRoutineSaved
+                      ? "bg-amber-500 text-black border-amber-400 font-black shadow-md shadow-amber-500/20"
+                      : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white"
+                  }`}
+                  title={isCurrentRoutineSaved ? "Saved" : "Save this routine"}
+                >
+                  <Bookmark className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Save</span>
+                </button>
+
+                {/* PNG Download */}
+                <button
+                  type="button"
+                  onClick={handleDownloadPNG}
+                  disabled={isExporting}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                  title="Download Routine Image (PNG)"
+                >
+                  <Download className="w-3.5 h-3.5 text-blue-400" />
+                  <span>PNG</span>
+                </button>
+
+                {/* Print */}
+                <button
+                  type="button"
+                  onClick={handlePrintRoutine}
+                  className="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs transition-all cursor-pointer"
+                  title="Print Timetable"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Copy Section Codes */}
+                <button
+                  type="button"
+                  onClick={handleCopySectionCodes}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                  title="Copy Advising Section Codes"
+                >
+                  <Copy className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="hidden sm:inline">Copy Codes</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Active Routine Highlights Strip */}
+            {activeRoutine && (
+              <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#0d1322] border border-slate-800/80 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono font-black text-indigo-300">
+                    #{selectedRoutineIndex + 1} Option {selectedRoutineIndex + 1}
+                  </span>
+                  <span className="text-emerald-400 font-bold">
+                    {activeRoutine.matchPercentage}% Efficiency Score
+                  </span>
+                  <span className="text-slate-400">•</span>
+                  <span className="text-slate-300">
+                    {activeRoutine.totalGapMinutes === 0
+                      ? "0m Gap (Direct Back-to-Back)"
+                      : `${activeRoutine.totalGapMinutes}m Total Gap`}
+                  </span>
+                  {activeRoutine.facultyMatchCount > 0 && (
+                    <>
+                      <span className="text-slate-400">•</span>
+                      <span className="text-amber-300 font-semibold">
+                        ⭐ {activeRoutine.facultyMatchCount} Preferred Faculty
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3 font-mono text-[11px] text-slate-400">
+                  <span>{activeRoutine.totalCredits} Credits</span>
+                  <span>
+                    {activeRoutine.activeDaysCount} Campus Days ({activeRoutine.activeDays.join(", ")})
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* ================================================================= */}
+            {/* VERTICAL-TIME TIMETABLE GRID (Traditional 7-Day Timetable)        */}
+            {/* ================================================================= */}
+            <div
+              ref={routineContainerRef}
+              id="seu-routine-timetable-sheet"
+              className="rounded-2xl bg-[#0a0e1a] border border-slate-800/90 shadow-2xl overflow-hidden p-4 space-y-2 backdrop-blur-xl"
+            >
+              {/* Day view selector when Day mode is active */}
+              {viewMode === "Day" && (
+                <div className="flex items-center gap-1.5 pb-2 border-b border-slate-800">
+                  <span className="text-xs text-slate-400 font-mono mr-2">Select Day:</span>
+                  {WEEK_DAYS.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setDayViewSelectedDay(d)}
+                      className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                        dayViewSelectedDay === d
+                          ? "bg-indigo-600 text-white shadow-md"
+                          : "bg-slate-800 text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Scrollable Timetable Area */}
+              <div className="overflow-x-auto">
+                <div className="min-w-[760px]">
+                  {/* Grid Header: TIME + 7 Days */}
+                  <div className="grid grid-cols-[64px_repeat(7,1fr)] border-b border-slate-800/90 pb-2.5 text-center">
+                    <div className="text-[11px] font-mono font-bold text-slate-500 uppercase tracking-wider self-center">
+                      TIME
+                    </div>
+                    {WEEK_DAYS.map((day) => {
+                      const isFree = dayTimeSpanMap[day]?.spanText === "Free";
+                      const isVisibleInDayView = viewMode === "Week" || dayViewSelectedDay === day;
+                      return (
+                        <div
+                          key={day}
+                          className={`space-y-0.5 px-1 ${!isVisibleInDayView && viewMode === "Day" ? "opacity-20" : ""}`}
+                        >
+                          <div className="text-xs font-black text-slate-200">{day}</div>
+                          <div
+                            className={`text-[10px] font-mono font-semibold truncate ${
+                              isFree ? "text-slate-500" : "text-indigo-400"
                             }`}
                           >
-                            {d}
-                          </button>
+                            {dayTimeSpanMap[day]?.spanText || "Free"}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Timetable Body (Vertical Time from 08:00 to 18:00) */}
+                  <div className="relative flex min-h-[580px] pt-1">
+                    {/* Left Column: 10 Hour Markers (58px each) */}
+                    <div className="w-[64px] shrink-0 flex flex-col justify-between py-1 select-none pr-2">
+                      {TIME_HOURS.map((hr) => (
+                        <div
+                          key={hr}
+                          className="h-[58px] text-[11px] font-mono text-slate-500 text-right leading-none -mt-1.5"
+                        >
+                          {hr}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Right Columns Area (7 Days) */}
+                    <div className="flex-1 grid grid-cols-7 relative border-l border-slate-800/60">
+                      {/* 10 Horizontal Grid Guide Lines */}
+                      <div className="absolute inset-0 pointer-events-none flex flex-col justify-between">
+                        {TIME_HOURS.map((hr, idx) => (
+                          <div
+                            key={hr}
+                            className={`w-full border-t border-slate-800/40 ${idx === 0 ? "border-transparent" : ""}`}
+                            style={{ height: "58px" }}
+                          />
                         ))}
                       </div>
 
-                      {(() => {
-                        const dayClasses: Array<{ section: OfferedSectionItem; slot: TimeSlot }> = [];
-                        activeRoutine.sections.forEach((sec) => {
-                          sec.slots.forEach((sl) => {
-                            if (sl.day.toUpperCase() === dailyDay) {
-                              dayClasses.push({ section: sec, slot: sl });
-                            }
-                          });
-                        });
+                      {/* Day Columns */}
+                      {WEEK_DAYS.map((day) => {
+                        const daySlots =
+                          activeRoutine?.sections.flatMap((sec) =>
+                            sec.slots
+                              .filter((sl) => sl.day.toUpperCase() === day)
+                              .map((sl) => ({ sec, slot: sl }))
+                          ) || [];
 
-                        dayClasses.sort((a, b) => (a.slot.startMinutes ?? 0) - (b.slot.startMinutes ?? 0));
-
-                        if (dayClasses.length === 0) {
-                          return (
-                            <div className="p-8 rounded-2xl bg-slate-900/40 border border-slate-800 text-center text-slate-400 text-sm">
-                              No classes scheduled on {dailyDay}! Enjoy your prep and self-study time.
-                            </div>
-                          );
-                        }
+                        const isVisible = viewMode === "Week" || dayViewSelectedDay === day;
 
                         return (
-                          <div className="space-y-3">
-                            {dayClasses.map((item, idx) => {
-                              const theme = COURSE_THEMES[item.section.courseCode] || DEFAULT_THEME;
-                              const nextClass = dayClasses[idx + 1];
-                              const gapToNext = nextClass
-                                ? (nextClass.slot.startMinutes ?? 0) - (item.slot.endMinutes ?? 0)
-                                : null;
+                          <div
+                            key={day}
+                            className={`relative h-[580px] border-r border-slate-800/40 last:border-r-0 transition-colors ${
+                              !isVisible && viewMode === "Day" ? "opacity-15 pointer-events-none" : "hover:bg-slate-850/20"
+                            }`}
+                          >
+                            {/* Class Cards */}
+                            {daySlots.map(({ sec, slot }) => {
+                              const sm = slot.startMinutes ?? timeToMinutes(slot.start);
+                              const em = slot.endMinutes ?? timeToMinutes(slot.end);
+                              const clampedStart = Math.max(TIMELINE_START_MINUTES, Math.min(TIMELINE_END_MINUTES, sm));
+                              const clampedEnd = Math.max(TIMELINE_START_MINUTES, Math.min(TIMELINE_END_MINUTES, em));
+                              const topPct = ((clampedStart - TIMELINE_START_MINUTES) / TIMELINE_TOTAL_MINUTES) * 100;
+                              const heightPct = Math.max(((clampedEnd - clampedStart) / TIMELINE_TOTAL_MINUTES) * 100, 7.5);
+                              const theme = getCourseTheme(sec.courseCode);
 
                               return (
-                                <React.Fragment key={idx}>
-                                  <div
-                                    className={`p-4 rounded-2xl bg-gradient-to-r ${theme.bg} border ${theme.border} space-y-2 shadow-md`}
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-mono font-black text-sm text-white">
-                                          {item.section.courseCode}.{item.section.sectionNumber}
-                                        </span>
-                                        <span className="text-xs text-slate-300 font-semibold">
-                                          {item.section.courseTitle}
-                                        </span>
-                                      </div>
-                                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-black/40 text-slate-200 border border-slate-700">
-                                        [{item.section.facultyInitial}] {item.section.facultyName}
-                                      </span>
-                                    </div>
-
-                                    <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs font-mono text-slate-200">
-                                      <span className="flex items-center gap-1 font-bold text-white">
-                                        <Clock className="w-3.5 h-3.5 text-blue-400" />
-                                        <span>
-                                          {formatTime12(item.slot.start)} ~ {formatTime12(item.slot.end)}
-                                        </span>
-                                      </span>
-                                      <span className="flex items-center gap-1 font-bold text-indigo-300">
-                                        <MapPin className="w-3.5 h-3.5 text-indigo-400" />
-                                        <span>{item.slot.room}</span>
-                                      </span>
-                                    </div>
+                                <div
+                                  key={`${sec.courseCode}-${sec.sectionNumber}-${slot.day}-${slot.start}`}
+                                  style={{
+                                    top: `${topPct}%`,
+                                    height: `${heightPct}%`,
+                                    left: "3px",
+                                    right: "3px",
+                                  }}
+                                  className={`absolute rounded-xl border p-2 flex flex-col justify-between overflow-hidden shadow-lg transition-all group hover:z-20 hover:scale-[1.02] cursor-pointer ${theme.cardBg} ${theme.border} backdrop-blur-md`}
+                                >
+                                  {/* Top Row: Course Code + Section + Lock */}
+                                  <div className="flex items-center justify-between gap-1 leading-none">
+                                    <span className="font-mono font-black text-[11px] sm:text-xs text-white truncate">
+                                      {sec.courseCode}.{sec.sectionNumber}
+                                    </span>
+                                    <Lock className="w-2.5 h-2.5 text-slate-400 group-hover:text-amber-400 shrink-0" />
                                   </div>
 
-                                  {gapToNext !== null && (
-                                    <div className="flex items-center justify-center py-1">
-                                      <span
-                                        className={`text-[11px] font-mono px-3 py-1 rounded-full border ${
-                                          gapToNext <= 15
-                                            ? "bg-emerald-950/60 text-emerald-300 border-emerald-800"
-                                            : gapToNext <= 50
-                                            ? "bg-blue-950/60 text-blue-300 border-blue-800"
-                                            : "bg-amber-950/60 text-amber-300 border-amber-800"
-                                        }`}
-                                      >
-                                        {gapToNext <= 15
-                                          ? `⚡ ${gapToNext}m break (Direct consecutive next class)`
-                                          : gapToNext <= 50
-                                          ? `☕ ${gapToNext}m lunch/break before next class`
-                                          : `⏱️ ${gapToNext}m gap before next class`}
-                                      </span>
+                                  {/* Course Title */}
+                                  <p
+                                    className="text-[10px] sm:text-[11px] font-semibold text-slate-200 line-clamp-1 leading-tight"
+                                    title={sec.courseTitle}
+                                  >
+                                    {sec.courseTitle}
+                                  </p>
+
+                                  {/* Time & Room */}
+                                  <div className="flex flex-wrap items-center justify-between gap-1 text-[9px] font-mono leading-none pt-0.5">
+                                    <span className="text-slate-300">
+                                      {slot.start} - {slot.end}
+                                    </span>
+                                    <span className="font-bold text-amber-300/90 truncate max-w-[65px]" title={slot.room}>
+                                      {slot.room || "@SEU"}
+                                    </span>
+                                  </div>
+
+                                  {/* Faculty badge */}
+                                  {sec.facultyInitial && sec.facultyInitial !== "TBA" && (
+                                    <div className="absolute right-1 bottom-1 text-[9px] font-mono font-bold px-1 rounded bg-black/50 text-indigo-300 border border-indigo-500/30">
+                                      [{sec.facultyInitial}]
                                     </div>
                                   )}
-                                </React.Fragment>
+                                </div>
                               );
                             })}
                           </div>
                         );
-                      })()}
-                    </div>
-                  )}
-
-                  {/* VIEW: OVERVIEW TABLE */}
-                  {viewMode === "Overview" && (
-                    <div className="overflow-x-auto scrollbar-thin">
-                      <table className="w-full text-left text-xs font-sans">
-                        <thead>
-                          <tr className="border-b border-slate-800 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
-                            <th className="py-3 px-3">Course</th>
-                            <th className="py-3 px-3">Course Title</th>
-                            <th className="py-3 px-3">Sec</th>
-                            <th className="py-3 px-3">Cr</th>
-                            <th className="py-3 px-3">Faculty Instructor</th>
-                            <th className="py-3 px-3">12-Hour Schedule & Rooms</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800 font-mono">
-                          {activeRoutine.sections.map((s, idx) => (
-                            <tr key={idx} className="hover:bg-slate-900/50 transition-colors">
-                              <td className="py-3 px-3 font-bold text-white">{s.courseCode}</td>
-                              <td className="py-3 px-3 font-sans text-slate-300 max-w-[200px] truncate">
-                                {s.courseTitle}
-                              </td>
-                              <td className="py-3 px-3 text-blue-400 font-bold">{s.sectionNumber}</td>
-                              <td className="py-3 px-3 text-slate-300">{s.credits}</td>
-                              <td className="py-3 px-3 text-indigo-300 font-sans">
-                                <span className="font-mono font-bold mr-1">[{s.facultyInitial}]</span> {s.facultyName}
-                              </td>
-                              <td className="py-3 px-3 text-slate-300 text-[11px]">
-                                {s.slots
-                                  .map(
-                                    (sl) =>
-                                      `${sl.day} ${formatTime12(sl.start)} - ${formatTime12(sl.end)} @ ${sl.room}`
-                                  )
-                                  .join(" / ")}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                  {/* Footer Action Buttons */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800">
-                    <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      <span>
-                        Zero-Clash Verified • {activeRoutine.totalCredits} Credit Hours • {activeRoutine.activeDaysCount} Days on Campus
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleCopySectionCodes}
-                        className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Copy className="w-3.5 h-3.5 text-blue-400" />
-                        <span>{language === "bn" ? "UMS সেকশন কপি" : "Copy for UMS"}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => window.print()}
-                        className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Printer className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{language === "bn" ? "প্রিন্ট" : "Print"}</span>
-                      </button>
+                      })}
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
-          );
-        };
-
-        // Full-width, clean linear workspace: 2. Priorities Card -> 3. Routine Results & Timetable
-        if (routines.length > 0) {
-          return (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              {renderPrioritiesCard()}
-              {renderRoutineResults()}
-            </div>
-          );
-        }
-
-        // When no routines generated yet: render Priorities Card + Helpful Empty State
-        return (
-          <div className="space-y-6 animate-in fade-in duration-300">
-            {renderPrioritiesCard()}
-
-            <div className="rounded-3xl bg-slate-900/40 border border-slate-800/80 p-8 sm:p-12 text-center space-y-4 backdrop-blur-md">
-              <div className="w-16 h-16 rounded-3xl bg-blue-600/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto">
-                <Sparkles className="w-8 h-8" />
-              </div>
-              <div className="max-w-md mx-auto space-y-2">
-                <h3 className="text-lg font-bold text-white">
-                  {language === "bn" ? "রুটিন তৈরির জন্য প্রস্তুত" : "Ready to Build Your Routine"}
-                </h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  {language === "bn"
-                    ? "ধাপ ১ থেকে কোর্স সিলেক্ট করুন এবং ধাপ ২-এর '১০টি সেরা রুটিন সাজান' বাটনে ক্লিক করে সাথে সাথে শূন্য-ক্ল্যাশ রুটিন তৈরি করুন।"
-                    : "Select your target courses in Step 1, tune your day/gap preferences in Step 2, and click 'Generate 10 Clash-Free Routines' to get optimal schedules."}
-                </p>
-              </div>
-              <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
-                <button
-                  onClick={() => {
-                    const sample = ["CSE355", "CSE381", "CSE382", "CSE443", "CSE444"].filter((c) =>
-                      coursesCatalog.some((cat) => cat.code === c)
-                    );
-                    setSelectedCourses(sample.length > 0 ? sample : coursesCatalog.slice(0, 5).map((c) => c.code));
-                    toast.success("Loaded 5 recommended standard courses (11 credits)!");
-                  }}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
-                >
-                  <Star className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
-                  <span>Recommend Standard 5 Courses (11 Cr)</span>
-                </button>
               </div>
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       {/* ========================================================================= */}
-      {/* 5. UPLOAD / PASTE ADVISING TABLE MODAL */}
+      {/* TAB 2: COMPARE VIEW                                                       */}
       {/* ========================================================================= */}
-      {isUploadModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-xl rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-7 space-y-5 shadow-2xl relative">
-            <button
-              onClick={() => setIsUploadModalOpen(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-white transition-colors cursor-pointer text-base"
-            >
-              ✕
-            </button>
-
-            <div className="space-y-1.5">
-              <div className="w-11 h-11 rounded-2xl bg-blue-600/20 border border-blue-500/30 text-blue-400 flex items-center justify-center">
-                <Upload className="w-5 h-5" />
-              </div>
-              <h3 className="text-lg sm:text-xl font-bold text-white">
-                {language === "bn" ? "সাউথইস্ট ইউনিভার্সিটি UMS টেবিল ইম্পোর্ট" : "Import Southeast University UMS Table"}
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                {language === "bn"
-                  ? "সাউথইস্ট ইউনিভার্সিটির UMS পোর্টাল (ums.seu.edu.bd) থেকে Advising Table-এর .html ফাইল আপলোড করুন অথবা টেবিল থেকে কপি করে সরাসরি পেস্ট করুন।"
-                  : "Upload official advising .html file or copy-paste table text directly from UMS. Auto-extracts all sections, slots, and faculty."}
+      {activeAppTab === "compare" && (
+        <div className="rounded-2xl bg-[#0d1322] border border-slate-800 p-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-black text-white">Compare Generated Routines</h2>
+              <p className="text-xs text-slate-400">
+                Side-by-side comparison of the top ranked clash-free routine options.
               </p>
             </div>
+            <button
+              type="button"
+              onClick={() => setActiveAppTab("routine")}
+              className="text-xs font-bold text-indigo-400 hover:underline cursor-pointer"
+            >
+              ← Back to Timetable
+            </button>
+          </div>
 
-            {/* Mode Switcher Tabs */}
-            <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-slate-800/80 border border-slate-700/80">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {sortedRoutines.slice(0, 6).map((routine, idx) => (
+              <div
+                key={idx}
+                className={`p-4 rounded-2xl border transition-all space-y-3 cursor-pointer ${
+                  selectedRoutineIndex === idx
+                    ? "bg-indigo-950/40 border-indigo-500/80 shadow-lg shadow-indigo-500/10"
+                    : "bg-slate-900/60 border-slate-800 hover:border-slate-700"
+                }`}
+                onClick={() => {
+                  setSelectedRoutineIndex(idx);
+                  setActiveAppTab("routine");
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-black text-sm text-white">
+                    Option #{idx + 1}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono font-bold">
+                    {routine.matchPercentage}% Score
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 text-xs text-slate-300">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Campus Days:</span>
+                    <span className="font-mono font-bold">{routine.activeDaysCount} Days ({routine.activeDays.join(", ")})</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Time Gap:</span>
+                    <span className="font-mono font-bold">{routine.totalGapMinutes} mins</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Preferred Faculty:</span>
+                    <span className="font-mono font-bold text-amber-300">
+                      {routine.facultyMatchCount} matches
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
+                  <span className="text-slate-400 font-mono">{routine.sections.length} courses</span>
+                  <span className="text-indigo-400 font-bold hover:underline">
+                    View in Timetable →
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 3: SAVED ROUTINES                                                     */}
+      {/* ========================================================================= */}
+      {activeAppTab === "saved" && (
+        <div className="rounded-2xl bg-[#0d1322] border border-slate-800 p-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-black text-white">Saved Routines ({savedRoutines.length})</h2>
+              <p className="text-xs text-slate-400">
+                Bookmarked routine combinations saved for this session.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveAppTab("routine")}
+              className="text-xs font-bold text-indigo-400 hover:underline cursor-pointer"
+            >
+              ← Back to Timetable
+            </button>
+          </div>
+
+          {savedRoutines.length === 0 ? (
+            <div className="text-center py-12 space-y-3 text-slate-500">
+              <Bookmark className="w-10 h-10 mx-auto text-slate-600" />
+              <p className="text-sm font-bold text-slate-400">No saved routines yet.</p>
+              <p className="text-xs">
+                Click the <strong>[ Save ]</strong> button on any generated routine option to bookmark it here.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {savedRoutines.map((item, idx) => (
+                <div
+                  key={item.id}
+                  className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3 shadow-lg"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-black text-sm text-white">
+                      {item.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSavedRoutines((prev) => prev.filter((_, i) => i !== idx))
+                      }
+                      className="p-1 rounded text-slate-500 hover:text-rose-400 cursor-pointer"
+                      title="Remove saved routine"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-1 text-xs text-slate-300">
+                    <p className="font-mono text-slate-400">
+                      Courses: {item.routine.sections.map((s) => `${s.courseCode}.${s.sectionNumber}`).join(", ")}
+                    </p>
+                    <p>
+                      <strong>{item.routine.activeDaysCount} Days:</strong> {item.routine.activeDays.join(", ")}
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetIdx = sortedRoutines.findIndex(
+                          (r) =>
+                            r.sections.length === item.routine.sections.length &&
+                            r.sections.every((s) =>
+                              item.routine.sections.some(
+                                (os) => os.courseCode === s.courseCode && os.sectionNumber === s.sectionNumber
+                              )
+                            )
+                        );
+                        if (targetIdx >= 0) setSelectedRoutineIndex(targetIdx);
+                        setActiveAppTab("routine");
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all cursor-pointer"
+                    >
+                      Open in Timetable
+                    </button>
+                    <span className="text-[10px] font-mono text-slate-500">{item.date}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 1: COURSE CATALOG MODAL (Add / Remove Courses with 17-Cr limit)      */}
+      {/* ========================================================================= */}
+      {isCatalogModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-3xl rounded-3xl bg-[#0d1322] border border-slate-800 p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-white flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-indigo-400" />
+                  <span>Course Catalog ({semester})</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Select Theory and Lab courses to build your routine (Max 17 Credits combined).
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span
+                  className={`text-xs font-mono font-bold px-3 py-1 rounded-full border ${
+                    selectedCreditsTotal >= 17
+                      ? "bg-amber-950 text-amber-300 border-amber-500/50"
+                      : "bg-slate-800 text-slate-300 border-slate-700"
+                  }`}
+                >
+                  {selectedCreditsTotal} / 17 Credits Selected
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsCatalogModalOpen(false)}
+                  className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Tabs & Search */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="inline-flex rounded-xl bg-slate-900 border border-slate-800 p-1">
+                {(["all", "theory", "lab"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setCatalogFilterTab(tab)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer uppercase ${
+                      catalogFilterTab === tab
+                        ? "bg-indigo-600 text-white shadow-md"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {tab === "all" ? `All (${coursesCatalog.length})` : tab === "theory" ? "Theory" : "Lab"}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative min-w-[240px] flex-1 max-w-md">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={catalogSearchQuery}
+                  onChange={(e) => setCatalogSearchQuery(e.target.value)}
+                  placeholder="Search by code or title (e.g. CSE355, Algorithm)..."
+                  className="w-full text-xs py-2 pl-9 pr-7 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                {catalogSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setCatalogSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Courses Grid */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {catalogModalCourses.map((c) => {
+                  const isSelected = selectedCourses.includes(c.code);
+                  const wouldExceed = !isSelected && selectedCreditsTotal + c.credits > 17;
+
+                  return (
+                    <div
+                      key={c.code}
+                      onClick={() => !wouldExceed && handleToggleCourse(c.code, c.credits)}
+                      className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                        isSelected
+                          ? "bg-indigo-950/60 border-indigo-500/80 shadow-md shadow-indigo-500/10"
+                          : wouldExceed
+                          ? "bg-slate-900/30 border-slate-800/60 opacity-50 cursor-not-allowed"
+                          : "bg-slate-850/50 border-slate-800 hover:border-slate-700 hover:bg-slate-800/60"
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-sm text-white">{c.code}</span>
+                          <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                            {c.credits} Cr
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400">
+                            {c.sections.length} sec
+                          </span>
+                        </div>
+                        <p className="text-xs font-bold text-slate-200 truncate" title={c.title}>
+                          {c.title}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={wouldExceed}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                          isSelected
+                            ? "bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30"
+                            : wouldExceed
+                            ? "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed"
+                            : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-md"
+                        }`}
+                      >
+                        {isSelected ? "Remove" : wouldExceed ? ">17 Cr" : "+ Add"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                {selectedCourses.length} courses selected • {selectedCreditsTotal} / 17 credits
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCatalogModalOpen(false);
+                  handleGenerateRoutines();
+                }}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs shadow-lg shadow-indigo-500/25 transition-all cursor-pointer"
+              >
+                Done & Re-Build Routine 🚀
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 2: ADVISING DATA MODAL (Upload UMS HTML or Paste table)             */}
+      {/* ========================================================================= */}
+      {isUploadModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-xl rounded-3xl bg-[#0d1322] border border-slate-800 p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-black text-white flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-indigo-400" />
+                  <span>Advising Data Upload</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Upload .html file from UMS or paste copied table text directly.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsUploadModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-900 border border-slate-800">
               <button
                 type="button"
                 onClick={() => setUploadTab("file")}
-                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                  uploadTab === "file"
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                    : "text-slate-400 hover:text-slate-200"
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  uploadTab === "file" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-white"
                 }`}
               >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Upload .html File</span>
+                Upload .html File
               </button>
               <button
                 type="button"
                 onClick={() => setUploadTab("paste")}
-                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                  uploadTab === "paste"
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
-                    : "text-slate-400 hover:text-slate-200"
+                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  uploadTab === "paste" ? "bg-indigo-600 text-white shadow-md" : "text-slate-400 hover:text-white"
                 }`}
               >
-                <Copy className="w-3.5 h-3.5" />
-                <span>Paste Table / HTML</span>
+                Paste Table / HTML
               </button>
             </div>
 
-            {/* Tab 1: File Upload */}
+            {/* Tab 1: File */}
             {uploadTab === "file" && (
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="p-7 rounded-2xl border-2 border-dashed border-slate-700 hover:border-blue-500 bg-slate-800/40 hover:bg-slate-800/80 transition-all text-center space-y-3 cursor-pointer"
+                className="p-8 rounded-2xl border-2 border-dashed border-slate-700 hover:border-indigo-500 bg-slate-850/40 hover:bg-slate-850/80 transition-all text-center space-y-3 cursor-pointer"
               >
                 <input
                   ref={fileInputRef}
@@ -2720,47 +2295,22 @@ export default function SmartAdvisingRoutineTool() {
                 <FileText className="w-9 h-9 text-slate-400 mx-auto" />
                 <div className="space-y-1">
                   <p className="text-xs font-bold text-slate-200">
-                    {language === "bn" ? "ক্লিক করুন অথবা ফাইল ড্রপ করুন" : "Click to browse or drop .html file"}
+                    Click to browse or drop .html file
                   </p>
-                  <p className="text-[10px] text-slate-400 font-mono">Supports SEU UMS HTML up to 10MB</p>
+                  <p className="text-[10px] text-slate-400 font-mono">Supports SEU UMS advising HTML</p>
                 </div>
               </div>
             )}
 
-            {/* Tab 2: Direct Paste (Supports UMS table text, raw HTML, or seu-routine-builder format) */}
+            {/* Tab 2: Paste */}
             {uploadTab === "paste" && (
               <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-slate-300">
-                    {language === "bn" ? "টেবিল বা HTML কোড পেস্ট করুন" : "Paste Copied Table or HTML Source"}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handlePasteFromClipboard}
-                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 text-[11px] font-mono font-bold transition-all flex items-center gap-1 cursor-pointer"
-                    >
-                      <Copy className="w-3 h-3" />
-                      <span>Paste Clipboard</span>
-                    </button>
-                    {pastedText && (
-                      <button
-                        type="button"
-                        onClick={() => setPastedText("")}
-                        className="text-[11px] font-mono text-slate-400 hover:text-rose-400 cursor-pointer"
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </div>
-                </div>
-
                 <textarea
                   value={pastedText}
                   onChange={(e) => setPastedText(e.target.value)}
-                  placeholder="Paste copied UMS advising table text or HTML source code here...&#10;&#10;Supported formats:&#10;• Full HTML source from ums.seu.edu.bd&#10;• Plain-text rows copied directly from browser (e.g. CSE355.1 Image Processing 3.0 [JAR] SUN # 10:00 ~ 11:20 @ SEU527 / TUE # 10:00 ~ 11:20 @ SEU527)&#10;• Formats from seu-routine-builder"
-                  rows={7}
-                  className="w-full text-xs font-mono p-3 rounded-2xl bg-slate-800/70 border border-slate-700 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed resize-none"
+                  placeholder="Paste copied UMS advising table text or HTML source code here...&#10;&#10;Supported formats:&#10;• Full HTML source from ums.seu.edu.bd&#10;• Plain-text rows copied directly from browser (e.g. CSE355.1 Image Processing 3.0 [JAR] SUN # 10:00 ~ 11:20 @ SEU527 / TUE # 10:00 ~ 11:20 @ SEU527)&#10;• seu-routine-builder format"
+                  rows={6}
+                  className="w-full text-xs font-mono p-3 rounded-2xl bg-slate-800/70 border border-slate-700 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 leading-relaxed resize-none"
                 />
 
                 <div className="flex items-center justify-between pt-1">
@@ -2771,7 +2321,7 @@ export default function SmartAdvisingRoutineTool() {
                     type="button"
                     onClick={handleApplyPastedText}
                     disabled={uploadingFile || !pastedText.trim()}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
                   >
                     <Sparkles className={`w-3.5 h-3.5 ${uploadingFile ? "animate-spin" : ""}`} />
                     <span>{uploadingFile ? "Parsing..." : "Parse & Apply Schedule"}</span>
@@ -2780,14 +2330,14 @@ export default function SmartAdvisingRoutineTool() {
               </div>
             )}
 
-            {/* Sandbox Guarantee Note */}
-            <div className="p-3 rounded-xl bg-blue-950/40 border border-blue-900/60 text-xs text-slate-300 space-y-1">
-              <div className="flex items-center gap-1.5 font-bold text-blue-400">
+            {/* Private Student Sandbox Note */}
+            <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-900/60 text-xs text-slate-300 space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-indigo-400">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
                 <span>Private Student Sandbox Guarantee</span>
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                Your uploaded or pasted schedule is exclusively processed inside your personal browser session. It will <strong>never alter or merge into the university administration master catalog</strong>.
+                Your uploaded schedule is processed inside your personal browser session. It will never alter the university master catalog.
               </p>
             </div>
           </div>
