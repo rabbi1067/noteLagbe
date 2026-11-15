@@ -332,7 +332,19 @@ public class AiExamChatService {
                             || rLower.contains("type out or paste")
                             || rLower.contains("what does question")
                             || rLower.contains("paste the text")
-                            || rLower.contains("paste question");
+                            || rLower.contains("paste question")
+                            || rLower.contains("which specific question")
+                            || rLower.contains("would you like to solve")
+                            || rLower.contains("which question or past exam")
+                            || rLower.contains("for example, you can ask for")
+                            || rLower.contains("for example you can ask for")
+                            || rLower.contains("let me know your quiz or question")
+                            || rLower.contains("please specify which question")
+                            || rLower.contains("which question would you like")
+                            || rLower.contains("could you please specify")
+                            || rLower.contains("please clarify which question")
+                            || (rLower.contains("which question") && rLower.contains("?"))
+                            || (rLower.contains("1.a") && rLower.contains("1.b") && rLower.contains("ask for"));
                     if (!isEvasive) {
                         return response.trim();
                     }
@@ -367,12 +379,19 @@ public class AiExamChatService {
                 + "ACADEMIC ARCHIVE CONTEXT:\n" + academicContext + "\n\n"
                 + "GUIDELINES & INSTRUCTIONS:\n"
                 + "1. Genuinely answer ANY academic question the student asks about " + course.getCode() + " (syllabus, question solutions, exam tips, dry runs, formulas).\n"
-                + "2. If the student asks about a specific teacher (e.g. NAAO sir, Opu sir, SM sir) or a specific past question (e.g. 'opu sir summer 2026 question number 1 ay answer daw'):\n"
+                + "2. FULL COMPLETE ANSWERS (CRITICAL MANDATORY POLICY):\n"
+                + "   - When a student asks for an answer ('quiz answer', 'quiz solution', 'ct answer', 'midterm answer', 'question 1 answer', 'solve', etc.):\n"
+                + "     NEVER be evasive! NEVER ask 'Which specific question or past exam would you like to solve?' or ask them to choose between 1.a, 1.b, etc.!\n"
+                + "     INSTEAD, YOU MUST IMMEDIATELY PROVIDE THE FULL, COMPLETE, STEP-BY-STEP ACADEMIC MODEL ANSWER FOR ALL QUESTIONS AND SUBPARTS!\n"
+                + "     - If student asks for 'quiz answer' or 'ct answer': provide the complete model answer for the core Class Test / Quiz questions of this course.\n"
+                + "     - If student asks for 'question 1 answer': provide the FULL solution for Question 1 (both 1.a Time Complexity and 1.b Selection Sort + Binary Search in full).\n"
+                + "   - ONLY if the student explicitly specifies a single subquestion (e.g. '1.a only', 'just 1.b'), then restrict the answer to that particular subquestion.\n"
+                + "3. If the student asks about a specific teacher (e.g. NAAO sir, Opu sir, SM sir) or a specific past question (e.g. 'opu sir summer 2026 question number 1 ay answer daw'):\n"
                 + "   - Provide a deep, authentic academic solution and model answer tailored to that teacher's known marking style and Southeast University examination standards.\n"
-                + "3. Highlight WHICH topics are repeated and WHY, with syllabus-grounded depth.\n"
-                + "4. Give actionable exam scoring tips (diagrams, presentation, step marking).\n"
-                + "5. Format cleanly using Markdown with bold headings, clean bullet points, code snippets, and standard LaTeX math syntax: use $$...$$ for block display equations and $...$ for inline math expressions (e.g. $O(n \\log n)$, $\\sum_{i=1}^n i$, $\\frac{a}{b}$). Never output raw unformatted ASCII equations.\n"
-                + "6. Language Policy: " + langInstruction;
+                + "4. Highlight WHICH topics are repeated and WHY, with syllabus-grounded depth.\n"
+                + "5. Give actionable exam scoring tips (diagrams, presentation, step marking).\n"
+                + "6. Format cleanly using Markdown with bold headings, clean bullet points, code snippets, and standard LaTeX math syntax: use $$...$$ for block display equations and $...$ for inline math expressions (e.g. $O(n \\log n)$, $\\sum_{i=1}^n i$, $\\frac{a}{b}$). Never output raw unformatted ASCII equations.\n"
+                + "7. Language Policy: " + langInstruction;
 
         // Build conversation contents for Gemini REST API with top-level system_instruction
         Map<String, Object> requestPayload = new HashMap<>();
@@ -543,6 +562,198 @@ public class AiExamChatService {
         String p = userPrompt.toLowerCase();
 
         // -------------------------------------------------------------
+        // PATTERN 0: QUIZ & CLASS TEST (CT) COMPLETE MODEL ANSWER
+        // When student asks "quiz answer", "ct answer", "quiz solve", etc.
+        // If specific subpart requested (e.g. ct 1, ct 2), answer that.
+        // Otherwise, PROVIDE THE FULL COMPREHENSIVE QUIZ SOLUTION!
+        // -------------------------------------------------------------
+        boolean isQuizOrCt = p.contains("quiz")
+                || p.contains("ct")
+                || p.contains("class test")
+                || p.contains("কুইজ")
+                || p.contains("সিটি")
+                || p.contains("lab quiz");
+
+        if ((codeUpper.contains("241") || titleLower.contains("data struct")) && isQuizOrCt) {
+            boolean isCt1Only = (p.contains("ct 1") || p.contains("ct1") || p.contains("quiz 1") || p.contains("asymptotic") || (p.contains("proof") && p.contains("big-o")))
+                    && !p.contains("ct 2") && !p.contains("ct 3") && !p.contains("ct 4");
+            boolean isCt2Only = (p.contains("ct 2") || p.contains("ct2") || p.contains("quiz 2") || p.contains("double pointer") || p.contains("**ptr") || p.contains("memory leak"))
+                    && !p.contains("ct 1") && !p.contains("ct 3") && !p.contains("ct 4");
+            boolean isCt3Only = (p.contains("ct 3") || p.contains("ct3") || p.contains("quiz 3") || p.contains("parenthes") || p.contains("balanced"))
+                    && !p.contains("ct 1") && !p.contains("ct 2") && !p.contains("ct 4");
+            boolean isCt4Only = (p.contains("ct 4") || p.contains("ct4") || p.contains("quiz 4") || p.contains("circular queue") || p.contains("modulo"))
+                    && !p.contains("ct 1") && !p.contains("ct 2") && !p.contains("ct 3");
+
+            // CT 1 ONLY: Asymptotic Limit Proof
+            if (isCt1Only) {
+                return isBengali
+                        ? "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                        + "**কোর্স:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                        + "**পরীক্ষা:** `CSE241 Class Test (CT 1) / Lab Quiz Model Answer`  \n"
+                        + "**শিক্ষক ফোকাস:** `" + teacherLabel + "`  \n\n"
+                        + "---\n\n"
+                        + "### 📝 **CT Question 1: Asymptotic Limit Proof (Big-O Notation) [5.0 Marks]**\n\n"
+                        + "**প্রশ্ন:** Define Big-O notation formally and prove mathematically that $f(n) = 3n^2 + 5n + 7 = O(n^2)$. Find the constants $c$ and $n_0$.\n\n"
+                        + "#### 🔍 **১. Big-O এর আনুষ্ঠানিক সংজ্ঞা (Formal Definition):**\n"
+                        + "একটি ফাংশন $f(n) = O(g(n))$ হবে যদি এবং কেবল যদি এমন দুটি ধনাত্মক ধ্রুবক $c > 0$ এবং $n_0 \\ge 1$ পাওয়া যায় যার জন্য:\n"
+                        + "$$0 \\le f(n) \\le c \\cdot g(n) \\quad \\forall n \\ge n_0$$\n\n"
+                        + "#### 🔍 **২. গাণিতিক প্রমাণ (Mathematical Proof):**\n"
+                        + "আমাদের প্রদত্ত ফাংশন: $f(n) = 3n^2 + 5n + 7$ এবং $g(n) = n^2$।\n\n"
+                        + "যেকোনো $n \\ge 1$ এর জন্য:\n"
+                        + "* $5n \\le 5n^2$\n"
+                        + "* $7 \\le 7n^2$\n\n"
+                        + "অতএব:\n"
+                        + "$$f(n) = 3n^2 + 5n + 7 \\le 3n^2 + 5n^2 + 7n^2 = 15n^2$$\n\n"
+                        + "সুতরাং, আমরা যদি ধ্রুবকদ্বয় নির্বাচন করি:\n"
+                        + "* **$c = 15$** এবং **$n_0 = 1$**\n\n"
+                        + "যেহেতু $0 \\le 3n^2 + 5n + 7 \\le 15n^2$ শর্তটি সকল $n \\ge 1$ এর জন্য সত্য,\n"
+                        + "$$\\mathbf{3n^2 + 5n + 7 = O(n^2)} \\quad \\text{[Proved]}$$"
+                        : "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                        + "**Course:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                        + "**Exam:** `CSE241 Class Test (CT 1) Model Answer`  \n"
+                        + "**Faculty Focus:** `" + teacherLabel + "`  \n\n"
+                        + "---\n\n"
+                        + "### 📝 **CT Question 1: Asymptotic Limit Proof (Big-O Notation) [5.0 Marks]**\n\n"
+                        + "**Formal Definition:** $f(n) = O(g(n))$ iff $\\exists c > 0, n_0 \\ge 1$ such that $0 \\le f(n) \\le c \\cdot g(n) \\; \\forall n \\ge n_0$.\n\n"
+                        + "**Proof:** For $f(n) = 3n^2 + 5n + 7$ with $n \\ge 1$:\n"
+                        + "$$3n^2 + 5n + 7 \\le 3n^2 + 5n^2 + 7n^2 = 15n^2$$\n"
+                        + "Choosing $c = 15$ and $n_0 = 1$ satisfies $f(n) \\le c \\cdot n^2$.\n"
+                        + "$$\\mathbf{3n^2 + 5n + 7 = O(n^2)} \\quad \\text{[Proved]}$$";
+            }
+
+            // CT 2 ONLY: Double Pointer & Memory Leak Prevention
+            if (isCt2Only) {
+                return isBengali
+                        ? "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                        + "**কোর্স:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                        + "**পরীক্ষা:** `CSE241 Class Test (CT 2) / Lab Quiz Model Answer`  \n"
+                        + "**শিক্ষক ফোকাস:** `" + teacherLabel + "`  \n\n"
+                        + "---\n\n"
+                        + "### 📝 **CT Question 2: Double Pointer (**ptr) & Memory Leak Prevention [5.0 Marks]**\n\n"
+                        + "#### 🔍 **১. ডাবল পয়েন্টার কনসেপ্ট (Double Pointer `**ptr`):**\n"
+                        + "একটি ডাবল পয়েন্টার এমন একটি পয়েন্টার যা অন্য একটি পয়েন্টারের মেমোরি অ্যাড্রেস ধারণ করে।\n\n"
+                        + "```cpp\n"
+                        + "int val = 42;\n"
+                        + "int *ptr = &val;    // ptr holds address of val\n"
+                        + "int **dptr = &ptr;  // dptr holds address of ptr\n\n"
+                        + "cout << **dptr;     // outputs 42\n"
+                        + "```\n\n"
+                        + "#### 🔍 **২. ডাইনামিক মেমোরি ও মেমোরি লিক প্রতিরোধ:**\n"
+                        + "* **মেমোরি লিক (Memory Leak):** হিপ মেমোরিতে `new` দিয়ে মেমোরি নেওয়ার পর `delete` না করে পয়েন্টার রি-অ্যাসাইন বা লস্ট হলে সেই মেমোরি অবমুক্ত হতে পারে না, যা মেমোরি লিক তৈরি করে।\n"
+                        + "* **নিরাপদ রুলস:**\n"
+                        + "  1. প্রতিটি `new` এর জন্য ঠিক একটি `delete` এবং `new[]` এর জন্য `delete[]` নিশ্চিত করতে হবে।\n"
+                        + "  2. ডিলিট করার পর পয়েন্টারকে `nullptr` অ্যাসাইন করতে হবে (`dangling pointer` প্রতিরোধে)।"
+                        : "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                        + "**Course:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                        + "**Exam:** `CSE241 Class Test (CT 2) Model Answer`  \n\n"
+                        + "### 📝 **CT Question 2: Double Pointer & Dynamic Memory Management [5.0 Marks]**\n\n"
+                        + "Double pointer `int **ptr` stores the memory address of an `int*` pointer. Always deallocate with `delete` or `delete[]` and set pointers to `nullptr` to avoid memory leaks.";
+            }
+
+            // CT 3 ONLY: Stack Balanced Parentheses
+            if (isCt3Only) {
+                return isBengali
+                        ? "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                        + "**কোর্স:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                        + "**পরীক্ষা:** `CSE241 Class Test (CT 3) / Lab Quiz Model Answer`  \n"
+                        + "**শিক্ষক ফোকাস:** `" + teacherLabel + "`  \n\n"
+                        + "---\n\n"
+                        + "### 📝 **CT Question 3: Stack Balanced Parentheses Algorithm & Trace [5.0 Marks]**\n\n"
+                        + "**ইনপুট স্ট্রিং:** `{[()()]}`\n\n"
+                        + "#### 🔍 **ট্রেস টেবিল (Step-by-Step Trace):**\n\n"
+                        + "| Step | Character | Action | Stack Content |\n"
+                        + "| :--- | :---: | :--- | :--- |\n"
+                        + "| 1 | `{` | Opening bracket $\\to$ Push | `['{']` |\n"
+                        + "| 2 | `[` | Opening bracket $\\to$ Push | `['{', '[']` |\n"
+                        + "| 3 | `(` | Opening bracket $\\to$ Push | `['{', '[', '(']` |\n"
+                        + "| 4 | `)` | Matches top `(` $\\to$ Pop | `['{', '[']` |\n"
+                        + "| 5 | `(` | Opening bracket $\\to$ Push | `['{', '[', '(']` |\n"
+                        + "| 6 | `)` | Matches top `(` $\\to$ Pop | `['{', '[']` |\n"
+                        + "| 7 | `]` | Matches top `[` $\\to$ Pop | `['{']` |\n"
+                        + "| 8 | `}` | Matches top `{` $\\to$ Pop | `[]` (Empty) |\n\n"
+                        + "💡 **ফলাফল:** স্ট্রিং শেষ হওয়ার পর স্ট্যাক সম্পূর্ণ খালি, অতএব স্ট্রিংটি **Balanced (সুসংগত)!**"
+                        : "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                        + "**Course:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                        + "**Exam:** `CSE241 Class Test (CT 3) Model Answer`  \n\n"
+                        + "### 📝 **CT Question 3: Stack Balanced Parentheses Trace [5.0 Marks]**\n\n"
+                        + "Trace for `{[()()]}`: All brackets matched and popped. Stack is empty at termination, proving expression is Balanced.";
+            }
+
+            // CT 4 ONLY: Circular Queue Array Modulo
+            if (isCt4Only) {
+                return isBengali
+                        ? "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                        + "**কোর্স:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                        + "**পরীক্ষা:** `CSE241 Class Test (CT 4) / Lab Quiz Model Answer`  \n"
+                        + "**শিক্ষক ফোকাস:** `" + teacherLabel + "`  \n\n"
+                        + "---\n\n"
+                        + "### 📝 **CT Question 4: Circular Queue Array Modulo Arithmetic [5.0 Marks]**\n\n"
+                        + "#### 🔍 **১. মডিউলো ইনডেক্সিং রুলস:**\n"
+                        + "* **Enqueue (ইনসার্ট):** `rear = (rear + 1) % MAX_SIZE`\n"
+                        + "* **Dequeue (রিমুভ):** `front = (front + 1) % MAX_SIZE`\n"
+                        + "* **Overflow কন্ডিশন:** `(rear + 1) % MAX_SIZE == front`\n"
+                        + "* **Underflow কন্ডিশন:** `front == -1` (বা `front == rear` ইনিশিয়াল স্টেটে)"
+                        : "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                        + "**Course:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                        + "**Exam:** `CSE241 Class Test (CT 4) Model Answer`\n\n"
+                        + "Circular Queue using Array modulo indexing: `rear = (rear + 1) % MAX` and `front = (front + 1) % MAX`.";
+            }
+
+            // DEFAULT: FULL COMPREHENSIVE QUIZ / CT ANSWER (ALL 4 QUESTIONS ANSWERED IN FULL!)
+            return isBengali
+                    ? "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                    + "**কোর্স:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                    + "**পরীক্ষা:** `CSE241 Class Test & Lab Quiz সম্পূর্ণ সমাধান (Full Model Answer)`  \n"
+                    + "**শিক্ষক ফোকাস:** `" + teacherLabel + "`  \n\n"
+                    + "---\n\n"
+                    + "### 📝 **Question 1: Asymptotic Limit Proof (Big-O Notation) [5.0 Marks]**\n\n"
+                    + "**গাণিতিক প্রমাণ:** প্রমাণ করুন যে $f(n) = 3n^2 + 5n + 7 = O(n^2)$।\n\n"
+                    + "1. **সংজ্ঞা:** $f(n) = O(g(n)) \\iff 0 \\le f(n) \\le c \\cdot g(n) \\; \\forall n \\ge n_0$।\n"
+                    + "2. **প্রমাণ:** যেকোনো $n \\ge 1$ এর জন্য:\n"
+                    + "   $$5n \\le 5n^2 \\quad \\text{এবং} \\quad 7 \\le 7n^2$$\n"
+                    + "   $$f(n) = 3n^2 + 5n + 7 \\le 3n^2 + 5n^2 + 7n^2 = 15n^2$$\n"
+                    + "3. **ধ্রুবকদ্বয়:** $c = 15$ এবং $n_0 = 1$।\n"
+                    + "   অতএব, $f(n) \\le 15n^2 \\implies \\mathbf{3n^2 + 5n + 7 = O(n^2)}$ [Proved]।\n\n"
+                    + "---\n\n"
+                    + "### 📝 **Question 2: Double Pointer (`**ptr`) & Dynamic Memory Deallocation [5.0 Marks]**\n\n"
+                    + "1. **ডাবল পয়েন্টার:** ডাবল পয়েন্টার অন্য একটি পয়েন্টারের মেমোরি অ্যাড্রেস রাখে (`int **dptr = &ptr;`)।\n"
+                    + "2. **মেমোরি লিক প্রতিরোধ:**\n"
+                    + "   ```cpp\n"
+                    + "   int *arr = new int[100]; // Heap allocation\n"
+                    + "   // কাজ শেষে অবশ্যই অবমুক্ত করতে হবে:\n"
+                    + "   delete[] arr;\n"
+                    + "   arr = nullptr;          // Dangling pointer প্রতিরোধে\n"
+                    + "   ```\n\n"
+                    + "---\n\n"
+                    + "### 📝 **Question 3: Stack Balanced Parentheses Verification [5.0 Marks]**\n\n"
+                    + "**ইনপুট:** `{[()()]}`  \n"
+                    + "**ট্রেস:**\n"
+                    + "* ওপেনিং ব্র্যাকেট `{`, `[`, `(` পেলে স্ট্যাকে `push` হয়।\n"
+                    + "* ক্লোজিং ব্র্যাকেট `)`, `]`, `}` পেলে স্ট্যাকের শীর্ষ উপাদানের সাথে ম্যাচ করে `pop` হয়।\n"
+                    + "* ইনপুট শেষে স্ট্যাক খালি $\\implies$ **Expression is Balanced (সুসংগত)!**\n\n"
+                    + "---\n\n"
+                    + "### 📝 **Question 4: Circular Queue Array Modulo Arithmetic [5.0 Marks]**\n\n"
+                    + "1. **Enqueue:** `rear = (rear + 1) % MAX_SIZE;`\n"
+                    + "2. **Dequeue:** `front = (front + 1) % MAX_SIZE;`\n"
+                    + "3. **Full Condition:** `(rear + 1) % MAX_SIZE == front;`\n"
+                    + "4. **Empty Condition:** `front == -1;`\n\n"
+                    + "> 💡 **এক্সাম স্কোরিং টিপ:** কুইজ বা সিটিতে এই ৪টি টপিক থেকেই মূলত অংক ও কোড দেওয়া হয়। প্রতিটি প্রশ্নের সূত্র ও টেবিল স্পষ্টভাবে উল্লেখ করলে পূর্ণ ২০-এ ২০ মার্কস নিশ্চিত পাবেন!"
+                    : "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                    + "**Course:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                    + "**Exam:** `CSE241 Class Test (CT) & Quiz Full Model Solution`  \n"
+                    + "**Faculty Focus:** `" + teacherLabel + "`  \n\n"
+                    + "---\n\n"
+                    + "### 📝 **Question 1: Asymptotic Big-O Proof [5.0 Marks]**\n"
+                    + "Prove $3n^2 + 5n + 7 = O(n^2)$: For $n \\ge 1$, $3n^2 + 5n + 7 \\le 3n^2 + 5n^2 + 7n^2 = 15n^2$. With $c = 15, n_0 = 1$, proof holds.\n\n"
+                    + "### 📝 **Question 2: Double Pointer & Memory Leak Prevention [5.0 Marks]**\n"
+                    + "Use `delete[] arr; arr = nullptr;` after dynamic allocation to avoid memory leaks and dangling pointers.\n\n"
+                    + "### 📝 **Question 3: Stack Balanced Parentheses Trace [5.0 Marks]**\n"
+                    + "Step-by-step trace of `{[()()]}` using stack push/pop confirms the expression is fully balanced.\n\n"
+                    + "### 📝 **Question 4: Circular Queue Array Modulo Arithmetic [5.0 Marks]**\n"
+                    + "Insert via `rear = (rear + 1) % MAX` and remove via `front = (front + 1) % MAX`. Full when `(rear + 1) % MAX == front`.";
+        }
+
+        // -------------------------------------------------------------
         // PATTERN 1: CSE241 Spring 2024 Midterm - Question 1 (1.a & 1.b)
         // Time Complexity of nested loop & Selection Sort (Descending) + Binary Search for 7
         // -------------------------------------------------------------
@@ -551,16 +762,16 @@ public class AiExamChatService {
         boolean isTimeComplexity = p.contains("time complexity") || (p.contains("for") && p.contains("while") && p.contains("k/3"));
         boolean isSelectionBinary = p.contains("selection sort") || (p.contains("binary search") && p.contains("7"));
 
-        // Ultra-flexible question identifiers that match: "1.(a)", "1(a)", "1.a", "1 a", "q1a", "১ এর ক", etc.
-        boolean isQ1aOnly = p.matches(".*1[\\.\\s]*\\(?a\\)?.*")
-                || p.matches(".*১[\\.\\s]*\\(?ক\\)?.*")
-                || p.matches(".*\\b(q1a|1a|q[\\s\\.]*1[\\s\\.]*a)\\b.*")
-                || (p.contains("1") && (p.contains("(a)") || p.contains(".a") || p.contains(" a ")) && !p.contains("1.b") && !p.contains("1(b)"));
+        // Specific subquestion identifiers (Must not match the 'a' in 'answer' or 'ans')
+        boolean isQ1aOnly = (p.contains("1.a") || p.contains("1(a)") || p.contains("1-a") || p.contains("1 a ") || p.endsWith("1 a")
+                || p.contains("q1a") || p.contains("১.ক") || p.contains("১(ক)") || p.contains("১ এর ক")
+                || (p.contains("time complexity") && !p.contains("selection sort") && !p.contains("binary search")))
+                && !p.contains("1.b") && !p.contains("1(b)");
 
-        boolean isQ1bOnly = p.matches(".*1[\\.\\s]*\\(?b\\)?.*")
-                || p.matches(".*১[\\.\\s]*\\(?খ\\)?.*")
-                || p.matches(".*\\b(q1b|1b|q[\\s\\.]*1[\\s\\.]*b)\\b.*")
-                || (p.contains("1") && (p.contains("(b)") || p.contains(".b") || p.contains(" b ")) && !p.contains("1.a") && !p.contains("1(a)"));
+        boolean isQ1bOnly = (p.contains("1.b") || p.contains("1(b)") || p.contains("1-b") || p.contains("1 b ") || p.endsWith("1 b")
+                || p.contains("q1b") || p.contains("১.খ") || p.contains("১(খ)") || p.contains("১ এর খ")
+                || ((p.contains("selection sort") || p.contains("binary search")) && !p.contains("time complexity")))
+                && !p.contains("1.a") && !p.contains("1(a)");
 
         boolean isQ1General = isSpring2024
                 || p.contains("question 1")
@@ -568,11 +779,15 @@ public class AiExamChatService {
                 || p.contains("q1")
                 || p.contains("1 no")
                 || p.contains("1 er")
+                || p.contains("midterm answer")
+                || p.contains("exam answer")
+                || p.contains("full answer")
+                || p.contains("model answer")
                 || p.trim().equals("1")
                 || p.trim().equals("q1");
 
-        // CASE 1.A ONLY: Time Complexity Analysis [3.5 Marks]
-        if ((codeUpper.contains("241") || titleLower.contains("data struct")) && isQ1aOnly && !isQ1bOnly) {
+        // CASE 1.A ONLY: Time Complexity Analysis [3.5 Marks] (ONLY when explicitly requested)
+        if ((codeUpper.contains("241") || titleLower.contains("data struct")) && isQ1aOnly && !isQ1bOnly && !isQ1General) {
             if (isBengali) {
                 return "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
                         + "**কোর্স:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
@@ -805,18 +1020,15 @@ public class AiExamChatService {
         // -------------------------------------------------------------
         // PATTERN 2: CSE241 Spring 2024 Midterm - Question 2 (Doubly Linked List & Stack)
         // -------------------------------------------------------------
-        boolean isQ2a = p.matches(".*2[\\.\\s]*\\(?a\\)?.*")
-                || p.matches(".*২[\\.\\s]*\\(?ক\\)?.*")
-                || p.matches(".*\\b(q2a|2a|q[\\s\\.]*2[\\s\\.]*a)\\b.*")
-                || p.contains("doubly linked")
-                || (p.contains("2") && (p.contains("(a)") || p.contains(".a") || p.contains(" a ")));
+        boolean isQ2aOnly = (p.contains("2.a") || p.contains("2(a)") || p.contains("2-a") || p.contains("2 a ") || p.endsWith("2 a")
+                || p.contains("q2a") || p.contains("২.ক") || p.contains("২(ক)") || p.contains("২ এর ক")
+                || (p.contains("doubly linked") && !p.contains("infix to postfix")))
+                && !p.contains("2.b") && !p.contains("2(b)");
 
-        boolean isQ2b = p.matches(".*2[\\.\\s]*\\(?b\\)?.*")
-                || p.matches(".*২[\\.\\s]*\\(?খ\\)?.*")
-                || p.matches(".*\\b(q2b|2b|q[\\s\\.]*2[\\s\\.]*b)\\b.*")
-                || p.contains("infix to postfix")
-                || p.contains("postfix conversion")
-                || (p.contains("2") && (p.contains("(b)") || p.contains(".b") || p.contains(" b ")));
+        boolean isQ2bOnly = (p.contains("2.b") || p.contains("2(b)") || p.contains("2-b") || p.contains("2 b ") || p.endsWith("2 b")
+                || p.contains("q2b") || p.contains("২.খ") || p.contains("২(খ)") || p.contains("২ এর খ")
+                || ((p.contains("infix to postfix") || p.contains("postfix conversion")) && !p.contains("doubly linked")))
+                && !p.contains("2.a") && !p.contains("2(a)");
 
         boolean isQ2General = p.contains("question 2")
                 || p.contains("number 2")
@@ -826,7 +1038,7 @@ public class AiExamChatService {
                 || p.trim().equals("2")
                 || p.trim().equals("q2");
 
-        if ((codeUpper.contains("241") || titleLower.contains("data struct")) && (isQ2a || isQ2General) && !isQ2b) {
+        if ((codeUpper.contains("241") || titleLower.contains("data struct")) && isQ2aOnly && !isQ2bOnly && !isQ2General) {
             return isBengali
                     ? "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
                     + "**কোর্স:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
@@ -867,7 +1079,7 @@ public class AiExamChatService {
                     + "Always assign `newNode->next` and `newNode->prev` before updating adjacent pointers to prevent breaking the chain!";
         }
 
-        if ((codeUpper.contains("241") || titleLower.contains("data struct")) && isQ2b) {
+        if ((codeUpper.contains("241") || titleLower.contains("data struct")) && isQ2bOnly && !isQ2aOnly && !isQ2General) {
             return isBengali
                     ? "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
                     + "**কোর্স:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
@@ -885,6 +1097,43 @@ public class AiExamChatService {
                     + "**Course:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
                     + "**Exam:** `Spring 2024 Midterm - Question 2.(b) Solution`  \n\n"
                     + "Infix to Postfix Conversion using Stack precedence.";
+        }
+
+        // CASE 2 FULL: Complete Question 2 Model Answer (Both 2.a & 2.b in Full)
+        if ((codeUpper.contains("241") || titleLower.contains("data struct")) && isQ2General) {
+            return isBengali
+                    ? "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                    + "**কোর্স:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                    + "**পরীক্ষা:** `Spring 2024 Midterm Examination - Question 2 সম্পূর্ণ নির্ভুল সমাধান [10 Marks]`  \n"
+                    + "**শিক্ষক ফোকাস:** `" + teacherLabel + "`  \n\n"
+                    + "---\n\n"
+                    + "### 📝 **2.(a) Doubly Linked List Node Manipulation [4.0 Marks]**\n\n"
+                    + "```c\n"
+                    + "struct node {\n"
+                    + "    int data;\n"
+                    + "    struct node *next;\n"
+                    + "    struct node *prev;\n"
+                    + "};\n"
+                    + "```\n\n"
+                    + "**পয়েন্টার ইনসার্শন লজিক:**\n"
+                    + "```c\n"
+                    + "struct node *newNode = (struct node*)malloc(sizeof(struct node));\n"
+                    + "newNode->data = val;\n"
+                    + "newNode->next = current->next;\n"
+                    + "newNode->prev = current;\n"
+                    + "if(current->next != NULL) current->next->prev = newNode;\n"
+                    + "current->next = newNode;\n"
+                    + "```\n\n"
+                    + "---\n\n"
+                    + "### 📝 **2.(b) Infix to Postfix Conversion using Stack [6.0 Marks]**\n\n"
+                    + "**অপারেটর প্রেসিডেন্স:** `^` (সর্বোচ্চ) $\\to$ `*`, `/` $\\to$ `+`, `-` (সর্বনিম্ন)।\n\n"
+                    + "1. অপারেন্ড সরাসরি আউটপুটে যোগ হয়।\n"
+                    + "2. `(` স্ট্যাকে পুশ হয় এবং `)` পেলে matching `(` পর্যন্ত সব পপ হয়ে আউটপুটে যায়।\n"
+                    + "3. স্ট্যাকটপে সমান বা উচ্চতর অপারেটর থাকলে তা পপ করে বর্তমান অপারেটর পুশ করতে হয়।"
+                    : "### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n"
+                    + "**Course:** `" + course.getCode() + " - " + course.getTitle() + "`  \n"
+                    + "**Exam:** `Spring 2024 Midterm - Question 2 Full Model Answer [10 Marks]`  \n\n"
+                    + "Full solution covering 2.(a) Doubly Linked List structure and 2.(b) Infix to Postfix conversion.";
         }
 
         // -------------------------------------------------------------
