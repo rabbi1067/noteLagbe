@@ -219,7 +219,7 @@ const TIME_12_AXIS = [
 ];
 
 export default function SmartAdvisingRoutineTool() {
-  const { user } = useAuth();
+  const { user, isAdmin, isSuperAdmin } = useAuth();
   const { language } = useLanguage();
 
   // State: Sections loaded from verified real SEU dataset
@@ -2211,7 +2211,7 @@ export default function SmartAdvisingRoutineTool() {
         onSaveCatalog={handleSaveCatalog}
         onMergeCatalog={handleMergeCatalog}
         semester={semester}
-        isStaffOrAdmin={user?.role === "ROLE_ADMIN" || user?.role === "ROLE_MANAGER" || user?.role === "ROLE_SUPER_ADMIN"}
+        isStaffOrAdmin={Boolean(isAdmin || isSuperAdmin || user?.role === "ROLE_ADMIN" || user?.role === "ROLE_MANAGER" || user?.role === "ROLE_SUPER_ADMIN")}
         onSyncBackend={async (rawText) => {
           try {
             await api.advising.uploadAdvisingTable(rawText, semester);

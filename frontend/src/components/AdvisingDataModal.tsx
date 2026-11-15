@@ -302,18 +302,20 @@ export default function AdvisingDataModal({
               <span>Sections ({currentSections.length})</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveTab("add")}
-              className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === "add"
-                  ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-              }`}
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>+ Add Section</span>
-            </button>
+            {isStaffOrAdmin && (
+              <button
+                type="button"
+                onClick={() => setActiveTab("add")}
+                className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === "add"
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Add Section</span>
+              </button>
+            )}
           </div>
 
           {/* Mobile sub-toggle between Raw Input and Live Detected list */}
@@ -550,18 +552,30 @@ export default function AdvisingDataModal({
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const updated = currentSections.filter((_, i) => i !== idx);
-                        onSaveCatalog(updated);
-                        toast.info(`Removed ${sec.courseCode}.${sec.sectionNumber}`);
-                      }}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
-                      title="Delete Section"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {isStaffOrAdmin ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = currentSections.filter(
+                            (s: any) =>
+                              !(
+                                s.courseCode?.toUpperCase() === sec.courseCode?.toUpperCase() &&
+                                String(s.sectionNumber) === String(sec.sectionNumber)
+                              )
+                          );
+                          onSaveCatalog(updated);
+                          toast.info(`Admin: Removed ${sec.courseCode}.${sec.sectionNumber}`);
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+                        title="Admin Clearance: Delete Section"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-lg font-mono font-bold text-[10px] bg-slate-800/80 text-slate-400 border border-slate-700/60 shrink-0">
+                        {sec.availableSeats ? `${sec.availableSeats} Seats` : "Offered"}
+                      </span>
+                    )}
                   </div>
                 ))
               ) : (
@@ -574,9 +588,9 @@ export default function AdvisingDataModal({
         )}
 
         {/* ===================================================================== */}
-        {/* TAB 3: ADD SECTION (MANUAL FORM)                                      */}
+        {/* TAB 3: ADD SECTION (MANUAL FORM - STAFF/ADMIN CLEARANCE)             */}
         {/* ===================================================================== */}
-        {activeTab === "add" && (
+        {activeTab === "add" && isStaffOrAdmin && (
           <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             <form onSubmit={handleAddManualSection} className="max-w-xl mx-auto space-y-4 text-xs">
               <h4 className="font-bold text-sm text-white mb-2">Manually Add Section</h4>
