@@ -27,6 +27,7 @@ import {
   Filter,
   FileText,
   Tag,
+  Zap,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
@@ -40,572 +41,17 @@ interface TeacherOption {
   designation?: string;
 }
 
-interface ExamQuestionLink {
-  id: string;
-  label: string;
-  marks?: string;
-  prompt: string;
-  topic?: string;
-}
-
-interface ExamPaperLink {
+export interface ExamPaperLink {
   id: string;
   title: string;
   type: string; // MID_QUESTION, FINAL_QUESTION, QUIZ_CT, NOTE
+  typeLabel: string;
   semester: string;
   faculty?: string;
   facultyId?: number;
-  questions: ExamQuestionLink[];
-}
-
-function generateQuestionsForResource(
-  code: string,
-  title: string,
-  category: string,
-  resTitle: string,
-  semester: string,
-  facultyName: string
-): ExamQuestionLink[] {
-  const isDS = code.includes("241") || title.includes("data struct");
-
-  if (category === "MID_QUESTION") {
-    if (isDS) {
-      return [
-        {
-          id: `${resTitle}-q1a`,
-          label: "1.(a) Time Complexity Analysis",
-          marks: "3.5M",
-          prompt: `${code} ${resTitle} Question 1.(a): Find out the Time Complexity of the given nested loop program (for i=1..n; for j=1..n j=j*3; k=j while k>1 k=k/3) by ${facultyName}. Provide step-by-step mathematical model answer.`,
-          topic: "Time Complexity Analysis",
-        },
-        {
-          id: `${resTitle}-q1b`,
-          label: "1.(b) Selection Sort & Binary Search",
-          marks: "6.5M",
-          prompt: `${code} ${resTitle} Question 1.(b): Selection Sort array [-9, -2, 10, 12, 30, -2, 28] in descending order & Binary Search steps for finding 7 by ${facultyName}.`,
-          topic: "Selection Sort & Binary Search",
-        },
-        {
-          id: `${resTitle}-q1-full`,
-          label: "1. (Full) Question 1 [10M]",
-          marks: "10M",
-          prompt: `${code} ${resTitle} Question 1: complete model answer for 1.(a) Time Complexity Analysis and 1.(b) Selection Sort & Binary Search by ${facultyName}.`,
-          topic: "Full Question 1",
-        },
-        {
-          id: `${resTitle}-q2a`,
-          label: "2.(a) Doubly Linked List Node Manipulation",
-          marks: "4.0M",
-          prompt: `${code} ${resTitle} Question 2.(a): Doubly Linked List structure definition, pointer manipulation rules, and memory diagrams by ${facultyName}.`,
-          topic: "Doubly Linked List",
-        },
-        {
-          id: `${resTitle}-q2b`,
-          label: "2.(b) Stack Infix to Postfix Conversion",
-          marks: "6.0M",
-          prompt: `${code} ${resTitle} Question 2.(b): Infix to Postfix conversion using Stack with operator precedence table by ${facultyName}.`,
-          topic: "Stack Applications",
-        },
-        {
-          id: `${resTitle}-q2-full`,
-          label: "2. (Full) Question 2 [10M]",
-          marks: "10M",
-          prompt: `${code} ${resTitle} Question 2: complete model answer for 2.(a) Doubly Linked List Node Manipulation and 2.(b) Stack Infix to Postfix Conversion by ${facultyName}.`,
-          topic: "Full Question 2",
-        },
-        {
-          id: `${resTitle}-q3a`,
-          label: "3.(a) Circular Queue using Array",
-          marks: "5.0M",
-          prompt: `${code} ${resTitle} Question 3.(a): Circular Queue implementation using Array with front, rear, modulo arithmetic, isFull, and isEmpty by ${facultyName}.`,
-          topic: "Circular Queue",
-        },
-        {
-          id: `${resTitle}-q3b`,
-          label: "3.(b) Singly Linked List In-Place Reversal",
-          marks: "5.0M",
-          prompt: `${code} ${resTitle} Question 3.(b): Singly Linked List In-Place Reversal using three pointers (prev, curr, next) with C++ code and memory pointer diagrams by ${facultyName}.`,
-          topic: "Linked List Reversal",
-        },
-        {
-          id: `${resTitle}-q3-full`,
-          label: "3. (Full) Question 3 [10M]",
-          marks: "10M",
-          prompt: `${code} ${resTitle} Question 3: complete model answer for 3.(a) Circular Queue using Array and 3.(b) Singly Linked List In-Place Reversal by ${facultyName}.`,
-          topic: "Full Question 3",
-        },
-        {
-          id: `${resTitle}-q4a`,
-          label: "4.(a) Postfix Expression Evaluation using Stack",
-          marks: "5.0M",
-          prompt: `${code} ${resTitle} Question 4.(a): Postfix Expression Evaluation using Stack with step-by-step operand stack trace table by ${facultyName}.`,
-          topic: "Postfix Evaluation",
-        },
-        {
-          id: `${resTitle}-q4b`,
-          label: "4.(b) Queue Implementation using Two Stacks",
-          marks: "5.0M",
-          prompt: `${code} ${resTitle} Question 4.(b): Queue implementation using Two Stacks (Stack1 for Enqueue, Stack2 for Dequeue) with time complexity analysis by ${facultyName}.`,
-          topic: "Two-Stack Queue",
-        },
-        {
-          id: `${resTitle}-q4-full`,
-          label: "4. (Full) Question 4 [10M]",
-          marks: "10M",
-          prompt: `${code} ${resTitle} Question 4: complete model answer for 4.(a) Postfix Expression Evaluation and 4.(b) Queue Implementation using Two Stacks by ${facultyName}.`,
-          topic: "Full Question 4",
-        },
-        {
-          id: `${resTitle}-q5a`,
-          label: "5.(a) Recursion & Tower of Hanoi (Steps & Complexity)",
-          marks: "5.0M",
-          prompt: `${code} ${resTitle} Question 5.(a): Tower of Hanoi recursive algorithm for n disks, recursion tree, recurrence relation T(n) = 2T(n-1) + 1, and 2^n - 1 total moves by ${facultyName}.`,
-          topic: "Tower of Hanoi Recursion",
-        },
-        {
-          id: `${resTitle}-q5b`,
-          label: "5.(b) Binary Search vs Linear Search & Bubble Sort",
-          marks: "5.0M",
-          prompt: `${code} ${resTitle} Question 5.(b): Detailed comparison of Binary Search vs Linear Search (best, average, worst case) and Bubble Sort dry run by ${facultyName}.`,
-          topic: "Search & Sort Comparison",
-        },
-        {
-          id: `${resTitle}-q5-full`,
-          label: "5. (Full) Question 5 [10M]",
-          marks: "10M",
-          prompt: `${code} ${resTitle} Question 5: complete model answer for 5.(a) Recursion & Tower of Hanoi and 5.(b) Binary Search vs Linear Search & Bubble Sort by ${facultyName}.`,
-          topic: "Full Question 5",
-        },
-      ];
-    }
-    return [
-      {
-        id: `${resTitle}-q1a`,
-        label: "1.(a) Core Theoretical Principles & Definitions",
-        marks: "4.0M",
-        prompt: `Explain Question 1.(a) from ${resTitle} for ${code} under ${facultyName}: Core foundational principles, definitions, and equations.`,
-        topic: "Core Theory",
-      },
-      {
-        id: `${resTitle}-q1b`,
-        label: "1.(b) Mathematical Formulation & Proofs",
-        marks: "6.0M",
-        prompt: `Solve Question 1.(b) from ${resTitle} for ${code} under ${facultyName}: Mathematical derivation and formal proof.`,
-        topic: "Mathematical Proofs",
-      },
-      {
-        id: `${resTitle}-q1-full`,
-        label: "1. (Full) Question 1 [10M]",
-        marks: "10M",
-        prompt: `Solve full Question 1 from ${resTitle} for ${code} by ${facultyName}: Complete model answer for 1.(a) and 1.(b).`,
-        topic: "Full Question 1",
-      },
-      {
-        id: `${resTitle}-q2a`,
-        label: "2.(a) Architectural Diagram & System Logic",
-        marks: "5.0M",
-        prompt: `Solve Question 2.(a) from ${resTitle} for ${code} under ${facultyName}: System architecture, block diagrams, and working mechanisms.`,
-        topic: "System Architecture",
-      },
-      {
-        id: `${resTitle}-q2b`,
-        label: "2.(b) Implementation & Execution Trace",
-        marks: "5.0M",
-        prompt: `Solve Question 2.(b) from ${resTitle} for ${code} under ${facultyName}: Code implementation, dry run trace, and state transitions.`,
-        topic: "Implementation Trace",
-      },
-      {
-        id: `${resTitle}-q2-full`,
-        label: "2. (Full) Question 2 [10M]",
-        marks: "10M",
-        prompt: `Solve full Question 2 from ${resTitle} for ${code} by ${facultyName}: Complete model answer for 2.(a) and 2.(b).`,
-        topic: "Full Question 2",
-      },
-      {
-        id: `${resTitle}-q3a`,
-        label: "3.(a) Algorithmic Dry Run & Complexity",
-        marks: "5.0M",
-        prompt: `Solve Question 3.(a) from ${resTitle} for ${code} under ${facultyName}: Step-by-step algorithm dry run with trace table and asymptotic bounds.`,
-        topic: "Algorithm Dry Run",
-      },
-      {
-        id: `${resTitle}-q3b`,
-        label: "3.(b) Boundary Condition & Corner Case Analysis",
-        marks: "5.0M",
-        prompt: `Solve Question 3.(b) from ${resTitle} for ${code} under ${facultyName}: Edge cases, constraints, and overflow/underflow handling.`,
-        topic: "Boundary Analysis",
-      },
-      {
-        id: `${resTitle}-q3-full`,
-        label: "3. (Full) Question 3 [10M]",
-        marks: "10M",
-        prompt: `Solve full Question 3 from ${resTitle} for ${code} by ${facultyName}: Complete model answer for 3.(a) and 3.(b).`,
-        topic: "Full Question 3",
-      },
-      {
-        id: `${resTitle}-q4a`,
-        label: "4.(a) Practical Scenario-Based Problem",
-        marks: "5.0M",
-        prompt: `Solve Question 4.(a) from ${resTitle} for ${code} under ${facultyName}: Practical real-world scenario problem with analytical solution.`,
-        topic: "Practical Scenario",
-      },
-      {
-        id: `${resTitle}-q4b`,
-        label: "4.(b) Optimization & Design Trade-offs",
-        marks: "5.0M",
-        prompt: `Solve Question 4.(b) from ${resTitle} for ${code} under ${facultyName}: Performance optimization, trade-off matrix, and design considerations.`,
-        topic: "Design Trade-offs",
-      },
-      {
-        id: `${resTitle}-q4-full`,
-        label: "4. (Full) Question 4 [10M]",
-        marks: "10M",
-        prompt: `Solve full Question 4 from ${resTitle} for ${code} by ${facultyName}: Complete model answer for 4.(a) and 4.(b).`,
-        topic: "Full Question 4",
-      },
-      {
-        id: `${resTitle}-q5a`,
-        label: "5.(a) Comparative Analysis & Evaluation",
-        marks: "5.0M",
-        prompt: `Solve Question 5.(a) from ${resTitle} for ${code} under ${facultyName}: In-depth comparative analysis, benchmark tables, and advantages/disadvantages.`,
-        topic: "Comparative Analysis",
-      },
-      {
-        id: `${resTitle}-q5b`,
-        label: "5.(b) Real-World Case Study Application",
-        marks: "5.0M",
-        prompt: `Solve Question 5.(b) from ${resTitle} for ${code} under ${facultyName}: Case study synthesis and application in industry workflows.`,
-        topic: "Case Study",
-      },
-      {
-        id: `${resTitle}-q5-full`,
-        label: "5. (Full) Question 5 [10M]",
-        marks: "10M",
-        prompt: `Solve full Question 5 from ${resTitle} for ${code} by ${facultyName}: Complete model answer for 5.(a) and 5.(b).`,
-        topic: "Full Question 5",
-      },
-    ];
-  }
-
-  if (category === "FINAL_QUESTION") {
-    if (isDS) {
-      return [
-        {
-          id: `${resTitle}-q1a`,
-          label: "1.(a) BST Insertion & Deletion Cases",
-          marks: "5.0M",
-          prompt: `Solve ${resTitle} Question 1.(a): Binary Search Tree (BST) node deletion cases (0 child, 1 child, 2 children with inorder successor) and insertion algorithm with complete C++ code by ${facultyName}.`,
-          topic: "BST Operations",
-        },
-        {
-          id: `${resTitle}-q1b`,
-          label: "1.(b) Binary Tree Traversals (In/Pre/Post)",
-          marks: "5.0M",
-          prompt: `Solve ${resTitle} Question 1.(b): Inorder, Preorder, Postorder traversals and reconstructing unique binary tree from Inorder and Preorder traversals by ${facultyName}.`,
-          topic: "Tree Traversals",
-        },
-        {
-          id: `${resTitle}-q1-full`,
-          label: "1. (Full) Question 1: Binary Search Tree (BST) [10M]",
-          marks: "10M",
-          prompt: `Solve ${resTitle} full Question 1: Complete model answer for BST Deletion, Insertion, and Tree Traversals by ${facultyName}.`,
-          topic: "Full Question 1",
-        },
-        {
-          id: `${resTitle}-q2a`,
-          label: "2.(a) AVL Tree Balance Factors & LL/RR Rotations",
-          marks: "5.0M",
-          prompt: `Solve ${resTitle} Question 2.(a): AVL Tree balance factors (BF = hL - hR) and step-by-step single rotations (LL and RR) with before/after trees by ${facultyName}.`,
-          topic: "AVL Single Rotations",
-        },
-        {
-          id: `${resTitle}-q2b`,
-          label: "2.(b) AVL Double Rotations (LR/RL) Key Trace",
-          marks: "5.0M",
-          prompt: `Solve ${resTitle} Question 2.(b): Step-by-step AVL key insertion dry run for [50, 20, 60, 10, 8, 15] showing LR/RL double rotations by ${facultyName}.`,
-          topic: "AVL Double Rotations",
-        },
-        {
-          id: `${resTitle}-q2-full`,
-          label: "2. (Full) Question 2: AVL Self-Balancing Trees [10M]",
-          marks: "10M",
-          prompt: `Solve ${resTitle} full Question 2: Complete model answer for AVL tree balance factors, single (LL, RR) and double (LR, RL) rotations by ${facultyName}.`,
-          topic: "Full Question 2",
-        },
-        {
-          id: `${resTitle}-q3a`,
-          label: "3.(a) Graph BFS & DFS Traversal Algorithms",
-          marks: "5.0M",
-          prompt: `Solve ${resTitle} Question 3.(a): Graph representations (Adjacency Matrix vs List), Breadth First Search (Queue) and Depth First Search (Stack/Recursion) algorithms with trace by ${facultyName}.`,
-          topic: "Graph Traversal",
-        },
-        {
-          id: `${resTitle}-q3b`,
-          label: "3.(b) Dijkstra Shortest Path Algorithm & Distance Table",
-          marks: "5.0M",
-          prompt: `Solve ${resTitle} Question 3.(b): Dijkstra's Shortest Path single-source algorithm, edge relaxation formula d[v] = min(d[v], d[u] + w(u,v)), and full distance trace table by ${facultyName}.`,
-          topic: "Dijkstra Algorithm",
-        },
-        {
-          id: `${resTitle}-q3-full`,
-          label: "3. (Full) Question 3: Graph Traversal & Dijkstra [10M]",
-          marks: "10M",
-          prompt: `Solve ${resTitle} full Question 3: Complete model answer for Graph BFS/DFS and Dijkstra Shortest Path by ${facultyName}.`,
-          topic: "Full Question 3",
-        },
-        {
-          id: `${resTitle}-q4a`,
-          label: "4.(a) Max-Heap & Min-Heap Construction (Heapify)",
-          marks: "5.0M",
-          prompt: `Solve ${resTitle} Question 4.(a): Max-Heap and Min-Heap properties, bottom-up Heapify algorithm on array [12, 11, 13, 5, 6, 7] with tree diagrams by ${facultyName}.`,
-          topic: "Heap Construction",
-        },
-        {
-          id: `${resTitle}-q4b`,
-          label: "4.(b) Heap Sort Algorithm & Complexity Analysis",
-          marks: "5.0M",
-          prompt: `Solve ${resTitle} Question 4.(b): Complete Heap Sort pass-by-pass dry run, root extraction, max-heap restoration, and O(n log n) time complexity proof by ${facultyName}.`,
-          topic: "Heap Sort",
-        },
-        {
-          id: `${resTitle}-q4-full`,
-          label: "4. (Full) Question 4: Heap Sort & Priority Queues [10M]",
-          marks: "10M",
-          prompt: `Solve ${resTitle} full Question 4: Complete model answer for Heap construction, Heapify, and Heap Sort by ${facultyName}.`,
-          topic: "Full Question 4",
-        },
-        {
-          id: `${resTitle}-q5a`,
-          label: "5.(a) Hash Table Collision (Linear & Quadratic Probing)",
-          marks: "5.0M",
-          prompt: `Solve ${resTitle} Question 5.(a): Hash Table collision resolution using Linear Probing h(k,i) = (h'(k)+i)%m and Quadratic Probing h(k,i) = (h'(k)+c1*i+c2*i^2)%m with trace by ${facultyName}.`,
-          topic: "Hash Table Probing",
-        },
-        {
-          id: `${resTitle}-q5b`,
-          label: "5.(b) Chaining & Double Hashing with Load Factor (α)",
-          marks: "5.0M",
-          prompt: `Solve ${resTitle} Question 5.(b): Separate Chaining vs Open Addressing, Double Hashing formula, and Load Factor alpha = n/m impact on search complexity by ${facultyName}.`,
-          topic: "Chaining & Double Hashing",
-        },
-        {
-          id: `${resTitle}-q5-full`,
-          label: "5. (Full) Question 5: Hashing & Collision Handling [10M]",
-          marks: "10M",
-          prompt: `Solve ${resTitle} full Question 5: Complete model answer for Hash Table Collision Resolution, Probing, and Load Factor by ${facultyName}.`,
-          topic: "Full Question 5",
-        },
-      ];
-    }
-    return [
-      {
-        id: `${resTitle}-q1a`,
-        label: "1.(a) Advanced Theoretical Frameworks",
-        marks: "5.0M",
-        prompt: `Solve Final Exam Question 1.(a) from ${resTitle} for ${code} by ${facultyName}: Core advanced theories, principles, and definitions.`,
-        topic: "Advanced Theory",
-      },
-      {
-        id: `${resTitle}-q1b`,
-        label: "1.(b) Comprehensive Proofs & Theorems",
-        marks: "5.0M",
-        prompt: `Solve Final Exam Question 1.(b) from ${resTitle} for ${code} by ${facultyName}: Formal mathematical proofs and theorems.`,
-        topic: "Theorems & Proofs",
-      },
-      {
-        id: `${resTitle}-q1-full`,
-        label: "1. (Full) Question 1: Core Theory & Proofs [10M]",
-        marks: "10M",
-        prompt: `Solve full Final Exam Question 1 from ${resTitle} for ${code} by ${facultyName}: Complete model answer for 1.(a) and 1.(b).`,
-        topic: "Full Question 1",
-      },
-      {
-        id: `${resTitle}-q2a`,
-        label: "2.(a) Algorithm / Protocol Design & Flow",
-        marks: "5.0M",
-        prompt: `Solve Final Exam Question 2.(a) from ${resTitle} for ${code} by ${facultyName}: Protocol / algorithm design, step flow, and logic.`,
-        topic: "Algorithm Design",
-      },
-      {
-        id: `${resTitle}-q2b`,
-        label: "2.(b) Time & Space Complexity Analysis",
-        marks: "5.0M",
-        prompt: `Solve Final Exam Question 2.(b) from ${resTitle} for ${code} by ${facultyName}: Rigorous asymptotic time and space complexity analysis.`,
-        topic: "Complexity Analysis",
-      },
-      {
-        id: `${resTitle}-q2-full`,
-        label: "2. (Full) Question 2: Design & Analysis [10M]",
-        marks: "10M",
-        prompt: `Solve full Final Exam Question 2 from ${resTitle} for ${code} by ${facultyName}: Complete model answer for 2.(a) and 2.(b).`,
-        topic: "Full Question 2",
-      },
-      {
-        id: `${resTitle}-q3a`,
-        label: "3.(a) System Architecture & Structural Diagram",
-        marks: "5.0M",
-        prompt: `Solve Final Exam Question 3.(a) from ${resTitle} for ${code} by ${facultyName}: System architectural design, modules, and clear diagrams.`,
-        topic: "System Architecture",
-      },
-      {
-        id: `${resTitle}-q3b`,
-        label: "3.(b) Data Flow & Component Integration",
-        marks: "5.0M",
-        prompt: `Solve Final Exam Question 3.(b) from ${resTitle} for ${code} by ${facultyName}: Component interaction, data flow pipelines, and protocols.`,
-        topic: "Data Flow",
-      },
-      {
-        id: `${resTitle}-q3-full`,
-        label: "3. (Full) Question 3: System Architecture [10M]",
-        marks: "10M",
-        prompt: `Solve full Final Exam Question 3 from ${resTitle} for ${code} by ${facultyName}: Complete model answer for 3.(a) and 3.(b).`,
-        topic: "Full Question 3",
-      },
-      {
-        id: `${resTitle}-q4a`,
-        label: "4.(a) Real-World Scenario Problem Solving",
-        marks: "5.0M",
-        prompt: `Solve Final Exam Question 4.(a) from ${resTitle} for ${code} by ${facultyName}: Applied engineering case study and scenario solution.`,
-        topic: "Scenario Problem",
-      },
-      {
-        id: `${resTitle}-q4b`,
-        label: "4.(b) Performance Bottlenecks & Optimization",
-        marks: "5.0M",
-        prompt: `Solve Final Exam Question 4.(b) from ${resTitle} for ${code} by ${facultyName}: Bottleneck identification, latency optimization, and scaling.`,
-        topic: "Optimization",
-      },
-      {
-        id: `${resTitle}-q4-full`,
-        label: "4. (Full) Question 4: Scenario & Optimization [10M]",
-        marks: "10M",
-        prompt: `Solve full Final Exam Question 4 from ${resTitle} for ${code} by ${facultyName}: Complete model answer for 4.(a) and 4.(b).`,
-        topic: "Full Question 4",
-      },
-      {
-        id: `${resTitle}-q5a`,
-        label: "5.(a) Comparative Evaluation of Technologies",
-        marks: "5.0M",
-        prompt: `Solve Final Exam Question 5.(a) from ${resTitle} for ${code} by ${facultyName}: Comprehensive evaluation matrix, trade-offs, and benchmarks.`,
-        topic: "Comparative Evaluation",
-      },
-      {
-        id: `${resTitle}-q5b`,
-        label: "5.(b) Future Trends & Industry Best Practices",
-        marks: "5.0M",
-        prompt: `Solve Final Exam Question 5.(b) from ${resTitle} for ${code} by ${facultyName}: Emerging paradigms, standard design patterns, and exam tips.`,
-        topic: "Industry Standards",
-      },
-      {
-        id: `${resTitle}-q5-full`,
-        label: "5. (Full) Question 5: Comparative Evaluation [10M]",
-        marks: "10M",
-        prompt: `Solve full Final Exam Question 5 from ${resTitle} for ${code} by ${facultyName}: Complete model answer for 5.(a) and 5.(b).`,
-        topic: "Full Question 5",
-      },
-    ];
-  }
-
-  if (category === "QUIZ_CT") {
-    if (isDS) {
-      return [
-        {
-          id: `${resTitle}-ct1`,
-          label: "CT 1. Asymptotic Limit Proof (Big-O)",
-          marks: "5.0M",
-          prompt: `Solve CT Question 1 from ${resTitle}: Formal definition of Big-O notation and mathematical proof that 3n^2 + 5n + 7 = O(n^2) with c and n0 constants under ${facultyName}.`,
-          topic: "Big-O Proof",
-        },
-        {
-          id: `${resTitle}-ct2`,
-          label: "CT 2. Double Pointer (**ptr) & Memory Leak",
-          marks: "5.0M",
-          prompt: `Solve CT Question 2 from ${resTitle}: Pointer arithmetic, double pointers (**ptr), and new/delete memory deallocation in C++ with memory diagrams by ${facultyName}.`,
-          topic: "Pointers & Memory",
-        },
-        {
-          id: `${resTitle}-ct3`,
-          label: "CT 3. Stack Balanced Parentheses Check",
-          marks: "5.0M",
-          prompt: `Solve CT Question 3 from ${resTitle}: Balanced parentheses checking algorithm using Stack with step-by-step trace of string {[()()]} by ${facultyName}.`,
-          topic: "Stack Balanced Parentheses",
-        },
-        {
-          id: `${resTitle}-ct4`,
-          label: "CT 4. Circular Queue Array Modulo Trace",
-          marks: "5.0M",
-          prompt: `Solve CT Question 4 from ${resTitle}: Circular Queue array enqueue/dequeue operations and overflow/underflow conditions with modulo arithmetic by ${facultyName}.`,
-          topic: "Circular Queue Modulo",
-        },
-        {
-          id: `${resTitle}-ct5`,
-          label: "CT 5. Singly Linked List Insertion at Head & Tail",
-          marks: "5.0M",
-          prompt: `Solve CT Question 5 from ${resTitle}: Singly Linked List insertion operations at beginning and end with pointer diagrams and edge cases (empty list) by ${facultyName}.`,
-          topic: "Linked List Insertion",
-        },
-      ];
-    }
-    return [
-      {
-        id: `${resTitle}-ct1`,
-        label: "CT 1. Core Concept Quick Solution",
-        marks: "5.0M",
-        prompt: `Solve Class Test (CT) Problem 1 from ${resTitle} for ${code} by ${facultyName}: Core foundational concept and direct numerical trace.`,
-        topic: "Core Concept",
-      },
-      {
-        id: `${resTitle}-ct2`,
-        label: "CT 2. Rapid Formula & Numerical Trace",
-        marks: "5.0M",
-        prompt: `Solve Class Test (CT) Problem 2 from ${resTitle} for ${code} by ${facultyName}: Step-by-step formula substitution and calculated result.`,
-        topic: "Numerical Trace",
-      },
-      {
-        id: `${resTitle}-ct3`,
-        label: "CT 3. Code Segment Dry Run & Output",
-        marks: "5.0M",
-        prompt: `Solve Class Test (CT) Problem 3 from ${resTitle} for ${code} by ${facultyName}: Trace code execution and state exact program output.`,
-        topic: "Code Dry Run",
-      },
-      {
-        id: `${resTitle}-ct4`,
-        label: "CT 4. Boundary Condition & Corner Case",
-        marks: "5.0M",
-        prompt: `Solve Class Test (CT) Problem 4 from ${resTitle} for ${code} by ${facultyName}: Edge conditions, validation checks, and error prevention.`,
-        topic: "Corner Cases",
-      },
-      {
-        id: `${resTitle}-ct5`,
-        label: "CT 5. Short Principle & Exam High-Yield Tip",
-        marks: "5.0M",
-        prompt: `Solve Class Test (CT) Problem 5 from ${resTitle} for ${code} by ${facultyName}: Rapid concept summary and high-scoring marking tips.`,
-        topic: "Exam Tips",
-      },
-    ];
-  }
-
-  // NOTE / OTHER
-  return [
-    {
-      id: `${resTitle}-note1`,
-      label: "📖 Note 1: Core Theoretical Highlights",
-      marks: "Note",
-      prompt: `Summarize Section 1 from ${resTitle} for ${code} under ${facultyName}: Essential definitions, rules, and core concepts.`,
-    },
-    {
-      id: `${resTitle}-note2`,
-      label: "📖 Note 2: Code Snippets & Practical Implementations",
-      marks: "Note",
-      prompt: `Explain the practical code patterns and algorithms discussed in ${resTitle} for ${code} by ${facultyName}.`,
-    },
-    {
-      id: `${resTitle}-note3`,
-      label: "📖 Note 3: Exam High-Yield Formula Summary",
-      marks: "Note",
-      prompt: `Extract all high-yield exam formulas and exam tips from ${resTitle} for ${code} by ${facultyName}.`,
-    },
-  ];
+  fileUrl?: string;
+  previewUrl?: string;
+  prompt: string;
 }
 
 export function buildLinkedAcademicItems(
@@ -615,7 +61,7 @@ export function buildLinkedAcademicItems(
   rawResources?: any[]
 ): ExamPaperLink[] {
   const cleanCode = (code || "").toUpperCase();
-  const cleanTitle = (title || "").toLowerCase();
+  const cleanTitle = (title || "").trim();
 
   const items: ExamPaperLink[] = [];
 
@@ -628,7 +74,7 @@ export function buildLinkedAcademicItems(
       const teacherLabel = teacherInitial ? `[${teacherInitial}]` : (teacherName ? `[${teacherName.split(" ").slice(-1)[0]}]` : "");
       const resType = (res.type || "OTHER").toUpperCase();
       const resTitle = res.title || `${cleanCode} Material`;
-      const semester = res.semesterName || "Academic Archive";
+      const semester = res.semesterName || res.semester || "Academic Archive";
 
       // Filter by activeTeacher if selected
       if (activeTeacher) {
@@ -641,354 +87,112 @@ export function buildLinkedAcademicItems(
         }
       }
 
-      // Determine category type
+      // Determine category type & human readable label
       let category = "NOTE";
-      if (resType.includes("MID") || resTitle.toLowerCase().includes("midterm")) {
+      let typeLabel = "Handwritten Note";
+      if (resType.includes("MID") || resTitle.toLowerCase().includes("midterm") || resTitle.toLowerCase().includes("mid question")) {
         category = "MID_QUESTION";
+        typeLabel = "Midterm Exam Paper";
       } else if (resType.includes("FINAL") || resTitle.toLowerCase().includes("final")) {
         category = "FINAL_QUESTION";
+        typeLabel = "Final Exam Paper";
       } else if (resType.includes("QUIZ") || resType.includes("CT") || resTitle.toLowerCase().includes("quiz") || resTitle.toLowerCase().includes("ct")) {
         category = "QUIZ_CT";
+        typeLabel = "Class Test / Quiz";
+      } else {
+        category = "NOTE";
+        typeLabel = "Lecture Note / Slide";
       }
 
-      // Generate question links for this specific item
-      const questions: ExamQuestionLink[] = generateQuestionsForResource(
-        cleanCode, cleanTitle, category, resTitle, semester, teacherName || activeTeacher?.name || "Instructor"
-      );
+      const facultyNotice = teacherName
+        ? `prepared under instructor ${teacherName} ${teacherLabel}`
+        : (activeTeacher ? `under ${activeTeacher.name}` : "");
+
+      const prompt = `Please provide a complete, step-by-step model solution and high-yield exam revision guide for the entire past exam paper: "${resTitle}" (${semester}) ${facultyNotice} for ${cleanCode} (${cleanTitle || "Southeast University"}). Solve every question sequentially with detailed explanations, complete mathematical proofs and calculations using LaTeX ($$...$$ and $...$), code implementations, dry runs, edge cases, and faculty-focused exam marking guidelines.`;
 
       items.push({
         id: `res-${res.id || Math.random()}`,
         title: resTitle,
         type: category,
+        typeLabel,
         semester,
         faculty: teacherName ? `${teacherName} ${teacherLabel}` : (activeTeacher ? activeTeacher.name : undefined),
         facultyId: teacher?.id,
-        questions,
+        fileUrl: res.fileUrl || res.url,
+        previewUrl: res.previewUrl,
+        prompt,
       });
     });
   }
 
-  // 2. If no items found for this teacher or catalog is empty, generate verified curriculum items
+  // 2. If no items found from database, generate standard academic archive papers
   if (items.length === 0) {
-    const teacherName = activeTeacher?.name || "Sakib Mahmud";
-    const teacherLabel = activeTeacher?.initial ? `[${activeTeacher.initial}]` : "[SMA]";
+    const teacherName = activeTeacher?.name || "";
+    const teacherLabel = activeTeacher?.initial ? `[${activeTeacher.initial}]` : "";
+    const facultyNotice = teacherName ? `under instructor ${teacherName} ${teacherLabel}` : "";
 
-    // Default Midterm Paper
-    items.push({
-      id: `${cleanCode}-sp24-mid`,
-      title: `${cleanCode} Spring 2024 Midterm Question Paper`,
-      type: "MID_QUESTION",
-      semester: "Spring 2024",
-      faculty: `${teacherName} ${teacherLabel}`,
-      questions: [
-        {
-          id: "q1a",
-          label: "1.(a) Time Complexity Analysis",
-          marks: "3.5M",
-          prompt: `${cleanCode} Spring 2024 Midterm Question 1.(a): Find out the Time Complexity of the given nested loop program (for i=1..n; for j=1..n j=j*3; k=j while k>1 k=k/3) by ${teacherName}. Provide step-by-step mathematical model answer.`,
-          topic: "Time Complexity of Nested Loop",
-        },
-        {
-          id: "q1b",
-          label: "1.(b) Selection Sort & Binary Search",
-          marks: "6.5M",
-          prompt: `${cleanCode} Spring 2024 Midterm Question 1.(b): Selection Sort array [-9, -2, 10, 12, 30, -2, 28] in descending order & Binary Search steps for finding 7 by ${teacherName}.`,
-          topic: "Selection Sort (Descending) & Binary Search",
-        },
-        {
-          id: "q1-full",
-          label: "1. (Full) Question 1 [10M]",
-          marks: "10M",
-          prompt: `${cleanCode} Spring 2024 Midterm Question 1: complete model answer for 1.(a) Time Complexity Analysis and 1.(b) Selection Sort & Binary Search by ${teacherName}.`,
-          topic: "Complete Question 1",
-        },
-        {
-          id: "q2a",
-          label: "2.(a) Doubly Linked List Node Manipulation",
-          marks: "4.0M",
-          prompt: `${cleanCode} Spring 2024 Midterm Question 2.(a): Doubly Linked List structure definition and pointer manipulation rules with code and memory diagrams by ${teacherName}.`,
-          topic: "Doubly Linked List",
-        },
-        {
-          id: "q2b",
-          label: "2.(b) Stack Infix to Postfix Conversion",
-          marks: "6.0M",
-          prompt: `${cleanCode} Spring 2024 Midterm Question 2.(b): Infix to Postfix conversion using Stack with operator precedence table by ${teacherName}.`,
-          topic: "Stack Applications",
-        },
-        {
-          id: "q2-full",
-          label: "2. (Full) Question 2 [10M]",
-          marks: "10M",
-          prompt: `${cleanCode} Spring 2024 Midterm Question 2: complete model answer for 2.(a) Doubly Linked List and 2.(b) Stack Infix to Postfix Conversion by ${teacherName}.`,
-          topic: "Full Question 2",
-        },
-        {
-          id: "q3a",
-          label: "3.(a) Circular Queue using Array",
-          marks: "5.0M",
-          prompt: `${cleanCode} Spring 2024 Midterm Question 3.(a): Circular Queue implementation using Array with front, rear, and modulo arithmetic by ${teacherName}.`,
-          topic: "Circular Queue",
-        },
-        {
-          id: "q3b",
-          label: "3.(b) Singly Linked List In-Place Reversal",
-          marks: "5.0M",
-          prompt: `${cleanCode} Spring 2024 Midterm Question 3.(b): Singly Linked List In-Place Reversal using three pointers (prev, curr, next) with C++ code and memory pointer diagrams by ${teacherName}.`,
-          topic: "Linked List Reversal",
-        },
-        {
-          id: "q3-full",
-          label: "3. (Full) Question 3 [10M]",
-          marks: "10M",
-          prompt: `${cleanCode} Spring 2024 Midterm Question 3: complete model answer for 3.(a) Circular Queue using Array and 3.(b) Singly Linked List In-Place Reversal by ${teacherName}.`,
-          topic: "Full Question 3",
-        },
-        {
-          id: "q4a",
-          label: "4.(a) Postfix Expression Evaluation using Stack",
-          marks: "5.0M",
-          prompt: `${cleanCode} Spring 2024 Midterm Question 4.(a): Postfix Expression Evaluation using Stack with step-by-step operand stack trace table by ${teacherName}.`,
-          topic: "Postfix Evaluation",
-        },
-        {
-          id: "q4b",
-          label: "4.(b) Queue Implementation using Two Stacks",
-          marks: "5.0M",
-          prompt: `${cleanCode} Spring 2024 Midterm Question 4.(b): Queue implementation using Two Stacks (Stack1 for Enqueue, Stack2 for Dequeue) with time complexity analysis by ${teacherName}.`,
-          topic: "Two-Stack Queue",
-        },
-        {
-          id: "q4-full",
-          label: "4. (Full) Question 4 [10M]",
-          marks: "10M",
-          prompt: `${cleanCode} Spring 2024 Midterm Question 4: complete model answer for 4.(a) Postfix Expression Evaluation and 4.(b) Queue Implementation using Two Stacks by ${teacherName}.`,
-          topic: "Full Question 4",
-        },
-        {
-          id: "q5a",
-          label: "5.(a) Recursion & Tower of Hanoi (Steps & Complexity)",
-          marks: "5.0M",
-          prompt: `${cleanCode} Spring 2024 Midterm Question 5.(a): Tower of Hanoi recursive algorithm for n disks, recursion tree, recurrence relation T(n) = 2T(n-1) + 1, and 2^n - 1 total moves by ${teacherName}.`,
-          topic: "Tower of Hanoi Recursion",
-        },
-        {
-          id: "q5b",
-          label: "5.(b) Binary Search vs Linear Search & Bubble Sort",
-          marks: "5.0M",
-          prompt: `${cleanCode} Spring 2024 Midterm Question 5.(b): Detailed comparison of Binary Search vs Linear Search (best, average, worst case) and Bubble Sort dry run by ${teacherName}.`,
-          topic: "Search & Sort Comparison",
-        },
-        {
-          id: "q5-full",
-          label: "5. (Full) Question 5 [10M]",
-          marks: "10M",
-          prompt: `${cleanCode} Spring 2024 Midterm Question 5: complete model answer for 5.(a) Recursion & Tower of Hanoi and 5.(b) Binary Search vs Linear Search & Bubble Sort by ${teacherName}.`,
-          topic: "Full Question 5",
-        },
-      ],
-    });
-
-    // Default Final Paper
-    items.push({
-      id: `${cleanCode}-sp24-fin`,
-      title: `${cleanCode} Spring 2024 Final Exam Paper`,
-      type: "FINAL_QUESTION",
-      semester: "Spring 2024",
-      faculty: `${teacherName} ${teacherLabel}`,
-      questions: [
-        {
-          id: "f1a",
-          label: "1.(a) BST Insertion & Deletion Cases",
-          marks: "5.0M",
-          prompt: `Solve ${cleanCode} Final Exam Question 1.(a): Binary Search Tree (BST) node deletion cases (0 child, 1 child, 2 children with inorder successor) and insertion algorithm with complete C++ code by ${teacherName}.`,
-          topic: "BST Operations",
-        },
-        {
-          id: "f1b",
-          label: "1.(b) Binary Tree Traversals (In/Pre/Post)",
-          marks: "5.0M",
-          prompt: `Solve ${cleanCode} Final Exam Question 1.(b): Inorder, Preorder, Postorder traversals and reconstructing unique binary tree from Inorder and Preorder traversals by ${teacherName}.`,
-          topic: "Tree Traversals",
-        },
-        {
-          id: "f1-full",
-          label: "1. (Full) Question 1: Binary Search Tree (BST) [10M]",
-          marks: "10M",
-          prompt: `Solve ${cleanCode} Final Exam full Question 1: Complete model answer for BST Deletion, Insertion, and Tree Traversals by ${teacherName}.`,
-          topic: "Full Question 1",
-        },
-        {
-          id: "f2a",
-          label: "2.(a) AVL Tree Balance Factors & LL/RR Rotations",
-          marks: "5.0M",
-          prompt: `Solve ${cleanCode} Final Exam Question 2.(a): AVL Tree balance factors (BF = hL - hR) and step-by-step single rotations (LL and RR) with before/after trees by ${teacherName}.`,
-          topic: "AVL Single Rotations",
-        },
-        {
-          id: "f2b",
-          label: "2.(b) AVL Double Rotations (LR/RL) Key Trace",
-          marks: "5.0M",
-          prompt: `Solve ${cleanCode} Final Exam Question 2.(b): Step-by-step AVL key insertion dry run for [50, 20, 60, 10, 8, 15] showing LR/RL double rotations by ${teacherName}.`,
-          topic: "AVL Double Rotations",
-        },
-        {
-          id: "f2-full",
-          label: "2. (Full) Question 2: AVL Self-Balancing Trees [10M]",
-          marks: "10M",
-          prompt: `Solve ${cleanCode} Final Exam full Question 2: Complete model answer for AVL tree balance factors, single (LL, RR) and double (LR, RL) rotations by ${teacherName}.`,
-          topic: "Full Question 2",
-        },
-        {
-          id: "f3a",
-          label: "3.(a) Graph BFS & DFS Traversal Algorithms",
-          marks: "5.0M",
-          prompt: `Solve ${cleanCode} Final Exam Question 3.(a): Graph representations (Adjacency Matrix vs List), Breadth First Search (Queue) and Depth First Search (Stack/Recursion) algorithms with trace by ${teacherName}.`,
-          topic: "Graph Traversal",
-        },
-        {
-          id: "f3b",
-          label: "3.(b) Dijkstra Shortest Path Algorithm & Distance Table",
-          marks: "5.0M",
-          prompt: `Solve ${cleanCode} Final Exam Question 3.(b): Dijkstra's Shortest Path single-source algorithm, edge relaxation formula d[v] = min(d[v], d[u] + w(u,v)), and full distance trace table by ${teacherName}.`,
-          topic: "Dijkstra Algorithm",
-        },
-        {
-          id: "f3-full",
-          label: "3. (Full) Question 3: Graph Traversal & Dijkstra [10M]",
-          marks: "10M",
-          prompt: `Solve ${cleanCode} Final Exam full Question 3: Complete model answer for Graph BFS/DFS and Dijkstra Shortest Path by ${teacherName}.`,
-          topic: "Full Question 3",
-        },
-        {
-          id: "f4a",
-          label: "4.(a) Max-Heap & Min-Heap Construction (Heapify)",
-          marks: "5.0M",
-          prompt: `Solve ${cleanCode} Final Exam Question 4.(a): Max-Heap and Min-Heap properties, bottom-up Heapify algorithm on array [12, 11, 13, 5, 6, 7] with tree diagrams by ${teacherName}.`,
-          topic: "Heap Construction",
-        },
-        {
-          id: "f4b",
-          label: "4.(b) Heap Sort Algorithm & Complexity Analysis",
-          marks: "5.0M",
-          prompt: `Solve ${cleanCode} Final Exam Question 4.(b): Complete Heap Sort pass-by-pass dry run, root extraction, max-heap restoration, and O(n log n) time complexity proof by ${teacherName}.`,
-          topic: "Heap Sort",
-        },
-        {
-          id: "f4-full",
-          label: "4. (Full) Question 4: Heap Sort & Priority Queues [10M]",
-          marks: "10M",
-          prompt: `Solve ${cleanCode} Final Exam full Question 4: Complete model answer for Heap construction, Heapify, and Heap Sort by ${teacherName}.`,
-          topic: "Full Question 4",
-        },
-        {
-          id: "f5a",
-          label: "5.(a) Hash Table Collision (Linear & Quadratic Probing)",
-          marks: "5.0M",
-          prompt: `Solve ${cleanCode} Final Exam Question 5.(a): Hash Table collision resolution using Linear Probing h(k,i) = (h'(k)+i)%m and Quadratic Probing h(k,i) = (h'(k)+c1*i+c2*i^2)%m with trace by ${teacherName}.`,
-          topic: "Hash Table Probing",
-        },
-        {
-          id: "f5b",
-          label: "5.(b) Chaining & Double Hashing with Load Factor (α)",
-          marks: "5.0M",
-          prompt: `Solve ${cleanCode} Final Exam Question 5.(b): Separate Chaining vs Open Addressing, Double Hashing formula, and Load Factor alpha = n/m impact on search complexity by ${teacherName}.`,
-          topic: "Chaining & Double Hashing",
-        },
-        {
-          id: "f5-full",
-          label: "5. (Full) Question 5: Hashing & Collision Handling [10M]",
-          marks: "10M",
-          prompt: `Solve ${cleanCode} Final Exam full Question 5: Complete model answer for Hash Table Collision Resolution, Probing, and Load Factor by ${teacherName}.`,
-          topic: "Full Question 5",
-        },
-      ],
-    });
-
-    // Default CT & Quiz Paper
-    items.push({
-      id: `${cleanCode}-ct`,
-      title: `${cleanCode} Quiz & Class Test (CT) Questions`,
-      type: "QUIZ_CT",
-      semester: "Class Tests",
-      faculty: `${teacherName} ${teacherLabel}`,
-      questions: [
-        {
-          id: "ct1",
-          label: "CT 1. Asymptotic Limit Proof (Big-O)",
-          marks: "5.0M",
-          prompt: `Solve CT 1 for ${cleanCode}: Formal definition of Big-O notation and mathematical proof that 3n^2 + 5n + 7 = O(n^2) with c and n0 constants under ${teacherName}.`,
-          topic: "Big-O Proof",
-        },
-        {
-          id: "ct2",
-          label: "CT 2. Double Pointer (**ptr) & Memory Leak",
-          marks: "5.0M",
-          prompt: `Solve CT 2 for ${cleanCode}: Pointer arithmetic, double pointers (**ptr), and new/delete memory deallocation in C++ with memory diagrams by ${teacherName}.`,
-          topic: "Pointers & Memory",
-        },
-        {
-          id: "ct3",
-          label: "CT 3. Stack Balanced Parentheses Check",
-          marks: "5.0M",
-          prompt: `Solve CT 3 for ${cleanCode}: Balanced parentheses checking algorithm using Stack with step-by-step trace of string {[()()]} by ${teacherName}.`,
-          topic: "Stack Balanced Parentheses",
-        },
-        {
-          id: "ct4",
-          label: "CT 4. Circular Queue Array Modulo Trace",
-          marks: "5.0M",
-          prompt: `Solve CT 4 for ${cleanCode}: Circular Queue array enqueue/dequeue operations and overflow/underflow conditions with modulo arithmetic by ${teacherName}.`,
-          topic: "Circular Queue Modulo",
-        },
-        {
-          id: "ct5",
-          label: "CT 5. Singly Linked List Insertion at Head & Tail",
-          marks: "5.0M",
-          prompt: `Solve CT 5 for ${cleanCode}: Singly Linked List insertion operations at beginning and end with pointer diagrams and edge cases (empty list) by ${teacherName}.`,
-          topic: "Linked List Insertion",
-        },
-      ],
-    });
-
-    // Default Lecture Hand Notes
-    items.push({
-      id: `${cleanCode}-notes`,
-      title: `${cleanCode} Lecture Hand Notes & Cheatsheet`,
-      type: "NOTE",
-      semester: "Course Notes",
-      faculty: `${teacherName} ${teacherLabel}`,
-      questions: [
-        {
-          id: "note1",
-          label: "📖 Note 1: Dynamic Memory (new/delete) in C++",
-          marks: "Note",
-          prompt: `Summarize Key Note 1 for ${cleanCode} under ${teacherName}: Dynamic Memory Allocation (new/delete), dangling pointers, memory leaks, and safe pointer practice.`,
-          topic: "Memory Allocation",
-        },
-        {
-          id: "note2",
-          label: "📖 Note 2: Linked List Operations & Edge Cases",
-          marks: "Note",
-          prompt: `Summarize Key Note 2 for ${cleanCode} under ${teacherName}: Singly and Doubly Linked List node insertion and deletion algorithms with all boundary edge cases.`,
-          topic: "Linked List Notes",
-        },
-        {
-          id: "note3",
-          label: "📖 Note 3: Stack & Queue Core Implementations",
-          marks: "Note",
-          prompt: `Summarize Key Note 3 for ${cleanCode} under ${teacherName}: Stack and Queue implementation via array and linked list with infix-to-postfix conversion rules.`,
-          topic: "Stack & Queue Notes",
-        },
-        {
-          id: "note4",
-          label: "📖 Note 4: Tree & Graph High-Yield Exam Formulas",
-          marks: "Note",
-          prompt: `Summarize Key Note 4 for ${cleanCode} under ${teacherName}: Binary Tree properties, BST search complexity, AVL rotation formulas, and Graph representation.`,
-          topic: "Tree & Graph Formulas",
-        },
-      ],
-    });
+    items.push(
+      {
+        id: `${cleanCode}-sp24-mid`,
+        title: `${cleanCode} Spring 2024 Midterm Examination Paper`,
+        type: "MID_QUESTION",
+        typeLabel: "Midterm Exam Paper",
+        semester: "Spring 2024",
+        faculty: teacherName ? `${teacherName} ${teacherLabel}` : undefined,
+        facultyId: activeTeacher?.id,
+        prompt: `Please provide a comprehensive, step-by-step model answer for the complete ${cleanCode} Spring 2024 Midterm Examination Question Paper ${facultyNotice}. Solve all questions with full mathematical equations in LaTeX ($$...$$ and $...$), code implementations, dry runs, and exam scoring guidelines.`,
+      },
+      {
+        id: `${cleanCode}-fa24-mid`,
+        title: `${cleanCode} Fall 2024 Midterm Examination Paper`,
+        type: "MID_QUESTION",
+        typeLabel: "Midterm Exam Paper",
+        semester: "Fall 2024",
+        faculty: teacherName ? `${teacherName} ${teacherLabel}` : undefined,
+        facultyId: activeTeacher?.id,
+        prompt: `Please solve the complete ${cleanCode} Fall 2024 Midterm Examination Question Paper ${facultyNotice} step-by-step with complete formulas, code examples, and teacher-specific marking breakdown.`,
+      },
+      {
+        id: `${cleanCode}-sp24-final`,
+        title: `${cleanCode} Spring 2024 Final Examination Paper`,
+        type: "FINAL_QUESTION",
+        typeLabel: "Final Exam Paper",
+        semester: "Spring 2024",
+        faculty: teacherName ? `${teacherName} ${teacherLabel}` : undefined,
+        facultyId: activeTeacher?.id,
+        prompt: `Please provide a complete model answer and comprehensive solution for the full ${cleanCode} Spring 2024 Final Examination Paper ${facultyNotice}. Cover all theoretical questions, mathematical problems with LaTeX ($$...$$), algorithms, and exam grading tips.`,
+      },
+      {
+        id: `${cleanCode}-fa23-final`,
+        title: `${cleanCode} Fall 2023 Final Examination Paper`,
+        type: "FINAL_QUESTION",
+        typeLabel: "Final Exam Paper",
+        semester: "Fall 2023",
+        faculty: teacherName ? `${teacherName} ${teacherLabel}` : undefined,
+        facultyId: activeTeacher?.id,
+        prompt: `Please provide step-by-step solutions for the entire ${cleanCode} Fall 2023 Final Examination Paper ${facultyNotice} with detailed diagrams, mathematical formulations, and step-marking tips.`,
+      },
+      {
+        id: `${cleanCode}-ct-archive`,
+        title: `${cleanCode} Class Test & Quiz Question Bank (CT 1 - CT 4)`,
+        type: "QUIZ_CT",
+        typeLabel: "Class Test & Quiz",
+        semester: "Fall 2024",
+        faculty: teacherName ? `${teacherName} ${teacherLabel}` : undefined,
+        facultyId: activeTeacher?.id,
+        prompt: `Please provide step-by-step model solutions and key revision summaries for all Class Tests and Quizzes (CT 1, CT 2, CT 3, CT 4) for ${cleanCode} ${facultyNotice}.`,
+      },
+      {
+        id: `${cleanCode}-highyield-notes`,
+        title: `${cleanCode} High-Yield Lecture Notes & Formula Revision Guide`,
+        type: "NOTE",
+        typeLabel: "Handwritten Note",
+        semester: "Academic Archive",
+        faculty: teacherName ? `${teacherName} ${teacherLabel}` : undefined,
+        facultyId: activeTeacher?.id,
+        prompt: `Generate a high-yield exam revision guide and formula cheat sheet from lecture notes for ${cleanCode} ${facultyNotice}, including definitions, all mathematical formulas formatted in LaTeX, time & space complexities, and last-night preparation tips.`,
+      }
+    );
   }
 
   return items;
@@ -1048,7 +252,6 @@ export default function CheatSheetModal({
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
 
   // Question Linker States
-  const [selectedPaperId, setSelectedPaperId] = useState<string>("");
   const [isQuestionLinkerOpen, setIsQuestionLinkerOpen] = useState(false);
 
   // Clear Chat Confirmation Modal States
@@ -1060,8 +263,6 @@ export default function CheatSheetModal({
   const [sheetLoading, setSheetLoading] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const questionsScrollRef = useRef<HTMLDivElement>(null);
-  const promptsScrollRef = useRef<HTMLDivElement>(null);
 
   // Selected faculty display name (must be declared before callbacks and hooks)
   const activeTeacher = teachers?.find((t) => t.id === selectedTeacherId);
@@ -1088,17 +289,7 @@ export default function CheatSheetModal({
     };
   }, [allLinkedItems]);
 
-  useEffect(() => {
-    if (filteredPapers.length > 0) {
-      if (!filteredPapers.some((p) => p.id === selectedPaperId)) {
-        setSelectedPaperId(filteredPapers[0].id);
-      }
-    } else {
-      setSelectedPaperId("");
-    }
-  }, [filteredPapers, selectedPaperId]);
 
-  const currentPaper = filteredPapers.find((p) => p.id === selectedPaperId) || filteredPapers[0] || null;
 
   const scrollContainer = (ref: React.RefObject<HTMLDivElement | null>, direction: "left" | "right") => {
     if (ref.current) {
@@ -1852,33 +1043,49 @@ export default function CheatSheetModal({
                     </div>
                   </div>
 
-                  {/* Linked Exam Questions in Welcome State */}
-                  {currentPaper && (
+                  {/* Linked Real Exam Papers in Welcome State */}
+                  {allLinkedItems.length > 0 && (
                     <div className="pt-3 space-y-2 text-left">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 uppercase tracking-wider">
                           <BookOpen className="w-3.5 h-3.5" />
-                          <span>{language === "bn" ? `বিগত প্রশ্ন সমাধান (${currentPaper.title}):` : `Solved Past Questions (${currentPaper.title}):`}</span>
+                          <span>
+                            {language === "bn"
+                              ? "বিগত প্রশ্নপত্র ও সমাধান (১-ক্লিকে ফুল পেপার সলভ):"
+                              : "Past Exam Papers (1-Click Full Paper Solve):"}
+                          </span>
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsQuestionLinkerOpen(true)}
+                          className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                        >
+                          {language === "bn" ? `সব পেপার দেখুন (${allLinkedItems.length}) →` : `View All (${allLinkedItems.length}) →`}
+                        </button>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[260px] overflow-y-auto pr-1">
-                        {currentPaper.questions.map((q) => (
+                        {allLinkedItems.slice(0, 4).map((paper) => (
                           <button
-                            key={q.id}
-                            onClick={() => handleSendMessage(q.prompt)}
+                            key={paper.id}
+                            onClick={() => handleSendMessage(paper.prompt)}
                             disabled={sending}
                             className="p-2.5 rounded-2xl bg-gradient-to-r from-blue-50/70 to-indigo-50/70 dark:from-slate-900 dark:to-indigo-950/40 hover:from-blue-100 hover:to-indigo-100 dark:hover:from-slate-800 dark:hover:to-indigo-900/60 border border-blue-200/60 dark:border-indigo-900/40 text-left text-xs font-semibold text-slate-800 dark:text-slate-200 transition-all shadow-sm flex items-center justify-between group cursor-pointer"
                           >
                             <div className="flex items-center gap-2 min-w-0 pr-2">
-                              <span className="text-amber-500 font-bold">⚡</span>
-                              <span className="font-bold truncate">{q.label}</span>
-                              {q.marks && (
-                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 shrink-0">
-                                  {q.marks}
+                              <span className="text-amber-500 font-bold shrink-0">
+                                {paper.type === "MID_QUESTION" ? "📝" : paper.type === "FINAL_QUESTION" ? "🎓" : paper.type === "QUIZ_CT" ? "⚡" : "📖"}
+                              </span>
+                              <div className="min-w-0">
+                                <span className="font-bold truncate block">{paper.title}</span>
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate block">
+                                  {paper.semester} {paper.faculty ? `• ${paper.faculty}` : ""}
                                 </span>
-                              )}
+                              </div>
                             </div>
-                            <Send className="w-3.5 h-3.5 text-blue-500 opacity-60 group-hover:opacity-100 shrink-0" />
+                            <span className="px-2 py-1 rounded-xl bg-blue-600 text-white text-[10px] font-bold shrink-0 opacity-80 group-hover:opacity-100 shadow-sm flex items-center gap-1">
+                              <Zap className="w-3 h-3" />
+                              <span>{language === "bn" ? "সলভ" : "Solve"}</span>
+                            </span>
                           </button>
                         ))}
                       </div>
@@ -1978,7 +1185,7 @@ export default function CheatSheetModal({
               )}
             </div>
 
-            {/* Interactive Question Linker Popover / Drawer (Toggled from the button beside text input) */}
+            {/* Interactive Past Exam Papers Bank Drawer (Toggled from the button beside text input) */}
             {isQuestionLinkerOpen && allLinkedItems.length > 0 && (
               <div className="border-t border-slate-200/90 dark:border-slate-800/90 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-4 sm:px-6 py-3.5 shrink-0 shadow-2xl space-y-3 max-h-[460px] sm:max-h-[520px] overflow-y-auto animate-in slide-in-from-bottom-2 duration-150">
                 {/* Drawer Header */}
@@ -1996,8 +1203,8 @@ export default function CheatSheetModal({
                       </h4>
                       <p className="text-[10px] text-slate-400">
                         {language === "bn"
-                          ? "যেকোনো প্রশ্নে ক্লিক করে সরাসরি এআই উত্তর বা সমাধান পান"
-                          : "Click any question below to get instant AI model answers"}
+                          ? "যেকোনো প্রশ্নপত্রে ক্লিক করলেই সম্পূর্ণ প্রশ্ন এআই দিয়ে সমাধান হবে"
+                          : "Click any paper below to solve the complete exam paper in Copilot"}
                       </p>
                     </div>
                   </div>
@@ -2045,78 +1252,115 @@ export default function CheatSheetModal({
                   })}
                 </div>
 
-                {/* 2. Paper Picker Dropdown */}
-                <div className="relative">
-                  <select
-                    value={selectedPaperId}
-                    onChange={(e) => setSelectedPaperId(e.target.value)}
-                    className="w-full text-xs font-bold py-2 pl-3 pr-8 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer truncate"
-                  >
-                    {filteredPapers.map((paper) => (
-                      <option key={paper.id} value={paper.id}>
-                        {paper.type === "MID_QUESTION" ? "📝 " : paper.type === "FINAL_QUESTION" ? "🎓 " : paper.type === "QUIZ_CT" ? "⚡ " : "📖 "}
-                        {paper.title} {paper.faculty ? `• ${paper.faculty}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-                </div>
-
-                {/* 3. Questions Grid */}
-                {currentPaper && currentPaper.questions.length > 0 ? (
-                  <div className="space-y-1.5 pt-1">
+                {/* 2. Direct Past Exam Papers List (No fake sub-questions, 1-click full paper solve) */}
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      {language === "bn" ? "প্রশ্ন সিলেক্ট করুন:" : "Select Question to Ask:"}
+                      {language === "bn"
+                        ? "প্রশ্নপত্র সিলেক্ট করুন (ক্লিক করলে সম্পূর্ণ পেপার এআই-তে সলভ হবে):"
+                        : "Select Past Paper to Solve in Copilot:"}
                     </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {currentPaper.questions.map((q) => (
-                        <div
-                          key={q.id}
-                          className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50/70 dark:bg-slate-800/80 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 hover:border-blue-400 transition-all gap-2 group cursor-pointer"
-                          onClick={() => {
-                            handleSendMessage(q.prompt);
-                            setIsQuestionLinkerOpen(false);
-                          }}
-                          title={q.prompt}
-                        >
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span className="text-amber-500 font-bold shrink-0">⚡</span>
-                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                              {q.label}
-                            </span>
-                            {q.marks && (
-                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 shrink-0">
-                                {q.marks}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setInputMessage(q.prompt);
-                                setIsQuestionLinkerOpen(false);
-                              }}
-                              className="p-1 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-700 transition-colors"
-                              title={language === "bn" ? "ইনপুট বক্সে নিন" : "Insert into input"}
-                            >
-                              <span className="text-xs">✏️</span>
-                            </button>
-                            <span className="px-2 py-0.5 rounded-md bg-blue-600 text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                              {language === "bn" ? "জিজ্ঞেস করুন" : "Ask"}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {filteredPapers.length} {language === "bn" ? "টি পেপার" : "papers"}
+                    </span>
                   </div>
-                ) : (
-                  <p className="text-xs text-slate-400 text-center py-3">
-                    {language === "bn" ? "এই পেপারে কোনো নির্দিষ্ট প্রশ্ন পাওয়া যায়নি।" : "No specific questions found for this paper."}
-                  </p>
-                )}
+
+                  {filteredPapers.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[290px] overflow-y-auto pr-1">
+                      {filteredPapers.map((paper) => {
+                        const icon =
+                          paper.type === "MID_QUESTION" ? "📝" :
+                          paper.type === "FINAL_QUESTION" ? "🎓" :
+                          paper.type === "QUIZ_CT" ? "⚡" : "📖";
+
+                        return (
+                          <div
+                            key={paper.id}
+                            className="p-3 rounded-2xl bg-slate-50 hover:bg-blue-50/80 dark:bg-slate-800/80 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 hover:border-blue-500/80 transition-all flex flex-col justify-between gap-2.5 group cursor-pointer shadow-sm"
+                            onClick={() => {
+                              handleSendMessage(paper.prompt);
+                              setIsQuestionLinkerOpen(false);
+                            }}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-start gap-2 min-w-0">
+                                <span className="text-base shrink-0 mt-0.5">{icon}</span>
+                                <div className="min-w-0">
+                                  <h5 className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1">
+                                    {paper.title}
+                                  </h5>
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                    <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.2 rounded border border-blue-200/50 dark:border-blue-900/50">
+                                      {paper.semester}
+                                    </span>
+                                    {paper.faculty && (
+                                      <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 truncate max-w-[150px]">
+                                        • {paper.faculty}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-200/60 dark:border-slate-700/60">
+                              <div className="flex items-center gap-1.5">
+                                {paper.fileUrl && (
+                                  <a
+                                    href={paper.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="p-1 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-700 transition-colors text-[10px] flex items-center gap-1 font-semibold"
+                                    title={language === "bn" ? "আসল পিডিএফ ফাইল দেখুন" : "View original PDF"}
+                                  >
+                                    <FileText className="w-3 h-3" />
+                                    <span>PDF</span>
+                                  </a>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setInputMessage(paper.prompt);
+                                    setIsQuestionLinkerOpen(false);
+                                  }}
+                                  className="p-1 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-700 transition-colors"
+                                  title={language === "bn" ? "প্রম্পট এডিট করুন" : "Edit prompt"}
+                                >
+                                  <span className="text-xs">✏️</span>
+                                </button>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSendMessage(paper.prompt);
+                                  setIsQuestionLinkerOpen(false);
+                                }}
+                                disabled={sending}
+                                className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[10px] font-bold shadow-sm flex items-center gap-1 transition-all cursor-pointer"
+                              >
+                                <Zap className="w-3 h-3" />
+                                <span>{language === "bn" ? "সম্পূর্ণ প্রশ্ন সলভ" : "Solve Full Paper"}</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 space-y-1">
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        {language === "bn" ? "এই ক্যাটাগরিতে কোনো প্রশ্নপত্র পাওয়া যায়নি।" : "No exam papers found in this category."}
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        {language === "bn" ? "'সব মেটেরিয়াল' ট্যাবে ক্লিক করে অন্যান্য পেপার দেখতে পারেন।" : "Switch to 'All Materials' to browse available archives."}
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 {/* Quick Revision Prompts inside Drawer */}
                 {promptSuggestions.length > 0 && (
