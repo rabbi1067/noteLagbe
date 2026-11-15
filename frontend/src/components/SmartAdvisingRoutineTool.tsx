@@ -1696,52 +1696,54 @@ export default function SmartAdvisingRoutineTool() {
         </div>
 
         {/* ------------------------------------------------------------------------- */}
-        {/* TIER 1: TARGET CAMPUS DAYS BUILDER (COMPACT & SLEEK)                     */}
+        {/* TIER 1: TARGET CAMPUS DAYS BUILDER (CLEAN & DIRECT SELECTION)             */}
         {/* ------------------------------------------------------------------------- */}
         <div className="rounded-2xl bg-slate-950/60 border border-slate-800/90 p-3.5 sm:p-4 space-y-3">
-          {/* Header with Title + Active Badge + Presets + Strict Filter Toggle */}
+          {/* Header with Title + Active Count + Quick Helpers + Strict Filter Toggle */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 border-b border-slate-800/60 pb-2.5">
             <div className="flex items-center gap-2 flex-wrap">
               <Calendar className="w-4 h-4 text-indigo-400" />
               <h3 className="text-xs sm:text-sm font-extrabold text-white">
                 {language === "bn" ? "টার্গেট ক্যাম্পাস দিন ও উপস্থিতি" : "Target Campus Days & Attendance"}
               </h3>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-bold">
-                {preferredDays.length} / 7 {language === "bn" ? "দিন সক্রিয়" : "Days Active"}
+              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-bold">
+                {preferredDays.length} / 7 {language === "bn" ? "দিন নির্বাচিত" : "Days Active"}
+                {preferredDays.length > 0 && preferredDays.length < 7 && ` (${preferredDays.join(", ")})`}
               </span>
             </div>
 
-            {/* Quick Presets & Strict Mode in Header */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {/* Presets Segmented Group */}
-              <div className="flex items-center gap-1 bg-slate-900/90 p-0.5 rounded-xl border border-slate-800">
-                {[
-                  { id: "2DAYS" as const, label: "2 Days", sub: "Sun+Tue", days: ["SUN", "TUE"] },
-                  { id: "3DAYS" as const, label: "3 Days", sub: "Sun+Tue+Thu", days: ["SUN", "TUE", "THU"] },
-                  { id: "4DAYS" as const, label: "4 Days", sub: "Sun-Wed", days: ["SUN", "MON", "TUE", "WED"] },
-                  { id: "5DAYS" as const, label: "5 Days", sub: "Sun-Thu", days: ["SUN", "MON", "TUE", "WED", "THU"] },
-                  { id: "ALL" as const, label: "All 7d", sub: "Flexible", days: ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] },
-                ].map((goal) => {
-                  const isActive =
-                    preferredDays.length === goal.days.length &&
-                    goal.days.every((d) => preferredDays.includes(d));
-
-                  return (
-                    <button
-                      key={goal.id}
-                      type="button"
-                      onClick={() => handleApplyDayGoal(goal.id)}
-                      className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                        isActive
-                          ? "bg-indigo-600 text-white shadow-xs font-black"
-                          : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-                      }`}
-                      title={goal.sub}
-                    >
-                      {goal.label}
-                    </button>
-                  );
-                })}
+            {/* Quick Actions & Strict Mode Toggle */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Quick Select Helpers */}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStrictDayConflict(null);
+                    setPreferredDays(["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]);
+                  }}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer border ${
+                    preferredDays.length === 7
+                      ? "bg-indigo-600 text-white border-indigo-400 shadow-xs"
+                      : "bg-slate-900/80 text-slate-400 hover:text-white border-slate-800 hover:border-slate-700"
+                  }`}
+                >
+                  {language === "bn" ? "সব ৭ দিন" : "All 7 Days"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStrictDayConflict(null);
+                    setPreferredDays(["SUN", "MON", "TUE", "WED", "THU"]);
+                  }}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer border ${
+                    preferredDays.length === 5 && !preferredDays.includes("FRI") && !preferredDays.includes("SAT")
+                      ? "bg-indigo-600 text-white border-indigo-400 shadow-xs"
+                      : "bg-slate-900/80 text-slate-400 hover:text-white border-slate-800 hover:border-slate-700"
+                  }`}
+                >
+                  {language === "bn" ? "উইকডেজ" : "Weekdays"}
+                </button>
               </div>
 
               {/* Strict vs Flexible Filter Toggle */}
@@ -1776,7 +1778,7 @@ export default function SmartAdvisingRoutineTool() {
             </div>
           </div>
 
-          {/* 7 Sleek Day Tiles */}
+          {/* 7 Sleek Day Tiles - Direct Selection */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-2">
             {WEEK_DAYS.map((day) => {
               const active = preferredDays.includes(day);
@@ -1841,7 +1843,7 @@ export default function SmartAdvisingRoutineTool() {
           {/* Quick Combinations Bar (Compact flex line) */}
           <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
             <span className="text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider mr-1">
-              {language === "bn" ? "কম্বিনেশন:" : "Pairs:"}
+              {language === "bn" ? "পেয়ার টগল:" : "Quick Pairs:"}
             </span>
             {[
               { label: "SUN & TUE", days: ["SUN", "TUE"], desc: "Theory" },
@@ -1874,7 +1876,10 @@ export default function SmartAdvisingRoutineTool() {
             {preferredDays.length < 7 && (
               <button
                 type="button"
-                onClick={() => handleApplyDayGoal("ALL")}
+                onClick={() => {
+                  setStrictDayConflict(null);
+                  setPreferredDays(["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]);
+                }}
                 className="px-2 py-1 rounded-lg text-[10px] font-mono text-slate-400 hover:text-white border border-dashed border-slate-800 hover:border-slate-700 bg-slate-900/40 transition-colors cursor-pointer"
               >
                 + {language === "bn" ? "সব ৭ দিন" : "All 7 Days"}
