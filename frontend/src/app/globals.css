@@ -194,3 +194,28 @@
 .animate-dot-3 {
   animation: dot-bounce 1.4s infinite ease-in-out 0.4s;
 }
+
+/* KaTeX Math Styling & Dark Theme Adaptations */
+.katex {
+  font-size: 1.05em;
+  text-rendering: auto;
+}
+
+.dark .katex {
+  color: #f1f5f9;
+}
+
+.dark .katex-display {
+  color: #f8fafc;
+}
+
+.katex-display {
+  margin: 0.5em 0 !important;
+}
+
+.katex-display > .katex {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25rem 0.5rem;
+}

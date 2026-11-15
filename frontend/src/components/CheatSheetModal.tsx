@@ -31,6 +31,7 @@ import {
 import { api } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
 import { toast } from "sonner";
+import katex from "katex";
 
 interface TeacherOption {
   id: number;
@@ -783,15 +784,36 @@ export default function CheatSheetModal({
     }
   };
 
-  // Simple Markdown formatter for clean rendering of bold text, lists, and code
+  // HTML entity sanitizer for fallback
+  const escapeHtml = (str: string) =>
+    str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // Helper to render KaTeX formulas safely with LaTeX typography
+  const renderKaTeX = (tex: string, displayMode: boolean): string => {
+    try {
+      return katex.renderToString(tex.trim(), {
+        displayMode,
+        throwOnError: false,
+        output: "htmlAndMathml",
+      });
+    } catch (e) {
+      console.warn("KaTeX render error:", e);
+      return `<span class="text-amber-400 font-mono">${escapeHtml(tex)}</span>`;
+    }
+  };
+
+  // Simple Markdown & LaTeX formatter for clean rendering of bold text, lists, code, and math equations
   const renderFormattedContent = (content: string) => {
     const lines = content.split("\n");
     let inCodeBlock = false;
     let codeBuffer: string[] = [];
+    let inMathBlock = false;
+    let mathBuffer: string[] = [];
 
     const elements: React.ReactNode[] = [];
 
     lines.forEach((line, index) => {
+      // 1. Code blocks (```)
       if (line.trim().startsWith("```")) {
         if (inCodeBlock) {
           elements.push(
@@ -816,25 +838,139 @@ export default function CheatSheetModal({
       }
 
       const trimmed = line.trim();
+
+      // 2. Multi-line Display Math Blocks ($$...$$ or \[...\])
+      if (trimmed === "$$" || trimmed === "\\[") {
+        if (inMathBlock) {
+          elements.push(
+            <div
+              key={`math-${index}`}
+              className="my-3 py-3 px-4 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900 to-indigo-950/40 border border-slate-700/70 dark:border-slate-800 shadow-xl overflow-x-auto text-center"
+            >
+              <div
+                className="inline-block text-slate-100 min-w-full text-center"
+                dangerouslySetInnerHTML={{
+                  __html: renderKaTeX(mathBuffer.join("\n"), true),
+                }}
+              />
+            </div>
+          );
+          mathBuffer = [];
+          inMathBlock = false;
+        } else {
+          inMathBlock = true;
+          mathBuffer = [];
+        }
+        return;
+      }
+
+      if (inMathBlock) {
+        if (trimmed === "$$" || trimmed === "\\]") {
+          elements.push(
+            <div
+              key={`math-${index}`}
+              className="my-3 py-3 px-4 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900 to-indigo-950/40 border border-slate-700/70 dark:border-slate-800 shadow-xl overflow-x-auto text-center"
+            >
+              <div
+                className="inline-block text-slate-100 min-w-full text-center"
+                dangerouslySetInnerHTML={{
+                  __html: renderKaTeX(mathBuffer.join("\n"), true),
+                }}
+              />
+            </div>
+          );
+          mathBuffer = [];
+          inMathBlock = false;
+        } else {
+          mathBuffer.push(line);
+        }
+        return;
+      }
+
+      // 3. Single-line Display Math ($$math$$ or \[math\])
+      if (
+        (trimmed.startsWith("$$") && trimmed.endsWith("$$") && trimmed.length > 2) ||
+        (trimmed.startsWith("\\[") && trimmed.endsWith("\\]") && trimmed.length > 4)
+      ) {
+        const formula = trimmed.startsWith("$$")
+          ? trimmed.slice(2, -2)
+          : trimmed.slice(2, -2);
+        elements.push(
+          <div
+            key={`math-${index}`}
+            className="my-3 py-3 px-4 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900 to-indigo-950/40 border border-slate-700/70 dark:border-slate-800 shadow-xl overflow-x-auto text-center"
+          >
+            <div
+              className="inline-block text-slate-100 min-w-full text-center"
+              dangerouslySetInnerHTML={{
+                __html: renderKaTeX(formula, true),
+              }}
+            />
+          </div>
+        );
+        return;
+      }
+
       if (!trimmed) {
         elements.push(<div key={`empty-${index}`} className="h-2" />);
         return;
       }
 
+      // Horizontal separator (---)
+      if (trimmed === "---" || trimmed === "***" || trimmed === "___") {
+        elements.push(
+          <hr
+            key={`hr-${index}`}
+            className="my-3 border-t border-slate-200 dark:border-slate-800"
+          />
+        );
+        return;
+      }
+
       // Headers
+      if (trimmed.startsWith("# ")) {
+        elements.push(
+          <h2
+            key={`h1-${index}`}
+            className="text-base font-black text-slate-900 dark:text-white mt-3 mb-1.5 flex items-center gap-2"
+          >
+            <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>{renderInlineText(trimmed.replace(/^#\s+/, ""))}</span>
+          </h2>
+        );
+        return;
+      }
+      if (trimmed.startsWith("## ")) {
+        elements.push(
+          <h3
+            key={`h2-${index}`}
+            className="text-sm font-black text-slate-900 dark:text-white mt-2.5 mb-1 flex items-center gap-1.5"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <span>{renderInlineText(trimmed.replace(/^##\s+/, ""))}</span>
+          </h3>
+        );
+        return;
+      }
       if (trimmed.startsWith("### ")) {
         elements.push(
-          <h4 key={`h3-${index}`} className="text-sm font-black text-slate-900 dark:text-white mt-2 mb-1 flex items-center gap-1.5">
+          <h4
+            key={`h3-${index}`}
+            className="text-sm font-black text-slate-900 dark:text-white mt-2 mb-1 flex items-center gap-1.5"
+          >
             <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-            <span>{trimmed.replace(/^###\s+/, "")}</span>
+            <span>{renderInlineText(trimmed.replace(/^###\s+/, ""))}</span>
           </h4>
         );
         return;
       }
       if (trimmed.startsWith("#### ")) {
         elements.push(
-          <h5 key={`h4-${index}`} className="text-xs font-bold text-blue-600 dark:text-blue-400 mt-2 mb-1">
-            {trimmed.replace(/^####\s+/, "")}
+          <h5
+            key={`h4-${index}`}
+            className="text-xs font-bold text-blue-600 dark:text-blue-400 mt-2 mb-1"
+          >
+            {renderInlineText(trimmed.replace(/^####\s+/, ""))}
           </h5>
         );
         return;
@@ -844,7 +980,10 @@ export default function CheatSheetModal({
       if (trimmed.startsWith("* ") || trimmed.startsWith("- ")) {
         const bulletText = trimmed.replace(/^[\*\-]\s+/, "");
         elements.push(
-          <div key={`li-${index}`} className="flex items-start gap-2 my-0.5 pl-2 text-xs text-slate-700 dark:text-slate-300">
+          <div
+            key={`li-${index}`}
+            className="flex items-start gap-2 my-0.5 pl-2 text-xs text-slate-700 dark:text-slate-300"
+          >
             <span className="text-blue-500 mt-0.5">•</span>
             <span>{renderInlineText(bulletText)}</span>
           </div>
@@ -855,7 +994,10 @@ export default function CheatSheetModal({
       // Numbered lists
       if (/^\d+\.\s+/.test(trimmed)) {
         elements.push(
-          <div key={`num-${index}`} className="flex items-start gap-2 my-0.5 pl-2 text-xs text-slate-700 dark:text-slate-300">
+          <div
+            key={`num-${index}`}
+            className="flex items-start gap-2 my-0.5 pl-2 text-xs text-slate-700 dark:text-slate-300"
+          >
             <span className="font-bold text-blue-600 dark:text-blue-400 shrink-0">
               {trimmed.match(/^\d+\./)?.[0]}
             </span>
@@ -880,7 +1022,10 @@ export default function CheatSheetModal({
 
       // Default paragraph
       elements.push(
-        <p key={`p-${index}`} className="my-1 text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+        <p
+          key={`p-${index}`}
+          className="my-1.5 text-xs text-slate-700 dark:text-slate-300 leading-relaxed"
+        >
           {renderInlineText(line)}
         </p>
       );
@@ -897,21 +1042,47 @@ export default function CheatSheetModal({
       );
     }
 
+    if (inMathBlock && mathBuffer.length > 0) {
+      elements.push(
+        <div
+          key={`math-end`}
+          className="my-3 py-3 px-4 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900 to-indigo-950/40 border border-slate-700/70 dark:border-slate-800 shadow-xl overflow-x-auto text-center"
+        >
+          <div
+            className="inline-block text-slate-100 min-w-full text-center"
+            dangerouslySetInnerHTML={{
+              __html: renderKaTeX(mathBuffer.join("\n"), true),
+            }}
+          />
+        </div>
+      );
+    }
+
     return elements;
   };
 
-  const renderInlineText = (text: string) => {
-    // Bold parsing (**text**)
-    const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
-    return parts.map((part, i) => {
-      if (part.startsWith("**") && part.endsWith("**")) {
+  const renderInlineText = (text: string, isNested = false): React.ReactNode => {
+    // Regex splits bold (**text**), inline code (`code`), display math ($$math$$ or \[math\]),
+    // and inline math ($math$ or \(math\)).
+    const tokens = text.split(
+      /(\*\*[^*]+\*\*|`[^`]+`|\$\$[^\$]+?\$\$|\\\[[\s\S]+?\\\]|\\\(.+?\\\)|(?<!\$)\$(?:[^\$\s\n]|[^\$\s\n][^\$\n]*?[^\$\s\n])\$(?!\$))/g
+    );
+
+    return tokens.map((part, i) => {
+      if (!part) return null;
+
+      // 1. Bold (**text**)
+      if (part.startsWith("**") && part.endsWith("**") && part.length >= 4) {
+        const inner = part.slice(2, -2);
         return (
           <strong key={i} className="font-black text-slate-900 dark:text-white">
-            {part.slice(2, -2)}
+            {isNested ? inner : renderInlineText(inner, true)}
           </strong>
         );
       }
-      if (part.startsWith("`") && part.endsWith("`")) {
+
+      // 2. Inline Code (`code`)
+      if (part.startsWith("`") && part.endsWith("`") && part.length >= 2) {
         return (
           <code
             key={i}
@@ -921,6 +1092,55 @@ export default function CheatSheetModal({
           </code>
         );
       }
+
+      // 3. Display Math ($$math$$ or \[math\]) inside line
+      if (
+        (part.startsWith("$$") && part.endsWith("$$") && part.length >= 4) ||
+        (part.startsWith("\\[") && part.endsWith("\\]") && part.length >= 4)
+      ) {
+        const formula = part.startsWith("$$")
+          ? part.slice(2, -2)
+          : part.slice(2, -2);
+        return (
+          <span
+            key={i}
+            className="inline-block my-1.5 max-w-full overflow-x-auto align-middle py-1 px-3 rounded-xl bg-slate-900/80 border border-slate-700/60 shadow-inner text-slate-100"
+            dangerouslySetInnerHTML={{
+              __html: renderKaTeX(formula, true),
+            }}
+          />
+        );
+      }
+
+      // 4. Inline Math (\(math\))
+      if (part.startsWith("\\(") && part.endsWith("\\)") && part.length >= 4) {
+        const formula = part.slice(2, -2);
+        return (
+          <span
+            key={i}
+            className="inline-math px-0.5 align-baseline text-slate-900 dark:text-slate-100 font-normal"
+            dangerouslySetInnerHTML={{
+              __html: renderKaTeX(formula, false),
+            }}
+          />
+        );
+      }
+
+      // 5. Inline Math ($math$)
+      if (part.startsWith("$") && part.endsWith("$") && part.length >= 2) {
+        const formula = part.slice(1, -1);
+        return (
+          <span
+            key={i}
+            className="inline-math px-0.5 align-baseline text-slate-900 dark:text-slate-100 font-normal"
+            dangerouslySetInnerHTML={{
+              __html: renderKaTeX(formula, false),
+            }}
+          />
+        );
+      }
+
+      // 6. Regular plain text
       return part;
     });
   };
@@ -1538,7 +1758,7 @@ export default function CheatSheetModal({
                     <span>{language === "bn" ? "লাস্ট নাইট রিভিশন স্ট্র্যাটেজি" : "Key Revision Strategy"}</span>
                   </h4>
                   <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                    {sheetData.lastNightSummary}
+                    {renderInlineText(sheetData.lastNightSummary)}
                   </p>
                 </div>
 
@@ -1559,7 +1779,7 @@ export default function CheatSheetModal({
                             {i + 1}
                           </span>
                           <span className="text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
-                            {topic}
+                            {renderInlineText(topic)}
                           </span>
                         </div>
                       ))}
@@ -1577,7 +1797,7 @@ export default function CheatSheetModal({
                     <div className="p-4 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40">
                       <ul className="space-y-2 text-slate-700 dark:text-slate-300 text-xs leading-relaxed list-disc list-inside">
                         {sheetData.examTips.map((tip: string, i: number) => (
-                          <li key={i}>{tip}</li>
+                          <li key={i}>{renderInlineText(tip)}</li>
                         ))}
                       </ul>
                     </div>

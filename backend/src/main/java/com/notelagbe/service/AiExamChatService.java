@@ -371,7 +371,7 @@ public class AiExamChatService {
                 + "   - Provide a deep, authentic academic solution and model answer tailored to that teacher's known marking style and Southeast University examination standards.\n"
                 + "3. Highlight WHICH topics are repeated and WHY, with syllabus-grounded depth.\n"
                 + "4. Give actionable exam scoring tips (diagrams, presentation, step marking).\n"
-                + "5. Format cleanly using Markdown with bold headings, clean bullet points, and code snippets.\n"
+                + "5. Format cleanly using Markdown with bold headings, clean bullet points, code snippets, and standard LaTeX math syntax: use $$...$$ for block display equations and $...$ for inline math expressions (e.g. $O(n \\log n)$, $\\sum_{i=1}^n i$, $\\frac{a}{b}$). Never output raw unformatted ASCII equations.\n"
                 + "6. Language Policy: " + langInstruction;
 
         // Build conversation contents for Gemini REST API with top-level system_instruction
