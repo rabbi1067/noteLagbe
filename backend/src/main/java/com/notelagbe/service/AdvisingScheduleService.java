@@ -8,6 +8,8 @@ import com.notelagbe.repository.OfferedSectionRepository;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,8 +38,8 @@ public class AdvisingScheduleService {
     public void initDefaultAdvisingData() {
         try {
             long count = sectionRepository.countBySemester(DEFAULT_SEMESTER);
-            if (count == 0) {
-                log.info("Offered sections empty for {}, pre-seeding verified Southeast University advising catalog...", DEFAULT_SEMESTER);
+            if (count < 60) {
+                log.info("Offered sections count is {} (< 60), seeding verified Southeast University advising catalog...", count);
                 seedDefaultSections();
             }
         } catch (Exception e) {
@@ -225,8 +227,13 @@ public class AdvisingScheduleService {
         // Sort descending by score
         scoredList.sort((a, b) -> Double.compare(b.score, a.score));
 
-        // Limit top 15 routines
-        List<ScoredRoutine> topRoutines = scoredList.stream().limit(15).collect(Collectors.toList());
+        // Limit top 15 routines and assign rank
+        List<ScoredRoutine> topRoutines = new ArrayList<>();
+        for (int i = 0; i < Math.min(15, scoredList.size()); i++) {
+            ScoredRoutine sr = scoredList.get(i);
+            sr.rank = i + 1;
+            topRoutines.add(sr);
+        }
 
         Map<String, Object> res = new HashMap<>();
         res.put("success", true);
@@ -400,28 +407,38 @@ public class AdvisingScheduleService {
             }
         }
 
-        // Gap calculations on each day
+        // Multi-objective Gap Calculations & Back-to-Back Class Optimization
         double totalGapMinutes = 0;
+        double consecutiveBonus = 0;
+        double longGapPenalty = 0;
         for (List<TimeSlot> slots : daySlots.values()) {
             slots.sort(Comparator.comparingInt(a -> a.startMinutes));
             for (int i = 0; i < slots.size() - 1; i++) {
                 int gap = slots.get(i + 1).startMinutes - slots.get(i).endMinutes;
-                if (gap > 0) {
+                if (gap <= 15) {
+                    consecutiveBonus += 40.0; // Ideal consecutive classes (10-15m transition between rooms)
+                } else if (gap <= 50) {
+                    consecutiveBonus += 20.0; // Reasonable lunch / prayer break
                     totalGapMinutes += gap;
+                } else {
+                    totalGapMinutes += gap;
+                    longGapPenalty += (gap / 15.0) * 12.0; // Heavy penalty for long dead waiting gaps
                 }
             }
         }
 
-        if ("AVOID_GAPS".equalsIgnoreCase(dayPref)) {
-            if (totalGapMinutes <= 60) {
-                score += 30.0;
-                highlights.add("⏱️ Minimal Gaps (" + (int) totalGapMinutes + " mins)");
-            } else {
-                score -= (totalGapMinutes / 30.0) * 5.0;
-            }
+        score += consecutiveBonus;
+        score -= longGapPenalty;
+
+        if (totalGapMinutes == 0) {
+            highlights.add("⏱️ 0m Gap (Back-to-Back Classes)");
+        } else if (totalGapMinutes <= 45) {
+            highlights.add("⏱️ Compact (" + (int) totalGapMinutes + "m Total Gap)");
+        } else {
+            highlights.add("⏱️ " + (int) totalGapMinutes + "m Total Gaps");
         }
 
-        // Calculate match percentage (clamped between 60% and 99%)
+        // Calculate match percentage (clamped between 65% and 99%)
         int matchPercentage = (int) Math.min(99, Math.max(65, Math.round((score / 240.0) * 100.0)));
 
         ScoredRoutine sr = new ScoredRoutine();
@@ -433,6 +450,7 @@ public class AdvisingScheduleService {
         sr.totalCredits = totalCredits;
         sr.hasEarlyMorning = hasEarlyMorning;
         sr.hasLateEvening = hasLateEvening;
+        sr.totalGapMinutes = totalGapMinutes;
         sr.highlights = highlights;
         return sr;
     }
@@ -441,9 +459,11 @@ public class AdvisingScheduleService {
         public List<OfferedSection> sections;
         public double score;
         public int matchPercentage;
+        public int rank;
         public int activeDaysCount;
         public List<String> activeDays;
         public int totalCredits;
+        public double totalGapMinutes;
         public boolean hasEarlyMorning;
         public boolean hasLateEvening;
         public List<String> highlights;
@@ -587,58 +607,52 @@ public class AdvisingScheduleService {
     }
 
     /**
-     * Seeds the 62 real Southeast University sections from UMS dataset
+     * Seeds the authentic 62 Southeast University sections from UMS dataset (seu_offered_sections.json)
      */
     private void seedDefaultSections() {
-        String defaultDataJson = "["
-            + "{\"c\":\"CSE355\",\"s\":\"1\",\"t\":\"Digital Image Processing\",\"cr\":3.0,\"f\":\"JAR\",\"fn\":\"Mst. Jesiara Khatun\",\"st\":\"SUN # 10:00 ~ 11:20 @ SEU527 / TUE # 10:00 ~ 11:20 @ SEU527\",\"sl\":[{\"day\":\"SUN\",\"start\":\"10:00\",\"end\":\"11:20\",\"room\":\"SEU527\"},{\"day\":\"TUE\",\"start\":\"10:00\",\"end\":\"11:20\",\"room\":\"SEU527\"}]},"
-            + "{\"c\":\"CSE355\",\"s\":\"2\",\"t\":\"Digital Image Processing\",\"cr\":3.0,\"f\":\"JAR\",\"fn\":\"Mst. Jesiara Khatun\",\"st\":\"SUN # 11:30 ~ 12:50 @ SEU527 / TUE # 11:30 ~ 12:50 @ SEU527\",\"sl\":[{\"day\":\"SUN\",\"start\":\"11:30\",\"end\":\"12:50\",\"room\":\"SEU527\"},{\"day\":\"TUE\",\"start\":\"11:30\",\"end\":\"12:50\",\"room\":\"SEU527\"}]},"
-            + "{\"c\":\"CSE355\",\"s\":\"3\",\"t\":\"Digital Image Processing\",\"cr\":3.0,\"f\":\"MAHB\",\"fn\":\"Mahbub Hasan\",\"st\":\"MON # 08:30 ~ 09:50 @ SEU527 / WED # 08:30 ~ 09:50 @ SEU527\",\"sl\":[{\"day\":\"MON\",\"start\":\"08:30\",\"end\":\"09:50\",\"room\":\"SEU527\"},{\"day\":\"WED\",\"start\":\"08:30\",\"end\":\"09:50\",\"room\":\"SEU527\"}]},"
-            + "{\"c\":\"CSE355\",\"s\":\"4\",\"t\":\"Digital Image Processing\",\"cr\":3.0,\"f\":\"MAHB\",\"fn\":\"Mahbub Hasan\",\"st\":\"MON # 10:00 ~ 11:20 @ SEU527 / WED # 10:00 ~ 11:20 @ SEU527\",\"sl\":[{\"day\":\"MON\",\"start\":\"10:00\",\"end\":\"11:20\",\"room\":\"SEU527\"},{\"day\":\"WED\",\"start\":\"10:00\",\"end\":\"11:20\",\"room\":\"SEU527\"}]},"
-            + "{\"c\":\"CSE355\",\"s\":\"5\",\"t\":\"Digital Image Processing\",\"cr\":3.0,\"f\":\"MNAR\",\"fn\":\"Namirah Rasul\",\"st\":\"THU # 13:30 ~ 14:50 @ SEU527 / SAT # 13:30 ~ 14:50 @ SEU527\",\"sl\":[{\"day\":\"THU\",\"start\":\"13:30\",\"end\":\"14:50\",\"room\":\"SEU527\"},{\"day\":\"SAT\",\"start\":\"13:30\",\"end\":\"14:50\",\"room\":\"SEU527\"}]},"
-            + "{\"c\":\"CSE355\",\"s\":\"6\",\"t\":\"Digital Image Processing\",\"cr\":3.0,\"f\":\"MNAR\",\"fn\":\"Namirah Rasul\",\"st\":\"THU # 15:00 ~ 16:20 @ SEU527 / SAT # 15:00 ~ 16:20 @ SEU527\",\"sl\":[{\"day\":\"THU\",\"start\":\"15:00\",\"end\":\"16:20\",\"room\":\"SEU527\"},{\"day\":\"SAT\",\"start\":\"15:00\",\"end\":\"16:20\",\"room\":\"SEU527\"}]},"
-            + "{\"c\":\"CSE355\",\"s\":\"7\",\"t\":\"Digital Image Processing\",\"cr\":3.0,\"f\":\"NAAO\",\"fn\":\"Md. Nahid Anam Opu\",\"st\":\"SUN # 13:30 ~ 14:50 @ SEU321 / TUE # 13:30 ~ 14:50 @ SEU321\",\"sl\":[{\"day\":\"SUN\",\"start\":\"13:30\",\"end\":\"14:50\",\"room\":\"SEU321\"},{\"day\":\"TUE\",\"start\":\"13:30\",\"end\":\"14:50\",\"room\":\"SEU321\"}]},"
-            + "{\"c\":\"CSE355\",\"s\":\"8\",\"t\":\"Digital Image Processing\",\"cr\":3.0,\"f\":\"NAAO\",\"fn\":\"Md. Nahid Anam Opu\",\"st\":\"SUN # 15:00 ~ 16:20 @ SEU321 / TUE # 15:00 ~ 16:20 @ SEU321\",\"sl\":[{\"day\":\"SUN\",\"start\":\"15:00\",\"end\":\"16:20\",\"room\":\"SEU321\"},{\"day\":\"TUE\",\"start\":\"15:00\",\"end\":\"16:20\",\"room\":\"SEU321\"}]},"
-            + "{\"c\":\"CSE355\",\"s\":\"9\",\"t\":\"Digital Image Processing\",\"cr\":3.0,\"f\":\"RKM\",\"fn\":\"Md. Rakibul Islam\",\"st\":\"MON # 13:30 ~ 14:50 @ SEU321 / WED # 13:30 ~ 14:50 @ SEU321\",\"sl\":[{\"day\":\"MON\",\"start\":\"13:30\",\"end\":\"14:50\",\"room\":\"SEU321\"},{\"day\":\"WED\",\"start\":\"13:30\",\"end\":\"14:50\",\"room\":\"SEU321\"}]},"
-            + "{\"c\":\"CSE355\",\"s\":\"10\",\"t\":\"Digital Image Processing\",\"cr\":3.0,\"f\":\"RKM\",\"fn\":\"Md. Rakibul Islam\",\"st\":\"SUN # 15:00 ~ 16:20 @ SEU321 / TUE # 15:00 ~ 16:20 @ SEU321\",\"sl\":[{\"day\":\"SUN\",\"start\":\"15:00\",\"end\":\"16:20\",\"room\":\"SEU321\"},{\"day\":\"TUE\",\"start\":\"15:00\",\"end\":\"16:20\",\"room\":\"SEU321\"}]},"
-            + "{\"c\":\"CSE381\",\"s\":\"1\",\"t\":\"Introduction to Embedded Systems\",\"cr\":3.0,\"f\":\"DSS\",\"fn\":\"Dr. Sherejad Sanam\",\"st\":\"SUN # 08:30 ~ 09:50 @ SEU535 / TUE # 08:30 ~ 09:50 @ SEU535\",\"sl\":[{\"day\":\"SUN\",\"start\":\"08:30\",\"end\":\"09:50\",\"room\":\"SEU535\"},{\"day\":\"TUE\",\"start\":\"08:30\",\"end\":\"09:50\",\"room\":\"SEU535\"}]},"
-            + "{\"c\":\"CSE381\",\"s\":\"2\",\"t\":\"Introduction to Embedded Systems\",\"cr\":3.0,\"f\":\"DSS\",\"fn\":\"Dr. Sherejad Sanam\",\"st\":\"SUN # 10:00 ~ 11:20 @ SEU535 / TUE # 10:00 ~ 11:20 @ SEU535\",\"sl\":[{\"day\":\"SUN\",\"start\":\"10:00\",\"end\":\"11:20\",\"room\":\"SEU535\"},{\"day\":\"TUE\",\"start\":\"10:00\",\"end\":\"11:20\",\"room\":\"SEU535\"}]},"
-            + "{\"c\":\"CSE381\",\"s\":\"3\",\"t\":\"Introduction to Embedded Systems\",\"cr\":3.0,\"f\":\"JABA\",\"fn\":\"Jayed Bin Azad\",\"st\":\"SUN # 10:00 ~ 11:20 @ SEU419 / TUE # 10:00 ~ 11:20 @ SEU419\",\"sl\":[{\"day\":\"SUN\",\"start\":\"10:00\",\"end\":\"11:20\",\"room\":\"SEU419\"},{\"day\":\"TUE\",\"start\":\"10:00\",\"end\":\"11:20\",\"room\":\"SEU419\"}]},"
-            + "{\"c\":\"CSE381\",\"s\":\"4\",\"t\":\"Introduction to Embedded Systems\",\"cr\":3.0,\"f\":\"JABA\",\"fn\":\"Jayed Bin Azad\",\"st\":\"SUN # 11:30 ~ 12:50 @ SEU419 / TUE # 11:30 ~ 12:50 @ SEU419\",\"sl\":[{\"day\":\"SUN\",\"start\":\"11:30\",\"end\":\"12:50\",\"room\":\"SEU419\"},{\"day\":\"TUE\",\"start\":\"11:30\",\"end\":\"12:50\",\"room\":\"SEU419\"}]},"
-            + "{\"c\":\"CSE381\",\"s\":\"5\",\"t\":\"Introduction to Embedded Systems\",\"cr\":3.0,\"f\":\"NAAO\",\"fn\":\"Md. Nahid Anam Opu\",\"st\":\"MON # 10:00 ~ 11:20 @ SEU535 / WED # 10:00 ~ 11:20 @ SEU535\",\"sl\":[{\"day\":\"MON\",\"start\":\"10:00\",\"end\":\"11:20\",\"room\":\"SEU535\"},{\"day\":\"WED\",\"start\":\"10:00\",\"end\":\"11:20\",\"room\":\"SEU535\"}]},"
-            + "{\"c\":\"CSE381\",\"s\":\"6\",\"t\":\"Introduction to Embedded Systems\",\"cr\":3.0,\"f\":\"NAAO\",\"fn\":\"Md. Nahid Anam Opu\",\"st\":\"MON # 11:30 ~ 12:50 @ SEU535 / WED # 11:30 ~ 12:50 @ SEU535\",\"sl\":[{\"day\":\"MON\",\"start\":\"11:30\",\"end\":\"12:50\",\"room\":\"SEU535\"},{\"day\":\"WED\",\"start\":\"11:30\",\"end\":\"12:50\",\"room\":\"SEU535\"}]},"
-            + "{\"c\":\"CSE382\",\"s\":\"1\",\"t\":\"Introduction to Embedded Systems Lab\",\"cr\":1.0,\"f\":\"TMD\",\"fn\":\"Tashreef Muhammad\",\"st\":\"SUN # 11:30 ~ 13:30 @ SEU610\",\"sl\":[{\"day\":\"SUN\",\"start\":\"11:30\",\"end\":\"13:30\",\"room\":\"SEU610\"}]},"
-            + "{\"c\":\"CSE382\",\"s\":\"2\",\"t\":\"Introduction to Embedded Systems Lab\",\"cr\":1.0,\"f\":\"TMD\",\"fn\":\"Tashreef Muhammad\",\"st\":\"SUN # 14:00 ~ 16:00 @ SEU610\",\"sl\":[{\"day\":\"SUN\",\"start\":\"14:00\",\"end\":\"16:00\",\"room\":\"SEU610\"}]},"
-            + "{\"c\":\"CSE382\",\"s\":\"4\",\"t\":\"Introduction to Embedded Systems Lab\",\"cr\":1.0,\"f\":\"NAAO\",\"fn\":\"Md. Nahid Anam Opu\",\"st\":\"MON # 11:30 ~ 13:30 @ SEU610\",\"sl\":[{\"day\":\"MON\",\"start\":\"11:30\",\"end\":\"13:30\",\"room\":\"SEU610\"}]},"
-            + "{\"c\":\"CSE382\",\"s\":\"8\",\"t\":\"Introduction to Embedded Systems Lab\",\"cr\":1.0,\"f\":\"JABA\",\"fn\":\"Jayed Bin Azad\",\"st\":\"TUE # 16:30 ~ 18:30 @ SEU610\",\"sl\":[{\"day\":\"TUE\",\"start\":\"16:30\",\"end\":\"18:30\",\"room\":\"SEU610\"}]},"
-            + "{\"c\":\"CSE443\",\"s\":\"7\",\"t\":\"Pattern Recognition\",\"cr\":3.0,\"f\":\"GMRN\",\"fn\":\"Gazi Maliha Raisa Noor\",\"st\":\"THU # 13:30 ~ 14:50 @ SEU332 / SAT # 13:30 ~ 14:50 @ SEU332\",\"sl\":[{\"day\":\"THU\",\"start\":\"13:30\",\"end\":\"14:50\",\"room\":\"SEU332\"},{\"day\":\"SAT\",\"start\":\"13:30\",\"end\":\"14:50\",\"room\":\"SEU332\"}]},"
-            + "{\"c\":\"CSE443\",\"s\":\"8\",\"t\":\"Pattern Recognition\",\"cr\":3.0,\"f\":\"GMRN\",\"fn\":\"Gazi Maliha Raisa Noor\",\"st\":\"THU # 15:00 ~ 16:20 @ SEU332 / SAT # 15:00 ~ 16:20 @ SEU332\",\"sl\":[{\"day\":\"THU\",\"start\":\"15:00\",\"end\":\"16:20\",\"room\":\"SEU332\"},{\"day\":\"SAT\",\"start\":\"15:00\",\"end\":\"16:20\",\"room\":\"SEU332\"}]},"
-            + "{\"c\":\"CSE443\",\"s\":\"10\",\"t\":\"Pattern Recognition\",\"cr\":3.0,\"f\":\"NIBI\",\"fn\":\"Sheikh Md. Nibir\",\"st\":\"THU # 16:30 ~ 17:50 @ SEU332 / SAT # 16:30 ~ 17:50 @ SEU332\",\"sl\":[{\"day\":\"THU\",\"start\":\"16:30\",\"end\":\"17:50\",\"room\":\"SEU332\"},{\"day\":\"SAT\",\"start\":\"16:30\",\"end\":\"17:50\",\"room\":\"SEU332\"}]},"
-            + "{\"c\":\"CSE444\",\"s\":\"12\",\"t\":\"Pattern Recognition Lab\",\"cr\":1.0,\"f\":\"TAJO\",\"fn\":\"Tanjina Oriana\",\"st\":\"SAT # 11:30 ~ 13:30 @ SEU213A\",\"sl\":[{\"day\":\"SAT\",\"start\":\"11:30\",\"end\":\"13:30\",\"room\":\"SEU213A\"}]},"
-            + "{\"c\":\"CSE444\",\"s\":\"14\",\"t\":\"Pattern Recognition Lab\",\"cr\":1.0,\"f\":\"TAJO\",\"fn\":\"Tanjina Oriana\",\"st\":\"SAT # 14:00 ~ 16:00 @ SEU213A\",\"sl\":[{\"day\":\"SAT\",\"start\":\"14:00\",\"end\":\"16:00\",\"room\":\"SEU213A\"}]},"
-            + "{\"c\":\"CSE472\",\"s\":\"1\",\"t\":\"Software Quality Assurance & Testing Lab\",\"cr\":1.0,\"f\":\"ABAH\",\"fn\":\"Abid Ahmad\",\"st\":\"SUN # 08:30 ~ 10:30 @ SEU804\",\"sl\":[{\"day\":\"SUN\",\"start\":\"08:30\",\"end\":\"10:30\",\"room\":\"SEU804\"}]},"
-            + "{\"c\":\"CSE472\",\"s\":\"4\",\"t\":\"Software Quality Assurance & Testing Lab\",\"cr\":1.0,\"f\":\"ANMS\",\"fn\":\"Anik Mahmud Shanto\",\"st\":\"THU # 11:30 ~ 13:30 @ SEU804\",\"sl\":[{\"day\":\"THU\",\"start\":\"11:30\",\"end\":\"13:30\",\"room\":\"SEU804\"}]}"
-            + "]";
-
         try {
-            List<Map<String, Object>> list = objectMapper.readValue(defaultDataJson, new TypeReference<List<Map<String, Object>>>() {});
-            for (Map<String, Object> map : list) {
-                String c = (String) map.get("c");
-                String s = (String) map.get("s");
-                String t = (String) map.get("t");
-                Double cr = ((Number) map.get("cr")).doubleValue();
-                String f = (String) map.get("f");
-                String fn = (String) map.get("fn");
-                String st = (String) map.get("st");
-                Object sl = map.get("sl");
-                String slJson = objectMapper.writeValueAsString(sl);
-
-                OfferedSection os = new OfferedSection(
-                        c, s, t, cr, f, fn, 40, st, slJson, DEFAULT_SEMESTER, null, "SYSTEM", null
+            Resource resource = new ClassPathResource("data/seu_offered_sections.json");
+            if (resource.exists()) {
+                List<Map<String, Object>> list = objectMapper.readValue(
+                        resource.getInputStream(),
+                        new TypeReference<List<Map<String, Object>>>() {}
                 );
-                sectionRepository.save(os);
+                for (Map<String, Object> map : list) {
+                    String courseCode = (String) map.get("courseCode");
+                    String sectionNumber = String.valueOf(map.get("sectionNumber"));
+                    String courseTitle = (String) map.get("courseTitle");
+                    Double credits = ((Number) map.get("credits")).doubleValue();
+                    String facultyInitial = (String) map.get("facultyInitial");
+                    String facultyName = (String) map.get("facultyName");
+                    String scheduleText = (String) map.get("scheduleText");
+                    Object slots = map.get("slots");
+                    String scheduleJson = objectMapper.writeValueAsString(slots);
+
+                    Optional<OfferedSection> existingOpt = sectionRepository
+                            .findByCourseCodeIgnoreCaseAndSectionNumberAndSemester(courseCode, sectionNumber, DEFAULT_SEMESTER);
+
+                    if (existingOpt.isPresent()) {
+                        OfferedSection existing = existingOpt.get();
+                        existing.setCourseTitle(courseTitle);
+                        existing.setCredits(credits);
+                        existing.setFacultyInitial(facultyInitial);
+                        existing.setFacultyName(facultyName);
+                        existing.setScheduleText(scheduleText);
+                        existing.setScheduleJson(scheduleJson);
+                        sectionRepository.save(existing);
+                    } else {
+                        OfferedSection os = new OfferedSection(
+                                courseCode, sectionNumber, courseTitle, credits,
+                                facultyInitial, facultyName, 40, scheduleText,
+                                scheduleJson, DEFAULT_SEMESTER, null, "SYSTEM", null
+                        );
+                        sectionRepository.save(os);
+                    }
+                }
+                log.info("Successfully seeded {} real Southeast University advising sections from seu_offered_sections.json", list.size());
+            } else {
+                log.warn("Resource data/seu_offered_sections.json not found on classpath!");
             }
-            log.info("Successfully pre-seeded default Southeast University advising sections");
         } catch (Exception e) {
             log.warn("Failed to seed default advising sections: {}", e.getMessage());
         }
