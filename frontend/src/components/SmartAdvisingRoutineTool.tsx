@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
+import AdvisingDataModal from "@/components/AdvisingDataModal";
 import {
   REAL_SEU_OFFERED_SECTIONS,
   OfferedSectionItem,
@@ -260,20 +261,28 @@ export default function SmartAdvisingRoutineTool() {
   const [viewMode, setViewMode] = useState<"Weekly" | "Daily" | "Overview">("Weekly");
   const [dailyDay, setDailyDay] = useState<string>("SUN");
 
-  // Upload Modal State (Dual-mode: File or Direct Text/HTML Paste)
+  // Upload / Advising Data Modal State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
-  const [uploadTab, setUploadTab] = useState<"file" | "paste">("file");
-  const [pastedText, setPastedText] = useState<string>("");
-  const [uploadingFile, setUploadingFile] = useState<boolean>(false);
   const [isCustomUpload, setIsCustomUpload] = useState<boolean>(false);
   const [customUploadName, setCustomUploadName] = useState<string>("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Export Timetable Ref
   const routineContainerRef = useRef<HTMLDivElement>(null);
 
-  // Load sections from backend on mount (or use built-in real sections)
+  // Load sections from localStorage (if custom upload exists) or backend on mount
   useEffect(() => {
+    try {
+      const saved = typeof window !== "undefined" ? localStorage.getItem(`notelagbe_custom_advising_${semester}`) : null;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSections(parsed);
+          setIsCustomUpload(true);
+          setCustomUploadName(`Custom Catalog (${parsed.length} sections)`);
+          return;
+        }
+      }
+    } catch {}
     fetchBackendSections();
   }, [semester]);
 
@@ -780,6 +789,11 @@ export default function SmartAdvisingRoutineTool() {
 
   // Reset from custom student upload back to official SEU master catalog
   const handleResetToOfficial = () => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(`notelagbe_custom_advising_${semester}`);
+      }
+    } catch {}
     setSections(REAL_SEU_OFFERED_SECTIONS);
     setSelectedCourses([]);
     setRoutines([]);
@@ -792,286 +806,53 @@ export default function SmartAdvisingRoutineTool() {
     );
   };
 
-  // Resilient Client Parser for TSV Table & HTML
-  const parseRawTextOrGenericTableClient = (input: string): OfferedSectionItem[] => {
-    const list: OfferedSectionItem[] = [];
-    if (!input || !input.trim()) return list;
-
-    let text = input;
-    if (text.includes("<") && text.includes(">")) {
-      text = text
-        .replace(/<br\s*\/?>/gi, "\n")
-        .replace(/<\/(?:div|p|tr|li|td)>/gi, "\n")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&amp;/g, "&")
-        .replace(/&nbsp;/g, " ");
-    }
-
-    const secPattern = /(?:^|[\s|,]|^)([A-Z]{3,4}\d{3})\.(\d+)(?:[\s|,]|$|:)/gm;
-    const matchStarts: number[] = [];
-    const courseCodes: string[] = [];
-    const sectionNums: string[] = [];
-
-    let m: RegExpExecArray | null;
-    while ((m = secPattern.exec(text)) !== null) {
-      matchStarts.push(m.index);
-      courseCodes.push(m[1].trim().toUpperCase());
-      sectionNums.push(m[2].trim());
-    }
-
-    if (matchStarts.length === 0) return list;
-
-    // Resilient delimiter matching: ~, --, ---, –, —, -, to
-    const schedPattern = /(SUN|MON|TUE|WED|THU|FRI|SAT)\s*#?\s*([0-9]{1,2}:[0-9]{2})\s*(?:~|---|--|–|—|-|to)\s*([0-9]{1,2}:[0-9]{2})(?:\s*@?\s*([A-Za-z0-9_-]+))?/gi;
-    const facPattern = /\[([A-Za-z0-9_-]{2,6})\]\s*([^\n\r0-9<]+)?/;
-    const credPattern = /(?:^|\s)(1\.0|1\.5|2\.0|3\.0|4\.0|1|2|3|4)(?:\s|Cr|cr|Credits|\b)/;
-
-    for (let i = 0; i < matchStarts.length; i++) {
-      const start = matchStarts[i];
-      const end = i + 1 < matchStarts.length ? matchStarts[i + 1] : text.length;
-      const chunk = text.substring(start, end).trim();
-
-      const courseCode = courseCodes[i];
-      const secNum = sectionNums[i];
-
-      const slots: TimeSlot[] = [];
-      let schedM: RegExpExecArray | null;
-      schedPattern.lastIndex = 0;
-      while ((schedM = schedPattern.exec(chunk)) !== null) {
-        const day = schedM[1].toUpperCase();
-        let st = schedM[2].trim();
-        if (st.length === 4) st = "0" + st;
-        let et = schedM[3].trim();
-        if (et.length === 4) et = "0" + et;
-        const rm = schedM[4] ? schedM[4].trim() : "SEU-TBA";
-        slots.push({
-          day,
-          start: st,
-          end: et,
-          room: rm,
-          startMinutes: timeToMinutes(st),
-          endMinutes: timeToMinutes(et),
-        });
-      }
-
-      if (slots.length === 0) continue;
-
-      let facInit = "TBA";
-      let facName = "To Be Announced";
-      const facM = chunk.match(facPattern);
-      if (facM) {
-        facInit = facM[1].trim().toUpperCase();
-        if (facM[2] && facM[2].trim()) {
-          facName = facM[2].trim().replace(/\s+/g, " ");
-        }
-      }
-
-      let credits = (courseCode.endsWith("2") || courseCode.endsWith("4") || courseCode.endsWith("6") || courseCode.endsWith("8")) ? 1.0 : 3.0;
-      const credM = chunk.match(credPattern);
-      if (credM) {
-        const parsedCred = parseFloat(credM[1]);
-        if (!isNaN(parsedCred)) credits = parsedCred;
-      }
-
-      // Title & available seats extraction (handles TSV columns & plain lines)
-      let title = "";
-      let availableSeats = 40;
-
-      if (chunk.includes("\t")) {
-        const cols = chunk.split("\t");
-        if (cols.length >= 2) {
-          const candidate = cols[1].replace(/\[.*?\]/g, "").replace(/\d+/g, "").trim();
-          if (candidate.length >= 3 && !/^(CSE|EEE|BBA|THU|MON|TUE|WED|FRI|SAT)/i.test(candidate)) {
-            title = candidate;
-          }
-        }
-        if (cols.length >= 5) {
-          const seatCandidate = parseInt(cols[4].trim(), 10);
-          if (!isNaN(seatCandidate)) availableSeats = seatCandidate;
-        }
-      }
-
-      if (!title) {
-        const afterSec = chunk.replace(/^[A-Z]{3,4}\d{3}\.\d+/, "").trim();
-        const lines = afterSec.split(/[\r\n]+/);
-        for (const line of lines) {
-          const candidate = line
-            .replace(/\[.*?\]/g, "")
-            .replace(/\d+\s*(?:Cr|cr|Credits)?/g, "")
-            .replace(/&amp;/g, "&")
-            .trim();
-          if (!candidate) continue;
-          const upper = candidate.toUpperCase();
-          if (
-            upper === "CSE." || upper === "CSE" ||
-            upper === "EEE." || upper === "EEE" ||
-            upper === "BBA." || upper === "BBA" ||
-            upper === "TEXTILE" || upper === "LAW" || upper === "PHR" || upper === "ENG" ||
-            upper === "B.SC." || upper === "B.SC" || upper.startsWith("B.SC IN") ||
-            upper.startsWith("DEPARTMENT") || upper.startsWith("DEPT") || upper.startsWith("PROGRAM") ||
-            upper === "SL" || upper === "COURSE" || upper === "SECTION" ||
-            upper.includes("SUN") || upper.includes("MON") || upper.includes("TUE") ||
-            upper.includes("WED") || upper.includes("THU") || upper.includes("FRI") || upper.includes("SAT")
-          ) {
-            continue;
-          }
-          if (candidate.length >= 3) {
-            title = candidate;
-            break;
-          }
-        }
-      }
-
-      title = getSeuCourseTitle(courseCode, title);
-
-      list.push({
-        courseCode,
-        sectionNumber: secNum,
-        courseTitle: title,
-        credits,
-        facultyInitial: facInit,
-        facultyName: facName,
-        availableSeats,
-        scheduleText: slots.map((s) => `${s.day} # ${s.start} ~ ${s.end} @ ${s.room}`).join(" / "),
-        slots,
-        semester,
-      });
-    }
-
-    return list;
-  };
-
-  const parseHtmlClientSide = (html: string): OfferedSectionItem[] => {
-    let list: OfferedSectionItem[] = [];
-    if (html.includes("ums-grid-offered-section")) {
-      const blocks = html.split("ums-grid-offered-section");
-
-      const secPattern = /(?:class="[^"]*mat-mdc-tooltip-trigger[^"]*"[^>]*>|>)\s*([A-Z]{3}\d{3}\.\d+)\s*</;
-      const titlePattern = /hidden md:block[^"]*">[\s\S]*?<div[^>]*>([^<]+)<\/div>/;
-      const credPattern = /ml-3[^"]*">([0-9.]+)</;
-      const facPattern = /\[([A-Za-z0-9_-]+)\]\s*([^<]+)</;
-      const seatsPattern = /(\d+)\s*<\/div>\s*<div[^>]*><div[^>]*class="[^"]*ng-star-inserted/;
-      const schedPattern = /(SUN|MON|TUE|WED|THU|FRI|SAT)\s*#\s*([0-9]{1,2}:[0-9]{2})\s*(?:~|---|--|–|—|-|to)\s*([0-9]{1,2}:[0-9]{2})(?:\s*@\s*([A-Za-z0-9_-]+))?/g;
-
-      for (let i = 1; i < blocks.length; i++) {
-        const chunk = blocks[i].slice(0, 3000);
-        const secM = chunk.match(secPattern);
-        if (!secM) continue;
-        const fullSec = secM[1].trim();
-        const [courseCode, secNum] = fullSec.split(".");
-
-        const titleM = chunk.match(titlePattern);
-        const rawTitle = titleM ? titleM[1].trim() : courseCode;
-        const title = getSeuCourseTitle(courseCode, rawTitle.replace(/&amp;/g, "&").trim());
-
-        const credM = chunk.match(credPattern);
-        const credits = credM ? parseFloat(credM[1].trim()) : 3.0;
-
-        const facM = chunk.match(facPattern);
-        const facInit = facM ? facM[1].trim().toUpperCase() : "TBA";
-        const facName = facM ? facM[2].trim().replace(/\s+/g, " ") : "To Be Announced";
-
-        const seatsM = chunk.match(seatsPattern);
-        const seats = seatsM ? parseInt(seatsM[1], 10) : 40;
-
-        const slots: TimeSlot[] = [];
-        let match: RegExpExecArray | null;
-        schedPattern.lastIndex = 0;
-        while ((match = schedPattern.exec(chunk)) !== null) {
-          slots.push({
-            day: match[1].toUpperCase(),
-            start: match[2].length === 4 ? "0" + match[2] : match[2],
-            end: match[3].length === 4 ? "0" + match[3] : match[3],
-            room: match[4] || "SEU-TBA",
-            startMinutes: timeToMinutes(match[2]),
-            endMinutes: timeToMinutes(match[3]),
-          });
-        }
-
-        if (slots.length > 0) {
-          list.push({
-            courseCode,
-            sectionNumber: secNum,
-            courseTitle: title,
-            credits,
-            facultyInitial: facInit,
-            facultyName: facName,
-            availableSeats: seats,
-            scheduleText: slots.map((s) => `${s.day} # ${s.start} ~ ${s.end} @ ${s.room}`).join(" / "),
-            slots,
-            semester,
-          });
-        }
-      }
-    }
-
-    if (list.length === 0) {
-      list = parseRawTextOrGenericTableClient(html);
-    }
-
-    return list;
-  };
-
-  const handleFileUpload = async (file: File) => {
-    if (!file) return;
-    setUploadingFile(true);
+  // Handle Save Catalog from AdvisingDataModal (persists locally and syncs to backend)
+  const handleSaveCatalog = async (newSections: OfferedSectionItem[], rawText?: string) => {
+    setSections(newSections);
+    setIsCustomUpload(true);
+    setCustomUploadName(`Custom Catalog (${newSections.length} sections)`);
+    setSelectedCourses([]);
+    setRoutines([]);
     try {
-      const text = await file.text();
-      const parsedList = parseHtmlClientSide(text);
-      if (parsedList.length > 0) {
-        setSections(parsedList);
-        setIsCustomUpload(true);
-        setCustomUploadName(file.name);
-        setSelectedCourses([]);
-        setRoutines([]);
-        toast.success(
-          language === "bn"
-            ? `✅ আপনার ফাইলের ${parsedList.length}টি সেকশন সফলভাবে লোড করা হয়েছে!`
-            : `✅ Successfully extracted ${parsedList.length} sections from file!`
-        );
-        setIsUploadModalOpen(false);
-      } else {
-        toast.error("Could not extract sections. Please check your HTML file format.");
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`notelagbe_custom_advising_${semester}`, JSON.stringify(newSections));
       }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to process advising HTML file.");
-    } finally {
-      setUploadingFile(false);
+    } catch {}
+
+    // Auto-sync to backend in background so database stores it
+    if (rawText && rawText.trim()) {
+      try {
+        await api.advising.uploadAdvisingTable(rawText, semester);
+        console.log("Successfully synced advising data to backend");
+      } catch (err) {
+        console.warn("Backend advising sync error:", err);
+      }
     }
   };
 
-  const handleApplyPastedText = async () => {
-    if (!pastedText.trim()) {
-      toast.error("Please paste your UMS table text or HTML first!");
-      return;
-    }
-
-    setUploadingFile(true);
-    try {
-      const parsedList = parseHtmlClientSide(pastedText);
-      if (parsedList.length === 0) {
-        toast.error("Could not detect valid course sections. Please verify copied text.");
-        return;
-      }
-
-      setSections(parsedList);
-      setIsCustomUpload(true);
-      setCustomUploadName(`Pasted Table (${parsedList.length} sections)`);
-      setSelectedCourses([]);
-      setRoutines([]);
-      toast.success(
-        language === "bn"
-          ? `✅ পেস্ট করা টেবিল থেকে ${parsedList.length}টি সেকশন সফলভাবে লোড হয়েছে!`
-          : `✅ Successfully extracted ${parsedList.length} sections from pasted data!`
-      );
-      setIsUploadModalOpen(false);
-      setPastedText("");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to parse pasted table.");
-    } finally {
-      setUploadingFile(false);
-    }
+  // Handle Merge Catalog from AdvisingDataModal
+  const handleMergeCatalog = (mergedSections: OfferedSectionItem[]) => {
+    setSections((prev) => {
+      const map = new Map<string, OfferedSectionItem>();
+      prev.forEach((s) => map.set(`${s.courseCode}.${s.sectionNumber}`, s));
+      mergedSections.forEach((s) => map.set(`${s.courseCode}.${s.sectionNumber}`, s));
+      const updated = Array.from(map.values());
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`notelagbe_custom_advising_${semester}`, JSON.stringify(updated));
+        }
+      } catch {}
+      return updated;
+    });
+    setIsCustomUpload(true);
+    setCustomUploadName(`Merged Catalog`);
   };
+
+
+
+
+
+
 
   const activeRoutine = routines[selectedRoutineIndex] || routines[0] || null;
 
@@ -1194,10 +975,10 @@ export default function SmartAdvisingRoutineTool() {
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             <button
               onClick={() => setIsUploadModalOpen(true)}
-              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-500/25 transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-blue-500/25 transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
             >
-              <Upload className="w-4 h-4" />
-              <span>{language === "bn" ? "UMS টেবিল আপলোড (.html)" : "Upload UMS Table (.html)"}</span>
+              <Upload className="w-4 h-4 text-blue-200" />
+              <span>{language === "bn" ? "অ্যাডভাইজিং ডাটা / UMS আপলোড" : "Advising Data / Upload UMS"}</span>
             </button>
           </div>
         </div>
@@ -2421,114 +2202,24 @@ export default function SmartAdvisingRoutineTool() {
       )}
 
       {/* ========================================================================= */}
-      {/* UMS TABLE UPLOAD & DIRECT PASTE MODAL                                     */}
+      {/* COURSE CATALOG & ADVISING DATA MODAL (FULL OVERHAUL WITH LIVE PARSER)     */}
       {/* ========================================================================= */}
-      {isUploadModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-xl rounded-3xl bg-[#0d1322] border border-slate-800 p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div>
-                <h3 className="text-base font-black text-white flex items-center gap-2">
-                  <Upload className="w-4 h-4 text-blue-400" />
-                  <span>Advising Data Upload</span>
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Upload .html file from UMS or paste copied table text directly.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsUploadModalOpen(false)}
-                className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-900 border border-slate-800">
-              <button
-                type="button"
-                onClick={() => setUploadTab("file")}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  uploadTab === "file" ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-white"
-                }`}
-              >
-                Upload .html File
-              </button>
-              <button
-                type="button"
-                onClick={() => setUploadTab("paste")}
-                className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  uploadTab === "paste" ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-white"
-                }`}
-              >
-                Paste Table / HTML
-              </button>
-            </div>
-
-            {uploadTab === "file" && (
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="p-8 rounded-2xl border-2 border-dashed border-slate-700 hover:border-blue-500 bg-slate-800/40 hover:bg-slate-800/80 transition-all text-center space-y-3 cursor-pointer"
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".html,.htm"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) handleFileUpload(e.target.files[0]);
-                  }}
-                  className="hidden"
-                />
-                <FileText className="w-9 h-9 text-slate-400 mx-auto" />
-                <div className="space-y-1">
-                  <p className="text-xs font-bold text-slate-200">
-                    Click to browse or drop .html file
-                  </p>
-                  <p className="text-[10px] text-slate-400 font-mono">Supports SEU UMS advising HTML</p>
-                </div>
-              </div>
-            )}
-
-            {uploadTab === "paste" && (
-              <div className="space-y-3">
-                <textarea
-                  value={pastedText}
-                  onChange={(e) => setPastedText(e.target.value)}
-                  placeholder="Paste copied UMS advising table text or HTML source code here...&#10;&#10;Supported formats:&#10;• Full HTML source from ums.seu.edu.bd&#10;• Plain-text rows copied directly from browser (e.g. CSE181.1 Discrete Mathematics 3 [KMU] 0 THU # 11:30 ~ 12:50 @ SEU510)"
-                  rows={6}
-                  className="w-full text-xs font-mono p-3 rounded-2xl bg-slate-800/70 border border-slate-700 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed resize-none"
-                />
-
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-[10px] font-mono text-slate-400">
-                    {pastedText.length > 0 ? `${pastedText.length.toLocaleString()} characters entered` : "Supports plain text or HTML"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleApplyPastedText}
-                    disabled={uploadingFile || !pastedText.trim()}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
-                  >
-                    <Sparkles className={`w-3.5 h-3.5 ${uploadingFile ? "animate-spin" : ""}`} />
-                    <span>{uploadingFile ? "Parsing..." : "Parse & Apply Schedule"}</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="p-3 rounded-xl bg-blue-950/40 border border-blue-900/60 text-xs text-slate-300 space-y-1">
-              <div className="flex items-center gap-1.5 font-bold text-blue-400">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Private Student Sandbox Guarantee</span>
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                Your uploaded schedule is processed inside your personal browser session. It will never alter the university master catalog.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      <AdvisingDataModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        currentSections={sections}
+        onSaveCatalog={handleSaveCatalog}
+        onMergeCatalog={handleMergeCatalog}
+        semester={semester}
+        isStaffOrAdmin={user?.role === "ROLE_ADMIN" || user?.role === "ROLE_MANAGER" || user?.role === "ROLE_SUPER_ADMIN"}
+        onSyncBackend={async (rawText) => {
+          try {
+            await api.advising.uploadAdvisingTable(rawText, semester);
+          } catch (e) {
+            console.warn("Background advising sync failed:", e);
+          }
+        }}
+      />
     </div>
   );
 }

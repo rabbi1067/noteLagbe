@@ -787,7 +787,7 @@ public class AdvisingScheduleService {
                 String day = schedM.group(1).trim().toUpperCase();
                 String start = schedM.group(2).trim();
                 String end = schedM.group(3).trim();
-                String room = schedM.group(4).trim();
+                String room = schedM.group(4) != null ? schedM.group(4).trim() : "SEU-TBA";
                 slots.add(new TimeSlot(day, start, end, room));
                 if (schedSummary.length() > 0) schedSummary.append(" / ");
                 schedSummary.append(day).append(" # ").append(start).append(" ~ ").append(end).append(" @ ").append(room);
@@ -830,7 +830,7 @@ public class AdvisingScheduleService {
                        .replace("&nbsp;", " ");
         }
 
-        Pattern secPattern = Pattern.compile("(?m)(?:^|[\\s|,]|^)([A-Z]{3,4}\\d{3})\\.(\\d+)(?:[\\s|,]|$|:)");
+        Pattern secPattern = Pattern.compile("(?i)(?:^|[\\r\\n\\s|,\t;<>(])([A-Z]{2,5}\\s*\\d{2,4})\\s*(?:\\.|-|\\s+sec(?:tion)?\\s*|\\s+#\\s*)\\s*(\\d{1,3})(?:[\\r\\n\\s|,\t;<>)]|$)");
         Matcher secMatcher = secPattern.matcher(text);
 
         List<Integer> matchStarts = new ArrayList<>();
@@ -839,7 +839,7 @@ public class AdvisingScheduleService {
 
         while (secMatcher.find()) {
             matchStarts.add(secMatcher.start(1));
-            courseCodes.add(secMatcher.group(1).trim().toUpperCase());
+            courseCodes.add(secMatcher.group(1).replaceAll("\\s+", "").toUpperCase());
             sectionNums.add(secMatcher.group(2).trim());
         }
 
@@ -870,7 +870,10 @@ public class AdvisingScheduleService {
                 schedSummary.append(day).append(" # ").append(startTime).append(" ~ ").append(endTime).append(" @ ").append(room);
             }
 
-            if (slots.isEmpty()) continue;
+            if (slots.isEmpty()) {
+                slots.add(new TimeSlot("SUN", "08:30", "09:50", "SEU-TBA"));
+                schedSummary.append("Schedule TBA");
+            }
 
             String facInit = "TBA";
             String facName = "To Be Announced";
