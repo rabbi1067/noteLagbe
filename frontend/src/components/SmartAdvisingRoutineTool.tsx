@@ -738,8 +738,19 @@ export default function SmartAdvisingRoutineTool() {
       };
     });
 
-    // Sort descending by score
-    scored.sort((a, b) => b.score - a.score);
+    // Sort descending by score, STRICTLY prioritizing combinations that match user's selected preferred days
+    if (preferredDays && preferredDays.length > 0 && preferredDays.length < 7) {
+      scored.sort((a, b) => {
+        const aOutside = a.activeDays.filter((d) => !preferredDays.includes(d)).length;
+        const bOutside = b.activeDays.filter((d) => !preferredDays.includes(d)).length;
+        if (aOutside !== bOutside) {
+          return aOutside - bOutside; // Combinations with fewer or 0 outside days strictly rank first!
+        }
+        return b.score - a.score;
+      });
+    } else {
+      scored.sort((a, b) => b.score - a.score);
+    }
 
     const top10 = scored.slice(0, 10).map((opt, idx) => ({
       ...opt,
@@ -1227,104 +1238,49 @@ export default function SmartAdvisingRoutineTool() {
 
         return (
           <div className="rounded-3xl bg-slate-900/60 border border-slate-800 p-5 sm:p-6 backdrop-blur-md space-y-5">
-            {/* Header: Title, Credit Tracker Badge, Search Bar & Quick Actions */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
-              <div className="flex items-start gap-3">
-                <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0 mt-0.5">
-                  <BookOpen className="w-5 h-5" />
-                </div>
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-base sm:text-lg font-black text-white">
-                      {language === "bn" ? "১. টার্গেট কোর্স নির্বাচন করুন" : "1. Select Target Courses"}
-                    </h2>
-                    <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                      {selectedCourses.length} {language === "bn" ? "টি কোর্স" : "Courses"}
-                    </span>
-                    <span
-                      className={`text-xs font-mono font-bold px-3 py-0.5 rounded-full border transition-all ${
-                        selectedCreditsTotal >= 17
-                          ? "bg-amber-950/70 text-amber-300 border-amber-500/60 shadow-sm"
-                          : selectedCreditsTotal > 0
-                          ? "bg-blue-950/70 text-blue-300 border-blue-500/40"
-                          : "bg-slate-800 text-slate-400 border-slate-700"
-                      }`}
-                    >
-                      {selectedCreditsTotal} / 17 Credits
-                      {selectedCreditsTotal >= 17 && (
-                        <span className="ml-1 text-[10px] text-amber-400 font-sans font-bold">
-                          ({language === "bn" ? "সর্বোচ্চ সীমা" : "Max Reached"})
-                        </span>
-                      )}
-                    </span>
+            {/* Header: Title, Credit Tracker Badge, and Action Buttons */}
+            <div className="space-y-4 border-b border-slate-800/80 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 rounded-2xl bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0 mt-0.5">
+                    <BookOpen className="w-5 h-5" />
                   </div>
-                  <p className="text-xs text-slate-400">
-                    {language === "bn"
-                      ? "থিয়োরি ও ল্যাব মিলিয়ে সর্বোচ্চ ১৭ ক্রেডিট পর্যন্ত নির্বাচন করা যাবে। সার্চ করে যেকোনো কোর্স যুক্ত করুন অথবা সব সেকশন দেখুন।"
-                      : "Select Theory and Lab courses (max 17 credits combined). Search to add courses and inspect available sections."}
-                  </p>
-                </div>
-              </div>
-
-              {/* Quick Actions & Live Search-to-Add Input */}
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="relative min-w-[210px] sm:min-w-[260px] flex-1">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={courseSearchQuery}
-                    onChange={(e) => setCourseSearchQuery(e.target.value)}
-                    placeholder={
-                      language === "bn"
-                        ? "কোর্স সার্চ করুন (e.g. CSE181, Discrete, CSE4)..."
-                        : "Search to add (e.g. CSE181, Discrete, Lab)..."
-                    }
-                    className="w-full text-xs py-2 pl-8 pr-7 rounded-xl bg-slate-800/90 border border-slate-700 text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
-                  />
-                  {courseSearchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setCourseSearchQuery("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 cursor-pointer"
-                      title="Clear search"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-base sm:text-lg font-black text-white">
+                        {language === "bn" ? "১. টার্গেট কোর্স নির্বাচন করুন" : "1. Select Target Courses"}
+                      </h2>
+                      <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        {selectedCourses.length} {language === "bn" ? "টি কোর্স" : "Courses"}
+                      </span>
+                      <span
+                        className={`text-xs font-mono font-bold px-3 py-0.5 rounded-full border transition-all ${
+                          selectedCreditsTotal >= 17
+                            ? "bg-amber-950/70 text-amber-300 border-amber-500/60 shadow-sm"
+                            : selectedCreditsTotal > 0
+                            ? "bg-blue-950/70 text-blue-300 border-blue-500/40"
+                            : "bg-slate-800 text-slate-400 border-slate-700"
+                        }`}
+                      >
+                        {selectedCreditsTotal} / 17 Credits
+                        {selectedCreditsTotal >= 17 && (
+                          <span className="ml-1 text-[10px] text-amber-400 font-sans font-bold">
+                            ({language === "bn" ? "সর্বোচ্চ সীমা" : "Max Reached"})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      {language === "bn"
+                        ? "থিয়োরি ও ল্যাব মিলিয়ে সর্বোচ্চ ১৭ ক্রেডিট পর্যন্ত নির্বাচন করা যাবে। সার্চ করে যেকোনো কোর্স যুক্ত করুন অথবা সব সেকশন দেখুন।"
+                        : "Select Theory and Lab courses (max 17 credits combined). Search to add courses and inspect available sections."}
+                    </p>
+                  </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    const sample = ["CSE355", "CSE381", "CSE382", "CSE443", "CSE444"].filter((c) =>
-                      coursesCatalog.some((cat) => cat.code === c)
-                    );
-                    const targetList = sample.length > 0 ? sample : coursesCatalog.slice(0, 5).map((c) => c.code);
-                    let total = 0;
-                    const capped: string[] = [];
-                    for (const code of targetList) {
-                      const cObj = coursesCatalog.find((c) => c.code === code);
-                      const cred = cObj?.credits || 3.0;
-                      if (total + cred <= 17) {
-                        capped.push(code);
-                        total += cred;
-                      }
-                    }
-                    setSelectedCourses(capped);
-                    toast.success(
-                      language === "bn"
-                        ? `৫টি রেকমেন্ডেড কোর্স (${total} ক্রেডিট) সিলেক্ট করা হয়েছে!`
-                        : `Loaded recommended standard courses (${total} credits)!`
-                    );
-                  }}
-                  className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                  <span>Recommend 5 (11 Cr)</span>
-                </button>
-
+                {/* Clear & Generate Routines Buttons (Right side of header) */}
                 {selectedCourses.length > 0 && (
-                  <>
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                     <button
                       type="button"
                       onClick={() => setSelectedCourses([])}
@@ -1348,7 +1304,33 @@ export default function SmartAdvisingRoutineTool() {
                           : `Generate 10 Routines 🚀`}
                       </span>
                     </button>
-                  </>
+                  </div>
+                )}
+              </div>
+
+              {/* Dedicated Full-Width Search Row */}
+              <div className="relative w-full">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={courseSearchQuery}
+                  onChange={(e) => setCourseSearchQuery(e.target.value)}
+                  placeholder={
+                    language === "bn"
+                      ? "কোর্স কোড বা নাম দিয়ে সার্চ করুন (যেমন: CSE181, Discrete Mathematics, CSE4, Compiler, Lab)..."
+                      : "Search courses by code or title (e.g. CSE181, Discrete Mathematics, CSE4, Lab)..."
+                  }
+                  className="w-full text-xs sm:text-sm py-2.5 pl-10 pr-10 rounded-2xl bg-slate-800/90 border border-slate-700/80 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/80 focus:border-blue-500 shadow-inner transition-all"
+                />
+                {courseSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setCourseSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 rounded-full hover:bg-slate-700/60 transition-colors cursor-pointer"
+                    title="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 )}
               </div>
             </div>
@@ -1816,42 +1798,66 @@ export default function SmartAdvisingRoutineTool() {
           </div>
 
           {/* 3. Target Days */}
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-300">
-              <span>Target Days (Strict Filter)</span>
-              <span className="text-[10px] text-indigo-400 font-normal">
-                {preferredDays.length} / 7 Days Active
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Target Days (Strict Filter)</span>
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 font-bold">
+                {preferredDays.length === 7
+                  ? "All 7 Days (Flexible)"
+                  : `${preferredDays.length} / 7 Days Active`}
               </span>
             </div>
 
-            <div className="flex flex-wrap gap-1 mb-2">
+            {/* Quick SEU Presets */}
+            <div className="flex flex-wrap gap-1.5">
               {[
                 { label: "SUN+TUE", days: ["SUN", "TUE"] },
                 { label: "MON+WED", days: ["MON", "WED"] },
                 { label: "THU+SAT", days: ["THU", "SAT"] },
-                { label: "+ FRI (2h)", days: ["FRI"] },
+                { label: "+ FRI (2h)", days: ["FRI"], isToggle: true },
                 { label: "All 7d", days: ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] },
-              ].map((p) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  onClick={() => {
-                    if (p.label.startsWith("+")) {
-                      setPreferredDays((prev) => Array.from(new Set([...prev, ...p.days])));
-                    } else {
-                      setPreferredDays(p.days);
-                    }
-                  }}
-                  className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-mono border border-slate-700 transition-colors cursor-pointer"
-                >
-                  {p.label}
-                </button>
-              ))}
+              ].map((p) => {
+                const isActive = p.isToggle
+                  ? preferredDays.includes("FRI")
+                  : p.days.length === preferredDays.length && p.days.every((d) => preferredDays.includes(d));
+
+                return (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => {
+                      if (p.isToggle) {
+                        if (preferredDays.includes("FRI")) {
+                          if (preferredDays.length > 1) {
+                            setPreferredDays(preferredDays.filter((d) => d !== "FRI"));
+                          }
+                        } else {
+                          setPreferredDays((prev) => Array.from(new Set([...prev, "FRI"])));
+                        }
+                      } else {
+                        setPreferredDays(p.days);
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold transition-all cursor-pointer border ${
+                      isActive
+                        ? "bg-indigo-600 text-white border-indigo-400 shadow-sm shadow-indigo-500/20"
+                        : "bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border-slate-700"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="flex items-center justify-between gap-1">
+            {/* Individual Day Cards Grid */}
+            <div className="grid grid-cols-7 gap-1.5 pt-0.5">
               {WEEK_DAYS.map((day) => {
                 const active = preferredDays.includes(day);
+                const isFriday = day === "FRI";
                 return (
                   <button
                     key={day}
@@ -1867,17 +1873,26 @@ export default function SmartAdvisingRoutineTool() {
                         setPreferredDays([...preferredDays, day]);
                       }
                     }}
-                    className={`px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex-1 text-center ${
+                    className={`py-2 px-1 rounded-xl text-center transition-all cursor-pointer border flex flex-col items-center justify-center gap-0.5 ${
                       active
-                        ? "bg-indigo-600 text-white shadow-sm shadow-indigo-500/30 ring-1 ring-indigo-400"
-                        : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200"
+                        ? "bg-gradient-to-b from-indigo-600 to-indigo-700 text-white border-indigo-400/90 shadow-md shadow-indigo-500/25 ring-1 ring-indigo-400"
+                        : "bg-slate-800/70 text-slate-400 border-slate-700/80 hover:bg-slate-800 hover:text-slate-200"
                     }`}
                   >
-                    {day}
+                    <span className="text-[11px] font-mono font-black">{day}</span>
+                    <span className={`text-[8px] font-sans font-bold leading-none ${active ? "text-indigo-200" : "text-slate-500"}`}>
+                      {isFriday ? "2h" : active ? "✓" : "off"}
+                    </span>
                   </button>
                 );
               })}
             </div>
+
+            <p className="text-[10px] text-slate-400 leading-relaxed pt-0.5">
+              {language === "bn"
+                ? "💡 নির্বাচিত দিনগুলোতে ক্লাস থাকা রুটিনগুলো ১০০% প্রায়োরিটি নিয়ে সবার উপরে রাংক করবে। অনির্বাচিত দিনগুলোকে অফ-ডে রাখা হবে।"
+                : "💡 Routines fitting strictly within your selected days rank #1. Unselected days are treated as off-campus days."}
+            </p>
           </div>
         </div>
 
