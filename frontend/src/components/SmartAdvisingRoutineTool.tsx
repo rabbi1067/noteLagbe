@@ -1278,7 +1278,7 @@ export default function SmartAdvisingRoutineTool() {
                   </div>
                 </div>
 
-                {/* Clear & Generate Routines Buttons (Right side of header) */}
+                {/* Clear Selection Button (Right side of header) */}
                 {selectedCourses.length > 0 && (
                   <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                     <button
@@ -1287,22 +1287,6 @@ export default function SmartAdvisingRoutineTool() {
                       className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-mono font-bold transition-all cursor-pointer"
                     >
                       Clear ({selectedCourses.length})
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleGenerateRoutines}
-                      disabled={generating}
-                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black shadow-lg shadow-emerald-500/25 transition-all flex items-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-                    >
-                      <Sparkles className={`w-3.5 h-3.5 ${generating ? "animate-spin" : ""}`} />
-                      <span>
-                        {generating
-                          ? "Solving..."
-                          : language === "bn"
-                          ? `১০টি রুটিন সাজান (${selectedCourses.length}টি কোর্স) 🚀`
-                          : `Generate 10 Routines 🚀`}
-                      </span>
                     </button>
                   </div>
                 )}
