@@ -109,7 +109,7 @@ export function warmupBackend(force = false): Promise<boolean> {
 
   inFlightWarmup = (async () => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12_000);
+    const timer = setTimeout(() => controller.abort(), 45_000);
     try {
       const res = await fetch(pingUrl, {
         method: "GET",
@@ -314,9 +314,10 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
   const endpointPath = endpoint.split("?")[0];
   const isFormData = options.body instanceof FormData;
   const isAuthEndpoint = endpointPath.startsWith("/auth/");
+  const isAdminEndpoint = endpointPath.startsWith("/admin/");
   const canRetryOnColdStart =
     !isFormData &&
-    (method === "GET" || method === "HEAD" || SAFE_COLD_START_RETRY_ENDPOINTS.has(endpointPath));
+    (method === "GET" || method === "HEAD" || SAFE_COLD_START_RETRY_ENDPOINTS.has(endpointPath) || isAdminEndpoint);
 
   const headers: Record<string, string> = {
     ...(isFormData ? {} : { "Content-Type": "application/json" }),
@@ -344,8 +345,18 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
     : directBase && directBase !== primaryBase
       ? directBase
       : primaryBase;
-  const firstTimeoutMs = isFormData ? 120_000 : isAuthEndpoint ? 20_000 : 16_000;
-  const retryTimeoutMs = isAuthEndpoint ? 30_000 : 24_000;
+  const firstTimeoutMs = isFormData
+    ? 120_000
+    : isAdminEndpoint
+      ? 55_000
+      : isAuthEndpoint
+        ? 35_000
+        : 30_000;
+  const retryTimeoutMs = isAdminEndpoint
+    ? 65_000
+    : isAuthEndpoint
+      ? 45_000
+      : 35_000;
   const requestInit: RequestInit = {
     ...options,
     headers,

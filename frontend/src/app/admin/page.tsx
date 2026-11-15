@@ -12,7 +12,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
 import NotificationBell from "@/components/NotificationBell";
 import BrandLogo from "@/components/BrandLogo";
-import { api, ChatMessageDto } from "@/lib/api";
+import { api, ChatMessageDto, warmupBackend } from "@/lib/api";
 import { notifyDataChanged, useDataSync } from "@/lib/sync";
 import {
   Calendar,
@@ -417,6 +417,19 @@ export default function AdminDashboardPage() {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [profileDropdownOpen]);
+
+  // Active Keep-Alive for Render backend while admin console is open
+  useEffect(() => {
+    // Immediate warmup ping upon admin panel load
+    void warmupBackend(true);
+
+    // Keep backend alive every 5 minutes so it never spins down into cold sleep while admin is active
+    const keepAliveTimer = setInterval(() => {
+      void warmupBackend(true);
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(keepAliveTimer);
+  }, []);
 
   // Global Data
   const [loading, setLoading] = useState(true);
@@ -2893,7 +2906,19 @@ export default function AdminDashboardPage() {
     if (processingQueueKey) return;
     setProcessingQueueKey(actionKey);
     try {
-      const updated = await api.admin.approveContribution(id);
+      let updated: any;
+      try {
+        updated = await api.admin.approveContribution(id);
+      } catch (firstErr: any) {
+        // If server was waking up or timed out during cold start, retry automatically
+        if (/waking up|timed out|timeout|sleep|সংযোগ/i.test(firstErr?.message || "")) {
+          toast.loading("Server was sleeping. Retrying approval...", { duration: 4000 });
+          await new Promise((r) => setTimeout(r, 1500));
+          updated = await api.admin.approveContribution(id);
+        } else {
+          throw firstErr;
+        }
+      }
       applyStatusUpdate(setContributions, id, updated, "APPROVED");
       if (updated?.uploadedResource?.id) {
         setResources((prev) =>
@@ -2931,7 +2956,18 @@ export default function AdminDashboardPage() {
     if (processingQueueKey) return;
     setProcessingQueueKey(actionKey);
     try {
-      const updated = await api.admin.approveWaiver(id, 6, "Approved ৳99 package with 6 course unlock quota by Administrator");
+      let updated: any;
+      try {
+        updated = await api.admin.approveWaiver(id, 6, "Approved ৳99 package with 6 course unlock quota by Administrator");
+      } catch (firstErr: any) {
+        if (/waking up|timed out|timeout|sleep|সংযোগ/i.test(firstErr?.message || "")) {
+          toast.loading("Server was sleeping. Retrying waiver approval...", { duration: 4000 });
+          await new Promise((r) => setTimeout(r, 1500));
+          updated = await api.admin.approveWaiver(id, 6, "Approved ৳99 package with 6 course unlock quota by Administrator");
+        } else {
+          throw firstErr;
+        }
+      }
       applyStatusUpdate(setWaivers, id, updated, "APPROVED");
       markSelfQueueMutation();
       notifyDataChanged("waiver", "approved", id);
