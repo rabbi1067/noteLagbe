@@ -37,6 +37,7 @@ interface AdvisingDataModalProps {
   onSaveCatalog: (sections: any[]) => void;
   semester?: string;
   isStaffOrAdmin?: boolean;
+  language?: "en" | "bn";
 }
 
 export default function AdvisingDataModal({
@@ -45,6 +46,7 @@ export default function AdvisingDataModal({
   currentSections,
   onSaveCatalog,
   semester = "Spring 2026",
+  language = "en",
 }: AdvisingDataModalProps) {
   // Tabs: html (Highlighted default), paste, sections, add
   const [activeTab, setActiveTab] = useState<"html" | "paste" | "sections" | "add">("html");
@@ -389,7 +391,11 @@ export default function AdvisingDataModal({
                   Drag &amp; Drop your UMS .html file here
                 </h4>
                 <p className="text-xs text-slate-400 max-w-sm leading-relaxed mb-4">
-                  ব্রাউজারে UMS অ্যাডভাইজিং পেজটি <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono text-[10px]">Ctrl + S</kbd> চেপে HTML ফরম্যাটে সেভ করে এখানে ড্রপ করুন।
+                  {language === "bn" ? (
+                    <>ব্রাউজারে UMS অ্যাডভাইজিং পেজটি <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono text-[10px]">Ctrl + S</kbd> চেপে HTML ফরম্যাটে সেভ করে এখানে ড্রপ করুন।</>
+                  ) : (
+                    <>Press <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono text-[10px]">Ctrl + S</kbd> on your UMS advising page in your browser to save as HTML, then drop it here.</>
+                  )}
                 </p>
 
                 <button
@@ -430,10 +436,12 @@ export default function AdvisingDataModal({
               <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-[11px] text-slate-400 leading-relaxed space-y-1">
                 <p className="text-slate-300 font-bold flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>কেন HTML ফাইল আপলোড সেরা?</span>
+                  <span>{language === "bn" ? "কেন HTML ফাইল আপলোড সেরা?" : "Why is .html file upload recommended?"}</span>
                 </p>
                 <p>
-                  UMS থেকে সরাসরি সেভ করা HTML ফাইলে সব কোর্সের নাম, সেকশন নম্বর, সম্পূর্ণ শিক্ষকের নাম, রুম নম্বর ও ক্লাসের সময় ১০০% অবিকৃতভাবে স্বয়ংক্রিয়ভাবে ডিটেক্ট হয়।
+                  {language === "bn"
+                    ? "UMS থেকে সরাসরি সেভ করা HTML ফাইলে সব কোর্সের নাম, সেকশন নম্বর, সম্পূর্ণ শিক্ষকের নাম, রুম নম্বর ও ক্লাসের সময় ১০০% অবিকৃতভাবে স্বয়ংক্রিয়ভাবে ডিটেক্ট হয়।"
+                    : "HTML files saved directly from UMS preserve all course titles, section numbers, complete faculty names, room numbers, and schedule times with 100% precision."}
                 </p>
               </div>
             </div>

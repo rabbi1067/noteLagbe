@@ -2783,6 +2783,7 @@ export default function SmartAdvisingRoutineTool() {
         currentSections={sections}
         onSaveCatalog={handleSaveCatalog}
         semester={semester}
+        language={language}
         isStaffOrAdmin={Boolean(isAdmin || isSuperAdmin || user?.role === "ROLE_ADMIN" || user?.role === "ROLE_MANAGER" || user?.role === "ROLE_SUPER_ADMIN")}
       />
     </div>
