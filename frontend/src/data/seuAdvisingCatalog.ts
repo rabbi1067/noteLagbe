@@ -1456,5 +1456,119 @@ export const REAL_SEU_OFFERED_SECTIONS: OfferedSectionItem[] = [
         "endMinutes": 930
       }
     ]
+  },
+  {
+    "courseCode": "CSE382",
+    "sectionNumber": "15",
+    "courseTitle": "Introduction to Embedded Systems Lab",
+    "credits": 1.0,
+    "facultyInitial": "JABA",
+    "facultyName": "Jannatul Ferdous Azad",
+    "scheduleText": "FRI # 09:00 ~ 11:00 @ SEU608",
+    "slots": [
+      {
+        "day": "FRI",
+        "start": "09:00",
+        "end": "11:00",
+        "room": "SEU608",
+        "startMinutes": 540,
+        "endMinutes": 660
+      }
+    ]
+  },
+  {
+    "courseCode": "CSE382",
+    "sectionNumber": "16",
+    "courseTitle": "Introduction to Embedded Systems Lab",
+    "credits": 1.0,
+    "facultyInitial": "NAAO",
+    "facultyName": "Md. Nahid Anam Opu",
+    "scheduleText": "FRI # 14:30 ~ 16:30 @ SEU608",
+    "slots": [
+      {
+        "day": "FRI",
+        "start": "14:30",
+        "end": "16:30",
+        "room": "SEU608",
+        "startMinutes": 870,
+        "endMinutes": 990
+      }
+    ]
+  },
+  {
+    "courseCode": "CSE444",
+    "sectionNumber": "14",
+    "courseTitle": "Computer Graphics & Animation Lab",
+    "credits": 1.0,
+    "facultyInitial": "GMNN",
+    "facultyName": "Golam Md. Noor",
+    "scheduleText": "FRI # 09:00 ~ 11:00 @ SEU615",
+    "slots": [
+      {
+        "day": "FRI",
+        "start": "09:00",
+        "end": "11:00",
+        "room": "SEU615",
+        "startMinutes": 540,
+        "endMinutes": 660
+      }
+    ]
+  },
+  {
+    "courseCode": "CSE444",
+    "sectionNumber": "15",
+    "courseTitle": "Computer Graphics & Animation Lab",
+    "credits": 1.0,
+    "facultyInitial": "SHOA",
+    "facultyName": "Md. Shahin Alam",
+    "scheduleText": "FRI # 14:30 ~ 16:30 @ SEU615",
+    "slots": [
+      {
+        "day": "FRI",
+        "start": "14:30",
+        "end": "16:30",
+        "room": "SEU615",
+        "startMinutes": 870,
+        "endMinutes": 990
+      }
+    ]
+  },
+  {
+    "courseCode": "CSE472",
+    "sectionNumber": "9",
+    "courseTitle": "Web and Internet Programming Lab",
+    "credits": 1.0,
+    "facultyInitial": "ABAH",
+    "facultyName": "Abid Ahmad",
+    "scheduleText": "FRI # 09:30 ~ 11:30 @ SEU213B",
+    "slots": [
+      {
+        "day": "FRI",
+        "start": "09:30",
+        "end": "11:30",
+        "room": "SEU213B",
+        "startMinutes": 570,
+        "endMinutes": 690
+      }
+    ]
+  },
+  {
+    "courseCode": "CSE472",
+    "sectionNumber": "10",
+    "courseTitle": "Web and Internet Programming Lab",
+    "credits": 1.0,
+    "facultyInitial": "ANMS",
+    "facultyName": "Anik Mahmud Shanto",
+    "scheduleText": "FRI # 15:00 ~ 17:00 @ SEU213B",
+    "slots": [
+      {
+        "day": "FRI",
+        "start": "15:00",
+        "end": "17:00",
+        "room": "SEU213B",
+        "startMinutes": 900,
+        "endMinutes": 1020
+      }
+    ]
   }
 ];

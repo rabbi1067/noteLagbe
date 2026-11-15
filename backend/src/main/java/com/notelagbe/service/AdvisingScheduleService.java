@@ -356,12 +356,24 @@ public class AdvisingScheduleService {
             scoredList.add(sr);
         }
 
-        // Sort descending by score
-        scoredList.sort((a, b) -> Double.compare(b.score, a.score));
+        // Sort descending by score, strictly prioritizing combinations that match user's selected preferred days
+        if (preferredDays != null && !preferredDays.isEmpty()) {
+            Set<String> prefSet = preferredDays.stream().map(String::toUpperCase).collect(Collectors.toSet());
+            scoredList.sort((a, b) -> {
+                long aOutside = a.activeDays.stream().filter(d -> !prefSet.contains(d)).count();
+                long bOutside = b.activeDays.stream().filter(d -> !prefSet.contains(d)).count();
+                if (aOutside != bOutside) {
+                    return Long.compare(aOutside, bOutside); // Fewer outside days first
+                }
+                return Double.compare(b.score, a.score);
+            });
+        } else {
+            scoredList.sort((a, b) -> Double.compare(b.score, a.score));
+        }
 
-        // Limit top 15 routines and assign rank
+        // Limit top 10 routines and assign rank
         List<ScoredRoutine> topRoutines = new ArrayList<>();
-        for (int i = 0; i < Math.min(15, scoredList.size()); i++) {
+        for (int i = 0; i < Math.min(10, scoredList.size()); i++) {
             ScoredRoutine sr = scoredList.get(i);
             sr.rank = i + 1;
             topRoutines.add(sr);
@@ -461,12 +473,13 @@ public class AdvisingScheduleService {
         // Day preference matching
         if (preferredDays != null && !preferredDays.isEmpty()) {
             Set<String> prefSet = preferredDays.stream().map(String::toUpperCase).collect(Collectors.toSet());
-            long matches = activeDays.stream().filter(prefSet::contains).count();
-            if (matches == activeDays.size()) {
-                score += 30.0;
-                highlights.add("🎯 100% Preferred Days Match");
+            long outsideCount = activeDays.stream().filter(d -> !prefSet.contains(d)).count();
+            if (outsideCount == 0) {
+                score += 150.0;
+                highlights.add("🎯 100% Target Days (" + String.join("+", activeDays) + ")");
             } else {
-                score -= (activeDays.size() - matches) * 15.0;
+                score -= outsideCount * 90.0;
+                highlights.add("⚠️ Includes " + activeDays.stream().filter(d -> !prefSet.contains(d)).collect(Collectors.joining(", ")));
             }
         }
 
