@@ -119,15 +119,9 @@ export default function TopContributorsLeaderboard() {
   const top1 = contributors.find((c) => c.rank === 1);
   const top2 = contributors.find((c) => c.rank === 2);
   const top3 = contributors.find((c) => c.rank === 3);
-  const hasTop3Podium = Boolean(top1 && top2 && top3 && !searchQuery.trim() && selectedDept === "ALL");
 
-  // Ranks 4 to 50 (or all items if fewer than 4 or searching)
-  const directoryContributors = useMemo(() => {
-    if (searchQuery.trim() || selectedDept !== "ALL" || !hasTop3Podium) {
-      return filteredContributors;
-    }
-    return filteredContributors.filter((c) => c.rank > 3);
-  }, [filteredContributors, searchQuery, selectedDept, hasTop3Podium]);
+  // Complete Directory: shows ALL contributors starting from Rank #1 (including top 1, 2, 3)
+  const directoryContributors = filteredContributors;
 
   const displayedDirectory = showAll ? directoryContributors : directoryContributors.slice(0, 10);
 
@@ -366,11 +360,14 @@ export default function TopContributorsLeaderboard() {
         </div>
       </div>
 
-      {/* 4. Complete Directory (Ranks 4 to 50 or Filtered List) */}
+      {/* 4. Complete Directory (All Contributors Starting from Rank 1) */}
       <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         
         <div className="px-4 sm:px-6 py-3.5 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-300">
-          <span>{language === "bn" ? "কন্ট্রিবিউটর প্রোফাইল" : "Contributor Directory"}</span>
+          <div className="flex items-center gap-2">
+            <UserCheck className="w-4 h-4 text-blue-500" />
+            <span>{language === "bn" ? "সকল কন্ট্রিবিউটর তালিকা" : "Contributor Directory"}</span>
+          </div>
           <span className="text-slate-400 font-medium">
             {language === "bn"
               ? `প্রদর্শিত: ${displayedDirectory.length} / ${directoryContributors.length} জন`
@@ -389,19 +386,27 @@ export default function TopContributorsLeaderboard() {
               return (
                 <div
                   key={`${c.rank}-${c.name}`}
-                  className="px-4 sm:px-6 py-3 flex items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                  className={`px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3 transition-colors ${
+                    c.rank === 1
+                      ? "bg-indigo-50/40 dark:bg-indigo-950/20 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/30"
+                      : c.rank === 2
+                      ? "bg-teal-50/40 dark:bg-teal-950/20 hover:bg-teal-50/80 dark:hover:bg-teal-950/30"
+                      : c.rank === 3
+                      ? "bg-purple-50/40 dark:bg-purple-950/20 hover:bg-purple-50/80 dark:hover:bg-purple-950/30"
+                      : "hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
+                  }`}
                 >
                   {/* Left: Rank & Avatar & Name */}
                   <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                     {/* Rank Badge */}
                     <span
-                      className={`w-9 h-8 rounded-xl font-mono text-xs font-black flex items-center justify-center shrink-0 border ${
+                      className={`w-9 h-8 rounded-xl font-mono text-xs font-black flex items-center justify-center shrink-0 border shadow-xs ${
                         c.rank === 1
-                          ? "bg-indigo-600 text-white border-indigo-600"
+                          ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white border-indigo-500 shadow-indigo-500/20"
                           : c.rank === 2
-                          ? "bg-teal-600 text-white border-teal-600"
+                          ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white border-teal-500 shadow-teal-500/20"
                           : c.rank === 3
-                          ? "bg-purple-600 text-white border-purple-600"
+                          ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white border-purple-500 shadow-purple-500/20"
                           : c.rank <= 10
                           ? "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
                           : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700"
@@ -425,12 +430,30 @@ export default function TopContributorsLeaderboard() {
                         <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
                           {c.name}
                         </span>
-                        <span className="text-[10px] font-mono px-2 py-0.2 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold shrink-0">
+                        {c.rank === 1 && (
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 shrink-0 flex items-center gap-1">
+                            <Crown className="w-3 h-3 text-amber-500" />
+                            <span>{language === "bn" ? "প্রধান অবদানকারী" : "Lead Contributor"}</span>
+                          </span>
+                        )}
+                        {c.rank === 2 && (
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30 shrink-0 flex items-center gap-1">
+                            <Sparkles className="w-3 h-3 text-teal-500" />
+                            <span>{language === "bn" ? "সিনিয়র কন্ট্রিবিউটর" : "Senior Contributor"}</span>
+                          </span>
+                        )}
+                        {c.rank === 3 && (
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30 shrink-0 flex items-center gap-1">
+                            <Award className="w-3 h-3 text-purple-500" />
+                            <span>{language === "bn" ? "সম্মানিত অবদানকারী" : "Distinguished"}</span>
+                          </span>
+                        )}
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold shrink-0">
                           {c.department || "CSE"}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-400 truncate">
-                        {c.title || "Academic Contributor"} • {c.studentId}
+                        {c.title || (language === "bn" ? "অ্যাকাডেমিক কন্ট্রিবিউটর" : "Academic Contributor")} {c.studentId ? `• ${c.studentId}` : ""}
                       </p>
                     </div>
                   </div>
