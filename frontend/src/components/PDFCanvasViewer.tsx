@@ -57,7 +57,21 @@ export default function PDFCanvasViewer({
   const [numPages, setNumPages] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [renderError, setRenderError] = useState<string | null>(null);
-  const [containerWidth, setContainerWidth] = useState<number>(800);
+  const [containerWidth, setContainerWidth] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      return Math.max(280, Math.min(window.innerWidth - 32, 800));
+    }
+    return 600;
+  });
+
+  // Keep a stable ref to callbacks so parent re-renders don't trigger document reload
+  const onTotalPagesDetectedRef = useRef(onTotalPagesDetected);
+  useEffect(() => {
+    onTotalPagesDetectedRef.current = onTotalPagesDetected;
+  });
+
+  // Track the source signature currently loaded to prevent redundant reload / detached ArrayBuffer errors
+  const currentDocSourceRef = useRef<string | null>(null);
 
   // Active rendering tasks map to prevent race conditions when navigating rapidly
   const renderTasksRef = useRef<Map<number, any>>(new Map());
@@ -80,11 +94,21 @@ export default function PDFCanvasViewer({
 
   // Load PDF Document when pdfBytes or blobUrl changes
   useEffect(() => {
+    if (!pdfBytes && !blobUrl) return;
+
+    // Signature to identify if the file actually changed
+    const sourceSignature = blobUrl || (pdfBytes ? `bytes_${pdfBytes.length}_${pdfBytes[0] || 0}` : null);
+    if (!sourceSignature) return;
+
+    // If document is already loaded for this source, do NOT reload it!
+    if (currentDocSourceRef.current === sourceSignature && pdfDoc) {
+      return;
+    }
+
     let cancelled = false;
     let loadedDoc: any = null;
 
     const loadDocument = async () => {
-      if (!pdfBytes && !blobUrl) return;
       setLoading(true);
       setRenderError(null);
 
@@ -100,15 +124,18 @@ export default function PDFCanvasViewer({
         });
         renderTasksRef.current.clear();
 
+        // Senior Engineer Fix:
+        // 1. Prefer blobUrl if available so the browser worker handles data via HTTP/blob streaming without transferring ArrayBuffer.
+        // 2. If using pdfBytes, MUST clone with .slice(0) so the original Uint8Array buffer in React state is NEVER detached!
         const loadingTask = pdfjs.getDocument(
-          pdfBytes
+          blobUrl
             ? {
-                data: pdfBytes,
+                url: blobUrl,
                 cMapUrl: "https://unpkg.com/pdfjs-dist@3.11.174/cmaps/",
                 cMapPacked: true,
               }
             : {
-                url: blobUrl,
+                data: pdfBytes!.slice(0),
                 cMapUrl: "https://unpkg.com/pdfjs-dist@3.11.174/cmaps/",
                 cMapPacked: true,
               }
@@ -116,14 +143,17 @@ export default function PDFCanvasViewer({
 
         loadedDoc = await loadingTask.promise;
         if (cancelled) {
-          loadedDoc.destroy();
+          try {
+            loadedDoc.destroy();
+          } catch {}
           return;
         }
 
+        currentDocSourceRef.current = sourceSignature;
         setPdfDoc(loadedDoc);
         const total = loadedDoc.numPages;
         setNumPages(total);
-        onTotalPagesDetected(total);
+        onTotalPagesDetectedRef.current?.(total);
         setLoading(false);
       } catch (err: any) {
         if (cancelled) return;
@@ -143,7 +173,7 @@ export default function PDFCanvasViewer({
         } catch {}
       }
     };
-  }, [pdfBytes, blobUrl, onTotalPagesDetected]);
+  }, [pdfBytes, blobUrl]);
 
   // Render a specific page onto its corresponding canvas
   const renderPage = useCallback(
@@ -189,11 +219,14 @@ export default function PDFCanvasViewer({
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
 
-        // Set CSS display dimensions
+        // Strict Aspect-Ratio Preservation:
+        // Width adapts responsively up to maxWidth, while height is strictly driven by the native aspect ratio!
+        // This eliminates vertical stretching/elongation on mobile and desktop alike.
         const cssWidth = Math.floor(viewport.width / dpr);
-        const cssHeight = Math.floor(viewport.height / dpr);
-        canvas.style.width = `${cssWidth}px`;
-        canvas.style.height = `${cssHeight}px`;
+        canvas.style.width = "100%";
+        canvas.style.maxWidth = `${cssWidth}px`;
+        canvas.style.height = "auto";
+        canvas.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
 
         const ctx = canvas.getContext("2d", { alpha: false });
         if (!ctx) return;
@@ -305,14 +338,17 @@ export default function PDFCanvasViewer({
     >
       {viewMode === "single" ? (
         // Single Page Mode
-        <div className="relative flex flex-col items-center">
-          <div className="relative shadow-2xl rounded-xl overflow-hidden border border-slate-700/60 bg-white">
+        <div className="relative flex flex-col items-center w-full max-w-full">
+          <div
+            style={{ maxWidth: "100%" }}
+            className="relative shadow-2xl rounded-xl overflow-hidden border border-slate-700/60 bg-white mx-auto flex items-center justify-center"
+          >
             <canvas
               ref={(el) => {
                 if (el) canvasRefs.current.set(activePage, el);
                 else canvasRefs.current.delete(activePage);
               }}
-              className="block max-w-full h-auto select-none"
+              className="block select-none"
             />
             {/* Watermark overlay directly on canvas */}
             {watermarkText && (
@@ -368,14 +404,17 @@ export default function PDFCanvasViewer({
                 Page {pageNum} of {numPages}
               </div>
 
-              {/* Page Canvas Container */}
-              <div className="relative shadow-2xl rounded-xl overflow-hidden border border-slate-700/60 bg-white">
+              {/* Page Canvas Container with Strict Aspect Ratio Preservation */}
+              <div
+                style={{ maxWidth: "100%" }}
+                className="relative shadow-2xl rounded-xl overflow-hidden border border-slate-700/60 bg-white mx-auto flex items-center justify-center"
+              >
                 <canvas
                   ref={(el) => {
                     if (el) canvasRefs.current.set(pageNum, el);
                     else canvasRefs.current.delete(pageNum);
                   }}
-                  className="block max-w-full h-auto select-none"
+                  className="block select-none"
                 />
 
                 {/* Watermark overlay */}

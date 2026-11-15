@@ -1349,11 +1349,16 @@ export default function PDFViewerModal({
                   </div>
                 </div>
               ) : detectedKind === "image" && blobUrl ? (
-                <div className="w-full h-full flex items-center justify-center overflow-auto rounded-xl bg-slate-950 p-2">
+                <div className="w-full h-full flex items-center justify-center overflow-auto rounded-xl bg-slate-950 p-4">
                   <img
                     src={blobUrl}
                     alt={displayTitle}
-                    className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                    style={{
+                      transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+                      transformOrigin: "center center",
+                      transition: "transform 0.2s cubic-bezier(0.2, 0, 0, 1)",
+                    }}
+                    className="max-w-full max-h-[82vh] w-auto h-auto object-contain rounded-lg shadow-2xl mx-auto block select-none"
                     draggable={false}
                   />
                 </div>
@@ -1380,7 +1385,7 @@ export default function PDFViewerModal({
                 />
               ) : detectedKind === "pdf" && (activePdfBytes || rawPdfBytes || blobUrl) ? (
                 /* High-Resolution HTML5 Canvas PDF Renderer (100% Mobile & Desktop Compatibility) */
-                <div className="w-full flex justify-center">
+                <div className="w-full max-w-full flex justify-center overflow-x-auto">
                   <PDFCanvasViewer
                     pdfBytes={activePdfBytes || rawPdfBytes}
                     blobUrl={blobUrl}
