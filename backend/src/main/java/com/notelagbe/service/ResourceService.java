@@ -179,14 +179,14 @@ public class ResourceService {
         return resources.stream().map(r -> {
             boolean resourceUnlocked = fullCourseUnlocked
                     || (r.getTeacher() != null && unlockedTeacherIds.contains(r.getTeacher().getId()))
-                    || (r.getTeacher() == null && !unlockedTeacherIds.isEmpty());
+                    || (r.getTeacher() == null && fullCourseUnlocked);
             if (!resourceUnlocked) {
                 return maskLockedResource(r);
             }
             if (r.getFileUrl() != null && r2Service.isConfigured() && (r.getFileUrl().contains(".r2.") || r.getFileUrl().contains("r2_"))) {
-            r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 24));
-        }
-        return r;
+                r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 24));
+            }
+            return r;
         }).toList();
     }
 
@@ -195,10 +195,8 @@ public class ResourceService {
         masked.setId(r.getId());
         masked.setTitle(r.getTitle());
         masked.setType(r.getType());
-        masked.setFileUrl(null); // Locked!
-        boolean previewIsSameAsFile = r.getPreviewUrl() != null && r.getFileUrl() != null
-                && r.getPreviewUrl().trim().equals(r.getFileUrl().trim());
-        masked.setPreviewUrl(previewIsSameAsFile ? null : r.getPreviewUrl());
+        masked.setFileUrl(null); // Strictly Locked!
+        masked.setPreviewUrl(null); // Strictly Locked!
         masked.setSemesterName(r.getSemesterName());
         masked.setAcademicYear(r.getAcademicYear());
         masked.setCourse(r.getCourse());

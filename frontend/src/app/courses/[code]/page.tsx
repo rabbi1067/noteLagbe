@@ -93,7 +93,8 @@ export default function CourseDetailPage() {
   const [resources, setResources] = useState<any[]>(() => {
     if (!code || typeof window === "undefined") return [];
     try {
-      const cached = localStorage.getItem(`notelagbe_res_${code.toUpperCase()}`);
+      const userKey = user?.id ? String(user.id) : "anon";
+      const cached = localStorage.getItem(`notelagbe_res_u${userKey}_${code.toUpperCase()}`);
       if (cached) return JSON.parse(cached);
     } catch {}
     return [];
@@ -155,7 +156,8 @@ export default function CourseDetailPage() {
       if (Array.isArray(rData)) {
         setResources(rData);
         try {
-          localStorage.setItem(`notelagbe_res_${code.toUpperCase()}`, JSON.stringify(rData));
+          const userKey = user?.id ? String(user.id) : "anon";
+          localStorage.setItem(`notelagbe_res_u${userKey}_${code.toUpperCase()}`, JSON.stringify(rData));
         } catch {}
       }
       if (Array.isArray(revData)) {
@@ -188,7 +190,7 @@ export default function CourseDetailPage() {
           .catch(() => {});
       }
     }
-  }, [code, isAuthenticated]);
+  }, [code, isAuthenticated, user?.id]);
 
   // Enterprise Live Sync: Refreshes course details and materials immediately when admin updates
   useDataSync(() => {
@@ -287,17 +289,17 @@ export default function CourseDetailPage() {
     (res: any): boolean => {
       if (!res) return false;
       if (isSuperAdmin && superAdminTestLocked) return false;
-      if (isCourseUnlocked || Boolean(res.fileUrl)) return true;
+      if (isCourseUnlocked) return true;
       const tId = res.teacher?.id;
       if (tId == null) {
-        return hasAnyCourseAccess;
+        return false;
       }
       return (
         hasUnlockedForTeacher(code, tId) ||
         Boolean(course?.unlockedTeacherIds?.some((id: number) => Number(id) === Number(tId)))
       );
     },
-    [isSuperAdmin, superAdminTestLocked, isCourseUnlocked, hasUnlockedForTeacher, code, course?.unlockedTeacherIds, hasAnyCourseAccess]
+    [isSuperAdmin, superAdminTestLocked, isCourseUnlocked, hasUnlockedForTeacher, code, course?.unlockedTeacherIds]
   );
 
   const handleUnlockCourse = async () => {
@@ -1292,7 +1294,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "হ্যান্ড নোট" : "Hand Note"}
                         tagColor="teal"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
+                        isUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1329,7 +1331,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "ল্যাব কুইজ" : "Lab Quiz"}
                         tagColor="purple"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
+                        isUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1366,7 +1368,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "ল্যাব ফাইনাল" : "Lab Final"}
                         tagColor="rose"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
+                        isUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1403,7 +1405,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "প্রজেক্ট লিংক" : "Project Link"}
                         tagColor="emerald"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
+                        isUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1440,7 +1442,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "ডক ফাইল নোট" : "Doc File Note"}
                         tagColor="cyan"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
+                        isUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1468,7 +1470,7 @@ export default function CourseDetailPage() {
                       resource={res}
                       categoryTag={language === "bn" ? "ল্যাব ম্যানুয়াল" : "Lab Manual"}
                       tagColor="amber"
-                      isCourseUnlocked={isResourceUnlockedForView(res)}
+                      isUnlocked={isResourceUnlockedForView(res)}
                       onOpenViewer={handleOpenViewer}
                     />
                   ))}
@@ -1511,7 +1513,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "হ্যান্ড নোট" : "Hand Notes"}
                         tagColor="emerald"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
+                        isUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1548,7 +1550,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "মিডটার্ম" : "Midterm"}
                         tagColor="blue"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
+                        isUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1585,7 +1587,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "ফাইনাল" : "Final"}
                         tagColor="indigo"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
+                        isUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1622,7 +1624,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "কুইজ / সিটি" : "Quiz / CT"}
                         tagColor="purple"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
+                        isUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -1659,7 +1661,7 @@ export default function CourseDetailPage() {
                         resource={res}
                         categoryTag={language === "bn" ? "ডক ফাইল নোট" : "Doc File Note"}
                         tagColor="cyan"
-                        isCourseUnlocked={isResourceUnlockedForView(res)}
+                        isUnlocked={isResourceUnlockedForView(res)}
                         onOpenViewer={handleOpenViewer}
                       />
                     ))}
@@ -2414,13 +2416,13 @@ function MaterialCard({
   resource,
   categoryTag,
   tagColor,
-  isCourseUnlocked,
+  isUnlocked,
   onOpenViewer,
 }: {
   resource: any;
   categoryTag: string;
   tagColor: "emerald" | "blue" | "indigo" | "amber" | "teal" | "cyan" | "purple" | "rose";
-  isCourseUnlocked: boolean;
+  isUnlocked: boolean;
   onOpenViewer: (r: any) => void;
 }) {
   const { language } = useLanguage();
@@ -2504,7 +2506,7 @@ function MaterialCard({
         </div>
 
         <div className="flex items-center gap-2">
-          {isCourseUnlocked || resource.fileUrl ? (
+          {isUnlocked ? (
             resource.type === "PROJECT_LINK" || resource.fileUrl?.includes("github.com") ? (
               <a
                 href={resource.fileUrl}
