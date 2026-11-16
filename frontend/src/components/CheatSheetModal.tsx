@@ -43,6 +43,7 @@ interface TeacherOption {
 
 export interface ExamPaperLink {
   id: string;
+  resourceId?: number | null;
   title: string;
   type: string; // MID_QUESTION, FINAL_QUESTION, QUIZ_CT, NOTE
   typeLabel: string;
@@ -112,6 +113,7 @@ export function buildLinkedAcademicItems(
 
       items.push({
         id: `res-${res.id || Math.random()}`,
+        resourceId: res.id || null,
         title: resTitle,
         type: category,
         typeLabel,
@@ -255,6 +257,7 @@ export default function CheatSheetModal({
   const [isQuestionLinkerOpen, setIsQuestionLinkerOpen] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState<{
     fileUrl?: string;
+    resourceId?: number | null;
     paperTitle?: string;
     semester?: string;
   } | null>(null);
@@ -351,7 +354,7 @@ export default function CheatSheetModal({
 
   const handleSendMessage = async (
     textToSend?: string,
-    paperAttachment?: { fileUrl?: string; paperTitle?: string; semester?: string } | null
+    paperAttachment?: { fileUrl?: string; resourceId?: number | null; paperTitle?: string; semester?: string } | null
   ) => {
     const text = (textToSend || inputMessage).trim();
     if (!text || sending) return;
@@ -400,6 +403,7 @@ export default function CheatSheetModal({
         language,
         history: conversationHistory,
         fileUrl: activeAttachment?.fileUrl || null,
+        resourceId: activeAttachment?.resourceId || null,
         paperTitle: activeAttachment?.paperTitle || null,
         semester: activeAttachment?.semester || null,
       });
@@ -1366,6 +1370,7 @@ export default function CheatSheetModal({
                                     setInputMessage(paper.prompt);
                                     setPendingAttachment({
                                       fileUrl: paper.fileUrl,
+                                      resourceId: paper.resourceId,
                                       paperTitle: paper.title,
                                       semester: paper.semester,
                                     });
@@ -1384,6 +1389,7 @@ export default function CheatSheetModal({
                                   e.stopPropagation();
                                   handleSendMessage(paper.prompt, {
                                     fileUrl: paper.fileUrl,
+                                    resourceId: paper.resourceId,
                                     paperTitle: paper.title,
                                     semester: paper.semester,
                                   });

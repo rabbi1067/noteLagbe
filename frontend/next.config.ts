@@ -9,6 +9,7 @@ const backendBaseUrl =
     : "https://notelagbe-backend.onrender.com");
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["pdfjs-dist", "canvas"],
   /* config options here */
   images: {
     remotePatterns: [

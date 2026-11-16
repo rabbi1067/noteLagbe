@@ -1192,6 +1192,7 @@ export const api = {
       language?: string;
       history?: Array<{ role: string; content: string }>;
       fileUrl?: string | null;
+      resourceId?: number | null;
       paperTitle?: string | null;
       semester?: string | null;
     }) => {

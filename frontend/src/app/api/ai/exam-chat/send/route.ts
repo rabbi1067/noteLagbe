@@ -75,6 +75,56 @@ function getSecurityRefusal(prompt: string, language: string): string {
   );
 }
 
+function detectBufferMime(buf: Buffer, headerMime?: string): string {
+  if (buf.length >= 4 && buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) {
+    return "application/pdf";
+  }
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (buf.length >= 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+    return "image/png";
+  }
+  if (buf.length >= 12 && buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 && buf[8] === 0x57 && buf[9] === 0x45) {
+    return "image/webp";
+  }
+  if (headerMime && (headerMime.includes("pdf") || headerMime.startsWith("image/"))) {
+    return headerMime.includes("pdf") ? "application/pdf" : headerMime.split(";")[0].trim();
+  }
+  return "application/pdf";
+}
+
+async function extractTextFromPdfBuffer(pdfBuffer: Buffer): Promise<string> {
+  try {
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.js");
+    const data = new Uint8Array(pdfBuffer);
+    const loadingTask = pdfjs.getDocument({
+      data,
+      useSystemFonts: true,
+      disableFontFace: true,
+    });
+    const doc = await loadingTask.promise;
+    const maxPages = Math.min(doc.numPages, 10);
+    const pageTexts: string[] = [];
+
+    for (let i = 1; i <= maxPages; i++) {
+      const page = await doc.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageStr = textContent.items
+        .map((item: any) => item.str || "")
+        .join(" ")
+        .trim();
+      if (pageStr) {
+        pageTexts.push(`--- Page ${i} ---\n${pageStr}`);
+      }
+    }
+    return pageTexts.join("\n\n").trim();
+  } catch (err: any) {
+    console.warn("[PDF Text Extraction] Error extracting text from PDF buffer:", err?.message || err);
+    return "";
+  }
+}
+
 const CANDIDATE_MODELS = [
   "gemini-2.5-flash",
   "gemini-2.0-flash",
@@ -124,8 +174,8 @@ async function callGemini(
   const userParts: Array<any> = [];
   if (fileAttachment?.base64) {
     userParts.push({
-      inline_data: {
-        mime_type: fileAttachment.mimeType,
+      inlineData: {
+        mimeType: fileAttachment.mimeType,
         data: fileAttachment.base64,
       },
     });
@@ -1287,6 +1337,7 @@ export async function POST(req: NextRequest) {
       language = "bn",
       history = [],
       fileUrl = null,
+      resourceId = null,
       paperTitle = null,
       semester = null,
     } = body;
@@ -1307,38 +1358,64 @@ export async function POST(req: NextRequest) {
       "https://notelagbe-backend.onrender.com"
     ).replace(/\/+$/, "");
 
-    // Fetch multimodal attachment (PDF or image) if provided
+    // Fetch multimodal attachment (PDF or image) and extract authentic text
     let fileAttachment: { mimeType: string; base64: string } | null = null;
-    if (fileUrl && typeof fileUrl === "string" && fileUrl.trim().length > 0) {
+    let extractedPdfText = "";
+
+    if (fileUrl || resourceId) {
       try {
-        let targetUrl = fileUrl.trim();
-        if (targetUrl.startsWith("/")) {
-          targetUrl = `${backendBase}${targetUrl}`;
-        }
-        if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
-          const fileRes = await fetch(targetUrl, { signal: AbortSignal.timeout(15000) });
-          if (fileRes.ok) {
-            const contentType = fileRes.headers.get("content-type") || "";
-            let mime = "application/pdf";
-            if (contentType.includes("image/png") || /\.png(\?|$)/i.test(targetUrl)) {
-              mime = "image/png";
-            } else if (contentType.includes("image/jpeg") || /\.(jpe?g)(\?|$)/i.test(targetUrl)) {
-              mime = "image/jpeg";
-            } else if (contentType.includes("image/webp") || /\.webp(\?|$)/i.test(targetUrl)) {
-              mime = "image/webp";
+        let arrayBuf: ArrayBuffer | null = null;
+        let mime = "application/pdf";
+
+        // Try 1: Fetch from fileUrl
+        if (fileUrl && typeof fileUrl === "string" && fileUrl.trim().length > 0) {
+          let targetUrl = fileUrl.trim();
+          if (targetUrl.startsWith("/")) {
+            targetUrl = `${backendBase}${targetUrl}`;
+          }
+          if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+            const fileRes = await fetch(targetUrl, { signal: AbortSignal.timeout(15000) });
+            if (fileRes.ok) {
+              const ct = fileRes.headers.get("content-type") || "";
+              arrayBuf = await fileRes.arrayBuffer();
+              const buf = Buffer.from(arrayBuf);
+              mime = detectBufferMime(buf, ct);
             }
-            const arrayBuf = await fileRes.arrayBuffer();
-            if (arrayBuf.byteLength > 0 && arrayBuf.byteLength < 25 * 1024 * 1024) {
-              fileAttachment = {
-                mimeType: mime,
-                base64: Buffer.from(arrayBuf).toString("base64"),
-              };
-              console.log(`[Exam AI Multimodal] Successfully fetched attached exam file (${mime}, ${arrayBuf.byteLength} bytes) from ${targetUrl}`);
+          }
+        }
+
+        // Try 2: If fileUrl was masked or failed, fetch binary stream from backend using resourceId & authHeader
+        if ((!arrayBuf || arrayBuf.byteLength === 0) && resourceId && backendBase) {
+          const streamUrl = `${backendBase}/api/resources/${resourceId}/file`;
+          const fileRes = await fetch(streamUrl, {
+            headers: authHeader ? { Authorization: authHeader } : {},
+            signal: AbortSignal.timeout(15000),
+          });
+          if (fileRes.ok) {
+            const ct = fileRes.headers.get("content-type") || "";
+            arrayBuf = await fileRes.arrayBuffer();
+            const buf = Buffer.from(arrayBuf);
+            mime = detectBufferMime(buf, ct);
+          }
+        }
+
+        if (arrayBuf && arrayBuf.byteLength > 0 && arrayBuf.byteLength < 25 * 1024 * 1024) {
+          const nodeBuf = Buffer.from(arrayBuf);
+          fileAttachment = {
+            mimeType: mime,
+            base64: nodeBuf.toString("base64"),
+          };
+          console.log(`[Exam AI Multimodal] Successfully loaded attachment (${mime}, ${nodeBuf.length} bytes)`);
+
+          if (mime === "application/pdf") {
+            extractedPdfText = await extractTextFromPdfBuffer(nodeBuf);
+            if (extractedPdfText) {
+              console.log(`[Exam AI Multimodal] Successfully extracted ${extractedPdfText.length} characters of authentic exam text from PDF!`);
             }
           }
         }
       } catch (err: any) {
-        console.warn("[Exam AI Multimodal] Failed to fetch attached exam file:", err?.message || err);
+        console.warn("[Exam AI Multimodal] Failed to fetch or extract attached exam file:", err?.message || err);
       }
     }
 
@@ -1387,19 +1464,19 @@ export async function POST(req: NextRequest) {
       ? "CRITICAL: The student has requested assistance in Bengali (বাংলা) or the app is set to Bengali. Provide your response naturally, fluently, and warmly in standard Bengali (বাংলা). Technical terms and code can remain in English/Bangla standard academic format."
       : "CRITICAL: Provide your response in clear, professional, supportive English with high academic rigor.";
 
-    const attachmentDirective = fileAttachment
-      ? `AUTHENTIC EXAM QUESTION PAPER SOLVER (HIGH-PRECISION MULTIMODAL MODE):
+    const attachmentDirective = (fileAttachment || extractedPdfText)
+      ? `AUTHENTIC EXAM QUESTION PAPER SOLVER (HIGH-PRECISION MULTIMODAL & OCR MODE):
 The student has attached the genuine Southeast University exam question paper: "${paperTitle || cleanCourse}" (${semester || "Academic Archive"}).
-You have direct multimodal access to the attached PDF/image file.
+You have access to the authentic attached document and its extracted text.
 MANDATORY DIRECTIVES:
-1. Examine the attached document from Question 1 to the end (A to Z).
-2. For EVERY question and sub-question (e.g. Question 1.(a), 1.(b), 2.(a)...):
-   - State the Question Number and Marks as written on the paper (e.g., "### 📝 Question 1.(a) [Marks: 4]").
+1. You MUST solve the REAL questions written on the attached exam paper. DO NOT substitute questions, DO NOT invent random numbers or different topics.
+2. For EVERY question and sub-question (e.g. Question 1, 1.(a), 2...):
+   - State the Question Number and Marks as written on the paper (e.g., "### 📝 Question 1 [Marks: 6]").
    - Provide an exhaustive, step-by-step academic model solution.
-   - For Math / Discrete Mathematics: Show all logic proofs, truth tables, set relations, induction steps, recurrences, or graph theory solutions using KaTeX LaTeX ($$...$$ for standalone blocks, $...$ for inline expressions).
-   - For Code / Algorithms: Write complete, clean code with syntax highlighting, dry-run trace table, and Big-O time and space complexity.
+   - For Math / Number Systems / Conversions: Show all base conversion steps, multiplications, divisions, binary groupings, or hexadecimal representations using KaTeX LaTeX ($$...$$ for standalone blocks, $...$ for inline expressions).
+   - For Code / Algorithms: Write complete, clean, tested code with syntax highlighting, sample input/output, and dry-run explanation.
    - Highlight SEU faculty grading criteria, common pitfalls, and presentation tips.
-3. NEVER skip questions or provide lazy summaries. Solve the real questions from the attached document from A to Z!`
+3. NEVER skip questions or provide lazy summaries. Solve the real questions from the attached document from Question 1 to the end!`
       : `SOUTHEAST UNIVERSITY EXAM ARCHIVES & CURRICULUM:
 You are an expert university professor and exam coach across ALL Southeast University courses (including ${cleanCourse} - ${courseTitle}, ${courseDepartment} Department).
 When asked to solve an exam paper or question:
@@ -1427,13 +1504,29 @@ MULTI-TURN CONVERSATION & CONTEXT CONTINUITY (MANDATORY & HIGHEST PRIORITY):
 ${attachmentDirective}
 
 CRITICAL ACADEMIC EXAM COACHING RULES:
-1. When a student asks to solve a question from a past semester (e.g. "spring 2024 question number 1 solve daw", "question 1", "q1", "solve q2"):
-   - NEVER ask the student to paste the text or question! You have access to the attached paper and SEU syllabus.
-   - IMMEDIATELY provide the full, step-by-step mathematical model answer with clean Markdown, formulas, code, and pass-by-pass dry run for maximum marks on their SEU exam script.
+1. When an authentic exam question paper is provided:
+   - YOU MUST SOLVE THE EXACT QUESTIONS WRITTEN ON THE PAPER!
+   - DO NOT invent or substitute different questions!
+   - Provide the complete, step-by-step mathematical model answer with clean Markdown, formulas, code, and dry runs for maximum marks on their SEU exam script.
 2. Format cleanly using Markdown with bold headers, bullet points, and code blocks where appropriate.
 3. Language policy: ${langRule}`;
 
-    // 3. Query Gemini API directly if key is configured
+    // 3. Construct user prompt with extracted authentic paper text if available
+    let userPromptWithContext = cleanMessage;
+    if (extractedPdfText && extractedPdfText.trim().length > 30) {
+      userPromptWithContext =
+        `[AUTHENTIC EXAM QUESTION PAPER CONTENT EXTRACTED DIRECTLY FROM ATTACHED OFFICIAL SEU PDF: "${paperTitle || cleanCourse}"]\n` +
+        `======================================================================\n` +
+        `${extractedPdfText.trim()}\n` +
+        `======================================================================\n\n` +
+        `[STUDENT DIRECTIVE]:\n${cleanMessage}\n\n` +
+        `CRITICAL MANDATORY INSTRUCTIONS:\n` +
+        `1. You MUST solve the EXACT questions printed in the exam paper text above. DO NOT substitute, change numbers, or hallucinate other questions.\n` +
+        `2. Solve each question sequentially with complete step-by-step mathematical working, formulas, code, dry runs, and exam marking tips.\n` +
+        `3. If the paper has Question 1 with parts A, B, C: solve A, B, C with the exact numbers printed in the document.`;
+    }
+
+    // 4. Query Gemini API directly if key is configured
     const apiKey =
       process.env.GEMINI_API_KEY ||
       process.env.GOOGLE_API_KEY ||
@@ -1442,7 +1535,7 @@ CRITICAL ACADEMIC EXAM COACHING RULES:
     let aiResponseText: string | null = null;
     let geminiDiag: GeminiCallResult | null = null;
     if (apiKey) {
-      const gRes = await callGemini(apiKey, cleanMessage, systemInstruction, history, fileAttachment);
+      const gRes = await callGemini(apiKey, userPromptWithContext, systemInstruction, history, fileAttachment);
       if (gRes.text) {
         aiResponseText = gRes.text;
       } else {
@@ -1452,7 +1545,7 @@ CRITICAL ACADEMIC EXAM COACHING RULES:
 
     // Secondary provider fallback: Groq API (if configured in environment)
     if (!aiResponseText && process.env.GROQ_API_KEY) {
-      aiResponseText = await callGroq(process.env.GROQ_API_KEY, cleanMessage, systemInstruction, history);
+      aiResponseText = await callGroq(process.env.GROQ_API_KEY, userPromptWithContext, systemInstruction, history);
     }
 
     // 4. If Next.js has no AI response yet, attempt calling backend directly without assistantReply
