@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { useTheme } from "@/context/ThemeContext";
 import { 
   BookOpen, 
   GraduationCap, 
@@ -15,24 +16,26 @@ import {
   Wrench, 
   Tag, 
   Sparkles, 
-  ExternalLink,
-  Laptop,
-  MessageSquare,
-  User,
-  ShieldCheck,
-  ChevronRight,
-  Home,
-  CheckCircle2,
-  Calendar,
-  Clock,
-  Compass
+  MessageSquare, 
+  User, 
+  ShieldCheck, 
+  ChevronRight, 
+  Calendar, 
+  FileText, 
+  Calculator, 
+  Award, 
+  Sun, 
+  Moon, 
+  LogOut, 
+  Globe
 } from "lucide-react";
 import BrandLogo, { NoteLagbeIcon } from "@/components/BrandLogo";
 
 export default function MobileBottomNav() {
   const pathname = usePathname() || "";
-  const { user, isAuthenticated, isAdmin, setShowAuthModal } = useAuth();
-  const { language, t } = useLanguage();
+  const { user, isAuthenticated, isAdmin, logout, setShowAuthModal } = useAuth();
+  const { language, toggleLanguage, t } = useLanguage();
+  const { toggleTheme, isDark } = useTheme();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatUnseenCount, setChatUnseenCount] = useState(0);
@@ -283,246 +286,252 @@ export default function MobileBottomNav() {
               </button>
             </div>
 
-            {/* TOP 3 FEATURED CARDS (As shown in user's diagram: Curriculum, Student Tools, Plans & Pricing) */}
+            {/* TOP 3 PRIMARY SERVICES (As shown in diagram: Curriculum | Student Tools | Plans & Pricing) */}
+            <div className="grid grid-cols-3 gap-2">
+              <Link
+                href="/curriculum"
+                onClick={() => setDrawerOpen(false)}
+                className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border text-center transition-all ${
+                  isActive("/curriculum")
+                    ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/25"
+                    : "bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200"
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-1.5 ${
+                  isActive("/curriculum") ? "bg-white/20 text-white" : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                }`}>
+                  <Layers className="w-4 h-4" />
+                </div>
+                <span className="text-[11px] font-bold leading-tight">
+                  {language === "bn" ? "কারিকুলাম" : "Curriculum"}
+                </span>
+              </Link>
+
+              <Link
+                href="/tools"
+                onClick={() => setDrawerOpen(false)}
+                className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border text-center transition-all ${
+                  isActive("/tools")
+                    ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/25"
+                    : "bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200"
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-1.5 ${
+                  isActive("/tools") ? "bg-white/20 text-white" : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                }`}>
+                  <Wrench className="w-4 h-4" />
+                </div>
+                <span className="text-[11px] font-bold leading-tight">
+                  {language === "bn" ? "স্টুডেন্ট টুলস" : "Student Tools"}
+                </span>
+              </Link>
+
+              <Link
+                href="/pricing"
+                onClick={() => setDrawerOpen(false)}
+                className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border text-center transition-all ${
+                  isActive("/pricing")
+                    ? "bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-500/25"
+                    : "bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200"
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center mb-1.5 ${
+                  isActive("/pricing") ? "bg-white/20 text-white" : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                }`}>
+                  <Tag className="w-4 h-4" />
+                </div>
+                <span className="text-[11px] font-bold leading-tight">
+                  {language === "bn" ? "প্ল্যান ও প্রাইসিং" : "Plans"}
+                </span>
+              </Link>
+            </div>
+
+            {/* QUICK STUDENT TOOLS (2-Column Clean Cards) */}
             <div className="space-y-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block px-1">
-                {language === "bn" ? "জনপ্রিয় স্টুডেন্ট সার্ভিসেস" : "Featured Services"}
-              </span>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {/* 1. Curriculum */}
-                <Link
-                  href="/curriculum"
-                  onClick={() => setDrawerOpen(false)}
-                  className={`p-3.5 rounded-2xl border transition-all flex items-center sm:flex-col sm:items-start justify-between sm:justify-start gap-3 group ${
-                    isActive("/curriculum")
-                      ? "bg-blue-50 dark:bg-blue-950/60 border-blue-400 dark:border-blue-700 text-blue-700 dark:text-blue-300 shadow-sm"
-                      : "bg-slate-50 dark:bg-slate-900/60 hover:bg-blue-50/50 dark:hover:bg-slate-800/60 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-200"
-                  }`}
-                >
-                  <div className="w-10 h-10 rounded-xl bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <Layers className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-bold text-xs sm:text-sm truncate">
-                      {language === "bn" ? "কারিকুলাম" : "Curriculum"}
-                    </h4>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-1">
-                      {language === "bn" ? "সিলেবাস ও ক্রেডিট ম্যাট্রিক্স" : "Batch 72+ & 60-71 Syllabus"}
-                    </p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400 sm:hidden shrink-0" />
-                </Link>
-
-                {/* 2. Student Tools */}
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  {language === "bn" ? "প্রয়োজনীয় টুলস" : "Student Utility Tools"}
+                </span>
                 <Link
                   href="/tools"
                   onClick={() => setDrawerOpen(false)}
-                  className={`p-3.5 rounded-2xl border transition-all flex items-center sm:flex-col sm:items-start justify-between sm:justify-start gap-3 group ${
-                    isActive("/tools")
-                      ? "bg-indigo-50 dark:bg-indigo-950/60 border-indigo-400 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 shadow-sm"
-                      : "bg-slate-50 dark:bg-slate-900/60 hover:bg-indigo-50/50 dark:hover:bg-slate-800/60 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-200"
-                  }`}
+                  className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <Wrench className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-bold text-xs sm:text-sm truncate">
-                      {language === "bn" ? "স্টুডেন্ট টুলস" : "Student Tools"}
-                    </h4>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-1">
-                      {language === "bn" ? "কভার পেজ, রুটিন ও সিজিপিএ" : "Cover Page, Routine & CGPA"}
-                    </p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400 sm:hidden shrink-0" />
-                </Link>
-
-                {/* 3. Plans & Pricing */}
-                <Link
-                  href="/pricing"
-                  onClick={() => setDrawerOpen(false)}
-                  className={`p-3.5 rounded-2xl border transition-all flex items-center sm:flex-col sm:items-start justify-between sm:justify-start gap-3 group ${
-                    isActive("/pricing")
-                      ? "bg-purple-50 dark:bg-purple-950/60 border-purple-400 dark:border-purple-700 text-purple-700 dark:text-purple-300 shadow-sm"
-                      : "bg-slate-50 dark:bg-slate-900/60 hover:bg-purple-50/50 dark:hover:bg-slate-800/60 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-200"
-                  }`}
-                >
-                  <div className="w-10 h-10 rounded-xl bg-purple-600/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <Tag className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-bold text-xs sm:text-sm truncate">
-                      {language === "bn" ? "প্ল্যান ও প্রাইসিং" : "Plans & Pricing"}
-                    </h4>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-1">
-                      {language === "bn" ? "আনলক ও স্টাডি প্যাকেজ" : "Course Unlocks & Quota"}
-                    </p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400 sm:hidden shrink-0" />
+                  {language === "bn" ? "সবগুলো দেখুন" : "View All"}
+                  <ChevronRight className="w-3 h-3" />
                 </Link>
               </div>
-            </div>
 
-            {/* ACADEMIC DIRECTORY & STUDENT HUB */}
-            <div className="space-y-1.5 pt-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block px-1">
-                {language === "bn" ? "একাডেমিক হাব" : "Academic Hub"}
-              </span>
-
-              <div className="divide-y divide-slate-100 dark:divide-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 overflow-hidden text-xs">
-                {/* Courses & Notes */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {/* 1. Cover Page */}
                 <Link
-                  href="/courses"
+                  href="/tools?tab=cover"
                   onClick={() => setDrawerOpen(false)}
-                  className="flex items-center justify-between p-3 hover:bg-white dark:hover:bg-slate-800/80 transition-colors"
+                  className="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-800/80 transition-all group"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <BookOpen className="w-4 h-4 text-blue-500" />
-                    <span className="font-bold text-slate-800 dark:text-slate-200">
-                      {language === "bn" ? "সকল কোর্স ও বিগত প্রশ্নব্যাংক" : "All Courses & Question Bank"}
-                    </span>
+                  <div className="w-7 h-7 rounded-lg bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <FileText className="w-3.5 h-3.5" />
                   </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                </Link>
-
-                {/* Faculty Directory */}
-                <Link
-                  href="/teachers"
-                  onClick={() => setDrawerOpen(false)}
-                  className="flex items-center justify-between p-3 hover:bg-white dark:hover:bg-slate-800/80 transition-colors"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <GraduationCap className="w-4 h-4 text-indigo-500" />
-                    <span className="font-bold text-slate-800 dark:text-slate-200">
-                      {language === "bn" ? "শিক্ষক তালিকা ও শিডিউল" : "Faculty & Staff Directory"}
-                    </span>
-                  </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                </Link>
-
-                {/* SEU Campus Live Community */}
-                <button
-                  type="button"
-                  onClick={handleToggleCampusLive}
-                  className="w-full flex items-center justify-between p-3 hover:bg-white dark:hover:bg-slate-800/80 transition-colors text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <MessageSquare className="w-4 h-4 text-cyan-500" />
-                    <span className="font-bold text-slate-800 dark:text-slate-200">
-                      {language === "bn" ? "SEU ক্যাম্পাস লাইভ কমিউনিটি" : "SEU Campus Live Community"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-80" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
-                    </span>
-                    <span className="text-[9px] font-black uppercase text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/60 px-1.5 py-0.5 rounded-full border border-cyan-200 dark:border-cyan-800">
-                      Live
-                    </span>
-                  </div>
-                </button>
-
-                {/* Contribute Material */}
-                <Link
-                  href="/contribute"
-                  onClick={() => setDrawerOpen(false)}
-                  className="flex items-center justify-between p-3 hover:bg-white dark:hover:bg-slate-800/80 transition-colors"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Upload className="w-4 h-4 text-emerald-500" />
-                    <span className="font-bold text-slate-800 dark:text-slate-200">
-                      {language === "bn" ? "নোট আপলোড করুন (+২ কোর্স ফ্রি)" : "Contribute Notes (+2 Courses Free)"}
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-black bg-emerald-600 text-white px-1.5 py-0.5 rounded-full">
-                    +2 Free
+                  <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                    {language === "bn" ? "কভার পেজ মেকার" : "Cover Page"}
                   </span>
                 </Link>
 
-                {/* User Dashboard / Auth Trigger */}
-                {isAuthenticated ? (
-                  <>
-                    <Link
-                      href="/dashboard"
-                      onClick={() => setDrawerOpen(false)}
-                      className="flex items-center justify-between p-3 hover:bg-white dark:hover:bg-slate-800/80 transition-colors"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <User className="w-4 h-4 text-blue-500" />
-                        <span className="font-bold text-slate-800 dark:text-slate-200">
-                          {language === "bn" ? "স্টুডেন্ট ড্যাশবোর্ড ও আনলকড কোর্স" : "Student Dashboard & Unlocked Courses"}
-                        </span>
-                      </div>
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                    </Link>
+                {/* 2. Exam Routine */}
+                <Link
+                  href="/tools?tab=routine"
+                  onClick={() => setDrawerOpen(false)}
+                  className="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-800/80 transition-all group"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <Calendar className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                    {language === "bn" ? "এক্সাম রুটিন" : "Exam Routine"}
+                  </span>
+                </Link>
 
-                    {isAdmin && (
-                      <Link
-                        href="/admin"
-                        onClick={() => setDrawerOpen(false)}
-                        className="flex items-center justify-between p-3 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-colors font-bold"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <ShieldCheck className="w-4 h-4" />
-                          <span>{language === "bn" ? "অ্যাডমিন কন্ট্রোল সেন্টার" : "Admin Control Center"}</span>
-                        </div>
-                        <ChevronRight className="w-3.5 h-3.5 text-purple-400" />
-                      </Link>
-                    )}
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDrawerOpen(false);
-                      setShowAuthModal(true);
-                    }}
-                    className="w-full flex items-center justify-between p-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors font-bold text-left cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <User className="w-4 h-4" />
-                      <span>{language === "bn" ? "সাইন ইন / অ্যাকাউন্ট রেজিস্ট্রেশন" : "Sign In / Register Student Account"}</span>
-                    </div>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                {/* 3. CGPA Calculator */}
+                <Link
+                  href="/tools?tab=cgpa"
+                  onClick={() => setDrawerOpen(false)}
+                  className="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-800/80 transition-all group"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <Calculator className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                    {language === "bn" ? "সিজিপিএ ক্যালকুলেটর" : "CGPA Calculator"}
+                  </span>
+                </Link>
+
+                {/* 4. Certificate Maker */}
+                <Link
+                  href="/tools?tab=certificate"
+                  onClick={() => setDrawerOpen(false)}
+                  className="flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-800/80 transition-all group"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <Award className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                    {language === "bn" ? "সার্টিফিকেট মেকার" : "Certificates"}
+                  </span>
+                </Link>
               </div>
             </div>
 
-            {/* SEU OFFICIAL EXTERNAL PORTALS */}
-            <div className="space-y-1.5 pt-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block px-1">
-                {language === "bn" ? "সাউথইস্ট ইউনিভার্সিটি লিংকস" : "SEU Official Portals"}
+            {/* USER ACCOUNT & CONTROLS */}
+            <div className="space-y-2 pt-1">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 block px-1">
+                {language === "bn" ? "অ্যাকাউন্ট ও সেটিংস" : "Account & Settings"}
               </span>
 
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <a
-                  href="https://ums.seu.edu.bd"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-800/80 transition-colors flex items-center justify-between font-bold text-slate-700 dark:text-slate-300"
-                >
-                  <div className="flex items-center gap-1.5 truncate">
-                    <ExternalLink className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                    <span className="truncate">UMS Portal</span>
-                  </div>
-                </a>
+              {isAuthenticated && user ? (
+                <div className="space-y-2">
+                  {/* Logged in User Bar */}
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setDrawerOpen(false)}
+                    className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 hover:bg-white dark:hover:bg-slate-800/80 transition-all"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden">
+                        {user.avatarUrl ? (
+                          <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                        ) : (
+                          user.name.charAt(0)
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                          {user.name}
+                        </div>
+                        <div className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold truncate">
+                          {isAdmin 
+                            ? "Admin / Staff" 
+                            : (user.planName ? user.planName.split(" (")[0] : (language === "bn" ? "শিক্ষার্থী" : "Student Portal"))}
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                  </Link>
 
-                <a
-                  href="https://canvas.seu.edu.bd"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="p-2.5 rounded-xl border border-cyan-200/60 dark:border-cyan-900/60 bg-cyan-50/30 dark:bg-cyan-950/20 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 transition-colors flex items-center justify-between font-bold text-cyan-700 dark:text-cyan-300"
+                  {/* Admin shortcut if user is admin */}
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setDrawerOpen(false)}
+                      className="flex items-center justify-between p-2.5 px-3 rounded-xl border border-purple-200 dark:border-purple-900/60 bg-purple-50/50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-300 font-bold text-xs hover:bg-purple-100/50 transition-all"
+                    >
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-purple-500" />
+                        <span>{language === "bn" ? "অ্যাডমিন প্যানেল" : "Admin Panel"}</span>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDrawerOpen(false);
+                    setShowAuthModal(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 cursor-pointer active:scale-98 transition-all"
                 >
-                  <div className="flex items-center gap-1.5 truncate">
-                    <Laptop className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
-                    <span className="truncate">Canvas LMS</span>
-                  </div>
-                  <span className="w-2 h-2 rounded-full bg-cyan-500 shrink-0" />
-                </a>
+                  <User className="w-4 h-4" />
+                  <span>{language === "bn" ? "লগইন / সাইন আপ" : "Sign In to NoteLagbe"}</span>
+                </button>
+              )}
+
+              {/* Bottom Utility Row: Language & Theme */}
+              <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
+                {/* Language Toggle */}
+                <button
+                  type="button"
+                  onClick={toggleLanguage}
+                  className="flex items-center justify-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/80 font-bold text-slate-700 dark:text-slate-300 transition-all cursor-pointer"
+                >
+                  <Globe className="w-4 h-4 text-blue-500" />
+                  <span>{language === "bn" ? "English" : "বাংলায় দেখুন"}</span>
+                </button>
+
+                {/* Theme Toggle */}
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className="flex items-center justify-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/80 font-bold text-slate-700 dark:text-slate-300 transition-all cursor-pointer"
+                >
+                  {isDark ? (
+                    <>
+                      <Sun className="w-4 h-4 text-amber-400" />
+                      <span>{language === "bn" ? "লাইট মোড" : "Light Mode"}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Moon className="w-4 h-4 text-indigo-500" />
+                      <span>{language === "bn" ? "ডার্ক মোড" : "Dark Mode"}</span>
+                    </>
+                  )}
+                </button>
               </div>
+
+              {/* Logout Option if logged in */}
+              {isAuthenticated && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDrawerOpen(false);
+                    logout();
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>{language === "bn" ? "লগআউট করুন" : "Sign Out"}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

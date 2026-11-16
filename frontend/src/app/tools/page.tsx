@@ -797,6 +797,22 @@ export default function StudentToolsPage() {
   // Active Tool Tab: 'cgpa' | 'tuition' | 'cover' | 'certificate' | 'routine' | 'calendar' | 'pdfmaker' | 'resume' | 'sections' | 'advising'
   const [activeTab, setActiveTab] = useState<"cgpa" | "tuition" | "cover" | "certificate" | "routine" | "calendar" | "pdfmaker" | "resume" | "sections" | "advising">("cgpa");
 
+  // Read ?tab= from URL on mount & popstate
+  useEffect(() => {
+    const handleUrlTab = () => {
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const tabParam = params.get("tab") as any;
+        if (tabParam && ["cgpa", "tuition", "cover", "certificate", "routine", "calendar", "pdfmaker", "resume", "sections", "advising"].includes(tabParam)) {
+          setActiveTab(tabParam);
+        }
+      }
+    };
+    handleUrlTab();
+    window.addEventListener("popstate", handleUrlTab);
+    return () => window.removeEventListener("popstate", handleUrlTab);
+  }, []);
+
   // Courses & Teachers for auto-suggest
   const [coursesList, setCoursesList] = useState<any[]>([]);
   const [teachersList, setTeachersList] = useState<any[]>([]);
