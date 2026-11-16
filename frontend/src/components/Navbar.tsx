@@ -104,7 +104,7 @@ export default function Navbar() {
           </nav>
 
           {/* Right Action Icons & Auth */}
-          <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 min-w-0 shrink">
+          <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 shrink-0">
             
             {/* In-App Notifications Bell (Campus Announcements & Personal Alerts) */}
             <div className="shrink-0">
@@ -131,41 +131,27 @@ export default function Navbar() {
               </span>
             </button>
 
-            {/* Day / Night Theme Switcher Pill */}
+            {/* Day / Night Theme Toggle Button (Compact, non-colliding icon button) */}
             <button
               onClick={toggleTheme}
-              className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-[10px] sm:text-xs font-bold transition-all hover:border-amber-400/60 dark:hover:border-indigo-400/60 shadow-sm shrink-0 cursor-pointer active:scale-95"
+              className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center shrink-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-amber-400/60 dark:hover:border-indigo-400/60 shadow-sm cursor-pointer active:scale-90 transition-all"
               title={isDark ? "Switch to Day Mode (Light)" : "Switch to Night Mode (Dark)"}
               aria-label="Toggle Day / Night Mode"
             >
-              {/* On mobile (< md): single icon */}
-              <span className="md:hidden flex items-center justify-center">
-                {isDark ? (
-                  <Sun className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                ) : (
-                  <Moon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                )}
-              </span>
-
-              {/* On md+: dual switch ☀️ Day | 🌙 Night */}
-              <span className={`hidden md:inline-flex items-center gap-1 ${!isDark ? "text-amber-600 dark:text-amber-400 font-black" : "text-slate-400 font-semibold"}`}>
-                <Sun className={`w-3.5 h-3.5 ${!isDark ? "text-amber-500" : "text-slate-400"}`} />
-                <span>Day</span>
-              </span>
-              <span className="hidden md:inline text-slate-300 dark:text-slate-600 text-[10px] font-light">|</span>
-              <span className={`hidden md:inline-flex items-center gap-1 ${isDark ? "text-indigo-600 dark:text-indigo-400 font-black" : "text-slate-400 font-semibold"}`}>
-                <Moon className={`w-3.5 h-3.5 ${isDark ? "text-indigo-400" : "text-slate-400"}`} />
-                <span>Night</span>
-              </span>
+              {isDark ? (
+                <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0 hover:rotate-45 transition-transform" />
+              ) : (
+                <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400 shrink-0 hover:-rotate-12 transition-transform" />
+              )}
             </button>
 
             {/* User Profile or Sign In Button */}
-            <div className="flex items-center justify-end min-w-0">
+            <div className="flex items-center justify-end shrink-0">
               {isAuthenticated && user ? (
                 <div className="relative">
                   <button
                     onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                    className="flex items-center gap-1.5 lg:gap-2 p-1 sm:p-1 lg:px-2.5 lg:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer shrink-0"
+                    className="flex items-center gap-1.5 lg:gap-2 p-1 sm:p-1 xl:px-2.5 xl:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer shrink-0"
                     title={user.name}
                     aria-label="User Account Menu"
                   >
@@ -176,8 +162,8 @@ export default function Navbar() {
                         user.name.charAt(0)
                       )}
                     </div>
-                    {/* User Name & Role Pill - Hidden on mobile and tablet, visible on desktop (lg+) */}
-                    <div className="hidden lg:flex flex-col text-left min-w-0 pr-0.5">
+                    {/* User Name & Role Pill - Hidden on mobile, tablet & laptop, visible on wide desktop (xl+) */}
+                    <div className="hidden xl:flex flex-col text-left min-w-0 pr-0.5">
                       <span className="text-xs font-bold text-slate-900 dark:text-white leading-tight truncate max-w-[130px]">
                         {user.name}
                       </span>

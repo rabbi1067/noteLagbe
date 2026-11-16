@@ -4133,32 +4133,18 @@ export default function AdminDashboardPage() {
             {language === "bn" ? "বাং" : "EN"}
           </button>
 
-          {/* Day / Night Theme Switcher Pill */}
+          {/* Day / Night Theme Toggle */}
           <button
             onClick={toggleTheme}
-            className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/60 dark:hover:bg-slate-700 text-xs font-bold transition-all shadow-sm cursor-pointer active:scale-95"
+            className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center shrink-0 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/60 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors shadow-sm cursor-pointer active:scale-95"
             title={isDark ? "Switch to Day Mode (Light)" : "Switch to Night Mode (Dark)"}
             aria-label="Toggle Day / Night Mode"
           >
-            {/* On mobile (< md): single icon */}
-            <span className="md:hidden flex items-center justify-center">
-              {isDark ? (
-                <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              ) : (
-                <Moon className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300 shrink-0" />
-              )}
-            </span>
-
-            {/* On md+: dual switch ☀️ Day | 🌙 Night */}
-            <span className={`hidden md:inline-flex items-center gap-1 ${!isDark ? "text-amber-600 dark:text-amber-400 font-black" : "text-slate-400 font-semibold"}`}>
-              <Sun className={`w-3.5 h-3.5 ${!isDark ? "text-amber-500" : "text-slate-400"}`} />
-              <span>Day</span>
-            </span>
-            <span className="hidden md:inline text-slate-300 dark:text-slate-600 text-[10px] font-light">|</span>
-            <span className={`hidden md:inline-flex items-center gap-1 ${isDark ? "text-indigo-600 dark:text-indigo-400 font-black" : "text-slate-400 font-semibold"}`}>
-              <Moon className={`w-3.5 h-3.5 ${isDark ? "text-indigo-400" : "text-slate-400"}`} />
-              <span>Night</span>
-            </span>
+            {isDark ? (
+              <Sun className="w-4 h-4 text-amber-500 shrink-0 hover:rotate-45 transition-transform" />
+            ) : (
+              <Moon className="w-4 h-4 text-slate-600 dark:text-slate-300 shrink-0 hover:-rotate-12 transition-transform" />
+            )}
           </button>
 
           {/* Interactive Executive Profile & Session Dropdown */}
