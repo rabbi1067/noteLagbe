@@ -340,6 +340,9 @@ export default function FloatingCommunityChat() {
   // Lock background page scroll on mobile and tablet when full-page chat is open
   useEffect(() => {
     if (isOpen && isMobileScreen) {
+      if (typeof window !== "undefined") {
+        window.scrollTo(0, 0);
+      }
       const prevBodyOverflow = document.body.style.overflow;
       const prevHtmlOverflow = document.documentElement.style.overflow;
       document.body.style.overflow = "hidden";
@@ -1488,13 +1491,13 @@ export default function FloatingCommunityChat() {
             isMobileScreen
               ? {
                   position: "fixed",
-                  top: pathname?.startsWith("/admin") ? 56 : 64,
+                  top: 0,
                   bottom: pathname?.startsWith("/admin") ? 0 : 64,
                   left: 0,
                   right: 0,
                   width: "100%",
                   maxWidth: "100vw",
-                  height: "auto",
+                  height: "100%",
                   maxHeight: "none",
                   transform: "none",
                   zIndex: 35,
@@ -1517,7 +1520,7 @@ export default function FloatingCommunityChat() {
           }
           className={
             isMobileScreen
-              ? `w-full h-full flex flex-col rounded-none overflow-hidden select-none transition-colors duration-200 border-none shadow-none ${
+              ? `w-full h-full flex flex-col rounded-none overflow-hidden select-none transition-colors duration-200 border-none shadow-none pt-16 ${
                   isDark
                     ? "bg-[#090d16] text-slate-100"
                     : "bg-slate-50 text-slate-800"

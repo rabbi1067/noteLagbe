@@ -60,8 +60,9 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-[#0b1120]/95 backdrop-blur-md transition-colors print:hidden">
-      <div className="max-w-7xl mx-auto px-2 xs:px-3 sm:px-6 lg:px-8">
+    <>
+      <header className="fixed top-0 left-0 right-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-[#0b1120]/95 backdrop-blur-md transition-colors print:hidden">
+        <div className="max-w-7xl mx-auto px-2 xs:px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-1.5 xs:gap-2 lg:gap-4">
           
           {/* Logo & Brand */}
@@ -237,5 +238,8 @@ export default function Navbar() {
         </div>
       </div>
     </header>
-  );
+    {/* 64px Spacer to preserve exact page flow below fixed header */}
+    <div className="h-16 w-full shrink-0 print:hidden" aria-hidden="true" />
+  </>
+);
 }
