@@ -28,6 +28,7 @@ import {
   Image as ImageIcon,
   SlidersHorizontal,
   Gauge,
+  Camera,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -154,6 +155,7 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
   const [exportStatus, setExportStatus] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const objectUrlsRef = useRef<Set<string>>(new Set());
   const encodedAssetCacheRef = useRef<Map<string, EncodedPageAsset>>(new Map());
@@ -349,6 +351,8 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
     setIsCropping(false);
     setCanvasDisplaySize({ w: 0, h: 0 });
     setEstimatedBytes(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
     toast.info(bn ? "সব টেম্পোরারি পেজ মুছে ফেলা হয়েছে।" : "Cleared all temporary pages.");
   };
 
@@ -610,6 +614,38 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
         }}
       />
 
+      {/* Hidden Mobile & Tablet Camera Input */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            const arr = Array.from(e.target.files);
+            const now = Date.now();
+            const normalized = arr.map((f, i) => {
+              const isGenericName =
+                !f.name ||
+                f.name.toLowerCase() === "image.jpg" ||
+                f.name.toLowerCase() === "image.jpeg" ||
+                f.name.toLowerCase() === "image.png" ||
+                f.name.toLowerCase().startsWith("captured_image");
+              if (isGenericName) {
+                return new File([f], `Camera_Page_${now}_${i + 1}.jpg`, {
+                  type: f.type || "image/jpeg",
+                  lastModified: now,
+                });
+              }
+              return f;
+            });
+            handleAddFiles(normalized);
+          }
+          e.target.value = "";
+        }}
+      />
+
       {/* Header */}
       <div className="p-5 sm:p-6 rounded-3xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1.5">
@@ -644,6 +680,25 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
               : bn
               ? "আরও ছবি যোগ করুন"
               : "Add More Pages"}
+          </button>
+
+          {/* Mobile & Tablet Only: Direct Camera Action Button */}
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            className="lg:hidden px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-emerald-600/20 inline-flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 border border-emerald-400/30"
+            title={bn ? "মোবাইল ক্যামেরা দিয়ে ছবি তুলুন" : "Snap page with mobile camera"}
+          >
+            <Camera className="w-4 h-4" />
+            <span>
+              {pages.length === 0
+                ? bn
+                  ? "ক্যামেরা দিয়ে তুলুন"
+                  : "Camera Scan"
+                : bn
+                ? "+ ক্যামেরা পেজ"
+                : "+ Snap Page"}
+            </span>
           </button>
 
           {pages.length > 0 && (
@@ -702,6 +757,10 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
             <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800">
               JPG / PNG / WebP
             </span>
+            <span className="lg:hidden px-3 py-1 rounded-full bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-500/20 flex items-center gap-1 font-bold">
+              <Camera className="w-3 h-3" />
+              <span>{bn ? "ক্যামেরা দিয়ে তোলা যাবে" : "Camera Scan Supported"}</span>
+            </span>
             <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800">
               {bn ? "বাঁকা ছবি সোজা + রোটেট" : "Straighten & Rotate"}
             </span>
@@ -712,6 +771,33 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
               PDF + DOCX Download
             </span>
           </div>
+
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-2.5">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                fileInputRef.current?.click();
+              }}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-sm inline-flex items-center gap-1.5 cursor-pointer transition-all"
+            >
+              <Upload className="w-4 h-4" />
+              <span>{bn ? "ফাইল থেকে ছবি বাছুন" : "Browse Files"}</span>
+            </button>
+
+            {/* Mobile & Tablet Only: Direct Camera Button in Dropzone */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                cameraInputRef.current?.click();
+              }}
+              className="lg:hidden px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-emerald-600/20 inline-flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 border border-emerald-400/30"
+            >
+              <Camera className="w-4 h-4" />
+              <span>{bn ? "ক্যামেরা দিয়ে ছবি তুলুন" : "Snap with Camera"}</span>
+            </button>
+          </div>
         </div>
       ) : (
         /* Active Workspace */
@@ -719,13 +805,24 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
           {/* Page Serial Bar (Upload Order + Drag & Drop + Manual Serial Picker) */}
           <div className="p-4 sm:p-5 rounded-3xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 <h3 className="text-sm font-black text-slate-900 dark:text-white">
                   {bn
                     ? `পেজ সিরিয়াল তালিকা (${pages.length}টি পেজ)`
                     : `Page Serial Order (${pages.length} ${pages.length === 1 ? "Page" : "Pages"})`}
                 </h3>
+
+                {/* Mobile & Tablet Quick Snap Next Page Button */}
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="lg:hidden px-2.5 py-1 rounded-xl text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                  title={bn ? "ক্যামেরা দিয়ে পরবর্তী পেজ তুলুন" : "Snap next page with camera"}
+                >
+                  <Camera className="w-3 h-3" />
+                  <span>{bn ? "+ ক্যামেরা পেজ" : "+ Camera Page"}</span>
+                </button>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {bn

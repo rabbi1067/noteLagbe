@@ -31,7 +31,8 @@ import {
   BadgeCheck,
   RotateCcw,
   Compass,
-  CheckCheck
+  CheckCheck,
+  Camera,
 } from "lucide-react";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
@@ -1387,7 +1388,9 @@ export default function ContributePage() {
                 </label>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                   {uploadMode === "DEVICE"
-                    ? (language === "bn" ? "মোবাইল বা পিসি থেকে সরাসরি ফাইল আপলোড করুন (সেরা ও দ্রুত)" : "Direct upload from mobile or desktop device (Recommended)")
+                    ? (language === "bn"
+                        ? "মোবাইল/ট্যাব ক্যামেরা বা ফাইল থেকে সরাসরি আপলোড করুন (সেরা ও দ্রুত)"
+                        : "Direct upload from mobile camera or files (Recommended)")
                     : (language === "bn" ? "৫০ MB এর বেশি বড় ফাইলের জন্য গুগল ড্রাইভ লিংক দিন" : "Google Drive link for larger archives (50MB+)")}
                 </p>
               </div>
@@ -1403,8 +1406,12 @@ export default function ContributePage() {
                       : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>{language === "bn" ? "ডিভাইস আপলোড (সেরা)" : "Direct Upload (Best)"}</span>
+                  <Upload className="w-3.5 h-3.5 hidden lg:inline" />
+                  <Camera className="w-3.5 h-3.5 lg:hidden" />
+                  <span>
+                    <span className="lg:hidden">{language === "bn" ? "ফাইল / ক্যামেরা" : "Files / Camera"}</span>
+                    <span className="hidden lg:inline">{language === "bn" ? "ডিভাইস আপলোড (সেরা)" : "Direct Upload (Best)"}</span>
+                  </span>
                 </button>
 
                 <button
