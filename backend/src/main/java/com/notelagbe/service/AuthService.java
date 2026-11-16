@@ -18,6 +18,7 @@ import com.notelagbe.security.CustomUserDetails;
 import com.notelagbe.security.FileUploadSecurityValidator;
 import com.notelagbe.security.JwtTokenProvider;
 import com.notelagbe.security.UrlSecurityValidator;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
