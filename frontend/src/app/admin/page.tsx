@@ -4036,7 +4036,7 @@ export default function AdminDashboardPage() {
           {activeTab === "departments" && (
             <button
               onClick={openAddDepartmentModal}
-              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
               title="Add Department"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -4047,7 +4047,7 @@ export default function AdminDashboardPage() {
           {activeTab === "resources" && (
             <button
               onClick={openNewResourceModal}
-              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
               title="Upload Material"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -4058,7 +4058,7 @@ export default function AdminDashboardPage() {
           {activeTab === "courses" && (
             <button
               onClick={openNewCourseModal}
-              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
               title="Add Course"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -4067,7 +4067,7 @@ export default function AdminDashboardPage() {
           )}
 
           {activeTab === "teachers" && (
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="hidden sm:flex items-center gap-1.5 sm:gap-2">
               <button
                 onClick={handleSyncCseFaculties}
                 disabled={syncingCse}
@@ -4091,7 +4091,7 @@ export default function AdminDashboardPage() {
           {activeTab === "notices" && (
             <button
               onClick={openNewNoticeModal}
-              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
               title="Add Notice"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -4101,7 +4101,7 @@ export default function AdminDashboardPage() {
 
           {/* Header Action: Security & Activity Logs */}
           {activeTab === "activityLogs" && (
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="hidden sm:flex items-center gap-1.5 sm:gap-2">
               {isSuperAdmin && user?.role === "ROLE_SUPER_ADMIN" && (
                 <button
                   onClick={handleOpenClearLogsModal}
@@ -4131,7 +4131,7 @@ export default function AdminDashboardPage() {
                 setStaffStudentId("");
                 setShowStaffModal(true);
               }}
-              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow-sm transition-all"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow-sm transition-all"
               title={isSuperAdmin ? "Add User / Staff" : "Add Student"}
             >
               <Plus className="w-3.5 h-3.5" />
@@ -4369,17 +4369,18 @@ export default function AdminDashboardPage() {
 
         {/* Left Sidebar */}
         <aside
-          className={`fixed inset-y-0 left-0 top-16 z-50 w-72 bg-white dark:bg-[#0d1527] border-r border-slate-200 dark:border-slate-800/80 flex flex-col justify-between transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:w-72 lg:h-full shrink-0 ${
+          className={`fixed inset-y-0 left-0 z-50 w-72 sm:w-80 bg-white dark:bg-[#0d1527] border-r border-slate-200 dark:border-slate-800/80 flex flex-col justify-between transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:w-72 lg:h-full shrink-0 ${
             mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
         <div className="flex flex-col h-full overflow-y-auto">
-          {/* Mobile Drawer Close Bar */}
-          <div className="lg:hidden p-4 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between">
-            <span className="font-bold text-xs text-slate-800 dark:text-slate-300">Admin Navigation</span>
+          {/* Mobile Drawer Header with Logo & Close Button */}
+          <div className="lg:hidden p-4 px-5 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/40">
+            <BrandLogo variant="admin" size="sm" showTagline={false} />
             <button
               onClick={() => setMobileSidebarOpen(false)}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="p-1.5 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              aria-label="Close Admin Sidebar"
             >
               <X className="w-5 h-5" />
             </button>
@@ -4850,7 +4851,7 @@ export default function AdminDashboardPage() {
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto bg-slate-50/70 dark:bg-[#0a0f1d] transition-colors">
         
         {/* Section In-Page Title Header */}
-        <div className="px-6 sm:px-8 pt-6 pb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="px-4 sm:px-8 pt-5 sm:pt-6 pb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
               {activeTab === "overview" && "Executive Overview & Health"}
