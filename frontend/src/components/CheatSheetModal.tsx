@@ -1119,9 +1119,6 @@ export default function CheatSheetModal({
                 <span className="text-xs font-mono font-black px-2.5 py-0.5 rounded-lg bg-blue-600 text-white shrink-0">
                   {courseCode}
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-300/40 shrink-0">
-                  {language === "bn" ? "⚡ জেমিনি ৩.৮ ফ্ল্যাশ এআই" : "⚡ Gemini 3.8 Flash AI"}
-                </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
                 {courseTitle || (language === "bn" ? "অ্যাকাডেমিক কোর্স আর্কাইভ" : "Academic Course Archive")} • {courseDepartment || "CSE"} • Southeast University
@@ -1239,7 +1236,7 @@ export default function CheatSheetModal({
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                 {language === "bn"
                   ? "NoteLagbe AI Exam Revision Copilot ব্যবহার করতে কোর্সটি আনলক করুন। আনলক করলে আপনি যেকোনো শিক্ষকের বিগত প্রশ্ন বিশ্লেষণ, সমাধান ও কুইক রিভিশন গাইড পেয়ে যাবেন।"
-                  : "Unlock this course to access the Gemini 3.8 AI Exam Revision Copilot, repetitive questions analysis, and faculty-specific revision guides."}
+                  : "Unlock this course to access the AI Exam Revision Copilot, repetitive questions analysis, and faculty-specific revision guides."}
               </p>
             </div>
             <div className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-xs text-blue-900 dark:text-blue-300 max-w-md">
@@ -1461,8 +1458,8 @@ export default function CheatSheetModal({
                         </div>
                         <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                           {language === "bn"
-                            ? "জেমিনাই এআই পরীক্ষার প্রশ্নপত্র ও নোটস সম্পূর্ণভাবে অ্যানালাইসিস করছে..."
-                            : "Gemini AI is analyzing the full exam question paper & materials..."}
+                            ? "এআই পরীক্ষার প্রশ্নপত্র ও নোটস সম্পূর্ণভাবে অ্যানালাইসিস করছে..."
+                            : "AI is analyzing the full exam question paper & materials..."}
                         </span>
                       </div>
                     </div>

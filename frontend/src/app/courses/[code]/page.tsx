@@ -867,9 +867,6 @@ export default function CourseDetailPage() {
                 <Lock className="w-4 h-4 text-slate-400" />
               )}
               <span>{t("course.aiCheatSheet", "AI Exam Revision Copilot")}</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-300/30">
-                ✨ Gemini 3.8
-              </span>
               {!isCourseUnlocked && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-normal">
                   {language === "bn" ? "লকড" : "Locked"}

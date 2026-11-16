@@ -1196,7 +1196,7 @@ export const api = {
     recordVisit: () => request<{ totalViews: number; activeNow: number; status: string }>("/stats/visit", { method: "POST" }),
   },
 
-  // AI Exam Revision Copilot & Chatbot API (Powered by Gemini 3.8)
+  // AI Exam Revision Copilot & Chatbot API
   aiExamChat: {
     getMessages: (courseCode: string) =>
       request<any[]>(`/ai/exam-chat/messages?courseCode=${encodeURIComponent(courseCode)}`),
