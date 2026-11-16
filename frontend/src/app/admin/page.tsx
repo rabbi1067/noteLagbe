@@ -4326,7 +4326,7 @@ export default function AdminDashboardPage() {
                       <LogOut className="w-3.5 h-3.5" />
                     </div>
                     <div className="text-left flex-1">
-                      <p className="leading-tight">Log Out / End Session</p>
+                      <p className="leading-tight">Log Out</p>
                       <p className="text-[10px] font-normal text-slate-400 dark:text-slate-500">Securely sign out of NoteLagbe HQ</p>
                     </div>
                   </button>
