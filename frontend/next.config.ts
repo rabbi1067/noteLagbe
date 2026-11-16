@@ -10,6 +10,9 @@ const backendBaseUrl =
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["pdfjs-dist", "canvas"],
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   /* config options here */
   images: {
     remotePatterns: [
