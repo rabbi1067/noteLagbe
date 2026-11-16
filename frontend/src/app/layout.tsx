@@ -7,6 +7,7 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { Toaster } from "sonner";
 import Navbar from "@/components/Navbar";
+import MobileBottomNav from "@/components/MobileBottomNav";
 import Footer from "@/components/Footer";
 import SpotlightModal from "@/components/SpotlightModal";
 import AuthModal from "@/components/AuthModal";
@@ -58,10 +59,11 @@ export default function RootLayout({
           <LanguageProvider>
             <AuthProvider>
               <Navbar />
-              <main className="flex-1 w-full max-w-full min-w-0 overflow-x-hidden">
+              <main className="flex-1 w-full max-w-full min-w-0 overflow-x-hidden pb-20 sm:pb-24 lg:pb-0">
                 {children}
               </main>
               <Footer />
+              <MobileBottomNav />
               <SpotlightModal />
               <AuthModal />
               <FloatingCommunityChat />

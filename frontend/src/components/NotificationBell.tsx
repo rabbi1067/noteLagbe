@@ -316,10 +316,7 @@ export default function NotificationBell() {
     return true;
   });
 
-  // Never render notifications bell for guest / unauthenticated users
-  if (!isAuthenticated) {
-    return null;
-  }
+  // Render notifications bell for all users (campus announcements for guests, personal alerts when authenticated)
 
   return (
     <div className="relative shrink-0" ref={dropdownRef}>

@@ -30,7 +30,6 @@ export default function Navbar() {
   const { user, isAuthenticated, isAdmin, logout, setShowAuthModal } = useAuth();
   const { language, toggleLanguage, t } = useLanguage();
   const { theme, toggleTheme, isDark } = useTheme();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   if (pathname.startsWith("/admin")) {
@@ -106,23 +105,21 @@ export default function Navbar() {
           {/* Right Action Icons & Auth */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             
-            {/* In-App Notifications Bell with Unread Badge (Only for Logged-In Users) */}
-            {isAuthenticated && (
-              <div className="shrink-0">
-                <NotificationBell />
-              </div>
-            )}
+            {/* In-App Notifications Bell (Campus Announcements & Personal Alerts) */}
+            <div className="shrink-0">
+              <NotificationBell />
+            </div>
 
-            {/* Language Switcher Pill (EN | বাং) */}
+            {/* Language Switcher Pill (EN | বাং) - Visible on ALL screen sizes */}
             <button
               onClick={toggleLanguage}
-              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs font-bold transition-all hover:border-blue-500 shadow-sm"
+              className="flex items-center gap-1 px-2 xs:px-2.5 py-1 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-[11px] sm:text-xs font-bold transition-all hover:border-blue-500 shadow-sm shrink-0 cursor-pointer active:scale-95"
               title={language === "en" ? "বাংলায় দেখুন" : "Switch to English"}
             >
               <span className={language === "en" ? "text-blue-600 dark:text-blue-400 font-black" : "text-slate-400 font-semibold"}>
                 EN
               </span>
-              <span className="text-slate-300 dark:text-slate-600 text-[11px] font-light">|</span>
+              <span className="text-slate-300 dark:text-slate-600 text-[10px] font-light">|</span>
               <span className={language === "bn" ? "text-blue-600 dark:text-blue-400 font-black" : "text-slate-400 font-semibold"}>
                 বাং
               </span>
@@ -131,33 +128,34 @@ export default function Navbar() {
             {/* Dark / Light Mode Toggle */}
             <button
               onClick={toggleTheme}
-              className="w-9 h-9 flex items-center justify-center shrink-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 shadow-sm cursor-pointer active:scale-90"
+              className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center shrink-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 shadow-sm cursor-pointer active:scale-90"
               title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
               aria-label="Toggle Theme"
             >
-              {isDark ? <Sun className="w-4 h-4 text-amber-400 shrink-0" /> : <Moon className="w-4 h-4 text-slate-700 shrink-0" />}
+              {isDark ? <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" /> : <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-700 shrink-0" />}
             </button>
 
             {/* User Profile or Sign In Button */}
-            <div className="min-w-[76px] sm:min-w-[85px] flex items-center justify-end">
+            <div className="flex items-center justify-end shrink-0">
               {isAuthenticated && user ? (
                 <div className="relative">
                   <button
                     onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                    className="flex items-center gap-2 p-1.5 pl-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm"
+                    className="flex items-center gap-1.5 sm:gap-2 p-1 sm:p-1.5 pl-1.5 sm:pl-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer"
                   >
-                    <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white text-xs font-bold uppercase shadow-sm overflow-hidden shrink-0">
+                    <div className="w-7 h-7 sm:w-7 sm:h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white text-xs font-bold uppercase shadow-sm overflow-hidden shrink-0">
                       {user.avatarUrl ? (
                         <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
                       ) : (
                         user.name.charAt(0)
                       )}
                     </div>
-                    <div className="hidden xl:flex flex-col text-left max-w-[125px] shrink-0">
-                      <span className="text-xs font-bold text-slate-900 dark:text-white leading-tight truncate">
+                    {/* User Name & Role Pill (Visible across Mobile, Tablet & Desktop) */}
+                    <div className="flex flex-col text-left max-w-[70px] xs:max-w-[85px] sm:max-w-[125px] shrink-0">
+                      <span className="text-[11px] sm:text-xs font-bold text-slate-900 dark:text-white leading-tight truncate">
                         {user.name}
                       </span>
-                      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium truncate">
+                      <span className="text-[9px] sm:text-[10px] text-blue-600 dark:text-blue-400 font-medium truncate">
                         {isAdmin 
                           ? (language === "bn" ? "অ্যাডমিন" : "Admin / Staff") 
                           : (user.planName ? user.planName.split(" (")[0] : (language === "bn" ? "শিক্ষার্থী" : "Student"))}
@@ -229,125 +227,15 @@ export default function Navbar() {
               ) : (
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="py-1.5 px-3 sm:py-2 sm:px-4 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all shadow-md shadow-blue-500/20 whitespace-nowrap"
+                  className="py-1.5 px-3 sm:py-2 sm:px-4 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all shadow-md shadow-blue-500/20 whitespace-nowrap cursor-pointer"
                 >
                   {t("nav.signIn", "Sign In")}
                 </button>
               )}
             </div>
-
-            {/* Mobile & Portrait Tablet Menu Hamburger */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
           </div>
         </div>
       </div>
-
-      {/* Mobile Drawer */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 pt-3 pb-6 space-y-1.5 text-sm font-semibold animate-in slide-in-from-top-2 duration-150">
-          <Link 
-            href="/courses" 
-            onClick={() => setMobileMenuOpen(false)}
-            className={getMobileNavLinkClass("/courses")}
-          >
-            {t("nav.courses", "Courses & Notes")}
-          </Link>
-          <Link 
-            href="/curriculum" 
-            onClick={() => setMobileMenuOpen(false)}
-            className={getMobileNavLinkClass("/curriculum")}
-          >
-            {t("nav.curriculum", "Curriculum")}
-          </Link>
-          <Link 
-            href="/teachers" 
-            onClick={() => setMobileMenuOpen(false)}
-            className={getMobileNavLinkClass("/teachers")}
-          >
-            {t("nav.faculty", "Faculty Directory")}
-          </Link>
-          <Link 
-            href="/tools" 
-            onClick={() => setMobileMenuOpen(false)}
-            className={getMobileNavLinkClass("/tools")}
-          >
-            {t("nav.tools", "Student Tools")}
-          </Link>
-          <Link 
-            href="/pricing" 
-            onClick={() => setMobileMenuOpen(false)}
-            className={getMobileNavLinkClass("/pricing")}
-          >
-            {t("nav.pricing", "Plans & Pricing")}
-          </Link>
-          <Link 
-            href="/contribute" 
-            onClick={() => setMobileMenuOpen(false)}
-            className={getMobileNavLinkClass("/contribute")}
-          >
-            {t("nav.contribute", "Upload Notes (+2 Courses Free)")}
-          </Link>
-          {isAdmin ? (
-            <Link 
-              href="/admin" 
-              onClick={() => setMobileMenuOpen(false)}
-              className="block px-3.5 py-2.5 rounded-xl text-sm text-purple-600 dark:text-purple-400 font-bold bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/40"
-            >
-              {t("nav.adminPanel", "Admin Control Center")}
-            </Link>
-          ) : isAuthenticated ? (
-            <Link 
-              href="/dashboard" 
-              onClick={() => setMobileMenuOpen(false)}
-              className="block px-3.5 py-2.5 rounded-xl text-sm text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/40"
-            >
-              {t("nav.dashboard", "Student Dashboard")}
-            </Link>
-          ) : null}
-
-          {!isAuthenticated && (
-            <div className="pt-2">
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setShowAuthModal(true);
-                }}
-                className="w-full py-2.5 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md flex items-center justify-center gap-2"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>{t("nav.signIn", "Sign In")} / {language === "bn" ? "নিবন্ধন" : "Register"}</span>
-              </button>
-            </div>
-          )}
-
-          {/* Mobile Quick Settings (Language & Theme) */}
-          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs font-semibold px-1">
-            <span className="text-slate-500 dark:text-slate-400">Settings</span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={toggleLanguage}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold"
-              >
-                <span>{language === "en" ? "EN" : "বাং"}</span>
-              </button>
-              <button
-                onClick={toggleTheme}
-                className="w-20 h-8 flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold shrink-0 cursor-pointer active:scale-95"
-                aria-label="Toggle Theme"
-              >
-                {isDark ? <Sun className="w-3.5 h-3.5 text-amber-400 shrink-0" /> : <Moon className="w-3.5 h-3.5 text-slate-700 shrink-0" />}
-                <span className="text-[11px] font-semibold w-8 text-center">{isDark ? "Light" : "Dark"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   );
 }

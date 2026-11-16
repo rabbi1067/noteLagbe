@@ -198,6 +198,17 @@ export default function FloatingCommunityChat() {
   // Voice playback state
   const [playingMessageId, setPlayingMessageId] = useState<number | null>(null);
   const [audioPlaybackRate, setAudioPlaybackRate] = useState<number>(1);
+
+  // Responsive mobile/tablet check to avoid collision with mobile bottom nav
+  const [isMobileScreen, setIsMobileScreen] = useState(false);
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileScreen(window.innerWidth < 1024);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Auto-scroll ref
@@ -1273,8 +1284,8 @@ export default function FloatingCommunityChat() {
         ref={bubbleRef}
         style={{
           position: "fixed",
-          bottom: 24,
-          right: 24,
+          bottom: isMobileScreen ? 82 : 24,
+          right: isMobileScreen ? 16 : 24,
           transform: `translate3d(${bubblePos.x}px, ${bubblePos.y}px, 0)`,
           zIndex: 9999,
           touchAction: "none",
@@ -1425,17 +1436,18 @@ export default function FloatingCommunityChat() {
           ref={windowRef}
           style={{
             position: "fixed",
-            bottom: 24,
-            right: 24,
+            bottom: isMobileScreen ? 76 : 24,
+            right: isMobileScreen ? 12 : 24,
             transform: `translate3d(${windowPos.x}px, ${windowPos.y}px, 0)`,
             zIndex: 10000,
-            maxWidth: "calc(100vw - 24px)",
+            maxWidth: isMobileScreen ? "calc(100vw - 24px)" : "380px",
+            maxHeight: isMobileScreen ? "calc(100vh - 92px)" : "calc(100vh - 32px)",
             willChange: "transform",
             transition: isDragging
               ? "none"
               : "transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
-          className={`w-[380px] h-[600px] max-h-[calc(100vh-32px)] flex flex-col rounded-3xl backdrop-blur-md sm:backdrop-blur-2xl transition-colors duration-200 overflow-hidden animate-in fade-in zoom-in-95 select-none ${
+          className={`w-[380px] h-[600px] flex flex-col rounded-3xl backdrop-blur-md sm:backdrop-blur-2xl transition-colors duration-200 overflow-hidden animate-in fade-in zoom-in-95 select-none ${
             isDark
               ? "bg-[#090d16]/98 border border-white/15 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.85),0_0_35px_rgba(34,211,238,0.12)] text-slate-100"
               : "bg-white/98 border border-slate-200/90 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.18),0_0_25px_rgba(59,130,246,0.12)] text-slate-800"
