@@ -3,7 +3,7 @@
 import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Award,
   Download,
@@ -201,31 +201,85 @@ export default function EventCertificateMaker({ language = "en" }: EventCertific
 
   const certificateRef = useRef<HTMLDivElement>(null);
   const previewBoxRef = useRef<HTMLDivElement>(null);
+  const isUserZoomedRef = useRef<boolean>(false);
+  const lastWindowWidthRef = useRef<number>(typeof window !== "undefined" ? window.innerWidth : 1200);
 
-  // Responsive Auto-Fit: automatically calculate optimal preview scale to fit container without scroll
+  // Responsive Auto-Fit: dynamically calculate optimal preview scale to fit container without horizontal scroll
+  const calculateFitZoom = useCallback(() => {
+    if (previewBoxRef.current) {
+      const containerWidth = previewBoxRef.current.clientWidth;
+      // On mobile screens (<640px) padding inside preview box is p-2 (16px total)
+      // On larger screens it is p-4 (32px total). We add safe breathing margin (4px)
+      const padding = containerWidth < 640 ? 20 : 36;
+      const available = containerWidth - padding;
+      if (available > 100) {
+        // Auto-scale to fit available width cleanly without horizontal overflow
+        // Min zoom 20% (for very narrow mobile screens), max 100%
+        const fitPercent = Math.min(100, Math.max(20, Math.floor((available / 920) * 100)));
+        setZoom(fitPercent);
+      }
+    }
+  }, []);
+
   useEffect(() => {
-    const calculateFitZoom = () => {
-      if (previewBoxRef.current) {
-        const available = previewBoxRef.current.clientWidth - 32;
-        if (available > 200) {
-          const fitPercent = Math.min(100, Math.max(50, Math.floor((available / 920) * 100)));
-          setZoom(fitPercent);
+    // Initial responsive fit calculation on mount
+    calculateFitZoom();
+    const t1 = setTimeout(calculateFitZoom, 60);
+    const t2 = setTimeout(calculateFitZoom, 250);
+
+    // Responsive container observer: detects layout changes, orientation switches, etc.
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined" && previewBoxRef.current) {
+      ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const width = entry.contentRect.width;
+          if (width > 100 && !isUserZoomedRef.current) {
+            const padding = width < 640 ? 20 : 36;
+            const available = width - padding;
+            const fitPercent = Math.min(100, Math.max(20, Math.floor((available / 920) * 100)));
+            setZoom((prev) => (Math.abs(prev - fitPercent) > 2 ? fitPercent : prev));
+          }
         }
+      });
+      ro.observe(previewBoxRef.current);
+    }
+
+    const handleWindowResize = () => {
+      const currentWidth = window.innerWidth;
+      if (Math.abs(currentWidth - lastWindowWidthRef.current) > 40) {
+        lastWindowWidthRef.current = currentWidth;
+        // On significant screen resize or rotation, reset and auto-fit
+        isUserZoomedRef.current = false;
+        calculateFitZoom();
       }
     };
 
-    calculateFitZoom();
-    window.addEventListener("resize", calculateFitZoom);
-    return () => window.removeEventListener("resize", calculateFitZoom);
-  }, []);
+    window.addEventListener("resize", handleWindowResize);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      if (ro) ro.disconnect();
+      window.removeEventListener("resize", handleWindowResize);
+    };
+  }, [calculateFitZoom]);
 
   const handleResetZoom = () => {
+    isUserZoomedRef.current = false;
     if (previewBoxRef.current) {
-      const available = previewBoxRef.current.clientWidth - 32;
-      const fitPercent = Math.min(100, Math.max(50, Math.floor((available / 920) * 100)));
+      const containerWidth = previewBoxRef.current.clientWidth;
+      const padding = containerWidth < 640 ? 20 : 36;
+      const available = containerWidth - padding;
+      const fitPercent = Math.min(100, Math.max(20, Math.floor((available / 920) * 100)));
       setZoom(fitPercent);
     } else {
-      setZoom(75);
+      if (typeof window !== "undefined") {
+        const screenW = window.innerWidth;
+        if (screenW < 640) setZoom(35);
+        else if (screenW < 1024) setZoom(65);
+        else setZoom(75);
+      } else {
+        setZoom(75);
+      }
     }
   };
 
@@ -956,39 +1010,52 @@ export default function EventCertificateMaker({ language = "en" }: EventCertific
         {/* RIGHT COLUMN: Live Certificate Canvas & Downloads (matching Cover Page Maker) */}
         <div className="lg:col-span-7 space-y-4">
           {/* Zoom & Canvas Toolbar */}
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Preview Scale:</span>
-              <button
-                type="button"
-                onClick={() => setZoom(Math.max(60, zoom - 15))}
-                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer"
-                title="Zoom Out"
-              >
-                <ZoomOut className="w-3.5 h-3.5" />
-              </button>
-              <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 min-w-10 text-center">
-                {zoom}%
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="flex items-center justify-between sm:justify-start gap-2 flex-wrap">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                {language === "bn" ? "প্রিভিউ স্কেল:" : "Preview Scale:"}
               </span>
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    isUserZoomedRef.current = true;
+                    setZoom((prev) => Math.max(20, prev - (prev <= 40 ? 5 : 10)));
+                  }}
+                  className="p-1 sm:p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer active:scale-95 transition-all"
+                  title="Zoom Out"
+                >
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 min-w-9 text-center">
+                  {zoom}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    isUserZoomedRef.current = true;
+                    setZoom((prev) => Math.min(140, prev + (prev < 40 ? 5 : 10)));
+                  }}
+                  className="p-1 sm:p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer active:scale-95 transition-all"
+                  title="Zoom In"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <button
                 type="button"
-                onClick={() => setZoom(Math.min(130, zoom + 15))}
-                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer"
-                title="Zoom In"
-              >
-                <ZoomIn className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={handleResetZoom}
-                className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white px-2 py-1 rounded-md cursor-pointer"
+                onClick={() => {
+                  isUserZoomedRef.current = false;
+                  handleResetZoom();
+                }}
+                className="text-[11px] font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/40 px-2.5 py-1.5 rounded-xl border border-blue-200/60 dark:border-blue-900/40 cursor-pointer transition-all active:scale-95 shadow-2xs"
                 title="Reset zoom to fit screen"
               >
-                Fit Screen
+                {language === "bn" ? "স্ক্রিন ফিট" : "Fit Screen"}
               </button>
             </div>
 
-            <span className="text-[11px] px-2.5 py-1 rounded-full font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-900/40">
+            <span className="self-start sm:self-auto text-[10px] sm:text-[11px] px-2.5 py-1 rounded-full font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-900/40 whitespace-nowrap">
               Standard Certificate (11" × 8.5" Landscape)
             </span>
           </div>
@@ -996,16 +1063,16 @@ export default function EventCertificateMaker({ language = "en" }: EventCertific
           {/* Certificate Rendering Box */}
           <div
             ref={previewBoxRef}
-            className="w-full overflow-x-auto p-2 sm:p-4 rounded-3xl bg-slate-100 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 shadow-inner flex flex-col items-center"
+            className="w-full overflow-x-auto p-2 sm:p-4 rounded-3xl bg-slate-100 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 shadow-inner flex flex-col items-center justify-center min-h-[220px] sm:min-h-[300px] transition-all"
           >
             <div
               style={{
-                width: `${920 * (zoom / 100)}px`,
-                height: `${650 * (zoom / 100)}px`,
+                width: `${Math.round(920 * (zoom / 100))}px`,
+                height: `${Math.round(650 * (zoom / 100))}px`,
                 position: "relative",
                 transition: "width 0.15s ease-out, height 0.15s ease-out",
               }}
-              className="mx-auto shrink-0 select-none"
+              className="mx-auto shrink-0 select-none shadow-xl rounded-xl sm:rounded-2xl overflow-hidden"
             >
               <div
                 style={{
