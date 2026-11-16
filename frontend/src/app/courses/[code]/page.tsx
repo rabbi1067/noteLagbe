@@ -197,6 +197,27 @@ export default function CourseDetailPage() {
     loadCourseData(true);
   });
 
+  // Auto-recover when sleeping backend wakes up
+  useEffect(() => {
+    const handleAwake = () => {
+      loadCourseData(true);
+    };
+    window.addEventListener("notelagbe:backend-awake", handleAwake);
+    return () => {
+      window.removeEventListener("notelagbe:backend-awake", handleAwake);
+    };
+  }, [loadCourseData]);
+
+  // Auto-retry if course has catalog materials but resources array is empty (due to idle cold start)
+  useEffect(() => {
+    if (course && ((course.notesCount ?? 0) > 0 || (course.questionsCount ?? 0) > 0) && resources.length === 0 && !loading) {
+      const retryTimer = setTimeout(() => {
+        loadCourseData(true);
+      }, 5000);
+      return () => clearTimeout(retryTimer);
+    }
+  }, [course, resources.length, loading, loadCourseData]);
+
   const tryFindCompanionCourse = (currentCode: string) => {
     // E.g., CSE347 <-> CSE348, CSE241 <-> CSE242, CSE141 <-> CSE161
     const match = currentCode.match(/^([A-Z]+)(\d+)$/);
