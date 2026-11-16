@@ -28,6 +28,7 @@ import {
   FileText,
   Tag,
   Zap,
+  Upload,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
@@ -262,6 +263,84 @@ export default function CheatSheetModal({
     semester?: string;
   } | null>(null);
 
+  // Real Uploaded File State (Direct Client-Side File Picker)
+  const [uploadedFile, setUploadedFile] = useState<{
+    base64: string;
+    mimeType: string;
+    name: string;
+    size: number;
+  } | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error(
+        language === "bn"
+          ? "ফাইলের সাইজ সর্বোচ্চ ২৫ মেগাবাইট হতে পারবে।"
+          : "File size exceeds the 25MB limit."
+      );
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    const allowedTypes = [
+      "application/pdf",
+      "image/png",
+      "image/jpeg",
+      "image/jpg",
+      "image/webp",
+    ];
+    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(pdf|png|jpe?g|webp)$/i)) {
+      toast.error(
+        language === "bn"
+          ? "শুধুমাত্র PDF অথবা ছবি (PNG, JPG, WEBP) আপলোড করা যাবে।"
+          : "Only PDF or image files (PNG, JPG, WEBP) are supported."
+      );
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setIsUploadingFile(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setUploadedFile({
+        base64,
+        mimeType: file.type || "application/pdf",
+        name: file.name,
+        size: file.size,
+      });
+      // Clear linked question attachment so uploaded file takes precedence
+      setPendingAttachment(null);
+      setIsUploadingFile(false);
+      toast.success(
+        language === "bn"
+          ? `"${file.name}" সফলভাবে যুক্ত হয়েছে! প্রশ্ন করুন বা সম্পূর্ণ সমাধান চান।`
+          : `"${file.name}" attached successfully!`
+      );
+      // Pre-fill prompt if input is currently empty
+      if (!inputMessage.trim()) {
+        setInputMessage(
+          language === "bn"
+            ? `সংযুক্ত প্রশ্নপত্র "${file.name}"-এর প্রতিটি প্রশ্ন ক্রমানুসারে সম্পূর্ণ সমাধান ও ব্যাখ্যা দিন।`
+            : `Please provide complete step-by-step solutions for every question in the attached exam paper "${file.name}".`
+        );
+      }
+    };
+    reader.onerror = () => {
+      setIsUploadingFile(false);
+      toast.error(
+        language === "bn" ? "ফাইল পড়তে সমস্যা হয়েছে।" : "Failed to read file."
+      );
+    };
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   // Clear Chat Confirmation Modal States
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
   const [clearingChat, setClearingChat] = useState(false);
@@ -354,10 +433,12 @@ export default function CheatSheetModal({
 
   const handleSendMessage = async (
     textToSend?: string,
-    paperAttachment?: { fileUrl?: string; resourceId?: number | null; paperTitle?: string; semester?: string } | null
+    paperAttachment?: { fileUrl?: string; resourceId?: number | null; paperTitle?: string; semester?: string } | null,
+    directUpload?: { base64: string; mimeType: string; name: string; size: number } | null
   ) => {
     const text = (textToSend || inputMessage).trim();
-    if (!text || sending) return;
+    const activeFile = directUpload !== undefined ? directUpload : uploadedFile;
+    if ((!text && !activeFile) || sending) return;
 
     if (!isCourseUnlocked) {
       toast.error(
@@ -369,21 +450,25 @@ export default function CheatSheetModal({
     }
 
     const activeAttachment = paperAttachment !== undefined ? paperAttachment : pendingAttachment;
+    const finalPrompt = text || (activeFile ? (language === "bn" ? `সংযুক্ত প্রশ্নপত্র "${activeFile.name}"-এর প্রতিটি প্রশ্নের সম্পূর্ণ নির্ভুল সমাধান দিন।` : `Please solve every question on the attached paper "${activeFile.name}".`) : "");
 
     const optimisticUserMsg = {
       id: Date.now(),
       role: "user",
-      content: text,
+      content: finalPrompt,
       createdAt: new Date().toISOString(),
       courseCode,
       teacherId: selectedTeacherId,
       fileUrl: activeAttachment?.fileUrl || null,
-      paperTitle: activeAttachment?.paperTitle || null,
+      paperTitle: activeFile?.name || activeAttachment?.paperTitle || null,
+      fileName: activeFile?.name || null,
+      fileMime: activeFile?.mimeType || null,
     };
 
     setMessages((prev) => [...prev, optimisticUserMsg]);
     setInputMessage("");
     setPendingAttachment(null);
+    setUploadedFile(null);
     setSending(true);
 
     // Build conversation history to send (excluding the current optimistic message)
@@ -398,14 +483,17 @@ export default function CheatSheetModal({
         courseTitle,
         courseDepartment,
         teacherName: activeTeacher?.name || null,
-        message: text,
+        message: finalPrompt,
         teacherId: selectedTeacherId,
         language,
         history: conversationHistory,
         fileUrl: activeAttachment?.fileUrl || null,
         resourceId: activeAttachment?.resourceId || null,
-        paperTitle: activeAttachment?.paperTitle || null,
+        paperTitle: activeFile?.name || activeAttachment?.paperTitle || null,
         semester: activeAttachment?.semester || null,
+        fileBase64: activeFile?.base64 || null,
+        fileMime: activeFile?.mimeType || null,
+        fileName: activeFile?.name || null,
       });
 
       if (res && res.assistantMessage) {
@@ -1160,17 +1248,15 @@ export default function CheatSheetModal({
 
                             {isUser ? (
                               <div>
-                                {(msg.paperTitle || msg.fileUrl) && (
+                                {(msg.paperTitle || msg.fileUrl || msg.fileName) && (
                                   <div className="flex items-center gap-1.5 px-2.5 py-1 mb-2 rounded-xl bg-white/20 text-white text-[10px] font-semibold border border-white/20">
                                     <FileText className="w-3 h-3 text-white shrink-0" />
                                     <span className="truncate max-w-[240px] sm:max-w-md">
-                                      {language === "bn" ? "সংযুক্ত প্রশ্নপত্র:" : "Attached Paper:"} {msg.paperTitle || "Exam Paper"}
+                                      {language === "bn" ? "সংযুক্ত প্রশ্নপত্র:" : "Attached Paper:"} {msg.fileName || msg.paperTitle || "Exam Paper"}
                                     </span>
-                                    {msg.fileUrl && (
-                                      <span className="ml-auto px-1.5 py-0.2 rounded bg-black/30 text-[9px] font-mono font-bold">
-                                        PDF
-                                      </span>
-                                    )}
+                                    <span className="ml-auto px-1.5 py-0.2 rounded bg-black/30 text-[9px] font-mono font-bold">
+                                      {msg.fileMime?.includes("image") ? "IMAGE" : "PDF"}
+                                    </span>
                                   </div>
                                 )}
                                 <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -1295,6 +1381,23 @@ export default function CheatSheetModal({
 
                 {/* 2. Direct Past Exam Papers List (No fake sub-questions, 1-click full paper solve) */}
                 <div className="space-y-2 pt-1">
+                  {/* Option to Upload Direct PDF from Device */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsQuestionLinkerOpen(false);
+                      fileInputRef.current?.click();
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-dashed border-emerald-500/60 hover:border-emerald-500 bg-emerald-50/60 hover:bg-emerald-50 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 transition-all flex items-center justify-center gap-2 text-xs font-bold shadow-sm cursor-pointer"
+                  >
+                    <Upload className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>
+                      {language === "bn"
+                        ? "ডিভাইস থেকে নিজস্ব প্রশ্নপত্র (PDF / ছবি) সরাসরি আপলোড করুন"
+                        : "Upload authentic PDF or question photo from device"}
+                    </span>
+                  </button>
+
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                       {language === "bn"
@@ -1448,7 +1551,32 @@ export default function CheatSheetModal({
 
             {/* Message Input Form */}
             <div className="p-3 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
-              {pendingAttachment && (
+              {/* Active Uploaded Real File Chip */}
+              {uploadedFile && (
+                <div className="flex items-center gap-2 px-3 py-1.5 mb-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-semibold w-fit animate-in fade-in shadow-sm">
+                  <FileText className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="truncate max-w-[220px] sm:max-w-md font-bold">
+                    {language === "bn" ? "আপলোডকৃত প্রশ্নপত্র:" : "Attached Exam Paper:"} {uploadedFile.name}
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded bg-emerald-600 text-white text-[9px] font-mono font-bold">
+                    {uploadedFile.mimeType.includes("image") ? "IMAGE" : "PDF"}
+                  </span>
+                  <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-mono">
+                    {(uploadedFile.size / 1024).toFixed(1)} KB
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setUploadedFile(null)}
+                    className="p-0.5 rounded-full hover:bg-emerald-200 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 cursor-pointer ml-1"
+                    title={language === "bn" ? "রিমুভ করুন" : "Remove attachment"}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+
+              {/* Linked Past Question Paper Chip */}
+              {!uploadedFile && pendingAttachment && (
                 <div className="flex items-center gap-2 px-3 py-1.5 mb-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900/60 text-blue-700 dark:text-blue-300 text-xs font-semibold w-fit animate-in fade-in">
                   <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                   <span className="truncate max-w-[240px] sm:max-w-md">
@@ -1469,6 +1597,7 @@ export default function CheatSheetModal({
                   </button>
                 </div>
               )}
+
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -1476,6 +1605,27 @@ export default function CheatSheetModal({
                 }}
                 className="flex items-center gap-2"
               >
+                {/* Real PDF / Image Upload Button with native file picker */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp"
+                  onChange={handleFileSelect}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingFile || sending}
+                  className="px-3 py-3 rounded-2xl border text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm bg-slate-100 hover:bg-emerald-50 dark:bg-slate-800 dark:hover:bg-emerald-950/40 border-slate-200 dark:border-slate-700 hover:border-emerald-500 text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400"
+                  title={language === "bn" ? "ডিভাইস থেকে আসল পিডিএফ বা প্রশ্নপত্রের ছবি আপলোড করুন" : "Upload authentic PDF or question photo"}
+                >
+                  <Upload className="w-4 h-4 text-emerald-500" />
+                  <span className="hidden sm:inline">
+                    {language === "bn" ? "পিডিএফ আপলোড" : "Upload PDF"}
+                  </span>
+                </button>
+
                 {/* Link Past Question Button Beside Text Field */}
                 {allLinkedItems.length > 0 && (
                   <button
@@ -1507,12 +1657,16 @@ export default function CheatSheetModal({
                     onChange={(e) => setInputMessage(e.target.value)}
                     placeholder={
                       language === "bn"
-                        ? activeTeacher
+                        ? uploadedFile
+                          ? `সংযুক্ত "${uploadedFile.name}" সম্পর্কে প্রশ্ন করুন (যেমন: সব সলভ দাও, ১ নং সমাধান)...`
+                          : activeTeacher
                           ? `${activeTeacher.name} [${teacherInit}] স্যারের পরীক্ষার সাজেশন বা প্রশ্ন লিখুন...`
-                          : "যেকোনো পরীক্ষার প্রশ্ন লিখুন বা 'প্রশ্ন লিংক' থেকে সিলেক্ট করুন..."
+                          : "যেকোনো পরীক্ষার প্রশ্ন লিখুন বা 'পিডিএফ আপলোড' / 'প্রশ্ন লিংক' করুন..."
+                        : uploadedFile
+                        ? `Ask question about "${uploadedFile.name}" (e.g. solve paper, solve Q1)...`
                         : activeTeacher
                         ? `Ask exam question or tips for ${activeTeacher.name}...`
-                        : "Ask exam question or select from 'Link Question'..."
+                        : "Ask exam question, or 'Upload PDF' / 'Link Question'..."
                     }
                     disabled={sending}
                     className="w-full pl-4 pr-10 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
@@ -1521,7 +1675,7 @@ export default function CheatSheetModal({
 
                 <button
                   type="submit"
-                  disabled={!inputMessage.trim() || sending}
+                  disabled={(!inputMessage.trim() && !uploadedFile) || sending}
                   className="px-4 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
                 >
                   <Send className="w-4 h-4" />

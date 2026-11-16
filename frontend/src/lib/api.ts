@@ -1195,6 +1195,9 @@ export const api = {
       resourceId?: number | null;
       paperTitle?: string | null;
       semester?: string | null;
+      fileBase64?: string | null;
+      fileMime?: string | null;
+      fileName?: string | null;
     }) => {
       const token = getToken();
       try {
