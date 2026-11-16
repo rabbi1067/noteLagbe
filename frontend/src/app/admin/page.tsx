@@ -3979,12 +3979,12 @@ export default function AdminDashboardPage() {
       {/* ========================================================================= */}
       {/* 1. TOP UNIFIED EXECUTIVE ADMIN HEADER (64px / h-16)                       */}
       {/* ========================================================================= */}
-      <header className="h-16 shrink-0 bg-white dark:bg-[#0d1527] border-b border-slate-200 dark:border-slate-800/80 px-4 sm:px-6 flex items-center justify-between z-30 transition-colors">
+      <header className="h-16 shrink-0 bg-white dark:bg-[#0d1527] border-b border-slate-200 dark:border-slate-800/80 px-3 sm:px-6 flex items-center justify-between z-30 transition-colors">
         {/* Left: Mobile Toggle, Brand & Breadcrumb */}
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
             onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-            className="lg:hidden p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="lg:hidden p-1.5 sm:p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
             title="Toggle Menu"
           >
             <Menu className="w-5 h-5" />
@@ -4032,23 +4032,23 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Right: Quick Action, Refresh, Notifications, Lang, Theme, User Profile */}
-        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {activeTab === "departments" && (
             <button
               onClick={openAddDepartmentModal}
-              className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
+              title="Add Department"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Add Department</span>
+              <span className="hidden sm:inline">Add Department</span>
             </button>
           )}
-
-
 
           {activeTab === "resources" && (
             <button
               onClick={openNewResourceModal}
-              className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
+              title="Upload Material"
             >
               <Plus className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Upload Material</span>
@@ -4058,52 +4058,54 @@ export default function AdminDashboardPage() {
           {activeTab === "courses" && (
             <button
               onClick={openNewCourseModal}
-              className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
+              title="Add Course"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Add Course</span>
+              <span className="hidden sm:inline">Add Course</span>
             </button>
           )}
 
           {activeTab === "teachers" && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 onClick={handleSyncCseFaculties}
                 disabled={syncingCse}
-                className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
                 title="Sync CSE Faculty directly from official website (cse.seu.edu.bd/cse-faculties-staff)"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${syncingCse ? "animate-spin text-emerald-500" : ""}`} />
-                <span>{syncingCse ? "Syncing..." : "⚡ Sync Official CSE"}</span>
+                <span className="hidden md:inline">{syncingCse ? "Syncing..." : "⚡ Sync Official CSE"}</span>
               </button>
               <button
                 onClick={openNewTeacherModal}
-                className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
+                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
+                title="Add Faculty"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add Faculty</span>
+                <span className="hidden sm:inline">Add Faculty</span>
               </button>
             </div>
           )}
 
-
           {activeTab === "notices" && (
             <button
               onClick={openNewNoticeModal}
-              className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
+              title="Add Notice"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Add Notice</span>
+              <span className="hidden sm:inline">Add Notice</span>
             </button>
           )}
 
           {/* Header Action: Security & Activity Logs */}
           {activeTab === "activityLogs" && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               {isSuperAdmin && user?.role === "ROLE_SUPER_ADMIN" && (
                 <button
                   onClick={handleOpenClearLogsModal}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-900/50 shadow-xs transition-all"
+                  className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-900/50 shadow-xs transition-all"
                   title="Clear All Activity Logs (Super Admin Panel Only)"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -4113,7 +4115,7 @@ export default function AdminDashboardPage() {
               <button
                 onClick={() => loadActivityLogs(activityLogPage, activityLogSearch, activityLogCategory)}
                 disabled={loadingActivityLogs}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-xs transition-all disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-xs transition-all disabled:opacity-50"
                 title="Refresh Activity Logs"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${loadingActivityLogs ? "animate-spin text-emerald-500" : ""}`} />
@@ -4129,17 +4131,18 @@ export default function AdminDashboardPage() {
                 setStaffStudentId("");
                 setShowStaffModal(true);
               }}
-              className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow-sm transition-all"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow-sm transition-all"
+              title={isSuperAdmin ? "Add User / Staff" : "Add Student"}
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>{isSuperAdmin ? "Add User / Staff" : "Add Student"}</span>
+              <span className="hidden sm:inline">{isSuperAdmin ? "Add User / Staff" : "Add Student"}</span>
             </button>
           )}
 
           <button
             onClick={() => loadAllAdminData(true)}
             disabled={loading}
-            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors border border-slate-200 dark:border-slate-700/60"
+            className="hidden sm:inline-flex p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors border border-slate-200 dark:border-slate-700/60"
             title="Refresh All Data"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -4149,7 +4152,7 @@ export default function AdminDashboardPage() {
 
           <button
             onClick={toggleLanguage}
-            className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/60 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition-colors"
+            className="px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/60 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition-colors"
             title="Toggle Language"
           >
             {language === "bn" ? "বাং" : "EN"}
@@ -4157,7 +4160,7 @@ export default function AdminDashboardPage() {
 
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/60 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
+            className="p-1.5 sm:p-2 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/60 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
             title="Toggle Theme"
           >
             {isDark ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-slate-600" />}
