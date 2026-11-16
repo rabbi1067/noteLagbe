@@ -294,7 +294,7 @@ export default function FloatingCommunityChat() {
     setTimeout(performScroll, 250);
   }, []);
 
-  // Listen for external "notelagbe-open-chat" event
+  // Listen for external "notelagbe-open-chat", "notelagbe-close-chat", "notelagbe-toggle-chat" events
   useEffect(() => {
     const handleOpenChat = (e: any) => {
       setIsOpen(true);
@@ -304,9 +304,36 @@ export default function FloatingCommunityChat() {
         }, 200);
       }
     };
+    const handleCloseChat = () => {
+      setIsOpen(false);
+    };
+    const handleToggleChat = () => {
+      setIsOpen((prev) => !prev);
+    };
+
     window.addEventListener("notelagbe-open-chat", handleOpenChat);
-    return () => window.removeEventListener("notelagbe-open-chat", handleOpenChat);
+    window.addEventListener("notelagbe-close-chat", handleCloseChat);
+    window.addEventListener("notelagbe-toggle-chat", handleToggleChat);
+    return () => {
+      window.removeEventListener("notelagbe-open-chat", handleOpenChat);
+      window.removeEventListener("notelagbe-close-chat", handleCloseChat);
+      window.removeEventListener("notelagbe-toggle-chat", handleToggleChat);
+    };
   }, [scrollToMessage]);
+
+  // Broadcast chat state to MobileBottomNav and other components
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("notelagbe-chat-state", { detail: { isOpen } }));
+    }
+  }, [isOpen]);
+
+  // Broadcast unseen messages count to MobileBottomNav
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("notelagbe-chat-unseen", { detail: { count: unseenCount } }));
+    }
+  }, [unseenCount]);
 
   // Extract first recognized URL or route from text
   const extractUrlFromText = (text?: string | null): string | null => {
@@ -1295,7 +1322,7 @@ export default function FloatingCommunityChat() {
             : "transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease",
         }}
         onPointerDown={handleBubblePointerDown}
-        className={`group select-none cursor-grab active:cursor-grabbing ${
+        className={`hidden lg:block group select-none cursor-grab active:cursor-grabbing ${
           isOpen ? "opacity-0 pointer-events-none scale-75" : "opacity-100 scale-100"
         }`}
         title={

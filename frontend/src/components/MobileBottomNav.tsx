@@ -17,6 +17,7 @@ import {
   Sparkles, 
   ExternalLink,
   Laptop,
+  MessageSquare,
   User,
   ShieldCheck,
   ChevronRight,
@@ -33,6 +34,40 @@ export default function MobileBottomNav() {
   const { user, isAuthenticated, isAdmin, setShowAuthModal } = useAuth();
   const { language, t } = useLanguage();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatUnseenCount, setChatUnseenCount] = useState(0);
+
+  // Sync chat state with FloatingCommunityChat (SEU Campus Live)
+  useEffect(() => {
+    const handleChatState = (e: any) => {
+      if (typeof e.detail?.isOpen === "boolean") {
+        setIsChatOpen(e.detail.isOpen);
+      }
+    };
+    const handleChatUnseen = (e: any) => {
+      if (typeof e.detail?.count === "number") {
+        setChatUnseenCount(e.detail.count);
+      }
+    };
+
+    window.addEventListener("notelagbe-chat-state", handleChatState);
+    window.addEventListener("notelagbe-chat-unseen", handleChatUnseen);
+    return () => {
+      window.removeEventListener("notelagbe-chat-state", handleChatState);
+      window.removeEventListener("notelagbe-chat-unseen", handleChatUnseen);
+    };
+  }, []);
+
+  const handleToggleCampusLive = () => {
+    if (typeof window !== "undefined") {
+      setDrawerOpen(false);
+      if (isChatOpen) {
+        window.dispatchEvent(new CustomEvent("notelagbe-close-chat"));
+      } else {
+        window.dispatchEvent(new CustomEvent("notelagbe-open-chat"));
+      }
+    }
+  };
 
   // Auto-close drawer on route navigation
   useEffect(() => {
@@ -138,26 +173,42 @@ export default function MobileBottomNav() {
             </span>
           </div>
 
-          {/* 4. SEU CANVAS Live Portal Button */}
-          <a
-            href="https://canvas.seu.edu.bd"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex flex-col items-center justify-center flex-1 h-full py-1 text-slate-600 dark:text-slate-400 hover:text-cyan-500 transition-all font-medium group active:scale-95"
-            title="Southeast University Canvas Portal (Live)"
+          {/* 4. SEU CAMPUS Live Community Chat Button */}
+          <button
+            type="button"
+            onClick={handleToggleCampusLive}
+            className={`flex flex-col items-center justify-center flex-1 h-full py-1 transition-all active:scale-95 cursor-pointer relative group ${
+              isChatOpen
+                ? "text-cyan-600 dark:text-cyan-400 font-extrabold"
+                : "text-slate-600 dark:text-slate-400 hover:text-cyan-500 font-medium"
+            }`}
+            title={language === "bn" ? "SEU ক্যাম্পাস লাইভ" : "SEU Campus Live"}
           >
             <div className="relative">
-              <Laptop className="w-5 h-5 group-hover:scale-105 transition-transform" />
-              <span className="absolute -top-1 -right-1.5 flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-80" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500 shadow-[0_0_6px_#06b6d4]" />
-              </span>
+              <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              {chatUnseenCount > 0 && !isChatOpen ? (
+                <span className="absolute -top-1.5 -right-2.5 min-w-4 h-4 px-1 rounded-full bg-rose-600 text-white text-[9px] font-black flex items-center justify-center shadow-[0_0_8px_rgba(225,29,72,0.8)] border border-white dark:border-slate-900 animate-in zoom-in-75">
+                  {chatUnseenCount > 99 ? "99+" : chatUnseenCount}
+                </span>
+              ) : (
+                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-80" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500 shadow-[0_0_6px_#06b6d4]" />
+                </span>
+              )}
+              {isChatOpen && (
+                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_6px_#06b6d4]" />
+              )}
             </div>
             <div className="flex items-center gap-0.5 mt-1 leading-none">
-              <span className="text-[10px] sm:text-[11px] tracking-tight">Canvas</span>
-              <span className="text-[8px] font-black uppercase text-cyan-600 dark:text-cyan-400">Live</span>
+              <span className="text-[10px] sm:text-[11px] tracking-tight">
+                {language === "bn" ? "ক্যাম্পাস" : "Campus"}
+              </span>
+              <span className="text-[8px] font-black uppercase text-cyan-600 dark:text-cyan-400">
+                Live
+              </span>
             </div>
-          </a>
+          </button>
 
           {/* 5. Contribute (+2 Free) */}
           <Link
@@ -340,6 +391,29 @@ export default function MobileBottomNav() {
                   </div>
                   <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                 </Link>
+
+                {/* SEU Campus Live Community */}
+                <button
+                  type="button"
+                  onClick={handleToggleCampusLive}
+                  className="w-full flex items-center justify-between p-3 hover:bg-white dark:hover:bg-slate-800/80 transition-colors text-left cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <MessageSquare className="w-4 h-4 text-cyan-500" />
+                    <span className="font-bold text-slate-800 dark:text-slate-200">
+                      {language === "bn" ? "SEU ক্যাম্পাস লাইভ কমিউনিটি" : "SEU Campus Live Community"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-80" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+                    </span>
+                    <span className="text-[9px] font-black uppercase text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/60 px-1.5 py-0.5 rounded-full border border-cyan-200 dark:border-cyan-800">
+                      Live
+                    </span>
+                  </div>
+                </button>
 
                 {/* Contribute Material */}
                 <Link
