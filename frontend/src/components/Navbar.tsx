@@ -131,14 +131,32 @@ export default function Navbar() {
               </span>
             </button>
 
-            {/* Dark / Light Mode Toggle */}
+            {/* Day / Night Theme Switcher Pill */}
             <button
               onClick={toggleTheme}
-              className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center shrink-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 shadow-sm cursor-pointer active:scale-90"
-              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              aria-label="Toggle Theme"
+              className="flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-[10px] sm:text-xs font-bold transition-all hover:border-amber-400/60 dark:hover:border-indigo-400/60 shadow-sm shrink-0 cursor-pointer active:scale-95"
+              title={isDark ? "Switch to Day Mode (Light)" : "Switch to Night Mode (Dark)"}
+              aria-label="Toggle Day / Night Mode"
             >
-              {isDark ? <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" /> : <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-700 shrink-0" />}
+              {/* On mobile (< md): single icon */}
+              <span className="md:hidden flex items-center justify-center">
+                {isDark ? (
+                  <Sun className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                ) : (
+                  <Moon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                )}
+              </span>
+
+              {/* On md+: dual switch ☀️ Day | 🌙 Night */}
+              <span className={`hidden md:inline-flex items-center gap-1 ${!isDark ? "text-amber-600 dark:text-amber-400 font-black" : "text-slate-400 font-semibold"}`}>
+                <Sun className={`w-3.5 h-3.5 ${!isDark ? "text-amber-500" : "text-slate-400"}`} />
+                <span>Day</span>
+              </span>
+              <span className="hidden md:inline text-slate-300 dark:text-slate-600 text-[10px] font-light">|</span>
+              <span className={`hidden md:inline-flex items-center gap-1 ${isDark ? "text-indigo-600 dark:text-indigo-400 font-black" : "text-slate-400 font-semibold"}`}>
+                <Moon className={`w-3.5 h-3.5 ${isDark ? "text-indigo-400" : "text-slate-400"}`} />
+                <span>Night</span>
+              </span>
             </button>
 
             {/* User Profile or Sign In Button */}
