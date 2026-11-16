@@ -187,31 +187,6 @@ export default function ContributePage() {
     return list.length > 0 ? list : courses;
   }, [courses, selectedDepartment]);
 
-  // Dynamic quick-pick recommendations for upcoming reward courses (excluding uploaded course & already selected)
-  const recommendedRewardPicks = React.useMemo(() => {
-    return rewardCourses
-      .filter((c) => {
-        const code = c.code?.toLowerCase();
-        return (
-          (!courseCode || code !== courseCode.toLowerCase()) &&
-          (!requestedCourseCode1 || code !== requestedCourseCode1.toLowerCase()) &&
-          (!requestedCourseCode2 || code !== requestedCourseCode2.toLowerCase())
-        );
-      })
-      .slice(0, 5);
-  }, [rewardCourses, courseCode, requestedCourseCode1, requestedCourseCode2]);
-
-  const handleQuickPickReward = (code: string) => {
-    if (!requestedCourseCode1) {
-      setRequestedCourseCode1(code);
-    } else if (!requestedCourseCode2 && requestedCourseCode1.toLowerCase() !== code.toLowerCase()) {
-      setRequestedCourseCode2(code);
-    } else if (requestedCourseCode1.toLowerCase() === code.toLowerCase()) {
-      // Slot 1 already matches
-    } else {
-      setRequestedCourseCode2(code);
-    }
-  };
 
   const currentDepartment = DEPARTMENTS.find((d) => d.id === selectedDepartment) || DEPARTMENTS[0];
 
@@ -1943,25 +1918,6 @@ export default function ContributePage() {
                 : `💡 Guidance: Choose any 2 upcoming courses you plan to study next semester (different from ${courseCode || "e.g. CSE141"} which you are uploading for). Once verified by an admin, these 2 courses will unlock for 3 months completely free!`}
             </p>
 
-            {/* Quick-Pick Popular Recommendation Chips */}
-            {recommendedRewardPicks.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                  {language === "bn" ? "💡 দ্রুত নির্বাচন করুন (জনপ্রিয়):" : "💡 Quick picks:"}
-                </span>
-                {recommendedRewardPicks.map((pick) => (
-                  <button
-                    key={pick.code}
-                    type="button"
-                    onClick={() => handleQuickPickReward(pick.code)}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 transition-all cursor-pointer flex items-center gap-1 active:scale-95 shadow-2xs"
-                    title={pick.title}
-                  >
-                    <span>+ {pick.code}</span>
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* Alert if student selected the exact course they are uploading */}
             {courseCode && (courseCode.toLowerCase() === requestedCourseCode1.toLowerCase() || courseCode.toLowerCase() === requestedCourseCode2.toLowerCase()) && (
