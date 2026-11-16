@@ -4145,7 +4145,7 @@ export default function AdminDashboardPage() {
           <div className="relative pl-2 sm:pl-3 border-l border-slate-200 dark:border-slate-800" ref={profileDropdownRef}>
             <button
               onClick={() => setProfileDropdownOpen((prev) => !prev)}
-              className={`flex items-center gap-2 sm:gap-2.5 p-1 sm:px-2.5 sm:py-1.5 rounded-2xl transition-all duration-150 border cursor-pointer select-none ${
+              className={`flex items-center gap-1.5 lg:gap-2.5 p-1 lg:px-2.5 lg:py-1.5 rounded-2xl transition-all duration-150 border cursor-pointer select-none ${
                 profileDropdownOpen
                   ? "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 shadow-sm"
                   : "border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:border-slate-200 dark:hover:border-slate-700/60"
@@ -4160,7 +4160,7 @@ export default function AdminDashboardPage() {
                   user?.name ? user.name[0]?.toUpperCase() : "A"
                 )}
               </div>
-              <div className="hidden sm:block text-left">
+              <div className="hidden lg:block text-left">
                 <div className="text-xs font-bold text-slate-900 dark:text-white leading-none truncate max-w-[130px]">
                   {user?.name || "Admin"}
                 </div>
@@ -4170,7 +4170,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
               <ChevronDown
-                className={`w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-transform duration-200 ${
+                className={`hidden lg:block w-3.5 h-3.5 text-slate-400 dark:text-slate-500 transition-transform duration-200 ${
                   profileDropdownOpen ? "rotate-180 text-blue-500" : ""
                 }`}
               />

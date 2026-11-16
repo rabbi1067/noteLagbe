@@ -147,21 +147,23 @@ export default function Navbar() {
                 <div className="relative">
                   <button
                     onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                    className="flex items-center gap-1 sm:gap-1.5 md:gap-2 p-1 sm:p-1.5 pl-1.5 sm:pl-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer min-w-0 max-w-[125px] sm:max-w-[165px] md:max-w-[210px]"
+                    className="flex items-center gap-1.5 lg:gap-2 p-1 sm:p-1 lg:px-2.5 lg:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer shrink-0"
+                    title={user.name}
+                    aria-label="User Account Menu"
                   >
-                    <div className="w-7 h-7 sm:w-7 sm:h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white text-xs font-bold uppercase shadow-sm overflow-hidden shrink-0">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white text-xs font-bold uppercase shadow-sm overflow-hidden shrink-0">
                       {user.avatarUrl ? (
                         <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
                       ) : (
                         user.name.charAt(0)
                       )}
                     </div>
-                    {/* User Name & Role Pill - Fully visible with zero overflow */}
-                    <div className="flex flex-col text-left min-w-0 flex-1 pr-0.5">
-                      <span className="text-[11px] sm:text-xs font-bold text-slate-900 dark:text-white leading-tight truncate">
+                    {/* User Name & Role Pill - Hidden on mobile and tablet, visible on desktop (lg+) */}
+                    <div className="hidden lg:flex flex-col text-left min-w-0 pr-0.5">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white leading-tight truncate max-w-[130px]">
                         {user.name}
                       </span>
-                      <span className="hidden sm:block text-[9px] sm:text-[10px] text-blue-600 dark:text-blue-400 font-medium truncate">
+                      <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium truncate max-w-[130px]">
                         {isAdmin 
                           ? (language === "bn" ? "অ্যাডমিন" : "Admin / Staff") 
                           : (user.planName ? user.planName.split(" (")[0] : (language === "bn" ? "শিক্ষার্থী" : "Student"))}
