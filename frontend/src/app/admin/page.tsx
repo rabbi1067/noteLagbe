@@ -4152,7 +4152,7 @@ export default function AdminDashboardPage() {
 
           <button
             onClick={toggleLanguage}
-            className="px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/60 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition-colors"
+            className="hidden sm:inline-flex px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/60 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition-colors"
             title="Toggle Language"
           >
             {language === "bn" ? "বাং" : "EN"}
@@ -4160,7 +4160,7 @@ export default function AdminDashboardPage() {
 
           <button
             onClick={toggleTheme}
-            className="p-1.5 sm:p-2 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/60 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
+            className="hidden sm:inline-flex p-1.5 sm:p-2 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/60 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
             title="Toggle Theme"
           >
             {isDark ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5 text-slate-600" />}
@@ -4296,6 +4296,40 @@ export default function AdminDashboardPage() {
                     </div>
                     <span className="text-[10px] text-slate-400 font-mono">SEU Live</span>
                   </Link>
+                </div>
+
+                {/* Mobile Quick Toggles: Language & Theme */}
+                <div className="sm:hidden p-2 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400">Language:</span>
+                    <button
+                      type="button"
+                      onClick={toggleLanguage}
+                      className="px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-blue-600 dark:text-blue-400 shadow-2xs cursor-pointer"
+                    >
+                      {language === "bn" ? "🇧🇩 বাংলা" : "🇺🇸 English"}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400">Theme:</span>
+                    <button
+                      type="button"
+                      onClick={toggleTheme}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 shadow-2xs cursor-pointer"
+                    >
+                      {isDark ? (
+                        <>
+                          <Sun className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Light Mode</span>
+                        </>
+                      ) : (
+                        <>
+                          <Moon className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>Dark Mode</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Divider */}
