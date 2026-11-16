@@ -192,6 +192,23 @@ export function removeToken() {
   }
 }
 
+export async function refreshAuthToken(): Promise<boolean> {
+  const token = getToken();
+  if (!token) return false;
+  try {
+    const res = await request<{ token: string }>("/auth/refresh", {
+      method: "POST",
+    });
+    if (res && res.token) {
+      setToken(res.token);
+      return true;
+    }
+  } catch {
+    // Fail silently
+  }
+  return false;
+}
+
 export function uploadWithProgress<T>(
   endpoint: string,
   formData: FormData,
@@ -645,6 +662,7 @@ export const api = {
     register: (data: any) => request<any>("/auth/register", { method: "POST", body: JSON.stringify(data) }),
     googleLogin: (data: any) => request<any>("/auth/google", { method: "POST", body: JSON.stringify(data) }),
     logout: () => request<any>("/auth/logout", { method: "POST" }),
+    refresh: () => request<any>("/auth/refresh", { method: "POST" }),
     getMe: () => request<any>("/auth/me"),
     updateProfile: (data: { name?: string; phone?: string; address?: string; avatarUrl?: string | null }) =>
       request<any>("/auth/profile", { method: "PUT", body: JSON.stringify(data) }),

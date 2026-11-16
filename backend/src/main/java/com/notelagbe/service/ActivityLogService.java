@@ -115,27 +115,37 @@ public class ActivityLogService {
     public static String getClientIp(HttpServletRequest request) {
         if (request == null) return "127.0.0.1";
 
-        String[] headers = {
-                "CF-Connecting-IP",      // Cloudflare tunnel
-                "True-Client-IP",
-                "X-Client-IP",
-                "X-Forwarded-For",
-                "X-Real-IP",
-                "Proxy-Client-IP",
-                "WL-Proxy-Client-IP"
-        };
+        // Priority 1: Verified Cloudflare tunnel (only trust if CF-Ray is present)
+        String cfRay = request.getHeader("CF-Ray");
+        if (cfRay != null && !cfRay.isBlank()) {
+            String cfIp = request.getHeader("CF-Connecting-IP");
+            if (cfIp != null && !cfIp.isBlank() && !"unknown".equalsIgnoreCase(cfIp)) {
+                return cfIp.trim();
+            }
+        }
 
-        for (String header : headers) {
-            String val = request.getHeader(header);
-            if (val != null && !val.isBlank() && !"unknown".equalsIgnoreCase(val)) {
-                String[] ips = val.split(",");
-                for (String ip : ips) {
-                    String clean = ip.trim();
-                    if (!clean.isEmpty() && !"unknown".equalsIgnoreCase(clean)) {
-                        return clean;
-                    }
+        // Priority 2: Reverse Proxy (Render / Vercel):
+        // Reverse proxies append client IP to the end. Parse right-to-left to prevent header spoofing.
+        String xf = request.getHeader("X-Forwarded-For");
+        if (xf != null && !xf.isBlank() && !"unknown".equalsIgnoreCase(xf)) {
+            String[] ips = xf.split(",");
+            for (int i = ips.length - 1; i >= 0; i--) {
+                String clean = ips[i].trim();
+                if (!clean.isEmpty() && !"unknown".equalsIgnoreCase(clean) && !isInternalIp(clean)) {
+                    return clean;
                 }
             }
+            for (int i = ips.length - 1; i >= 0; i--) {
+                String clean = ips[i].trim();
+                if (!clean.isEmpty() && !"unknown".equalsIgnoreCase(clean)) {
+                    return clean;
+                }
+            }
+        }
+
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank() && !"unknown".equalsIgnoreCase(realIp)) {
+            return realIp.trim();
         }
 
         String remote = request.getRemoteAddr();
@@ -143,6 +153,14 @@ public class ActivityLogService {
             return "127.0.0.1";
         }
         return remote != null ? remote : "127.0.0.1";
+    }
+
+    private static boolean isInternalIp(String ip) {
+        if (ip == null) return false;
+        return ip.startsWith("10.") || ip.startsWith("192.168.") || ip.startsWith("172.16.")
+                || ip.startsWith("172.17.") || ip.startsWith("172.18.") || ip.startsWith("172.19.")
+                || ip.startsWith("172.2") || ip.startsWith("172.3") || ip.startsWith("169.254.")
+                || ip.startsWith("fc00:") || ip.startsWith("fe80:") || "127.0.0.1".equals(ip);
     }
 
     /**

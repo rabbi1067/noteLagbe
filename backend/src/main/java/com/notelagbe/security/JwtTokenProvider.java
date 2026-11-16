@@ -17,15 +17,22 @@ import java.util.stream.Collectors;
 @Component
 public class JwtTokenProvider {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JwtTokenProvider.class);
+
     private final SecretKey secretKey;
     private final long expirationMs;
     private final long refreshExpirationMs;
 
     public JwtTokenProvider(
-            @Value("${app.jwt.secret}") String secret,
-            @Value("${app.jwt.expiration-ms}") long expirationMs,
-            @Value("${app.jwt.refresh-expiration-ms}") long refreshExpirationMs) {
-        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+            @Value("${app.jwt.secret:}") String secret,
+            @Value("${app.jwt.expiration-ms:86400000}") long expirationMs,
+            @Value("${app.jwt.refresh-expiration-ms:604800000}") long refreshExpirationMs) {
+        if (secret == null || secret.trim().length() < 32) {
+            log.warn("JWT secret is not provided via JWT_SECRET env var or too short. Generating cryptographically secure ephemeral HS256 key for runtime session.");
+            this.secretKey = Jwts.SIG.HS256.key().build();
+        } else {
+            this.secretKey = Keys.hmacShaKeyFor(secret.trim().getBytes(StandardCharsets.UTF_8));
+        }
         this.expirationMs = expirationMs;
         this.refreshExpirationMs = refreshExpirationMs;
     }

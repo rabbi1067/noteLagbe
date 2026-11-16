@@ -155,39 +155,15 @@ public class ContributionService {
                 : "CSE";
 
         Course uploadCourse = courseRepository.findByCodeIgnoreCase(uploadCode)
-                .orElseGet(() -> {
-                    Course c = new Course();
-                    c.setCode(uploadCode.toUpperCase());
-                    c.setTitle(uploadCode.toUpperCase() + " (" + targetDept + " Contributed Course)");
-                    c.setCredits(3.0);
-                    c.setSemester(1);
-                    c.setDepartment(targetDept);
-                    return courseRepository.save(c);
-                });
+                .orElseThrow(() -> new ApiException("Upload target course not found in official catalog: " + uploadCode));
 
-        Course rewardCourse1 = courseRepository.findByCodeIgnoreCase(request.getRequestedCourseCode1().trim())
-                .orElseGet(() -> {
-                    Course c = new Course();
-                    String rCode = request.getRequestedCourseCode1().trim().toUpperCase();
-                    c.setCode(rCode);
-                    c.setTitle(rCode + " (Reward Course)");
-                    c.setCredits(3.0);
-                    c.setSemester(1);
-                    c.setDepartment("CSE");
-                    return courseRepository.save(c);
-                });
+        String rCode1 = request.getRequestedCourseCode1().trim();
+        Course rewardCourse1 = courseRepository.findByCodeIgnoreCase(rCode1)
+                .orElseThrow(() -> new ApiException("Reward course 1 not found in official catalog: " + rCode1));
 
-        Course rewardCourse2 = courseRepository.findByCodeIgnoreCase(request.getRequestedCourseCode2().trim())
-                .orElseGet(() -> {
-                    Course c = new Course();
-                    String rCode = request.getRequestedCourseCode2().trim().toUpperCase();
-                    c.setCode(rCode);
-                    c.setTitle(rCode + " (Reward Course)");
-                    c.setCredits(3.0);
-                    c.setSemester(1);
-                    c.setDepartment("CSE");
-                    return courseRepository.save(c);
-                });
+        String rCode2 = request.getRequestedCourseCode2().trim();
+        Course rewardCourse2 = courseRepository.findByCodeIgnoreCase(rCode2)
+                .orElseThrow(() -> new ApiException("Reward course 2 not found in official catalog: " + rCode2));
 
         // Ensure upload course department is recorded
         if (uploadCourse.getDepartment() == null || uploadCourse.getDepartment().trim().isEmpty()) {

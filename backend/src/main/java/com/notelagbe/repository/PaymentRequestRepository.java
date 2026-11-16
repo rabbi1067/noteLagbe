@@ -14,6 +14,8 @@ public interface PaymentRequestRepository extends JpaRepository<PaymentRequest, 
     List<PaymentRequest> findAllByOrderByCreatedAtDesc();
     List<PaymentRequest> findByStatusOrderByCreatedAtDesc(PaymentStatus status);
     List<PaymentRequest> findByUserIdOrderByCreatedAtDesc(Long userId);
+    List<PaymentRequest> findByTransactionIdOrderByCreatedAtDesc(String transactionId);
     boolean existsByTransactionId(String transactionId);
+    boolean existsByTransactionIdAndStatusNot(String transactionId, PaymentStatus status);
     void deleteByUserId(Long userId);
 }

@@ -61,11 +61,27 @@ public class PaymentService {
         String cleanPhone = inputSanitizationService.sanitizeAndValidatePhoneNumber(request.getSenderPhone());
         String cleanSlip = inputSanitizationService.sanitizePlainText(request.getSlipUrl());
 
-        if (paymentRequestRepository.existsByTransactionId(cleanTrx)) {
-            throw new ApiException("This Transaction ID has already been submitted.");
+        // Verify duplicate or existing transaction ID usage:
+        List<PaymentRequest> existingRequests = paymentRequestRepository.findByTransactionIdOrderByCreatedAtDesc(cleanTrx);
+        PaymentRequest existingToReuse = null;
+        for (PaymentRequest existing : existingRequests) {
+            if (existing.getStatus() == PaymentStatus.APPROVED) {
+                throw new ApiException("This Transaction ID has already been verified and approved.");
+            }
+            if (existing.getStatus() == PaymentStatus.PENDING) {
+                throw new ApiException("A payment verification request with this Transaction ID is currently pending review.");
+            }
+            if (existing.getStatus() == PaymentStatus.REJECTED) {
+                if (!existing.getUser().getId().equals(user.getId())) {
+                    throw new ApiException("This Transaction ID was previously submitted by another student account.");
+                }
+                if (existingToReuse == null) {
+                    existingToReuse = existing;
+                }
+            }
         }
 
-        PaymentRequest pr = new PaymentRequest();
+        PaymentRequest pr = existingToReuse != null ? existingToReuse : new PaymentRequest();
         pr.setUser(user);
         pr.setPlanType(request.getPlanType());
         pr.setPaymentMethod(request.getPaymentMethod());
@@ -75,6 +91,9 @@ public class PaymentService {
         pr.setSlipUrl(cleanSlip);
         pr.setSelectedCoursesJson(request.getSelectedCoursesJson());
         pr.setStatus(PaymentStatus.PENDING);
+        pr.setAdminNotes(null);
+        pr.setReviewedAt(null);
+        pr.setCreatedAt(LocalDateTime.now());
 
         PaymentRequest saved = paymentRequestRepository.save(pr);
         liveSyncService.broadcast("payment", "created", saved.getId());

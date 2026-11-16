@@ -283,4 +283,10 @@ public class AuthController {
         }
         return ResponseEntity.ok(Map.of("authorized", true));
     }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refreshToken(HttpServletRequest httpRequest) {
+        String authHeader = httpRequest.getHeader("Authorization");
+        return ResponseEntity.ok(authService.refreshToken(authHeader));
+    }
 }

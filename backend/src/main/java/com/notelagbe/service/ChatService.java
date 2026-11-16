@@ -168,9 +168,17 @@ public class ChatService {
         msg.setCreatedAt(LocalDateTime.now());
 
         if (req.getReplyToId() != null) {
-            msg.setReplyToId(req.getReplyToId());
-            msg.setReplyToSender(req.getReplyToSender());
-            msg.setReplyToText(req.getReplyToText());
+            chatMessageRepository.findById(req.getReplyToId()).ifPresent(parentMsg -> {
+                msg.setReplyToId(parentMsg.getId());
+                msg.setReplyToSender(parentMsg.getSenderName() != null ? parentMsg.getSenderName() : "Community Member");
+                String snippet = parentMsg.getText();
+                if (snippet == null || snippet.isBlank()) {
+                    snippet = "VOICE".equalsIgnoreCase(parentMsg.getMessageType()) ? "Voice Message" : "Shared Media";
+                } else if (snippet.length() > 100) {
+                    snippet = snippet.substring(0, 97) + "...";
+                }
+                msg.setReplyToText(snippet);
+            });
         }
 
         ChatMessage saved = chatMessageRepository.save(msg);

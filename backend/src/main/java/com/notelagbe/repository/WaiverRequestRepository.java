@@ -10,5 +10,6 @@ public interface WaiverRequestRepository extends JpaRepository<WaiverRequest, Lo
     List<WaiverRequest> findAllByOrderByCreatedAtDesc();
     List<WaiverRequest> findByStatusOrderByCreatedAtDesc(PaymentStatus status);
     List<WaiverRequest> findByUserIdOrderByCreatedAtDesc(Long userId);
+    boolean existsByUserIdAndStatus(Long userId, PaymentStatus status);
     void deleteByUserId(Long userId);
 }

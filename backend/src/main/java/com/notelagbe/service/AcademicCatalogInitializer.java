@@ -130,12 +130,12 @@ public class AcademicCatalogInitializer implements CommandLineRunner {
     }
 
     private void ensureSuperAdminUser() {
-        String adminEmail = (initialAdminEmail != null && !initialAdminEmail.isBlank())
-                ? initialAdminEmail.trim().toLowerCase()
-                : "admin@seu.edu.bd";
-        String adminPass = (initialAdminPassword != null && !initialAdminPassword.isBlank())
-                ? initialAdminPassword.trim()
-                : "Admin@Password123!";
+        if (initialAdminEmail == null || initialAdminEmail.isBlank() || initialAdminPassword == null || initialAdminPassword.isBlank()) {
+            log.info(">>> No initial admin credentials configured via INITIAL_ADMIN_EMAIL/INITIAL_ADMIN_PASSWORD. Skipping auto-provisioning.");
+            return;
+        }
+        String adminEmail = initialAdminEmail.trim().toLowerCase();
+        String adminPass = initialAdminPassword.trim();
 
         Optional<User> existingAdmin = userRepository.findByEmail(adminEmail);
         if (existingAdmin.isPresent()) {

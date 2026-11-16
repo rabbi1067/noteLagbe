@@ -202,22 +202,45 @@ public class RateLimitFilter implements Filter {
     }
 
     private String getClientIP(HttpServletRequest request) {
-        String cfIp = sanitizeIpCandidate(request.getHeader("CF-Connecting-IP"));
-        if (cfIp != null) {
-            return cfIp;
+        // Priority 1: Cloudflare tunnel (only trust if verified via CF-Ray)
+        String cfRay = request.getHeader("CF-Ray");
+        if (cfRay != null && !cfRay.isBlank()) {
+            String cfIp = sanitizeIpCandidate(request.getHeader("CF-Connecting-IP"));
+            if (cfIp != null && !isLoopbackLiteral(cfIp)) {
+                return cfIp;
+            }
         }
+
+        // Priority 2: Reverse proxy (Render / Vercel proxy)
+        // Reverse proxies append client IP to the end of X-Forwarded-For. To prevent
+        // an attacker from prepending fake IPs on the left, we parse from right to left.
         String xfHeader = request.getHeader("X-Forwarded-For");
         if (xfHeader != null && !xfHeader.isEmpty()) {
             String[] parts = xfHeader.split(",");
-            for (String part : parts) {
-                String candidate = sanitizeIpCandidate(part);
+            for (int i = parts.length - 1; i >= 0; i--) {
+                String candidate = sanitizeIpCandidate(parts[i]);
+                if (candidate != null && !isLoopbackLiteral(candidate) && !isInternalSubnet(candidate)) {
+                    return candidate;
+                }
+            }
+            for (int i = parts.length - 1; i >= 0; i--) {
+                String candidate = sanitizeIpCandidate(parts[i]);
                 if (candidate != null && !isLoopbackLiteral(candidate)) {
                     return candidate;
                 }
             }
         }
+
         String remote = sanitizeIpCandidate(request.getRemoteAddr());
         return remote != null ? remote : "unknown";
+    }
+
+    private boolean isInternalSubnet(String ip) {
+        if (ip == null) return false;
+        return ip.startsWith("10.") || ip.startsWith("192.168.") || ip.startsWith("172.16.")
+                || ip.startsWith("172.17.") || ip.startsWith("172.18.") || ip.startsWith("172.19.")
+                || ip.startsWith("172.2") || ip.startsWith("172.3") || ip.startsWith("169.254.")
+                || ip.startsWith("fc00:") || ip.startsWith("fe80:");
     }
 
     private String sanitizeIpCandidate(String raw) {

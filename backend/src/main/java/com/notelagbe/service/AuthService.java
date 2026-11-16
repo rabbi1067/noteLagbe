@@ -829,4 +829,31 @@ public class AuthService {
                 "message", "Password reset successfully! You can now sign in with your new password."
         );
     }
+
+    public AuthResponse refreshToken(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new ApiException("Bearer token is required to refresh session.", HttpStatus.UNAUTHORIZED);
+        }
+        String oldToken = authHeader.substring(7).trim();
+        if (!tokenProvider.validateToken(oldToken)) {
+            throw new ApiException("Session token is invalid or expired.", HttpStatus.UNAUTHORIZED);
+        }
+        String email = tokenProvider.getUsernameFromToken(oldToken);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+        assertUserNotBlocked(user);
+
+        String newToken = tokenProvider.generateTokenFromUser(user);
+        AuthResponse response = new AuthResponse(
+                newToken,
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getRole() != null ? user.getRole().name() : Role.ROLE_STUDENT.name(),
+                user.getStudentId(),
+                user.getAvatarUrl()
+        );
+        response.setProfile(getCurrentUserProfile(user));
+        return response;
+    }
 }
