@@ -1492,12 +1492,12 @@ export default function FloatingCommunityChat() {
               ? {
                   position: "fixed",
                   top: 0,
-                  bottom: pathname?.startsWith("/admin") ? 0 : 64,
+                  bottom: pathname?.startsWith("/admin") ? 0 : "calc(64px + env(safe-area-inset-bottom, 0px))",
                   left: 0,
                   right: 0,
                   width: "100%",
                   maxWidth: "100vw",
-                  height: "100%",
+                  height: pathname?.startsWith("/admin") ? "100dvh" : "calc(100dvh - 64px - env(safe-area-inset-bottom, 0px))",
                   maxHeight: "none",
                   transform: "none",
                   zIndex: 35,
@@ -1764,7 +1764,7 @@ export default function FloatingCommunityChat() {
             <div
               ref={chatContainerRef}
               onScroll={handleScroll}
-              className="flex-1 overflow-y-auto p-3.5 space-y-3.5 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
+              className="flex-1 min-h-0 overflow-y-auto p-3.5 space-y-3.5 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
             >
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">

@@ -3979,7 +3979,7 @@ export default function AdminDashboardPage() {
       {/* ========================================================================= */}
       {/* 1. TOP UNIFIED EXECUTIVE ADMIN HEADER (64px / h-16)                       */}
       {/* ========================================================================= */}
-      <header className="h-16 shrink-0 bg-white dark:bg-[#0d1527] border-b border-slate-200 dark:border-slate-800/80 px-3 sm:px-6 flex items-center justify-between z-30 transition-colors">
+      <header className="h-16 shrink-0 bg-white dark:bg-[#0d1527] border-b border-slate-200 dark:border-slate-800/80 px-3 sm:px-6 flex items-center justify-between z-40 transition-colors">
         {/* Left: Mobile Toggle, Brand & Breadcrumb */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
