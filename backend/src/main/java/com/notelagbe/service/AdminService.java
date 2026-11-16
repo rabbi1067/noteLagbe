@@ -32,6 +32,8 @@ import java.util.Optional;
 @Service
 public class AdminService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AdminService.class);
+
     private final UserRepository userRepository;
     private final TeacherRepository teacherRepository;
     private final CourseRepository courseRepository;
@@ -51,6 +53,9 @@ public class AdminService {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.notelagbe.security.UserDetailsServiceImpl userDetailsServiceImpl;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     private static final List<ResourceType> NOTE_RESOURCE_TYPES = List.of(
             ResourceType.NOTE,
@@ -372,6 +377,17 @@ public class AdminService {
         for (Resource r : userResources) {
             r.setUploader(null);
             resourceRepository.save(r);
+        }
+
+        // 9. Clean up chat records and AI messages to prevent FK constraint failure
+        if (jdbcTemplate != null) {
+            try {
+                jdbcTemplate.update("UPDATE chat_messages SET sender_id = NULL WHERE sender_id = ?", userId);
+                jdbcTemplate.update("DELETE FROM chat_message_likes WHERE user_id = ?", userId);
+                jdbcTemplate.update("DELETE FROM ai_exam_chat_messages WHERE user_id = ?", userId);
+            } catch (Exception e) {
+                log.warn("Secondary chat cleanup during user deletion: {}", e.getMessage());
+            }
         }
 
         String deletedEmail = u.getEmail();
