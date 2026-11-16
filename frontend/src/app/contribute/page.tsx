@@ -184,6 +184,32 @@ export default function ContributePage() {
     return list.length > 0 ? list : courses;
   }, [courses, selectedDepartment]);
 
+  // Dynamic quick-pick recommendations for upcoming reward courses (excluding uploaded course & already selected)
+  const recommendedRewardPicks = React.useMemo(() => {
+    return rewardCourses
+      .filter((c) => {
+        const code = c.code?.toLowerCase();
+        return (
+          (!courseCode || code !== courseCode.toLowerCase()) &&
+          (!requestedCourseCode1 || code !== requestedCourseCode1.toLowerCase()) &&
+          (!requestedCourseCode2 || code !== requestedCourseCode2.toLowerCase())
+        );
+      })
+      .slice(0, 5);
+  }, [rewardCourses, courseCode, requestedCourseCode1, requestedCourseCode2]);
+
+  const handleQuickPickReward = (code: string) => {
+    if (!requestedCourseCode1) {
+      setRequestedCourseCode1(code);
+    } else if (!requestedCourseCode2 && requestedCourseCode1.toLowerCase() !== code.toLowerCase()) {
+      setRequestedCourseCode2(code);
+    } else if (requestedCourseCode1.toLowerCase() === code.toLowerCase()) {
+      // Slot 1 already matches
+    } else {
+      setRequestedCourseCode2(code);
+    }
+  };
+
   const currentDepartment = DEPARTMENTS.find((d) => d.id === selectedDepartment) || DEPARTMENTS[0];
 
   const handleDepartmentChange = (deptId: string) => {
@@ -1157,10 +1183,14 @@ export default function ContributePage() {
               )}
             </div>
 
-            {/* Target Course with Interactive Searchable Combobox */}
+            {/* Contributing Course with Interactive Searchable Combobox */}
             <div>
               <SearchableCourseSelect
-                label={language === "bn" ? `${selectedDepartment} টার্গেট কোর্স` : `${selectedDepartment} Target Course`}
+                label={
+                  language === "bn"
+                    ? `১. যে কোর্সের নোট/প্রশ্ন দিচ্ছেন (${selectedDepartment})`
+                    : `1. Course You Are Uploading For (${selectedDepartment})`
+                }
                 required
                 value={courseCode}
                 onChange={(code) => {
@@ -1168,12 +1198,21 @@ export default function ContributePage() {
                   setTouchedFields((prev) => ({ ...prev, courseCode: true }));
                 }}
                 courses={targetCourses.length > 0 ? targetCourses : courses}
-                placeholder={language === "bn" ? `টার্গেট কোর্স খুঁজুন বা নির্বাচন করুন (বাধ্যতামূলক)...` : `Search or select target course (Required)...`}
+                placeholder={
+                  language === "bn"
+                    ? `যে বিষয়ের হ্যান্ডনোট বা প্রশ্ন দিচ্ছেন খুঁজুন (যেমন: CSE141)...`
+                    : `Search the course you are contributing to (e.g. CSE141)...`
+                }
                 language={language}
               />
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium pt-1">
+                {language === "bn"
+                  ? "💡 আপনি যে বিষয়ের স্টাডি ম্যাটেরিয়াল দিচ্ছেন সেই কোর্সটি এখানে সিলেক্ট করুন।"
+                  : "💡 Select the specific subject whose notes or exam paper you are contributing."}
+              </p>
               {(hasAttemptedSubmit || touchedFields.courseCode) && !courseCode && (
-                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium pt-1 animate-in fade-in">
-                  ⚠️ {language === "bn" ? "টার্গেট কোর্স নির্বাচন করা আবশ্যক" : "Target course selection is required"}
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium pt-0.5 animate-in fade-in">
+                  ⚠️ {language === "bn" ? "যে কোর্সের নোট দিচ্ছেন তা নির্বাচন করা আবশ্যক" : "Contributing course selection is required"}
                 </p>
               )}
             </div>
@@ -1597,11 +1636,11 @@ export default function ContributePage() {
           <div className="p-5 sm:p-6 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border-2 border-dashed border-emerald-500/40 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <Gift className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 <h3 className="font-extrabold text-xs sm:text-sm text-emerald-950 dark:text-emerald-200">
                   {language === "bn"
-                    ? "অনুমোদনের পর ৩ মাসের জন্য ফ্রি আনলক করার ২টি কোর্স নির্বাচন করুন:"
-                    : "Select Your 2 Reward Courses to Unlock for 3 Months Upon Verification:"}
+                    ? "🎁 আপনার ফ্রি উপহার: পছন্দের যেকোনো ২টি কোর্স বেছে নিন (৩ মাস সম্পূর্ণ ফ্রি)"
+                    : "🎁 Your Free Gift: Unlock Any 2 Courses for 3 Months (100% Free)"}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
@@ -1609,25 +1648,121 @@ export default function ContributePage() {
                   {currentDepartment.code} {language === "bn" ? "ডিপার্টমেন্ট" : "Dept"} ({rewardCourses.length} {language === "bn" ? "কোর্স উপলব্ধ" : "courses"})
                 </span>
                 <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 px-2.5 py-0.5 rounded-full">
-                  {language === "bn" ? "২টি কোর্স ৩ মাসের (১ সেমিস্টার) জন্য ফ্রি!" : "2 Courses Free for 3 Months (1 Semester)!"}
+                  {language === "bn" ? "১ সেমিস্টার (৯০ দিন) ফ্রি!" : "1 Full Semester Free!"}
                 </span>
               </div>
             </div>
+
+            {/* Visual Distinction & Guidance Card (Contributing Course vs Reward Gifts) */}
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-white/90 dark:bg-slate-900/90 border border-emerald-400/30 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                  <Upload className="w-4 h-4" />
+                </div>
+                <div className="text-left min-w-0">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                    {language === "bn" ? "১. আপনি যেটির নোট দিচ্ছেন" : "1. What You Contribute"}
+                  </span>
+                  <span className="text-xs font-black text-slate-900 dark:text-white truncate block">
+                    {courseCode ? `${courseCode}` : (language === "bn" ? "উপরে কোর্স নির্বাচন করুন" : "Select course above first")}
+                  </span>
+                </div>
+              </div>
+
+              <div className="hidden sm:flex items-center text-emerald-500 dark:text-emerald-400 font-black text-base">
+                ➔
+              </div>
+
+              <div className="flex items-center gap-2.5 w-full sm:w-auto bg-emerald-500/10 dark:bg-emerald-950/40 p-2 sm:px-3 rounded-xl border border-emerald-500/20">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Gift className="w-4 h-4" />
+                </div>
+                <div className="text-left min-w-0">
+                  <span className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-300 block tracking-wider">
+                    {language === "bn" ? "২. উপহারে ফ্রিতে পাবেন" : "2. What You Unlock for Free"}
+                  </span>
+                  <span className="text-xs font-black text-emerald-800 dark:text-emerald-200 truncate block">
+                    {requestedCourseCode1 && requestedCourseCode2
+                      ? `${requestedCourseCode1} + ${requestedCourseCode2} (৩ মাস ফ্রি)`
+                      : (language === "bn" ? "নিচে ২টি ভিন্ন কোর্স সিলেক্ট করুন" : "Pick 2 upcoming courses below")}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Explanatory helper box */}
+            <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-white/60 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800/60">
+              {language === "bn"
+                ? `💡 নির্দেশিকা: আপনি যে কোর্সের নোট আপলোড করছেন (${courseCode || "যেমন: CSE141"}), সেটির পাশাপাশি আগামী সেমিস্টারে আপনি যে দুটি নতুন কোর্স পড়তে চান সেগুলো এখানে নির্বাচন করুন। অ্যাডমিন আপনার অবদান যাচাই করলেই ওই ২টি কোর্স আপনার প্রোফাইলে ৩ মাসের জন্য সম্পূর্ণ ফ্রিতে আনলক হয়ে যাবে!`
+                : `💡 Guidance: Choose any 2 upcoming courses you plan to study next semester (different from ${courseCode || "e.g. CSE141"} which you are uploading for). Once verified by an admin, these 2 courses will unlock for 3 months completely free!`}
+            </p>
+
+            {/* Quick-Pick Popular Recommendation Chips */}
+            {recommendedRewardPicks.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                  {language === "bn" ? "💡 দ্রুত নির্বাচন করুন (জনপ্রিয়):" : "💡 Quick picks:"}
+                </span>
+                {recommendedRewardPicks.map((pick) => (
+                  <button
+                    key={pick.code}
+                    type="button"
+                    onClick={() => handleQuickPickReward(pick.code)}
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-950/60 transition-all cursor-pointer flex items-center gap-1 active:scale-95 shadow-2xs"
+                    title={pick.title}
+                  >
+                    <span>+ {pick.code}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Alert if student selected the exact course they are uploading */}
+            {courseCode && (courseCode.toLowerCase() === requestedCourseCode1.toLowerCase() || courseCode.toLowerCase() === requestedCourseCode2.toLowerCase()) && (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-300 animate-in fade-in">
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold">
+                    {language === "bn"
+                      ? `⚠️ আপনি যে কোর্সের নোট দিচ্ছেন (${courseCode}), সেটিই উপহারের তালিকায় রেখেছেন!`
+                      : `⚠️ You selected the same course (${courseCode}) that you are uploading materials for!`}
+                  </p>
+                  <p className="text-[11px] leading-relaxed">
+                    {language === "bn"
+                      ? "উপহার হিসেবে অন্য যেকোনো ২টি ভিন্ন কোর্স (যেমন আগামী সেমিস্টারের বিষয়) বেছে নিলে আপনি বেশি সুবিধা পাবেন।"
+                      : "We recommend choosing 2 upcoming courses for next semester to get maximum benefit from your free 3-month unlock reward."}
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               
               {/* 1st Reward Course (Searchable Combobox) */}
               <div>
                 <SearchableCourseSelect
-                  label={language === "bn" ? `১ম পুরস্কার কোর্স (${selectedDepartment})` : `1st Reward Course (${selectedDepartment})`}
+                  label={language === "bn" ? `১ম ফ্রি কোর্স (আপনার উপহার)` : `1st Free Course (Your Reward)`}
                   required
                   value={requestedCourseCode1}
                   onChange={setRequestedCourseCode1}
                   courses={rewardCourses}
-                  placeholder={language === "bn" ? `${selectedDepartment} ১ম পুরস্কার কোর্স খুঁজুন...` : `Search ${selectedDepartment} 1st reward course...`}
+                  placeholder={language === "bn" ? `${selectedDepartment} ১ম ফ্রি উপহার কোর্স খুঁজুন...` : `Search 1st free reward course...`}
                   variant="reward"
-                  disabledCode={requestedCourseCode2}
-                  disabledCodeReason={language === "bn" ? "২য় কোর্সে নির্বাচিত" : "Chosen as 2nd"}
+                  disabledCodes={[
+                    ...(courseCode
+                      ? [{
+                          code: courseCode,
+                          reason: language === "bn" ? "আপলোড করা কোর্স (অন্য কোর্স নিন)" : "Currently Uploading (Pick another)",
+                        }]
+                      : []),
+                    ...(requestedCourseCode2
+                      ? [{
+                          code: requestedCourseCode2,
+                          reason: language === "bn" ? "২য় কোর্সে নির্বাচিত" : "Chosen as 2nd",
+                        }]
+                      : []),
+                  ]}
+                  disabledCodeReason={language === "bn" ? "অনুপলব্ধ" : "Unavailable"}
                   language={language}
                 />
               </div>
@@ -1635,15 +1770,28 @@ export default function ContributePage() {
               {/* 2nd Reward Course (Searchable Combobox) */}
               <div>
                 <SearchableCourseSelect
-                  label={language === "bn" ? `২য় পুরস্কার কোর্স (${selectedDepartment})` : `2nd Reward Course (${selectedDepartment})`}
+                  label={language === "bn" ? `২য় ফ্রি কোর্স (আপনার উপহার)` : `2nd Free Course (Your Reward)`}
                   required
                   value={requestedCourseCode2}
                   onChange={setRequestedCourseCode2}
                   courses={rewardCourses}
-                  placeholder={language === "bn" ? `${selectedDepartment} ২য় পুরস্কার কোর্স খুঁজুন...` : `Search ${selectedDepartment} 2nd reward course...`}
+                  placeholder={language === "bn" ? `${selectedDepartment} ২য় ফ্রি উপহার কোর্স খুঁজুন...` : `Search 2nd free reward course...`}
                   variant="reward"
-                  disabledCode={requestedCourseCode1}
-                  disabledCodeReason={language === "bn" ? "১ম কোর্সে নির্বাচিত" : "Chosen as 1st"}
+                  disabledCodes={[
+                    ...(courseCode
+                      ? [{
+                          code: courseCode,
+                          reason: language === "bn" ? "আপলোড করা কোর্স (অন্য কোর্স নিন)" : "Currently Uploading (Pick another)",
+                        }]
+                      : []),
+                    ...(requestedCourseCode1
+                      ? [{
+                          code: requestedCourseCode1,
+                          reason: language === "bn" ? "১ম কোর্সে নির্বাচিত" : "Chosen as 1st",
+                        }]
+                      : []),
+                  ]}
+                  disabledCodeReason={language === "bn" ? "অনুপলব্ধ" : "Unavailable"}
                   language={language}
                 />
               </div>
@@ -1675,6 +1823,37 @@ export default function ContributePage() {
               duplicateInfo={contribDupCheck.duplicateInfo}
               language={language}
             />
+          )}
+
+          {/* Quick Submission Overview Card (Confirms to student what they are uploading vs receiving) */}
+          {courseCode && (requestedCourseCode1 || requestedCourseCode2) && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-50 via-emerald-50/40 to-slate-50 dark:from-slate-900 dark:via-emerald-950/20 dark:to-slate-900 border border-emerald-500/30 space-y-2 animate-in fade-in shadow-xs">
+              <div className="flex items-center justify-between text-xs flex-wrap gap-2">
+                <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  {language === "bn" ? "আপনার সাবমিশনের সারাংশ (Summary):" : "Your Submission Summary:"}
+                </span>
+                <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-bold">
+                  {language === "bn" ? "ভেরিফাই হলে স্বয়ংক্রিয়ভাবে সক্রিয় হবে" : "Auto-activates on verification"}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+                <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block tracking-wider">
+                    {language === "bn" ? "📤 আপনি যে কোর্সের নোট দিচ্ছেন" : "📤 You are contributing to"}
+                  </span>
+                  <span className="font-black text-slate-900 dark:text-white mt-0.5 block">{courseCode}</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-900/30 border border-emerald-300 dark:border-emerald-700/60">
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase block tracking-wider">
+                    {language === "bn" ? "🎁 আপনি ৩ মাস সম্পূর্ণ ফ্রি পাবেন" : "🎁 You unlock for 3 months free"}
+                  </span>
+                  <span className="font-black text-emerald-800 dark:text-emerald-200 mt-0.5 block">
+                    {requestedCourseCode1 || "—"} {requestedCourseCode2 ? `& ${requestedCourseCode2}` : ""}
+                  </span>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Submit Button */}

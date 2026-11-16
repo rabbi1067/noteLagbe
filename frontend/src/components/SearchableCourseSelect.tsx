@@ -37,6 +37,11 @@ export function sortCoursesNaturally<T extends { code: string; title?: string }>
   });
 }
 
+export interface DisabledCodeOption {
+  code: string;
+  reason?: string;
+}
+
 interface SearchableCourseSelectProps {
   label?: string;
   value: string;
@@ -46,6 +51,7 @@ interface SearchableCourseSelectProps {
   required?: boolean;
   disabledCode?: string;
   disabledCodeReason?: string;
+  disabledCodes?: (string | DisabledCodeOption)[];
   variant?: "default" | "reward";
   language?: string;
 }
@@ -59,6 +65,7 @@ export default function SearchableCourseSelect({
   required = false,
   disabledCode,
   disabledCodeReason = "Already selected",
+  disabledCodes,
   variant = "default",
   language = "en",
 }: SearchableCourseSelectProps) {
@@ -123,8 +130,27 @@ export default function SearchableCourseSelect({
     return codeMatch || titleMatch || deptMatch;
   });
 
+  const getDisabledReason = (code: string): string | null => {
+    if (disabledCode && code.toLowerCase() === disabledCode.toLowerCase()) {
+      return disabledCodeReason;
+    }
+    if (disabledCodes && disabledCodes.length > 0) {
+      for (const item of disabledCodes) {
+        if (!item) continue;
+        if (typeof item === "string") {
+          if (code.toLowerCase() === item.toLowerCase()) {
+            return disabledCodeReason;
+          }
+        } else if (item.code && code.toLowerCase() === item.code.toLowerCase()) {
+          return item.reason || disabledCodeReason;
+        }
+      }
+    }
+    return null;
+  };
+
   const handleSelect = (course: CourseOption) => {
-    if (disabledCode && course.code.toLowerCase() === disabledCode.toLowerCase()) {
+    if (getDisabledReason(course.code)) {
       return;
     }
     onChange(course.code);
@@ -258,7 +284,8 @@ export default function SearchableCourseSelect({
             ) : (
               filteredCourses.map((c) => {
                 const isSelected = Boolean(value && value.toLowerCase() === c.code.toLowerCase());
-                const isDisabled = Boolean(disabledCode && disabledCode.toLowerCase() === c.code.toLowerCase());
+                const disabledReason = getDisabledReason(c.code);
+                const isDisabled = Boolean(disabledReason);
 
                 return (
                   <button
@@ -270,7 +297,7 @@ export default function SearchableCourseSelect({
                       isSelected
                         ? "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold"
                         : isDisabled
-                        ? "opacity-40 cursor-not-allowed bg-slate-50 dark:bg-slate-900"
+                        ? "opacity-45 cursor-not-allowed bg-slate-50 dark:bg-slate-900"
                         : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200"
                     }`}
                   >
@@ -291,8 +318,8 @@ export default function SearchableCourseSelect({
 
                     <div className="shrink-0 flex items-center gap-1.5">
                       {isDisabled && (
-                        <span className="text-[10px] text-amber-500 font-bold px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
-                          {disabledCodeReason}
+                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/80">
+                          {disabledReason}
                         </span>
                       )}
                       {isSelected && (
