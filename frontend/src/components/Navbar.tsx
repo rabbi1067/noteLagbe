@@ -62,11 +62,11 @@ export default function Navbar() {
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-[#0b1120]/95 backdrop-blur-md transition-colors print:hidden">
-        <div className="max-w-7xl mx-auto px-2 xs:px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-1.5 xs:gap-2 lg:gap-4">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 gap-1 sm:gap-2 lg:gap-4 min-w-0">
           
           {/* Logo & Brand */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <BrandLogo variant="public" size="md" />
           </div>
 
@@ -104,24 +104,29 @@ export default function Navbar() {
           </nav>
 
           {/* Right Action Icons & Auth */}
-          <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 min-w-0 shrink">
             
             {/* In-App Notifications Bell (Campus Announcements & Personal Alerts) */}
             <div className="shrink-0">
               <NotificationBell />
             </div>
 
-            {/* Language Switcher Pill (Compact single-token on mobile, full pill on sm+) */}
+            {/* Language Switcher Pill (Compact single-token on mobile, full pill on md+) */}
             <button
               onClick={toggleLanguage}
-              className="flex items-center gap-0.5 sm:gap-1 px-1.5 xs:px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-[10px] sm:text-xs font-bold transition-all hover:border-blue-500 shadow-sm shrink-0 cursor-pointer active:scale-95"
+              className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-[10px] sm:text-xs font-bold transition-all hover:border-blue-500 shadow-sm shrink-0 cursor-pointer active:scale-95"
               title={language === "en" ? "বাংলায় দেখুন" : "Switch to English"}
             >
-              <span className={language === "en" ? "text-blue-600 dark:text-blue-400 font-black" : "text-slate-400 font-semibold"}>
+              {/* On mobile (< md): show active language token */}
+              <span className="md:hidden text-blue-600 dark:text-blue-400 font-black">
+                {language === "bn" ? "বাং" : "EN"}
+              </span>
+              {/* On md+: show dual switch EN | বাং */}
+              <span className={`hidden md:inline ${language === "en" ? "text-blue-600 dark:text-blue-400 font-black" : "text-slate-400 font-semibold"}`}>
                 EN
               </span>
-              <span className="hidden sm:inline text-slate-300 dark:text-slate-600 text-[10px] font-light">|</span>
-              <span className={`hidden sm:inline ${language === "bn" ? "text-blue-600 dark:text-blue-400 font-black" : "text-slate-400 font-semibold"}`}>
+              <span className="hidden md:inline text-slate-300 dark:text-slate-600 text-[10px] font-light">|</span>
+              <span className={`hidden md:inline ${language === "bn" ? "text-blue-600 dark:text-blue-400 font-black" : "text-slate-400 font-semibold"}`}>
                 বাং
               </span>
             </button>
@@ -129,7 +134,7 @@ export default function Navbar() {
             {/* Dark / Light Mode Toggle */}
             <button
               onClick={toggleTheme}
-              className="w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 flex items-center justify-center shrink-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 shadow-sm cursor-pointer active:scale-90"
+              className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center shrink-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 shadow-sm cursor-pointer active:scale-90"
               title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
               aria-label="Toggle Theme"
             >
@@ -137,12 +142,12 @@ export default function Navbar() {
             </button>
 
             {/* User Profile or Sign In Button */}
-            <div className="flex items-center justify-end shrink-0">
+            <div className="flex items-center justify-end min-w-0">
               {isAuthenticated && user ? (
                 <div className="relative">
                   <button
                     onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                    className="flex items-center gap-1.5 sm:gap-2 p-1 sm:p-1.5 pl-1.5 sm:pl-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer max-w-[145px] xs:max-w-[170px] sm:max-w-[210px]"
+                    className="flex items-center gap-1 sm:gap-1.5 md:gap-2 p-1 sm:p-1.5 pl-1.5 sm:pl-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer min-w-0 max-w-[125px] sm:max-w-[165px] md:max-w-[210px]"
                   >
                     <div className="w-7 h-7 sm:w-7 sm:h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white text-xs font-bold uppercase shadow-sm overflow-hidden shrink-0">
                       {user.avatarUrl ? (
@@ -151,12 +156,12 @@ export default function Navbar() {
                         user.name.charAt(0)
                       )}
                     </div>
-                    {/* User Name & Role Pill - Fully visible with generous room */}
+                    {/* User Name & Role Pill - Fully visible with zero overflow */}
                     <div className="flex flex-col text-left min-w-0 flex-1 pr-0.5">
                       <span className="text-[11px] sm:text-xs font-bold text-slate-900 dark:text-white leading-tight truncate">
                         {user.name}
                       </span>
-                      <span className="text-[9px] sm:text-[10px] text-blue-600 dark:text-blue-400 font-medium truncate">
+                      <span className="hidden sm:block text-[9px] sm:text-[10px] text-blue-600 dark:text-blue-400 font-medium truncate">
                         {isAdmin 
                           ? (language === "bn" ? "অ্যাডমিন" : "Admin / Staff") 
                           : (user.planName ? user.planName.split(" (")[0] : (language === "bn" ? "শিক্ষার্থী" : "Student"))}

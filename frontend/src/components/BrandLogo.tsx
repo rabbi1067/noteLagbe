@@ -163,7 +163,7 @@ export default function BrandLogo({
             </span>
             {currentBadge.label && (
               <span
-                className={`hidden xs:inline-flex text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border ${currentBadge.classes}`}
+                className={`hidden sm:inline-flex text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border ${currentBadge.classes}`}
                 title={currentBadge.tooltip}
               >
                 {currentBadge.label}
