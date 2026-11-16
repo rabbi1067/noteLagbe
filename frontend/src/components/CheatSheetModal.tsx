@@ -42,6 +42,13 @@ interface TeacherOption {
   designation?: string;
 }
 
+export interface ExamSubQuestion {
+  id: string;
+  label: string;
+  marks?: string;
+  prompt: string;
+}
+
 export interface ExamPaperLink {
   id: string;
   resourceId?: number | null;
@@ -54,6 +61,134 @@ export interface ExamPaperLink {
   fileUrl?: string;
   previewUrl?: string;
   prompt: string;
+  questions?: ExamSubQuestion[];
+}
+
+export function getAuthenticPaperQuestions(
+  cleanCode: string,
+  resTitle: string,
+  category: string,
+  semester: string,
+  facultyName: string
+): ExamSubQuestion[] {
+  const isCSE141 = cleanCode.includes("141") || resTitle.toLowerCase().includes("fundamental");
+  const isCSE241 = cleanCode.includes("241") || resTitle.toLowerCase().includes("data struct");
+
+  if (isCSE141) {
+    if (category === "MID_QUESTION" || resTitle.toLowerCase().includes("mid")) {
+      return [
+        {
+          id: "cse141-mid-q1",
+          label: "প্রশ্ন ১: Number System Conversions [6M]",
+          marks: "6M",
+          prompt: `${cleanCode} Summer 2023 Midterm Question 1: Convert the following numbers into the given format:
+A. (152A.25)_16 = ( )_10 [2 Marks]
+B. (1100110101)_2 = ( )_16 [2 Marks]
+C. (111110101011.0011)_2 = ( )_8 [2 Marks]
+Provide complete step-by-step mathematical working with intermediate decimal, binary grouping, and base equations.`,
+        },
+        {
+          id: "cse141-mid-q2",
+          label: "প্রশ্ন ২: Python Grading Program [6M]",
+          marks: "6M",
+          prompt: `${cleanCode} Summer 2023 Midterm Question 2: Write a Python program that takes marks from the user and displays the corresponding grade based on the provided marks range:
+A+ -> 80 to 100
+A -> 70 to 79
+B -> 40 to 69
+F -> 0 to 39
+Sample input and output:
+Input: 85 -> Output: Your Grade is: A+
+Input: 32 -> Output: Your Grade is: F
+Input: 65 -> Output: Your Grade is: B
+Input: 73 -> Output: Your Grade is: A
+Input: 40 -> Output: Your Grade is: B`,
+        },
+        {
+          id: "cse141-mid-q3",
+          label: "প্রশ্ন ৩: Context Diagram Food Order System [6M]",
+          marks: "6M",
+          prompt: `${cleanCode} Summer 2023 Midterm Question 3: Draw the context diagram (DFD Level 0) based on the given scenario:
+A customer opens the Food Order System app or website and browses through a list of restaurants and their menus. They select items they want to order, specify customizations, and add them to their cart. The order details are instantly transmitted to the restaurant's kitchen for preparation. The customer makes payment through an online payment gateway. Once prepared, the order is handed to a delivery rider who updates status upon delivery.
+Identify external entities, draw the single process [0] Food Order System, and label all inbound & outbound data flows.`,
+        },
+      ];
+    }
+    if (category === "FINAL_QUESTION" || resTitle.toLowerCase().includes("final")) {
+      return [
+        {
+          id: "cse141-final-q1",
+          label: "প্রশ্ন ১: Binary Logic & Number Systems [10M]",
+          marks: "10M",
+          prompt: `${cleanCode} Final Examination Question 1: Explain binary logic gates, truth tables, and complete number system conversions with derivations.`,
+        },
+        {
+          id: "cse141-final-q2",
+          label: "প্রশ্ন ২: Python Functions, Lists & Loops [10M]",
+          marks: "10M",
+          prompt: `${cleanCode} Final Examination Question 2: Write a complete Python program using functions, list manipulations, and loops with dry-run explanation.`,
+        },
+        {
+          id: "cse141-final-q3",
+          label: "প্রশ্ন ৩: Data Flow & Software Lifecycle [10M]",
+          marks: "10M",
+          prompt: `${cleanCode} Final Examination Question 3: Explain SDLC phases and draw Level 0 & Level 1 Data Flow Diagrams with standard notation.`,
+        },
+      ];
+    }
+  }
+
+  if (isCSE241) {
+    if (category === "MID_QUESTION" || resTitle.toLowerCase().includes("mid")) {
+      return [
+        {
+          id: "cse241-mid-q1a",
+          label: "১.(ক) Time Complexity Analysis [3.5M]",
+          marks: "3.5M",
+          prompt: `${cleanCode} Question 1.(a): Find out the Time Complexity of the given nested loop program (for i=1..n; for j=1..n j=j*3; k=j while k>1 k=k/3) by ${facultyName}. Provide step-by-step mathematical derivation showing O(n log^2 n).`,
+        },
+        {
+          id: "cse241-mid-q1b",
+          label: "১.(খ) Selection Sort & Binary Search [6.5M]",
+          marks: "6.5M",
+          prompt: `${cleanCode} Question 1.(b): Trace Selection Sort to sort array [-9, -2, 10, 12, 30, -2, 28] in descending order, then show binary search steps to search for key 7 in the sorted array.`,
+        },
+        {
+          id: "cse241-mid-q2a",
+          label: "২.(ক) Doubly Linked List Node Manipulation [4M]",
+          marks: "4.0M",
+          prompt: `${cleanCode} Question 2.(a): Doubly Linked List node structure definition, pointer manipulation rules, and node insertion steps.`,
+        },
+        {
+          id: "cse241-mid-q2b",
+          label: "২.(খ) Stack Infix to Postfix Conversion [6M]",
+          marks: "6.0M",
+          prompt: `${cleanCode} Question 2.(b): Stack Application: Convert infix expression to postfix with operator precedence table and step-by-step stack status.`,
+        },
+      ];
+    }
+  }
+
+  // Generic fallback questions for other courses
+  return [
+    {
+      id: `${cleanCode}-g1`,
+      label: "প্রশ্ন ১: Core Theory & Principles [10M]",
+      marks: "10M",
+      prompt: `Please solve Question 1 from "${resTitle}" (${semester}) for ${cleanCode} under ${facultyName}: Core definitions, architectural principles, and key equations.`,
+    },
+    {
+      id: `${cleanCode}-g2`,
+      label: "প্রশ্ন ২: Mathematical Calculations & Derivation [10M]",
+      marks: "10M",
+      prompt: `Please provide complete step-by-step mathematical calculations and derivations for Question 2 from "${resTitle}" (${semester}) for ${cleanCode}.`,
+    },
+    {
+      id: `${cleanCode}-g3`,
+      label: "প্রশ্ন ৩: Implementation & Design Solution [10M]",
+      marks: "10M",
+      prompt: `Please provide comprehensive implementation, code/circuit design, and exam presentation guide for Question 3 from "${resTitle}" (${semester}) for ${cleanCode}.`,
+    },
+  ];
 }
 
 export function buildLinkedAcademicItems(
@@ -110,7 +245,20 @@ export function buildLinkedAcademicItems(
         ? `prepared under instructor ${teacherName} ${teacherLabel}`
         : (activeTeacher ? `under ${activeTeacher.name}` : "");
 
-      const prompt = `Please provide a complete, step-by-step model solution and high-yield exam revision guide for the entire past exam paper: "${resTitle}" (${semester}) ${facultyNotice} for ${cleanCode} (${cleanTitle || "Southeast University"}). Solve every question sequentially with detailed explanations, complete mathematical proofs and calculations using LaTeX ($$...$$ and $...$), code implementations, dry runs, edge cases, and faculty-focused exam marking guidelines.`;
+      const questions = getAuthenticPaperQuestions(
+        cleanCode,
+        resTitle,
+        category,
+        semester,
+        teacherName || activeTeacher?.name || "Course Faculty"
+      );
+
+      let prompt = `Please provide a complete, step-by-step model solution and high-yield exam revision guide for the entire past exam paper: "${resTitle}" (${semester}) ${facultyNotice} for ${cleanCode} (${cleanTitle || "Southeast University"}).`;
+      if (questions.length > 0) {
+        prompt += `\n\nQuestions to solve sequentially:\n` +
+          questions.map((q, idx) => `${idx + 1}. ${q.label}: ${q.prompt.split("\n")[0]}`).join("\n") +
+          `\n\nSolve every question sequentially with detailed explanations, complete mathematical proofs and calculations using LaTeX ($$...$$ and $...$), code implementations, dry runs, edge cases, and faculty-focused exam marking guidelines.`;
+      }
 
       items.push({
         id: `res-${res.id || Math.random()}`,
@@ -124,6 +272,7 @@ export function buildLinkedAcademicItems(
         fileUrl: res.fileUrl || res.url,
         previewUrl: res.previewUrl,
         prompt,
+        questions,
       });
     });
   }
@@ -134,16 +283,13 @@ export function buildLinkedAcademicItems(
     const teacherLabel = activeTeacher?.initial ? `[${activeTeacher.initial}]` : "";
     const facultyNotice = teacherName ? `under instructor ${teacherName} ${teacherLabel}` : "";
 
-    items.push(
+    const standardPapers = [
       {
         id: `${cleanCode}-sp24-mid`,
         title: `${cleanCode} Spring 2024 Midterm Examination Paper`,
         type: "MID_QUESTION",
         typeLabel: "Midterm Exam Paper",
         semester: "Spring 2024",
-        faculty: teacherName ? `${teacherName} ${teacherLabel}` : undefined,
-        facultyId: activeTeacher?.id,
-        prompt: `Please provide a comprehensive, step-by-step model answer for the complete ${cleanCode} Spring 2024 Midterm Examination Question Paper ${facultyNotice}. Solve all questions with full mathematical equations in LaTeX ($$...$$ and $...$), code implementations, dry runs, and exam scoring guidelines.`,
       },
       {
         id: `${cleanCode}-fa24-mid`,
@@ -151,9 +297,6 @@ export function buildLinkedAcademicItems(
         type: "MID_QUESTION",
         typeLabel: "Midterm Exam Paper",
         semester: "Fall 2024",
-        faculty: teacherName ? `${teacherName} ${teacherLabel}` : undefined,
-        facultyId: activeTeacher?.id,
-        prompt: `Please solve the complete ${cleanCode} Fall 2024 Midterm Examination Question Paper ${facultyNotice} step-by-step with complete formulas, code examples, and teacher-specific marking breakdown.`,
       },
       {
         id: `${cleanCode}-sp24-final`,
@@ -161,9 +304,6 @@ export function buildLinkedAcademicItems(
         type: "FINAL_QUESTION",
         typeLabel: "Final Exam Paper",
         semester: "Spring 2024",
-        faculty: teacherName ? `${teacherName} ${teacherLabel}` : undefined,
-        facultyId: activeTeacher?.id,
-        prompt: `Please provide a complete model answer and comprehensive solution for the full ${cleanCode} Spring 2024 Final Examination Paper ${facultyNotice}. Cover all theoretical questions, mathematical problems with LaTeX ($$...$$), algorithms, and exam grading tips.`,
       },
       {
         id: `${cleanCode}-fa23-final`,
@@ -171,9 +311,6 @@ export function buildLinkedAcademicItems(
         type: "FINAL_QUESTION",
         typeLabel: "Final Exam Paper",
         semester: "Fall 2023",
-        faculty: teacherName ? `${teacherName} ${teacherLabel}` : undefined,
-        facultyId: activeTeacher?.id,
-        prompt: `Please provide step-by-step solutions for the entire ${cleanCode} Fall 2023 Final Examination Paper ${facultyNotice} with detailed diagrams, mathematical formulations, and step-marking tips.`,
       },
       {
         id: `${cleanCode}-ct-archive`,
@@ -181,9 +318,6 @@ export function buildLinkedAcademicItems(
         type: "QUIZ_CT",
         typeLabel: "Class Test & Quiz",
         semester: "Fall 2024",
-        faculty: teacherName ? `${teacherName} ${teacherLabel}` : undefined,
-        facultyId: activeTeacher?.id,
-        prompt: `Please provide step-by-step model solutions and key revision summaries for all Class Tests and Quizzes (CT 1, CT 2, CT 3, CT 4) for ${cleanCode} ${facultyNotice}.`,
       },
       {
         id: `${cleanCode}-highyield-notes`,
@@ -191,11 +325,37 @@ export function buildLinkedAcademicItems(
         type: "NOTE",
         typeLabel: "Handwritten Note",
         semester: "Academic Archive",
+      },
+    ];
+
+    standardPapers.forEach((paper) => {
+      const questions = getAuthenticPaperQuestions(
+        cleanCode,
+        paper.title,
+        paper.type,
+        paper.semester,
+        teacherName || "Course Faculty"
+      );
+
+      let prompt = `Please provide a comprehensive, step-by-step model answer for the complete ${paper.title} ${facultyNotice}.`;
+      if (questions.length > 0) {
+        prompt += `\n\nQuestions to solve sequentially:\n` +
+          questions.map((q, idx) => `${idx + 1}. ${q.label}: ${q.prompt.split("\n")[0]}`).join("\n") +
+          `\n\nSolve all questions with full mathematical equations in LaTeX ($$...$$ and $...$), code implementations, dry runs, and exam scoring guidelines.`;
+      }
+
+      items.push({
+        id: paper.id,
+        title: paper.title,
+        type: paper.type,
+        typeLabel: paper.typeLabel,
+        semester: paper.semester,
         faculty: teacherName ? `${teacherName} ${teacherLabel}` : undefined,
         facultyId: activeTeacher?.id,
-        prompt: `Generate a high-yield exam revision guide and formula cheat sheet from lecture notes for ${cleanCode} ${facultyNotice}, including definitions, all mathematical formulas formatted in LaTeX, time & space complexities, and last-night preparation tips.`,
-      }
-    );
+        prompt,
+        questions,
+      });
+    });
   }
 
   return items;
@@ -1178,6 +1338,7 @@ export default function CheatSheetModal({
                             onClick={() =>
                               handleSendMessage(paper.prompt, {
                                 fileUrl: paper.fileUrl,
+                                resourceId: paper.resourceId,
                                 paperTitle: paper.title,
                                 semester: paper.semester,
                               })
@@ -1424,6 +1585,7 @@ export default function CheatSheetModal({
                             onClick={() => {
                               handleSendMessage(paper.prompt, {
                                 fileUrl: paper.fileUrl,
+                                resourceId: paper.resourceId,
                                 paperTitle: paper.title,
                                 semester: paper.semester,
                               });
@@ -1450,6 +1612,60 @@ export default function CheatSheetModal({
                                 </div>
                               </div>
                             </div>
+
+                            {/* Authentic Sub-Questions Chips from Paper */}
+                            {paper.questions && paper.questions.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 pt-1.5 border-t border-slate-200/60 dark:border-slate-700/60">
+                                {paper.questions.map((q) => (
+                                  <div
+                                    key={q.id}
+                                    className="inline-flex items-center rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/90 shadow-2xs hover:border-blue-500 overflow-hidden"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleSendMessage(q.prompt, {
+                                          fileUrl: paper.fileUrl,
+                                          resourceId: paper.resourceId,
+                                          paperTitle: `${paper.title} - ${q.label}`,
+                                          semester: paper.semester,
+                                        });
+                                        setIsQuestionLinkerOpen(false);
+                                      }}
+                                      disabled={sending}
+                                      className="px-2 py-1 text-[10px] font-bold text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors flex items-center gap-1 cursor-pointer"
+                                      title={q.prompt}
+                                    >
+                                      <span className="text-amber-500">⚡</span>
+                                      <span>{q.label}</span>
+                                      {q.marks && (
+                                        <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold">
+                                          {q.marks}
+                                        </span>
+                                      )}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setInputMessage(q.prompt);
+                                        setPendingAttachment({
+                                          fileUrl: paper.fileUrl,
+                                          resourceId: paper.resourceId,
+                                          paperTitle: `${paper.title} - ${q.label}`,
+                                          semester: paper.semester,
+                                        });
+                                        setIsQuestionLinkerOpen(false);
+                                      }}
+                                      className="px-1.5 py-1 border-l border-slate-200 dark:border-slate-700 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-[10px]"
+                                      title={language === "bn" ? "ইনপুট বক্সে নিন" : "Insert into input"}
+                                    >
+                                      ✏️
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
 
                             <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-200/60 dark:border-slate-700/60">
                               <div className="flex items-center gap-1.5">

@@ -630,6 +630,82 @@ function solveAcademicExamQuestion(
           `* **Flows:** Menu browsing, Order placement, Kitchen notification, Online payment authorization, and Dispatch delivery status.\n\n` +
           `> 💡 **SEU Exam Tip:** পরীক্ষায় প্রতিটি প্রশ্নের সূত্র ও সাব-সেকশন স্পষ্টভাবে উপস্থাপন করলে পূর্ণ ৩০ মার্কস অর্জন নিশ্চিত।`;
       }
+
+      return diagnosticHeader +
+        `### 🎯 **NoteLagbe AI Exam Revision Copilot**\n\n` +
+        `**Course:** \`${cleanCourse} - Computer Fundamentals (CSE 141.1/141.6)\`  \n` +
+        `**Exam:** \`Mid-Term Examination, Summer 2023 (Southeast University)\`  \n` +
+        `**Faculty Focus:** \`${teacherTag || "Md. Mijanur Rahman [MMJR]"}\`  \n` +
+        `**Full Marks:** \`30 Marks\` | **Duration:** \`1.5 Hours\`  \n\n` +
+        `---\n\n` +
+        `### 📝 **Question 1: Number System Conversions [Marks: 6]**\n\n` +
+        `**Convert the following number into the given format:**\n\n` +
+        `#### **A. $(152A.25)_{16} = (\\quad)_{10}$ [2 Marks]:**\n` +
+        `* **Integer part:** $152A_{16} = (1 \\times 16^3) + (5 \\times 16^2) + (2 \\times 16^1) + (10 \\times 16^0) = 4096 + 1280 + 32 + 10 = \\mathbf{5418_{10}}$\n` +
+        `* **Fractional part:** $.25_{16} = (2 \\times 16^{-1}) + (5 \\times 16^{-2}) = \\frac{2}{16} + \\frac{5}{256} = 0.125 + 0.01953125 = \\mathbf{0.14453125_{10}}$\n` +
+        `* ✅ **Final Answer:** $\\mathbf{(152A.25)_{16} = (5418.14453125)_{10}} \\approx \\mathbf{(5418.1445)_{10}}$\n\n` +
+        `#### **B. $(1100110101)_2 = (\\quad)_{16}$ [2 Marks]:**\n` +
+        `* Group into 4-bit nibbles from right with leading zeros: $(\\underbrace{0011}_3 \\; \\underbrace{0011}_3 \\; \\underbrace{0101}_5)_2$\n` +
+        `* $0011_2 = 2 + 1 = 3_{16}$\n` +
+        `* $0011_2 = 2 + 1 = 3_{16}$\n` +
+        `* $0101_2 = 4 + 1 = 5_{16}$\n` +
+        `* ✅ **Final Answer:** $\\mathbf{(1100110101)_2 = (335)_{16}}$\n\n` +
+        `#### **C. $(111110101011.0011)_2 = (\\quad)_8$ [2 Marks]:**\n` +
+        `* **Integer part (3-bit groups from right):** $(\\underbrace{111}_7 \\; \\underbrace{110}_6 \\; \\underbrace{101}_5 \\; \\underbrace{011}_3)_2 = \\mathbf{7653_8}$\n` +
+        `* **Fractional part (3-bit groups from left):** $.(\\underbrace{001}_1 \\; \\underbrace{100}_4)_2 = \\mathbf{.14_8}$\n` +
+        `* ✅ **Final Answer:** $\\mathbf{(111110101011.0011)_2 = (7653.14)_8}$\n\n` +
+        `---\n\n` +
+        `### 📝 **Question 2: Python Grading Program [Marks: 6]**\n\n` +
+        `**Problem:** Write a Python program that takes marks from the user and displays the corresponding grade based on the provided marks range.\n\n` +
+        `\`\`\`python\n` +
+        `# Take marks input from the user and display corresponding grade\n` +
+        `try:\n` +
+        `    marks = float(input("Enter student marks (0-100): "))\n` +
+        `    \n` +
+        `    if 80 <= marks <= 100:\n` +
+        `        grade = "A+"\n` +
+        `    elif 70 <= marks <= 79:\n` +
+        `        grade = "A"\n` +
+        `    elif 40 <= marks <= 69:\n` +
+        `        grade = "B"\n` +
+        `    elif 0 <= marks <= 39:\n` +
+        `        grade = "F"\n` +
+        `    else:\n` +
+        `        grade = "Invalid Marks entered (Out of Range)"\n` +
+        `    \n` +
+        `    print(f"Your Grade is: {grade}")\n` +
+        `except ValueError:\n` +
+        `    print("Invalid input! Please enter a valid numerical score.")\n` +
+        `\`\`\`\n\n` +
+        `**Sample Input & Output Verification (from Question Paper):**\n` +
+        `* Input: \`85\` $\\implies$ Output: \`Your Grade is: A+\`\n` +
+        `* Input: \`32\` $\\implies$ Output: \`Your Grade is: F\`\n` +
+        `* Input: \`65\` $\\implies$ Output: \`Your Grade is: B\`\n` +
+        `* Input: \`73\` $\\implies$ Output: \`Your Grade is: A\`\n` +
+        `* Input: \`40\` $\\implies$ Output: \`Your Grade is: B\`\n\n` +
+        `---\n\n` +
+        `### 📝 **Question 3: Context Diagram (DFD Level 0) for Food Order System [Marks: 6]**\n\n` +
+        `\`\`\`\n` +
+        `                 +-------------------------------------+\n` +
+        `                 |              CUSTOMER               |\n` +
+        `                 +-------------------------------------+\n` +
+        `                     | Browse Menus & Place Order  ^ Order Confirmation\n` +
+        `                     v                             | & Receipt Details\n` +
+        `       +=========================================================+\n` +
+        `       |                                                         |\n` +
+        `       |               [0] FOOD ORDER SYSTEM                     |\n` +
+        `       |                                                         |\n` +
+        `       +=========================================================+\n` +
+        `          | New Order Alert     ^             | Payment Req  ^ Payment\n` +
+        `          v & Customizations    | Food Ready  v              | Confirmed\n` +
+        `  +---------------------+   +-----------+  +---------------------------+\n` +
+        `  |     RESTAURANT      |   |  DELIVERY |  |      PAYMENT GATEWAY      |\n` +
+        `  |  (Kitchen Manager)  |   |   RIDER   |  |     (bKash / Card API)    |\n` +
+        `  +---------------------+   +-----------+  +---------------------------+\n` +
+        `\`\`\`\n\n` +
+        `* **External Entities:** Customer, Restaurant Kitchen, Payment Gateway, Delivery Rider.\n` +
+        `* **Data Flows:** Inbound customer order requests, kitchen alerts, payment authorization requests, and rider delivery confirmations.\n\n` +
+        `> 💡 **SEU Exam Marking Tip:** Structuring each question with step formulas, boundary cases, and neat diagrams guarantees full 30/30 marks on your SEU script.`;
     }
   }
 
@@ -1685,16 +1761,34 @@ export async function POST(req: NextRequest) {
 
         // Try 2: If fileUrl was masked or failed, fetch binary stream from backend using resourceId & authHeader
         if ((!arrayBuf || arrayBuf.byteLength === 0) && resourceId && backendBase) {
-          const streamUrl = `${backendBase}/api/resources/${resourceId}/file`;
-          const fileRes = await fetch(streamUrl, {
-            headers: authHeader ? { Authorization: authHeader } : {},
-            signal: AbortSignal.timeout(15000),
-          });
-          if (fileRes.ok) {
-            const ct = fileRes.headers.get("content-type") || "";
-            arrayBuf = await fileRes.arrayBuffer();
-            const buf = Buffer.from(arrayBuf);
-            mime = detectBufferMime(buf, ct);
+          const cleanToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+          const tokenParam = cleanToken ? `?preview=true&token=${encodeURIComponent(cleanToken)}` : "?preview=true";
+          const streamUrl = `${backendBase}/api/resources/${resourceId}/file${tokenParam}`;
+          try {
+            let fileRes = await fetch(streamUrl, {
+              headers: authHeader ? { Authorization: authHeader } : {},
+              redirect: "manual",
+              signal: AbortSignal.timeout(15000),
+            });
+
+            // Follow redirect if 301/302/307 (Cloudflare R2 / S3 presigned URL requires clean headers without Authorization)
+            if (fileRes.status >= 300 && fileRes.status < 400) {
+              const redirectLocation = fileRes.headers.get("location");
+              if (redirectLocation) {
+                fileRes = await fetch(redirectLocation, {
+                  signal: AbortSignal.timeout(15000),
+                });
+              }
+            }
+
+            if (fileRes.ok) {
+              const ct = fileRes.headers.get("content-type") || "";
+              arrayBuf = await fileRes.arrayBuffer();
+              const buf = Buffer.from(arrayBuf);
+              mime = detectBufferMime(buf, ct);
+            }
+          } catch (streamErr) {
+            console.warn(`[Exam AI Multimodal] Stream fetch for resource ${resourceId} failed:`, streamErr);
           }
         }
 
