@@ -47,6 +47,7 @@ interface UseDuplicateResourceCheckParams {
 }
 
 const SINGLE_SLOT_EXAM_TYPES = new Set(["MID_QUESTION", "FINAL_QUESTION", "LAB_FINAL"]);
+const MULTI_INSTANCE_SEMESTER_TYPES = new Set(["QUIZ_CT", "LAB_QUIZ"]);
 const SLOT_CACHE_TTL_MS = 20_000;
 
 const SEASON_FIRST_REGEX =
@@ -188,6 +189,18 @@ function matchDuplicateLocally(
   const titleKey = titleComparisonKeyClient(params.title);
   const singleSlot = SINGLE_SLOT_EXAM_TYPES.has(params.type);
 
+  // Quizzes & Class Tests are faculty-administered and frequently have multiple
+  // distinct tests (CT 1, CT 2, CT 3, Section A, Section B) within the exact same semester.
+  // Multiple questions in the same semester are explicitly permitted and must never be blocked.
+  if (MULTI_INSTANCE_SEMESTER_TYPES.has(params.type)) {
+    return {
+      duplicate: false,
+      normalizedSemester: canonicalSemester,
+      singleSlotExam: false,
+      message: null,
+    };
+  }
+
   if (!params.courseCode || !params.type || !semesterKey || (!singleSlot && !titleKey)) {
     return {
       duplicate: false,
@@ -299,8 +312,11 @@ export function useDuplicateResourceCheck({
   const requestSeqRef = useRef(0);
   const lastToastedKeyRef = useRef("");
 
+  const isMultiInstance = MULTI_INSTANCE_SEMESTER_TYPES.has(cleanType);
+
   const isEligible =
     enabled &&
+    !isMultiInstance &&
     cleanCourse.length > 0 &&
     cleanType.length > 0 &&
     cleanSemester.length >= 3 &&

@@ -127,21 +127,22 @@ class ResourceDuplicateGuardTest {
     }
 
     @Test
-    void multiItemMaterialsAllowDistinctTitlesAndBlockIdenticalTitles() {
+    void multiItemMaterialsAllowMultipleQuizAndCtPerSemester() {
         Object[] quiz1Row = slotRow(20L, "Quiz 1", ResourceType.QUIZ_CT, "Summer 2025", ResourceStatus.PENDING, "CSE141", 202L, "Md. Sakib Sir");
         when(resourceRepository.findActiveDuplicateSlotsByCourseCode(eq("CSE141"), any()))
                 .thenReturn(List.<Object[]>of(quiz1Row));
 
+        // Quiz 2 in same semester is allowed
         Map<String, Object> quiz2Allowed = duplicateService.checkDuplicate(
                 "CSE141", 202L, ResourceType.QUIZ_CT, "summer 2025", "Quiz 2", null
         );
         assertEquals(Boolean.FALSE, quiz2Allowed.get("duplicate"));
 
-        Map<String, Object> quiz1Blocked = duplicateService.checkDuplicate(
+        // Multiple faculty-administered CTs/quizzes in same semester are explicitly permitted
+        Map<String, Object> anotherCtAllowed = duplicateService.checkDuplicate(
                 "CSE141", 202L, ResourceType.QUIZ_CT, "Sum 25", "quiz-1", null
         );
-        assertEquals(Boolean.TRUE, quiz1Blocked.get("duplicate"));
-        assertEquals("PENDING", quiz1Blocked.get("existingStatus"));
+        assertEquals(Boolean.FALSE, anotherCtAllowed.get("duplicate"));
 
         Map<String, Object> emptyTitle = duplicateService.checkDuplicate(
                 "CSE141", 202L, ResourceType.QUIZ_CT, "Summer 2025", "", null

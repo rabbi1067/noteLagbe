@@ -169,10 +169,14 @@ export function buildConciseAcademicTitle(
   courseCode: string,
   resourceType: string,
   _sem?: string,
-  _courseTitle?: string
+  _courseTitle?: string,
+  instanceIndex?: number
 ): string {
   const cleanCode = (courseCode || "CSE").toUpperCase().trim();
   const shortType = getShortResourceTypeName(resourceType);
+  if ((resourceType === "QUIZ_CT" || resourceType === "LAB_QUIZ") && typeof instanceIndex === "number" && instanceIndex > 0) {
+    return `${cleanCode} ${shortType} ${instanceIndex}`;
+  }
   return `${cleanCode} ${shortType}`;
 }
 

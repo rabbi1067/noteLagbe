@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -70,6 +71,7 @@ const PROFANITY_REGEX =
   /(?:bc|mc|chutiya|harami|bapok|sala|magi|khanki|kutta|shor|bitch|bastard|fuck|shit|asshole|fucker|dick|pussy)/i;
 
 export default function FloatingCommunityChat() {
+  const pathname = usePathname() || "";
   const { user, isAuthenticated, isAdmin, isSuperAdmin, setShowAuthModal } = useAuth();
   const { language } = useLanguage();
   const { isDark } = useTheme();
@@ -334,6 +336,27 @@ export default function FloatingCommunityChat() {
       window.dispatchEvent(new CustomEvent("notelagbe-chat-unseen", { detail: { count: unseenCount } }));
     }
   }, [unseenCount]);
+
+  // Lock background page scroll on mobile and tablet when full-page chat is open
+  useEffect(() => {
+    if (isOpen && isMobileScreen) {
+      const prevBodyOverflow = document.body.style.overflow;
+      const prevHtmlOverflow = document.documentElement.style.overflow;
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prevBodyOverflow;
+        document.documentElement.style.overflow = prevHtmlOverflow;
+      };
+    }
+  }, [isOpen, isMobileScreen]);
+
+  // Auto-close chat view on route change when on mobile
+  useEffect(() => {
+    if (isMobileScreen && isOpen) {
+      setIsOpen(false);
+    }
+  }, [pathname, isMobileScreen]);
 
   // Extract first recognized URL or route from text
   const extractUrlFromText = (text?: string | null): string | null => {
@@ -1456,46 +1479,76 @@ export default function FloatingCommunityChat() {
       </div>
 
       {/* =========================================================================
-          2. Expanded Modern Glassmorphic Chatroom Window
+          2. Modern Chatroom Window (Full Page on Mobile / Floating on Desktop)
          ========================================================================= */}
       {isOpen && (
         <div
           ref={windowRef}
-          style={{
-            position: "fixed",
-            bottom: isMobileScreen ? 76 : 24,
-            right: isMobileScreen ? 12 : 24,
-            transform: `translate3d(${windowPos.x}px, ${windowPos.y}px, 0)`,
-            zIndex: 10000,
-            maxWidth: isMobileScreen ? "calc(100vw - 24px)" : "380px",
-            maxHeight: isMobileScreen ? "calc(100vh - 92px)" : "calc(100vh - 32px)",
-            willChange: "transform",
-            transition: isDragging
-              ? "none"
-              : "transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
-          }}
-          className={`w-[380px] h-[600px] flex flex-col rounded-3xl backdrop-blur-md sm:backdrop-blur-2xl transition-colors duration-200 overflow-hidden animate-in fade-in zoom-in-95 select-none ${
-            isDark
-              ? "bg-[#090d16]/98 border border-white/15 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.85),0_0_35px_rgba(34,211,238,0.12)] text-slate-100"
-              : "bg-white/98 border border-slate-200/90 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.18),0_0_25px_rgba(59,130,246,0.12)] text-slate-800"
-          }`}
+          style={
+            isMobileScreen
+              ? {
+                  position: "fixed",
+                  top: pathname?.startsWith("/admin") ? 56 : 64,
+                  bottom: pathname?.startsWith("/admin") ? 0 : 64,
+                  left: 0,
+                  right: 0,
+                  width: "100%",
+                  maxWidth: "100vw",
+                  height: "auto",
+                  maxHeight: "none",
+                  transform: "none",
+                  zIndex: 35,
+                  willChange: "auto",
+                  transition: "none",
+                }
+              : {
+                  position: "fixed",
+                  bottom: 24,
+                  right: 24,
+                  transform: `translate3d(${windowPos.x}px, ${windowPos.y}px, 0)`,
+                  zIndex: 10000,
+                  maxWidth: "380px",
+                  maxHeight: "calc(100vh - 32px)",
+                  willChange: "transform",
+                  transition: isDragging
+                    ? "none"
+                    : "transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
+                }
+          }
+          className={
+            isMobileScreen
+              ? `w-full h-full flex flex-col rounded-none overflow-hidden select-none transition-colors duration-200 border-none shadow-none ${
+                  isDark
+                    ? "bg-[#090d16] text-slate-100"
+                    : "bg-slate-50 text-slate-800"
+                }`
+              : `w-[380px] h-[600px] flex flex-col rounded-3xl backdrop-blur-md sm:backdrop-blur-2xl transition-colors duration-200 overflow-hidden animate-in fade-in zoom-in-95 select-none ${
+                  isDark
+                    ? "bg-[#090d16]/98 border border-white/15 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.85),0_0_35px_rgba(34,211,238,0.12)] text-slate-100"
+                    : "bg-white/98 border border-slate-200/90 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.18),0_0_25px_rgba(59,130,246,0.12)] text-slate-800"
+                }`
+          }
         >
           {/* Radiant Top Neon Light Strip */}
           <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_12px_#22d3ee] shrink-0" />
 
-          {/* Header Bar (Direct Drag Handle + Double-Click to Reset to Corner) */}
+          {/* Header Bar (Direct Drag Handle on Desktop + Fixed Navigation on Mobile) */}
           <div
-            onPointerDown={handleHeaderPointerDown}
-            onDoubleClick={handleResetPosition}
-            className={`relative px-4 py-3 border-b flex items-center justify-between cursor-grab active:cursor-grabbing select-none transition-colors ${
+            onPointerDown={isMobileScreen ? undefined : handleHeaderPointerDown}
+            onDoubleClick={isMobileScreen ? undefined : handleResetPosition}
+            className={`relative px-4 py-3 border-b flex items-center justify-between select-none transition-colors ${
+              isMobileScreen ? "cursor-default" : "cursor-grab active:cursor-grabbing"
+            } ${
               isDark
                 ? "bg-gradient-to-r from-slate-900/95 via-indigo-950/85 to-slate-900/95 border-white/10"
                 : "bg-gradient-to-r from-slate-100/95 via-blue-50/90 to-slate-100/95 border-slate-200/90"
             }`}
             title={
-              isBn
-                ? "হেডার ধরে যেকোনো দিকে সরাতে পারেন (ডাবল-ক্লিক করলে কর্নারে রিসেট হবে)"
-                : "Drag header to move chat (double-click to reset position)"
+              !isMobileScreen
+                ? isBn
+                  ? "হেডার ধরে যেকোনো দিকে সরাতে পারেন (ডাবল-ক্লিক করলে কর্নারে রিসেট হবে)"
+                  : "Drag header to move chat (double-click to reset position)"
+                : undefined
             }
           >
             {/* Left: Avatar + Title + Integrated Online Status */}
@@ -1564,14 +1617,16 @@ export default function FloatingCommunityChat() {
                 )}
               </button>
 
-              {/* 1-Click Reset to Default Corner */}
-              <button
-                onClick={handleResetPosition}
-                className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 transition-colors"
-                title={isBn ? "ডিফল্ট কর্নারে রিসেট করুন" : "Reset position to corner"}
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
+              {/* 1-Click Reset to Default Corner (Desktop Only) */}
+              {!isMobileScreen && (
+                <button
+                  onClick={handleResetPosition}
+                  className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 transition-colors"
+                  title={isBn ? "ডিফল্ট কর্নারে রিসেট করুন" : "Reset position to corner"}
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              )}
 
               {/* Sound Notification Toggle */}
               <button

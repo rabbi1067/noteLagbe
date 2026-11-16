@@ -10813,7 +10813,11 @@ export default function AdminDashboardPage() {
                   required
                   value={resTitle}
                   onChange={(e) => setResTitle(e.target.value)}
-                  placeholder="e.g. Lecture Slides - Graph BFS & DFS Traversal"
+                  placeholder={
+                    resType === "QUIZ_CT" || resType === "LAB_QUIZ"
+                      ? `e.g. ${resCourseCode || "CSE"} Quiz & CT Question 1 (or CT-1, CT-2, Section A)`
+                      : "e.g. Lecture Slides - Graph BFS & DFS Traversal"
+                  }
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 font-medium"
                 />
               </div>
@@ -10859,6 +10863,17 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
+              {(resType === "QUIZ_CT" || resType === "LAB_QUIZ") && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold">
+                  <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                  <span>
+                    {language === "bn"
+                      ? "একই সেমিস্টারে একাধিক কুইজ / সিটি প্রশ্ন আপলোড অনুমোদিত (যেমন: CT 1, CT 2, CT 3, Section A/B)।"
+                      : "Supported: Multiple Quiz & CT questions can be uploaded for the same semester (e.g. CT 1, CT 2, CT 3, Section A/B)."}
+                  </span>
+                </div>
+              )}
+
               <DuplicateWarningBanner
                 checking={resourceDupCheck.checkingDuplicate}
                 duplicateInfo={resourceDupCheck.duplicateInfo}
@@ -10892,8 +10907,19 @@ export default function AdminDashboardPage() {
                     LAB_HAND_NOTE: "Lab Hand Note",
                   };
                   const currentSemester = resSemester?.trim() || getCurrentAcademicSemester();
-                  const smartBaseTitle = buildConciseAcademicTitle(resCourseCode, resType);
-                  const smartFileName = `${resCourseCode ? resCourseCode + "_" : ""}${currentSemester.replace(/\s+/g, "_")}_${resType}`;
+                  const isQuizOrCt = resType === "QUIZ_CT" || resType === "LAB_QUIZ";
+                  const currentSemKey = (currentSemester || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+                  const existingQuizCount = isQuizOrCt
+                    ? resources.filter(
+                        (r) =>
+                          r.course?.code?.toUpperCase() === resCourseCode?.toUpperCase() &&
+                          (r.type === resType || (resType === "QUIZ_CT" && r.type === "QUESTION_COURSE_IN")) &&
+                          (r.semesterName || "").toLowerCase().replace(/[^a-z0-9]/g, "") === currentSemKey
+                      ).length
+                    : 0;
+                  const nextQuizIndex = isQuizOrCt ? existingQuizCount + 1 : undefined;
+                  const smartBaseTitle = buildConciseAcademicTitle(resCourseCode, resType, resSemester, undefined, nextQuizIndex);
+                  const smartFileName = `${resCourseCode ? resCourseCode + "_" : ""}${currentSemester.replace(/\s+/g, "_")}_${resType}${nextQuizIndex ? `_Q${nextQuizIndex}` : ""}`;
 
                   return (
                     <MultiPageUploader

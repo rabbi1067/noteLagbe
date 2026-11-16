@@ -40,6 +40,16 @@ public class ResourceDuplicateService {
             ResourceType.LAB_FINAL
     );
 
+    /**
+     * Faculty-administered assessments that explicitly allow multiple distinct tests per semester
+     * (e.g. CT 1, CT 2, CT 3, Quiz 1, Surprise Quiz, Section A/B variants).
+     * These should NEVER be blocked by single-slot semester duplicate detection.
+     */
+    private static final Set<ResourceType> MULTI_INSTANCE_SEMESTER_TYPES = EnumSet.of(
+            ResourceType.QUIZ_CT,
+            ResourceType.LAB_QUIZ
+    );
+
     private static final Pattern SEASON_FIRST_PATTERN = Pattern.compile(
             "^\\s*(spring|spr|summer|sum|smr|fall|fal|autumn|aut|winter|win)[\\s\\-_/'.,]*(\\d{2}|\\d{4})\\s*$",
             Pattern.CASE_INSENSITIVE
@@ -264,6 +274,14 @@ public class ResourceDuplicateService {
         if (courseCode == null || courseCode.trim().isEmpty() || type == null || semesterKey.isEmpty()) {
             return result;
         }
+
+        // Quizzes & Class Tests (CTs) are faculty-administered and frequently have multiple
+        // distinct tests (CT 1, CT 2, CT 3, Section A, Section B) within the exact same semester.
+        // They are explicitly multi-instance and should never be blocked from multiple uploads per semester.
+        if (MULTI_INSTANCE_SEMESTER_TYPES.contains(type)) {
+            return result;
+        }
+
         if (!singleSlot && titleKey.isEmpty()) {
             return result;
         }

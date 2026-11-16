@@ -111,6 +111,9 @@ export default function MobileBottomNav() {
           {/* 1. Courses & Notes */}
           <Link
             href="/courses"
+            onClick={() => {
+              if (isChatOpen) window.dispatchEvent(new CustomEvent("notelagbe-close-chat"));
+            }}
             className={`flex flex-col items-center justify-center flex-1 h-full py-1 transition-all active:scale-95 ${
               isActive("/courses")
                 ? "text-blue-600 dark:text-blue-400 font-extrabold"
@@ -131,6 +134,9 @@ export default function MobileBottomNav() {
           {/* 2. Faculty Directory */}
           <Link
             href="/teachers"
+            onClick={() => {
+              if (isChatOpen) window.dispatchEvent(new CustomEvent("notelagbe-close-chat"));
+            }}
             className={`flex flex-col items-center justify-center flex-1 h-full py-1 transition-all active:scale-95 ${
               isActive("/teachers")
                 ? "text-blue-600 dark:text-blue-400 font-extrabold"
@@ -213,6 +219,9 @@ export default function MobileBottomNav() {
           {/* 5. Contribute (+2 Free) */}
           <Link
             href="/contribute"
+            onClick={() => {
+              if (isChatOpen) window.dispatchEvent(new CustomEvent("notelagbe-close-chat"));
+            }}
             className={`flex flex-col items-center justify-center flex-1 h-full py-1 transition-all active:scale-95 ${
               isActive("/contribute")
                 ? "text-emerald-600 dark:text-emerald-400 font-extrabold"
