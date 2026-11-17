@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { api } from "@/lib/api";
+import { api, getToken } from "@/lib/api";
 import { 
   Upload, 
   Sparkles, 
@@ -421,9 +421,13 @@ export default function ContributePage() {
     const matchedCourse = courses.find((c) => c.code?.toLowerCase() === activeCourse?.toLowerCase());
 
     try {
+      const token = getToken();
       const res = await fetch("/api/ai/analyze-document", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           fileName: name,
           fileUrl: url,

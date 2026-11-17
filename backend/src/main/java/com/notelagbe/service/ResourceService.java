@@ -627,9 +627,9 @@ public class ResourceService {
             incrementDownloadCount(id);
         }
 
-        // Direct Cloudflare R2 Streaming & CDN Delivery (Zero Render Memory Pressure, 100% S3 Authorized)
+        // Direct Cloudflare R2 Streaming & CDN Delivery (Zero Render Memory Pressure, 100% S3 Authorized, 1-hour secure presigned URL)
         if (r2Service.isConfigured() && (targetUrl.contains(".r2.") || targetUrl.contains("r2.dev") || targetUrl.contains("r2_"))) {
-            String presignedUrl = r2Service.getPresignedDownloadUrl(targetUrl, 24);
+            String presignedUrl = r2Service.getPresignedDownloadUrl(targetUrl, 1);
             if (presignedUrl != null && !presignedUrl.isBlank() && !presignedUrl.equals(targetUrl)) {
                 log.info("Redirecting client directly to presigned/CDN Cloudflare R2 URL for material ID {}: {}", id, presignedUrl);
                 return ResponseEntity.status(HttpStatus.FOUND)

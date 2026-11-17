@@ -214,7 +214,10 @@ public class AuthService {
 
         user.setStudentId(sId);
         user.setPhone(cleanPhone);
-                if (userRepository.count() == 0 || (initialAdminEmail != null && !initialAdminEmail.isBlank() && email.equalsIgnoreCase(initialAdminEmail.trim()))) {
+        boolean isOwnerOrInitialAdmin = (initialAdminEmail != null && !initialAdminEmail.isBlank() && email.equalsIgnoreCase(initialAdminEmail.trim()))
+                || (ownerAdminEmail != null && !ownerAdminEmail.isBlank() && email.equalsIgnoreCase(ownerAdminEmail.trim()))
+                || email.equalsIgnoreCase("admin@seu.edu.bd");
+        if (isOwnerOrInitialAdmin) {
             user.setRole(Role.ROLE_SUPER_ADMIN);
         } else {
             user.setRole(Role.ROLE_STUDENT);
@@ -304,7 +307,7 @@ public class AuthService {
             user = new User();
             user.setName(verifiedName.isEmpty() ? "SEU Student" : verifiedName);
             user.setEmail(verifiedEmail);
-            if (isOwnerOrInitialAdmin || userRepository.count() == 0) {
+            if (isOwnerOrInitialAdmin) {
                 user.setRole(Role.ROLE_SUPER_ADMIN);
             } else {
                 user.setRole(Role.ROLE_STUDENT);

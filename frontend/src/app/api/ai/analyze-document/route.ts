@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyApiAuth } from "@/lib/authVerification";
 import {
   getCurrentAcademicSemester,
   getShortResourceTypeName,
@@ -37,8 +38,38 @@ interface AnalysisResult {
   confidence: number;
 }
 
+function isSafeInspectionHost(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === "localhost" ||
+      host.endsWith(".local") ||
+      host.endsWith(".internal") ||
+      host.startsWith("127.") ||
+      host.startsWith("192.168.") ||
+      host.startsWith("10.") ||
+      host.startsWith("172.") ||
+      host === "169.254.169.254"
+    ) {
+      return false;
+    }
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
+    const authCheck = await verifyApiAuth(req);
+    if (!authCheck.authenticated) {
+      return NextResponse.json(
+        { success: false, error: authCheck.error || "Authentication required." },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const {
       fileName = "",
@@ -156,7 +187,7 @@ export async function POST(req: NextRequest) {
       process.env.GOOGLE_API_KEY ||
       process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
-    if (apiKey && fileUrl && /^https?:\/\//i.test(fileUrl)) {
+    if (apiKey && fileUrl && /^https?:\/\//i.test(fileUrl) && isSafeInspectionHost(fileUrl)) {
       try {
         let imagePart: any = null;
         let inspectionUrl = fileUrl;

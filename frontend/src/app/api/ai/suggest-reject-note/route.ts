@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyApiAuth } from "@/lib/authVerification";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -38,6 +39,14 @@ function detectBufferMime(buf: Buffer, headerMime?: string): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const authCheck = await verifyApiAuth(req);
+    if (!authCheck.authenticated) {
+      return NextResponse.json(
+        { success: false, error: authCheck.error || "Authentication required." },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const {
       title = "",

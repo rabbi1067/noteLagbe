@@ -12,7 +12,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
 import NotificationBell from "@/components/NotificationBell";
 import BrandLogo from "@/components/BrandLogo";
-import { api, ChatMessageDto, warmupBackend } from "@/lib/api";
+import { api, ChatMessageDto, warmupBackend, getToken } from "@/lib/api";
 import { notifyDataChanged, useDataSync } from "@/lib/sync";
 import {
   Calendar,
@@ -920,9 +920,13 @@ export default function AdminDashboardPage() {
         fileUrl = `${directBackend.replace(/\/+$/, "")}${fileUrl}`;
       }
 
+      const token = getToken();
       const res = await fetch("/api/ai/suggest-reject-note", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           title:
             rejectingContribution.uploadedResource?.title ||

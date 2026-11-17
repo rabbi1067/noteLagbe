@@ -28,5 +28,5 @@ COPY --from=build /workspace/target/notelagbe-backend-1.0.0.jar app.jar
 ENV PORT=10000
 EXPOSE 10000
 
-# Run with container optimizations
-ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+# Run with container optimizations and cgroup memory limits to prevent sudden SIGKILL on Render 512MB RAM
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-Xss512k", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]

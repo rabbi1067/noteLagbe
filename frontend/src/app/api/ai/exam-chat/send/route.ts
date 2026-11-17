@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyApiAuth } from "@/lib/authVerification";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -1696,6 +1697,18 @@ export async function POST(req: NextRequest) {
 
     if (!cleanMessage) {
       return NextResponse.json({ success: false, message: "Message content cannot be blank." }, { status: 400 });
+    }
+
+    // Strict Authentication Shield: Block unauthenticated bots & public AI proxy abuse
+    const authCheck = await verifyApiAuth(req);
+    if (!authCheck.authenticated) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: authCheck.error || "Authentication required. Please sign in to access NoteLagbe AI.",
+        },
+        { status: 401 }
+      );
     }
 
     const authHeader = req.headers.get("authorization") || "";

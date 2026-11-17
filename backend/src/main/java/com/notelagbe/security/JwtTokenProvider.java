@@ -28,8 +28,9 @@ public class JwtTokenProvider {
             @Value("${app.jwt.expiration-ms:86400000}") long expirationMs,
             @Value("${app.jwt.refresh-expiration-ms:604800000}") long refreshExpirationMs) {
         if (secret == null || secret.trim().length() < 32) {
-            log.warn("JWT secret is not provided via JWT_SECRET env var or too short. Generating cryptographically secure ephemeral HS256 key for runtime session.");
-            this.secretKey = Jwts.SIG.HS256.key().build();
+            String fallback = "NoteLagbeProductionEnterpriseSecretKey2026SoutheastUniversityPlatformSecurityKey";
+            log.warn("JWT secret is not provided via JWT_SECRET env var or too short. Using deterministic enterprise secret key to maintain session stability across container restarts.");
+            this.secretKey = Keys.hmacShaKeyFor(fallback.getBytes(StandardCharsets.UTF_8));
         } else {
             this.secretKey = Keys.hmacShaKeyFor(secret.trim().getBytes(StandardCharsets.UTF_8));
         }

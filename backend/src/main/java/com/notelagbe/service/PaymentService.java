@@ -95,7 +95,13 @@ public class PaymentService {
         pr.setReviewedAt(null);
         pr.setCreatedAt(LocalDateTime.now());
 
-        PaymentRequest saved = paymentRequestRepository.save(pr);
+        PaymentRequest saved;
+        try {
+            saved = paymentRequestRepository.saveAndFlush(pr);
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            throw new ApiException("A payment verification request with this Transaction ID was just submitted. Please wait for admin review.", org.springframework.http.HttpStatus.CONFLICT);
+        }
+
         liveSyncService.broadcast("payment", "created", saved.getId());
         return saved;
     }
