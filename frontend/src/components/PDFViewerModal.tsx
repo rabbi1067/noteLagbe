@@ -20,6 +20,10 @@ import {
   Maximize,
   ChevronLeft,
   ChevronRight,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeftRight,
+  Layers,
   Save,
   AlertCircle,
   Loader2,
@@ -139,6 +143,87 @@ async function inspectBlobFormat(
   return { kind: "unsupported", normalizedBlob: blob };
 }
 
+function PageThumbnail({
+  pdfBytes,
+  blobUrl,
+  pageNum,
+  rotation = 0,
+}: {
+  pdfBytes?: Uint8Array | null;
+  blobUrl?: string | null;
+  pageNum: number;
+  rotation?: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    async function renderThumb() {
+      if (!blobUrl && !pdfBytes) return;
+      try {
+        const pdfjs = await import("pdfjs-dist");
+        if (pdfjs.GlobalWorkerOptions) {
+          pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+        }
+        const loadingTask = pdfjs.getDocument(
+          blobUrl
+            ? {
+                url: blobUrl,
+                cMapUrl: "https://unpkg.com/pdfjs-dist@3.11.174/cmaps/",
+                cMapPacked: true,
+              }
+            : {
+                data: pdfBytes,
+                cMapUrl: "https://unpkg.com/pdfjs-dist@3.11.174/cmaps/",
+                cMapPacked: true,
+              }
+        );
+        const doc = await loadingTask.promise;
+        const page = await doc.getPage(pageNum);
+        if (!active) return;
+        const viewport = page.getViewport({ scale: 0.22 });
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+        const ctx = canvas.getContext("2d", { alpha: false });
+        if (!ctx) return;
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        if (active) setLoading(false);
+      } catch {
+        if (active) setLoading(false);
+      }
+    }
+    void renderThumb();
+    return () => {
+      active = false;
+    };
+  }, [pdfBytes, blobUrl, pageNum]);
+
+  return (
+    <div className="relative w-full h-44 flex items-center justify-center bg-slate-900/60 rounded-xl overflow-hidden border border-slate-700/60 p-2">
+      {loading && (
+        <div className="flex flex-col items-center gap-1.5 text-slate-400">
+          <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
+          <span className="text-[10px]">Page {pageNum}</span>
+        </div>
+      )}
+      <canvas
+        ref={canvasRef}
+        style={{
+          transform: rotation ? `rotate(${rotation}deg)` : undefined,
+          transition: "transform 0.2s ease",
+          maxWidth: "100%",
+          maxHeight: "100%",
+          objectFit: "contain",
+        }}
+        className={loading ? "hidden" : "block shadow-md rounded"}
+      />
+    </div>
+  );
+}
+
 interface PDFViewerModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -174,6 +259,8 @@ export default function PDFViewerModal({
   const [pdfPageCount, setPdfPageCount] = useState(0);
   const [activePdfPage, setActivePdfPage] = useState(1);
   const [pageExtraRotations, setPageExtraRotations] = useState<Record<number, number>>({});
+  const [pageOrder, setPageOrder] = useState<number[]>([]);
+  const [pageOrganizerOpen, setPageOrganizerOpen] = useState(false);
   const [autoAlignMixedPdf, setAutoAlignMixedPdf] = useState(true);
   const [autoAlignedPagesList, setAutoAlignedPagesList] = useState<number[]>([]);
   const [pdfChangedFromRaw, setPdfChangedFromRaw] = useState(false);
@@ -221,6 +308,8 @@ export default function PDFViewerModal({
       setRotation(0);
       setActivePdfPage(1);
       setPageExtraRotations({});
+      setPageOrder([]);
+      setPageOrganizerOpen(false);
       setAutoAlignMixedPdf(true);
       setAutoAlignedPagesList([]);
       setPdfChangedFromRaw(false);
@@ -447,11 +536,13 @@ export default function PDFViewerModal({
             const info = await inspectPdfOrientations(rawBytes);
             if (!cancelled) {
               setPdfPageCount(info.pageCount);
+              setPageOrder(Array.from({ length: info.pageCount }, (_, i) => i + 1));
               setActivePdfPage(1);
             }
           } catch {
             if (!cancelled) {
               setPdfPageCount(0);
+              setPageOrder([]);
             }
           }
         } else {
@@ -510,11 +601,17 @@ export default function PDFViewerModal({
   }, [isOpen, resource?.id, resource?.fileUrl, isUnlocked, isAdminMode, drivePreviewUrl, retryTick, replaceBlobUrl]);
 
   const rebuildPdfWithRotations = useCallback(
-    async (nextMap: Record<number, number>, nextAutoAlign: boolean) => {
+    async (
+      nextMap: Record<number, number>,
+      nextAutoAlign: boolean,
+      nextOrder?: number[]
+    ) => {
       if (!rawPdfBytes) return;
+      const orderToUse = nextOrder !== undefined ? nextOrder : pageOrder;
       try {
         const res = await normalizeAndRotatePdfBytes(rawPdfBytes, {
           autoAlignMixed: nextAutoAlign,
+          pageOrder: orderToUse && orderToUse.length > 0 ? orderToUse : undefined,
           pageExtraRotations: nextMap,
           targetOrientation: "AUTO_UNIFORM",
         });
@@ -528,7 +625,7 @@ export default function PDFViewerModal({
         toast.error("Unable to rotate this PDF page.");
       }
     },
-    [rawPdfBytes, replaceBlobUrl]
+    [rawPdfBytes, pageOrder, replaceBlobUrl]
   );
 
   const handleRotateActivePdfPage = useCallback(
@@ -579,6 +676,74 @@ export default function PDFViewerModal({
     },
     [rawPdfBytes, pdfPageCount, pageExtraRotations, autoAlignedPagesList, autoAlignMixedPdf, rebuildPdfWithRotations]
   );
+
+  const handleSwapPages = useCallback(
+    async (idxA: number, idxB: number) => {
+      if (!rawPdfBytes || pdfPageCount <= 1) return;
+      const effectiveOrder =
+        pageOrder.length === pdfPageCount && pageOrder.length > 0
+          ? [...pageOrder]
+          : Array.from({ length: pdfPageCount }, (_, i) => i + 1);
+      if (idxA < 0 || idxA >= effectiveOrder.length || idxB < 0 || idxB >= effectiveOrder.length) return;
+      const nextOrder = [...effectiveOrder];
+      const temp = nextOrder[idxA];
+      nextOrder[idxA] = nextOrder[idxB];
+      nextOrder[idxB] = temp;
+      setPageOrder(nextOrder);
+      await rebuildPdfWithRotations(pageExtraRotations, autoAlignMixedPdf, nextOrder);
+      toast.success(`Position updated: Page ${idxA + 1} ↔ Page ${idxB + 1}`);
+    },
+    [rawPdfBytes, pdfPageCount, pageOrder, pageExtraRotations, autoAlignMixedPdf, rebuildPdfWithRotations]
+  );
+
+  const handleMoveActivePageUp = useCallback(async () => {
+    if (activePdfPage <= 1) return;
+    const currentIdx = activePdfPage - 1;
+    await handleSwapPages(currentIdx, currentIdx - 1);
+    setActivePdfPage((p) => Math.max(1, p - 1));
+  }, [activePdfPage, handleSwapPages]);
+
+  const handleMoveActivePageDown = useCallback(async () => {
+    if (activePdfPage >= pdfPageCount) return;
+    const currentIdx = activePdfPage - 1;
+    await handleSwapPages(currentIdx, currentIdx + 1);
+    setActivePdfPage((p) => Math.min(pdfPageCount, p + 1));
+  }, [activePdfPage, pdfPageCount, handleSwapPages]);
+
+  const handleReverseAllPages = useCallback(async () => {
+    if (!rawPdfBytes || pdfPageCount <= 1) return;
+    const effectiveOrder =
+      pageOrder.length === pdfPageCount && pageOrder.length > 0
+        ? [...pageOrder]
+        : Array.from({ length: pdfPageCount }, (_, i) => i + 1);
+    const nextOrder = [...effectiveOrder].reverse();
+    setPageOrder(nextOrder);
+    await rebuildPdfWithRotations(pageExtraRotations, autoAlignMixedPdf, nextOrder);
+    toast.success("All pages reversed! Click 'Save Fixed PDF' to save permanently.");
+  }, [rawPdfBytes, pdfPageCount, pageOrder, pageExtraRotations, autoAlignMixedPdf, rebuildPdfWithRotations]);
+
+  const handleRotateSpecificPage = useCallback(
+    async (origPageNum: number, deltaDeg: number) => {
+      if (!rawPdfBytes) return;
+      const current = pageExtraRotations[origPageNum] ?? 0;
+      const nextRot = normalizeRotationDegrees(current + deltaDeg);
+      const nextMap = { ...pageExtraRotations, [origPageNum]: nextRot };
+      setPageExtraRotations(nextMap);
+      await rebuildPdfWithRotations(nextMap, autoAlignMixedPdf, pageOrder);
+    },
+    [rawPdfBytes, pageExtraRotations, autoAlignMixedPdf, pageOrder, rebuildPdfWithRotations]
+  );
+
+  const handleResetPageOrderAndRotations = useCallback(async () => {
+    if (!rawPdfBytes) return;
+    const originalOrder = Array.from({ length: pdfPageCount }, (_, i) => i + 1);
+    setPageOrder(originalOrder);
+    setPageExtraRotations({});
+    setAutoAlignMixedPdf(false);
+    await rebuildPdfWithRotations({}, false, originalOrder);
+    setPdfChangedFromRaw(false);
+    toast.info("Page order and rotations reset to original.");
+  }, [rawPdfBytes, pdfPageCount, rebuildPdfWithRotations]);
 
   const applyImageRotation = useCallback(
     async (targetDeg: number) => {
@@ -641,15 +806,18 @@ export default function PDFViewerModal({
     });
     const savedUrl = await persistFixedFileToResource(
       fixedFile,
-      "Fixed uniform PDF saved permanently!"
+      "Fixed document with updated page positions & rotations saved permanently!"
     );
     if (savedUrl) {
       setRawPdfBytes(activePdfBytes);
+      setPageOrder(Array.from({ length: (pageOrder.length || pdfPageCount) }, (_, i) => i + 1));
       setPageExtraRotations({});
       setAutoAlignedPagesList([]);
       setPdfChangedFromRaw(false);
+      setPageOrganizerOpen(false);
+      confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
     }
-  }, [canDownloadAndOpen, resource, courseCode, activePdfBytes, persistFixedFileToResource]);
+  }, [canDownloadAndOpen, resource, courseCode, activePdfBytes, persistFixedFileToResource, pageOrder, pdfPageCount]);
 
   const handleSaveFixedImageToServer = useCallback(
     async (convertToPortraitPdf: boolean) => {
@@ -1088,6 +1256,54 @@ export default function PDFViewerModal({
                     </div>
                   )}
 
+                  {/* ADMIN ONLY: Quick Move Current Page Up/Down and Reverse All */}
+                  {canDownloadAndOpen && pdfPageCount > 1 && (
+                    <div className="flex items-center bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm gap-0.5">
+                      <button
+                        type="button"
+                        disabled={activePdfPage <= 1}
+                        onClick={handleMoveActivePageUp}
+                        className="px-2 py-1 rounded-lg text-[10px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors flex items-center gap-1 cursor-pointer"
+                        title={`Move Page ${activePdfPage} earlier (Up)`}
+                      >
+                        <ArrowUp className="w-3 h-3 text-amber-500" />
+                        <span>Move Pg {activePdfPage} ↑</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={activePdfPage >= pdfPageCount}
+                        onClick={handleMoveActivePageDown}
+                        className="px-2 py-1 rounded-lg text-[10px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 transition-colors flex items-center gap-1 cursor-pointer"
+                        title={`Move Page ${activePdfPage} later (Down)`}
+                      >
+                        <ArrowDown className="w-3 h-3 text-amber-500" />
+                        <span>Move Pg {activePdfPage} ↓</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleReverseAllPages}
+                        className="px-2 py-1 rounded-lg text-[10px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-1 cursor-pointer border-l border-slate-200 dark:border-slate-700 pl-1.5"
+                        title="Reverse all page order (e.g. Page 2 becomes Page 1, Page 1 becomes Page 2)"
+                      >
+                        <ArrowLeftRight className="w-3 h-3 text-amber-500" />
+                        <span>Reverse ⇄</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* ADMIN ONLY: Open Full Page Position & Rotation Organizer */}
+                  {canDownloadAndOpen && pdfPageCount > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setPageOrganizerOpen(true)}
+                      className="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 transition-colors flex items-center gap-1 cursor-pointer shadow-sm"
+                      title="Open visual Page Position & Rotation Organizer"
+                    >
+                      <Layers className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Organize Pages</span>
+                    </button>
+                  )}
+
                   <div className="flex items-center bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                     <button
                       type="button"
@@ -1399,6 +1615,11 @@ export default function PDFViewerModal({
                     }}
                     onTotalPagesDetected={(total) => {
                       setPdfPageCount(total);
+                      setPageOrder((prev) =>
+                        prev.length === total && prev.length > 0
+                          ? prev
+                          : Array.from({ length: total }, (_, i) => i + 1)
+                      );
                     }}
                     zoom={zoom}
                     rotation={applyCssTransformRotation ? 0 : rotation}
@@ -1476,6 +1697,206 @@ export default function PDFViewerModal({
             </div>
           )}
         </div>
+
+        {/* ============================================================== */}
+        {/* ADMIN ONLY: Page Position & Rotation Organizer Visual Overlay */}
+        {/* ============================================================== */}
+        {pageOrganizerOpen && canDownloadAndOpen && pdfPageCount > 1 && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
+            <div
+              className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/70">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      Organize Document Pages
+                      <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        Admin Tool
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Reorder page positions, rotate individual sheets, and save permanently to server.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleReverseAllPages}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="Reverse all pages (e.g. Pg 2 ↔ Pg 1)"
+                  >
+                    <ArrowLeftRight className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Reverse All</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetPageOrderAndRotations}
+                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="Reset to original uploaded sequence"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPageOrganizerOpen(false)}
+                    className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer ml-1"
+                    title="Close Organizer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body: Cards Grid */}
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
+                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-2">
+                  <span className="font-bold">Tip:</span>
+                  <span>
+                    Use <strong>Move Earlier (←)</strong> or <strong>Move Later (→)</strong> to swap page positions, or click <strong>Reverse All</strong> if pages were scanned in reverse. Click <strong>Save & Persist to Server</strong> when done.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {pageOrder.map((origNum, idx) => {
+                    const extraRot = pageExtraRotations[origNum] || 0;
+                    const isFirst = idx === 0;
+                    const isLast = idx === pageOrder.length - 1;
+
+                    return (
+                      <div
+                        key={`page-card-${origNum}-${idx}`}
+                        className="bg-slate-950/80 rounded-2xl border border-slate-800 hover:border-slate-700 p-3.5 flex flex-col gap-2.5 transition-all shadow-md group"
+                      >
+                        {/* Card Header */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-6 h-6 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-xs font-black">
+                              {idx + 1}
+                            </span>
+                            <span className="text-xs font-bold text-slate-200">
+                              Page {idx + 1}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {extraRot !== 0 && (
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold">
+                                {extraRot > 0 ? `+${extraRot}°` : `${extraRot}°`}
+                              </span>
+                            )}
+                            <span className="text-[10px] font-mono text-slate-500">
+                              (Src #{origNum})
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Visual Thumbnail */}
+                        <PageThumbnail
+                          pdfBytes={rawPdfBytes}
+                          blobUrl={blobUrl}
+                          pageNum={origNum}
+                          rotation={extraRot}
+                        />
+
+                        {/* Action Buttons */}
+                        <div className="grid grid-cols-4 gap-1 pt-1">
+                          <button
+                            type="button"
+                            disabled={isFirst}
+                            onClick={() => handleSwapPages(idx, idx - 1)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-20 text-slate-200 text-xs font-bold flex items-center justify-center transition-colors cursor-pointer"
+                            title="Move earlier (Swap Left)"
+                          >
+                            <ChevronLeft className="w-4 h-4 text-amber-400" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isLast}
+                            onClick={() => handleSwapPages(idx, idx + 1)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-20 text-slate-200 text-xs font-bold flex items-center justify-center transition-colors cursor-pointer"
+                            title="Move later (Swap Right)"
+                          >
+                            <ChevronRight className="w-4 h-4 text-amber-400" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRotateSpecificPage(origNum, -90)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center transition-colors cursor-pointer"
+                            title="Rotate 90° Counter-Clockwise"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5 text-blue-400" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRotateSpecificPage(origNum, 90)}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center transition-colors cursor-pointer"
+                            title="Rotate 90° Clockwise"
+                          >
+                            <RotateCw className="w-3.5 h-3.5 text-blue-400" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800 bg-slate-950/70 flex-wrap gap-3">
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <span>Current Sequence:</span>
+                  <div className="flex items-center gap-1 font-mono font-bold text-slate-200">
+                    {pageOrder.map((num, i) => (
+                      <React.Fragment key={`seq-${num}-${i}`}>
+                        {i > 0 && <span className="text-slate-600">→</span>}
+                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-amber-300">
+                          Pg {num}
+                        </span>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                  {pdfChangedFromRaw && (
+                    <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      Modified
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setPageOrganizerOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Done Editing
+                  </button>
+                  {pdfChangedFromRaw && (
+                    <button
+                      type="button"
+                      disabled={savingFixedFile}
+                      onClick={async () => {
+                        await handleSaveFixedPdfToServer();
+                        setPageOrganizerOpen(false);
+                      }}
+                      className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{savingFixedFile ? "Saving to Cloud..." : "Save & Persist to Server"}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

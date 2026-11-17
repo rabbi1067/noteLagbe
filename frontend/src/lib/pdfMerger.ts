@@ -401,12 +401,14 @@ export async function normalizeAndRotatePdfBytes(
   pdfBytes: Uint8Array,
   options: {
     autoAlignMixed?: boolean;
+    pageOrder?: number[]; // 1-based page order: e.g. [2, 1]
     pageExtraRotations?: Record<number, number>; // 1-based page number -> extra CW deg
     targetOrientation?: "UNIFORM_PORTRAIT" | "AUTO_UNIFORM";
   } = {}
 ): Promise<PdfNormalizationResult> {
   const {
     autoAlignMixed = true,
+    pageOrder,
     pageExtraRotations = {},
     targetOrientation = "AUTO_UNIFORM",
   } = options;
@@ -477,7 +479,14 @@ export async function normalizeAndRotatePdfBytes(
     if (!effLand) postPortraitCount++;
   }
 
+  const isReordered = Boolean(
+    pageOrder &&
+    pageOrder.length > 0 &&
+    (pageOrder.length !== n || pageOrder.some((p, idx) => p !== idx + 1))
+  );
+
   const needsUniformRebuild =
+    isReordered ||
     anyExtraRotation ||
     isMixedRaw ||
     hasMixedSizes ||
@@ -498,11 +507,17 @@ export async function normalizeAndRotatePdfBytes(
   const targetW = usePortraitFrame ? A4_PORTRAIT_WIDTH : A4_LANDSCAPE_WIDTH;
   const targetH = usePortraitFrame ? A4_PORTRAIT_HEIGHT : A4_LANDSCAPE_HEIGHT;
 
+  const outputSequence = (pageOrder && pageOrder.length > 0)
+    ? pageOrder.filter((p) => p >= 1 && p <= n)
+    : Array.from({ length: n }, (_, i) => i + 1);
+
   const outDoc = await PDFDocument.create();
 
-  for (let i = 0; i < n; i++) {
-    const srcPage = srcPages[i];
-    const totalCW = totalCWList[i];
+  for (let outIdx = 0; outIdx < outputSequence.length; outIdx++) {
+    const srcPageNum = outputSequence[outIdx]; // 1-based original page
+    const srcIdx = srcPageNum - 1;
+    const srcPage = srcPages[srcIdx];
+    const totalCW = totalCWList[srcIdx];
     const outPage = outDoc.addPage([targetW, targetH]);
 
     try {
@@ -520,7 +535,7 @@ export async function normalizeAndRotatePdfBytes(
       // Fallback for blank/unusual PDF pages without standard content streams
       const outPages = outDoc.getPages();
       outDoc.removePage(outPages.length - 1);
-      const [copied] = await outDoc.copyPages(srcDoc, [i]);
+      const [copied] = await outDoc.copyPages(srcDoc, [srcIdx]);
       copied.setRotation(degrees(totalCW));
       outDoc.addPage(copied);
     }
@@ -529,11 +544,31 @@ export async function normalizeAndRotatePdfBytes(
   const savedBytes = await outDoc.save();
   return {
     bytes: new Uint8Array(savedBytes),
-    pageCount: n,
+    pageCount: outputSequence.length,
     autoAlignedPages,
     effectiveOrientations,
     changed: true,
   };
+}
+
+/**
+ * Convenience helper: Reorders and rotates pages of an existing PDF document.
+ * @param pdfBytes Source PDF binary buffer
+ * @param pageOrder 1-based page sequence (e.g. [2, 1])
+ * @param pageRotations Optional 1-based original page number -> extra CW degrees
+ */
+export async function reorderAndRotatePdfBytes(
+  pdfBytes: Uint8Array,
+  pageOrder: number[],
+  pageRotations: Record<number, number> = {}
+): Promise<Uint8Array> {
+  const result = await normalizeAndRotatePdfBytes(pdfBytes, {
+    pageOrder,
+    pageExtraRotations: pageRotations,
+    autoAlignMixed: false,
+    targetOrientation: "AUTO_UNIFORM",
+  });
+  return result.bytes;
 }
 
 /**
