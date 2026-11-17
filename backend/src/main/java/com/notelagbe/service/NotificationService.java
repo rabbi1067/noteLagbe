@@ -24,7 +24,7 @@ public class NotificationService {
         this.liveSyncService = liveSyncService;
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public Notification createNotification(User user, String title, String message, String type, String link) {
         try {
             String safeTitle = clip(title, 200);

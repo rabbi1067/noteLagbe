@@ -1010,35 +1010,52 @@ export default function AdminDashboardPage() {
     if (!rejectingContribution) return;
     const id = rejectingContribution.id;
     const uploadedResId = rejectingContribution.uploadedResource?.id;
+    const prevContributions = contributions;
+    const prevResources = resources;
+    const feedback = rejectFeedback.trim() || "Submission does not meet quality or curriculum standards.";
+
+    // 1. Instantly close modal and optimistically update UI (0ms delay)
+    setRejectingContribution(null);
     setProcessingQueueKey(`contribution-${id}`);
+    markSelfQueueMutation();
+
+    setContributions((prev) =>
+      prev.map((c) =>
+        c.id === id
+          ? {
+              ...c,
+              status: "REJECTED" as const,
+              adminFeedback: feedback,
+              reviewedAt: new Date().toISOString(),
+            }
+          : c
+      )
+    );
+    if (uploadedResId) {
+      setResources((prev) => prev.filter((r) => r.id !== uploadedResId));
+    }
+
+    toast.success(
+      language === "bn"
+        ? "সাবমিশন বাতিল করা হয়েছে!"
+        : "Contribution rejected and file purged!"
+    );
+
+    // 2. Background persistence to server
     try {
-      const feedback = rejectFeedback.trim() || "Submission does not meet quality or curriculum standards.";
       const updated = await api.admin.rejectContribution(id, feedback);
       applyStatusUpdate(setContributions, id, updated, "REJECTED");
-      if (uploadedResId) {
-        setResources((prev) => prev.filter((r) => r.id !== uploadedResId));
-      }
-      markSelfQueueMutation();
       notifyDataChanged("contribution", "rejected", id);
       if (uploadedResId) {
         notifyDataChanged("resource", "deleted", uploadedResId);
       }
-      toast.success(
-        language === "bn"
-          ? "সাবমিশন বাতিল করা হয়েছে এবং ক্লাউড স্টোরেজ ও ডাটাবেজ থেকে ফাইল মুছে ফেলা হয়েছে!"
-          : "Contribution rejected and file permanently purged from cloud storage & database!"
-      );
-      showDeleteSuccess(
-        language === "bn" ? "সাবমিশন বাতিল ও ফাইল ডিলেট সম্পন্ন" : "Contribution Rejected & File Purged",
-        language === "bn"
-          ? "শিক্ষার্থীর সাবমিশনটি বাতিল করা হয়েছে এবং এর সমস্ত ফাইল ডাটাবেজ ও ক্লাউড স্টোরেজ থেকে স্বয়ংক্রিয়ভাবে মুছে ফেলা হয়েছে।"
-          : "The student submission has been declined and its uploaded files have been permanently removed from database and cloud storage.",
-        `Submission #${id}`
-      );
-      setRejectingContribution(null);
-      void refreshVerificationQueues({ includeResources: true });
     } catch (err: any) {
-      toast.error(err.message || "Failed to reject contribution");
+      // Rollback on network failure
+      setContributions(prevContributions);
+      if (uploadedResId) {
+        setResources(prevResources);
+      }
+      toast.error(err.message || "Failed to reject contribution on server. Restored to pending.");
     } finally {
       setProcessingQueueKey(null);
     }
@@ -2857,17 +2874,27 @@ export default function AdminDashboardPage() {
   const handleApprovePayment = async (id: number) => {
     const actionKey = `payment-${id}`;
     if (processingQueueKey) return;
+    const targetItem = payments.find((p) => p.id === id);
+    if (!targetItem) return;
+
+    const prevPayments = payments;
+    markSelfQueueMutation();
     setProcessingQueueKey(actionKey);
+
+    // Instant optimistic update (0ms UI latency)
+    setPayments((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, status: "APPROVED" as const } : p))
+    );
+    confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
+    toast.success("Payment approved! 6 courses unlocked for student.");
+
     try {
       const updated = await api.admin.approvePayment(id);
       applyStatusUpdate(setPayments, id, updated, "APPROVED");
-      markSelfQueueMutation();
       notifyDataChanged("payment", "approved", id);
-      confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
-      toast.success("Payment approved! 6 courses unlocked for student.");
-      void refreshVerificationQueues({ includeSubscribers: true });
     } catch (err: any) {
-      toast.error(err.message || "Failed to approve payment");
+      setPayments(prevPayments);
+      toast.error(err.message || "Failed to approve payment. Restored to pending.");
     } finally {
       setProcessingQueueKey(null);
     }
@@ -2882,17 +2909,23 @@ export default function AdminDashboardPage() {
       warningText: "Are you sure you want to decline this subscription payment request? The student will be notified and subscription will remain inactive.",
       confirmButtonText: "Reject Payment",
       onConfirm: async () => {
+        const prevPayments = payments;
         setProcessingQueueKey(`payment-${id}`);
+        markSelfQueueMutation();
+
+        // Instant optimistic update
+        setPayments((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, status: "REJECTED" as const } : p))
+        );
+        toast.success("Payment rejected");
+
         try {
           const updated = await api.admin.rejectPayment(id);
           applyStatusUpdate(setPayments, id, updated, "REJECTED");
-          markSelfQueueMutation();
           notifyDataChanged("payment", "rejected", id);
-          toast.success("Payment rejected");
-          showDeleteSuccess("Payment Request Rejected", "The subscription payment transaction has been declined.", `Payment #${id}`);
-          void refreshVerificationQueues();
         } catch (err: any) {
-          toast.error(err.message || "Failed to reject payment");
+          setPayments(prevPayments);
+          toast.error(err.message || "Failed to reject payment. Restored to pending.");
           throw err;
         } finally {
           setProcessingQueueKey(null);
@@ -2904,21 +2937,46 @@ export default function AdminDashboardPage() {
   const handleApproveContribution = async (id: number) => {
     const actionKey = `contribution-${id}`;
     if (processingQueueKey) return;
+    const targetItem = contributions.find((c) => c.id === id);
+    if (!targetItem) return;
+
+    const prevContributions = contributions;
+    const prevResources = resources;
+
+    // Instant optimistic update (0ms delay - instantly moves from pending to published)
+    markSelfQueueMutation();
     setProcessingQueueKey(actionKey);
+
+    const optimisticUpdated = {
+      ...targetItem,
+      status: "APPROVED" as const,
+      reviewedAt: new Date().toISOString(),
+    };
+    applyStatusUpdate(setContributions, id, optimisticUpdated, "APPROVED");
+
+    if (targetItem.uploadedResource?.id) {
+      const resId = targetItem.uploadedResource.id;
+      setResources((prev) =>
+        prev.map((r) => (r.id === resId ? { ...r, status: "APPROVED" as const } : r))
+      );
+    }
+
+    confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
+    toast.success("Contribution approved! Resource is published and student's 2 reward courses unlocked.");
+
     try {
       let updated: any;
       try {
         updated = await api.admin.approveContribution(id);
       } catch (firstErr: any) {
-        // If server was waking up or timed out during cold start, retry automatically
         if (/waking up|timed out|timeout|sleep|সংযোগ/i.test(firstErr?.message || "")) {
-          toast.loading("Server was sleeping. Retrying approval...", { duration: 4000 });
-          await new Promise((r) => setTimeout(r, 1500));
+          await new Promise((r) => setTimeout(r, 1200));
           updated = await api.admin.approveContribution(id);
         } else {
           throw firstErr;
         }
       }
+
       applyStatusUpdate(setContributions, id, updated, "APPROVED");
       if (updated?.uploadedResource?.id) {
         setResources((prev) =>
@@ -2927,15 +2985,13 @@ export default function AdminDashboardPage() {
             : [updated.uploadedResource, ...prev]
         );
       }
-      markSelfQueueMutation();
       notifyDataChanged("contribution", "approved", id);
       notifyDataChanged("subscription", "unlocked", id);
       notifyDataChanged("resource", "approved", id);
-      confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
-      toast.success("Contribution approved! Resource is published and student's 2 reward courses unlocked.");
-      void refreshVerificationQueues({ includeResources: true });
     } catch (err: any) {
-      toast.error(err.message || "Failed to approve contribution");
+      setContributions(prevContributions);
+      setResources(prevResources);
+      toast.error(err.message || "Failed to approve contribution on server. Restored to pending.");
     } finally {
       setProcessingQueueKey(null);
     }
@@ -2954,28 +3010,37 @@ export default function AdminDashboardPage() {
   const handleApproveWaiver = async (id: number) => {
     const actionKey = `waiver-${id}`;
     if (processingQueueKey) return;
+    const targetItem = waivers.find((w) => w.id === id);
+    if (!targetItem) return;
+
+    const prevWaivers = waivers;
+    markSelfQueueMutation();
     setProcessingQueueKey(actionKey);
+
+    // Instant optimistic update
+    setWaivers((prev) =>
+      prev.map((w) => (w.id === id ? { ...w, status: "APPROVED" as const } : w))
+    );
+    confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
+    toast.success("Financial waiver approved! Student granted 1-Semester 6 Course Unlocks.");
+
     try {
       let updated: any;
       try {
         updated = await api.admin.approveWaiver(id, 6, "Approved ৳99 package with 6 course unlock quota by Administrator");
       } catch (firstErr: any) {
         if (/waking up|timed out|timeout|sleep|সংযোগ/i.test(firstErr?.message || "")) {
-          toast.loading("Server was sleeping. Retrying waiver approval...", { duration: 4000 });
-          await new Promise((r) => setTimeout(r, 1500));
+          await new Promise((r) => setTimeout(r, 1200));
           updated = await api.admin.approveWaiver(id, 6, "Approved ৳99 package with 6 course unlock quota by Administrator");
         } else {
           throw firstErr;
         }
       }
       applyStatusUpdate(setWaivers, id, updated, "APPROVED");
-      markSelfQueueMutation();
       notifyDataChanged("waiver", "approved", id);
-      confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
-      toast.success("Financial waiver approved! Student granted 1-Semester 6 Course Unlocks.");
-      void refreshVerificationQueues({ includeSubscribers: true });
     } catch (err: any) {
-      toast.error(err.message || "Failed to approve waiver");
+      setWaivers(prevWaivers);
+      toast.error(err.message || "Failed to approve waiver. Restored to pending.");
     } finally {
       setProcessingQueueKey(null);
     }
@@ -2990,17 +3055,23 @@ export default function AdminDashboardPage() {
       warningText: "Are you sure you want to decline this financial waiver application?",
       confirmButtonText: "Decline Application",
       onConfirm: async () => {
+        const prevWaivers = waivers;
         setProcessingQueueKey(`waiver-${id}`);
+        markSelfQueueMutation();
+
+        // Instant optimistic update
+        setWaivers((prev) =>
+          prev.map((w) => (w.id === id ? { ...w, status: "REJECTED" as const } : w))
+        );
+        toast.success("Waiver application declined");
+
         try {
           const updated = await api.admin.rejectWaiver(id, "Declined based on quota availability.");
           applyStatusUpdate(setWaivers, id, updated, "REJECTED");
-          markSelfQueueMutation();
           notifyDataChanged("waiver", "rejected", id);
-          toast.success("Waiver application declined");
-          showDeleteSuccess("Waiver Declined", "The financial waiver application has been declined.", `Waiver #${id}`);
-          void refreshVerificationQueues();
         } catch (err: any) {
-          toast.error(err.message || "Failed to decline waiver");
+          setWaivers(prevWaivers);
+          toast.error(err.message || "Failed to decline waiver. Restored to pending.");
           throw err;
         } finally {
           setProcessingQueueKey(null);
@@ -3012,16 +3083,23 @@ export default function AdminDashboardPage() {
   const handleApproveReview = async (id: number) => {
     const actionKey = `review-${id}`;
     if (processingQueueKey) return;
+    const prevReviews = adminReviews;
+    markSelfQueueMutation();
     setProcessingQueueKey(actionKey);
+
+    // Instant optimistic update
+    setAdminReviews((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, status: "APPROVED" as const } : r))
+    );
+    toast.success("Review approved and published to public faculty profile!");
+
     try {
       const updated = await api.admin.approveReview(id);
       applyStatusUpdate(setAdminReviews, id, updated, "APPROVED");
-      markSelfQueueMutation();
       notifyDataChanged("review", "approved", id);
-      toast.success("Review approved and published to public faculty profile!");
-      void refreshVerificationQueues();
     } catch (err: any) {
-      toast.error(err.message || "Failed to approve review");
+      setAdminReviews(prevReviews);
+      toast.error(err.message || "Failed to approve review. Restored to pending.");
     } finally {
       setProcessingQueueKey(null);
     }
@@ -3030,16 +3108,23 @@ export default function AdminDashboardPage() {
   const handleRejectReview = async (id: number) => {
     const actionKey = `review-${id}`;
     if (processingQueueKey) return;
+    const prevReviews = adminReviews;
+    markSelfQueueMutation();
     setProcessingQueueKey(actionKey);
+
+    // Instant optimistic update
+    setAdminReviews((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, status: "REJECTED" as const } : r))
+    );
+    toast.success("Review rejected / unpublished from public view.");
+
     try {
       const updated = await api.admin.rejectReview(id);
       applyStatusUpdate(setAdminReviews, id, updated, "REJECTED");
-      markSelfQueueMutation();
       notifyDataChanged("review", "rejected", id);
-      toast.success("Review rejected / unpublished from public view.");
-      void refreshVerificationQueues();
     } catch (err: any) {
-      toast.error(err.message || "Failed to reject review");
+      setAdminReviews(prevReviews);
+      toast.error(err.message || "Failed to reject review. Restored to pending.");
     } finally {
       setProcessingQueueKey(null);
     }

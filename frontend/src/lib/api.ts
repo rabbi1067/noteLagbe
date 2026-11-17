@@ -365,12 +365,12 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
   const firstTimeoutMs = isFormData
     ? 120_000
     : isAdminEndpoint
-      ? 55_000
+      ? 25_000
       : isAuthEndpoint
         ? 35_000
         : 30_000;
   const retryTimeoutMs = isAdminEndpoint
-    ? 65_000
+    ? 30_000
     : isAuthEndpoint
       ? 45_000
       : 35_000;

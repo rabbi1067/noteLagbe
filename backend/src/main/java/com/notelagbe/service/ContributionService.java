@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -389,8 +390,10 @@ public class ContributionService {
         String courseCode = (res != null && res.getCourse() != null) ? res.getCourse().getCode() : "SEU";
         String resourceTitle = res != null ? res.getTitle() : "Study Material";
 
-        // 1. Permanently delete physical file from Cloud Storage (Cloudflare R2, Cloudinary, or Local Disk)
-        deletePhysicalFile(fileUrl);
+        // 1. Permanently delete physical file from Cloud Storage asynchronously (never blocks DB transaction)
+        if (fileUrl != null && !fileUrl.trim().isEmpty()) {
+            CompletableFuture.runAsync(() -> deletePhysicalFile(fileUrl));
+        }
 
         // 2. Safely update status and wipe preview URL (keep placeholder so non-null DB constraint never fails)
         if (res != null) {
@@ -473,8 +476,9 @@ public class ContributionService {
         String title = res != null ? res.getTitle() : "Material";
         String courseCode = (res != null && res.getCourse() != null) ? res.getCourse().getCode() : "N/A";
 
-        if (res != null) {
-            deletePhysicalFile(res.getFileUrl());
+        if (res != null && res.getFileUrl() != null && !res.getFileUrl().trim().isEmpty()) {
+            String urlToDelete = res.getFileUrl();
+            CompletableFuture.runAsync(() -> deletePhysicalFile(urlToDelete));
         }
 
         contributionRequestRepository.delete(cr);
