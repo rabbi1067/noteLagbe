@@ -62,12 +62,18 @@ function getGoogleDrivePreviewUrl(rawUrl?: string | null): string | null {
   return null;
 }
 
-function getAuthStreamUrl(resourceId: number | string, isAdminMode?: boolean, download = false): string {
+function getAuthStreamUrl(
+  resourceId: number | string,
+  isAdminMode?: boolean,
+  download = false,
+  cacheBuster?: string | number
+): string {
   const cleanBase = API_BASE_URL.replace(/\/+$/, "");
   const base = `${cleanBase}/${isAdminMode ? "admin/" : ""}resources/${resourceId}/file`;
   const token = getToken();
   const tokenParam = token ? `&token=${encodeURIComponent(token)}` : "";
-  return `${base}?${download ? "download=true" : "preview=true"}${tokenParam}`;
+  const cb = cacheBuster !== undefined ? `&_t=${cacheBuster}` : `&_t=${Date.now()}`;
+  return `${base}?${download ? "download=true" : "preview=true"}${tokenParam}${cb}`;
 }
 
 export function isRawR2StorageUrl(url?: string | null): boolean {
@@ -175,7 +181,7 @@ function PageThumbnail({
                 cMapPacked: true,
               }
             : {
-                data: pdfBytes,
+                data: pdfBytes as Uint8Array,
                 cMapUrl: "https://unpkg.com/pdfjs-dist@3.11.174/cmaps/",
                 cMapPacked: true,
               }
@@ -283,6 +289,7 @@ export default function PDFViewerModal({
   const [docError, setDocError] = useState<string | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const activeBlobUrlRef = useRef<string | null>(null);
+  const justSavedUrlRef = useRef<string | null>(null);
   const [detectedKind, setDetectedKind] = useState<ViewerDocKind>("pdf");
   const [embedUrl, setEmbedUrl] = useState<string>("");
   const [useGoogleDocsEmbed, setUseGoogleDocsEmbed] = useState(false);
@@ -373,6 +380,20 @@ export default function PDFViewerModal({
     const controller = new AbortController();
 
     const loadDocument = async () => {
+      // If this re-render was triggered by saving the currently active PDF/image in this modal,
+      // the newly normalized/rotated PDF or image is ALREADY active in memory.
+      // Do NOT wipe the state or re-fetch stale data from disk cache!
+      if (
+        justSavedUrlRef.current &&
+        resource.fileUrl &&
+        (resource.fileUrl === justSavedUrlRef.current || resource.fileUrl.includes(justSavedUrlRef.current))
+      ) {
+        justSavedUrlRef.current = null;
+        setDocLoading(false);
+        return;
+      }
+      justSavedUrlRef.current = null;
+
       setDocLoading(true);
       setDocError(null);
       replaceBlobUrl(null);
@@ -804,6 +825,10 @@ export default function PDFViewerModal({
       try {
         const uploadRes = await api.admin.uploadMaterialFile(fixedFile);
         await api.admin.updateResourceFile(resource.id, uploadRes.url);
+        if (resource) {
+          (resource as any).fileUrl = uploadRes.url;
+          (resource as any).previewUrl = uploadRes.url;
+        }
         toast.success(successMessage);
         if (onFileUpdated) {
           onFileUpdated(uploadRes.url);
@@ -832,15 +857,18 @@ export default function PDFViewerModal({
       "Fixed document with updated page positions & rotations saved permanently!"
     );
     if (savedUrl) {
+      justSavedUrlRef.current = savedUrl;
       setRawPdfBytes(activePdfBytes);
       setPageOrder(Array.from({ length: (pageOrder.length || pdfPageCount) }, (_, i) => i + 1));
       setPageExtraRotations({});
       setAutoAlignedPagesList([]);
       setPdfChangedFromRaw(false);
       setPageOrganizerOpen(false);
+      const updatedBlob = new Blob([activePdfBytes as any], { type: "application/pdf" });
+      replaceBlobUrl(URL.createObjectURL(updatedBlob));
       confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
     }
-  }, [canDownloadAndOpen, resource, courseCode, activePdfBytes, persistFixedFileToResource, pageOrder, pdfPageCount]);
+  }, [canDownloadAndOpen, resource, courseCode, activePdfBytes, persistFixedFileToResource, pageOrder, pdfPageCount, replaceBlobUrl]);
 
   const handleSaveFixedImageToServer = useCallback(
     async (convertToPortraitPdf: boolean) => {
@@ -865,9 +893,20 @@ export default function PDFViewerModal({
             "Image converted to Portrait A4 PDF and saved!"
           );
           if (savedUrl) {
+            justSavedUrlRef.current = savedUrl;
             setRotation(0);
             setActiveImageBytes(null);
-            setRetryTick((t) => t + 1);
+            setRawImageBlob(null);
+            const pdfBytes = new Uint8Array(await pdfFile.arrayBuffer());
+            setDetectedKind("pdf");
+            setRawPdfBytes(pdfBytes);
+            setActivePdfBytes(pdfBytes);
+            setPdfPageCount(1);
+            setPageOrder([1]);
+            setPageExtraRotations({});
+            const newBlob = new Blob([pdfBytes as any], { type: "application/pdf" });
+            replaceBlobUrl(URL.createObjectURL(newBlob));
+            confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
           }
         } catch (err: any) {
           setSavingFixedFile(false);
@@ -886,12 +925,14 @@ export default function PDFViewerModal({
         "Upright image saved permanently!"
       );
       if (savedUrl) {
+        justSavedUrlRef.current = savedUrl;
         const nextRawBlob = new Blob([bytesToUpload as any], { type: "image/jpeg" });
         setRawImageBlob(nextRawBlob);
         setActiveImageBytes(null);
         setImageCssFallback(false);
         setRotation(0);
         replaceBlobUrl(URL.createObjectURL(nextRawBlob));
+        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
       }
     },
     [

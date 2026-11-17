@@ -13348,10 +13348,10 @@ export default function AdminDashboardPage() {
           isAdminMode={true}
           onFileUpdated={(newUrl) => {
             const targetId = viewingResource?.id;
-            setViewingResource((prev: any) => (prev ? { ...prev, fileUrl: newUrl } : null));
+            setViewingResource((prev: any) => (prev ? { ...prev, fileUrl: newUrl, previewUrl: newUrl } : null));
             if (targetId) {
               setEditingResource((prev: any) =>
-                prev?.id === targetId ? { ...prev, fileUrl: newUrl } : prev
+                prev?.id === targetId ? { ...prev, fileUrl: newUrl, previewUrl: newUrl } : prev
               );
               if (editingResource?.id === targetId) {
                 setResFileUrl(newUrl);
@@ -13359,8 +13359,15 @@ export default function AdminDashboardPage() {
               }
               setEditingContribution((prev: any) =>
                 prev?.uploadedResource?.id === targetId
-                  ? { ...prev, uploadedResource: { ...prev.uploadedResource, fileUrl: newUrl } }
+                  ? { ...prev, uploadedResource: { ...prev.uploadedResource, fileUrl: newUrl, previewUrl: newUrl } }
                   : prev
+              );
+              setResources((prevList: any[]) =>
+                Array.isArray(prevList)
+                  ? prevList.map((item) =>
+                      item.id === targetId ? { ...item, fileUrl: newUrl, previewUrl: newUrl } : item
+                    )
+                  : prevList
               );
               notifyDataChanged("resource", "updated", targetId);
             }

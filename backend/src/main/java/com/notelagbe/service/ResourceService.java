@@ -475,12 +475,13 @@ public class ResourceService {
             throw new ApiException("A valid fileUrl is required.");
         }
         String trimmed = fileUrl.trim();
-        if (trimmed.length() > 500) {
-            throw new ApiException("File URL cannot exceed 500 characters.");
+        if (trimmed.length() > 1000) {
+            throw new ApiException("File URL cannot exceed 1000 characters.");
         }
         Resource r = resourceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource not found with ID: " + id));
         r.setFileUrl(trimmed);
+        r.setPreviewUrl(trimmed);
         Resource updated = resourceRepository.save(r);
         evictCaches();
         liveSyncService.broadcast("resource", "updated", id);
@@ -634,6 +635,9 @@ public class ResourceService {
                 log.info("Redirecting client directly to presigned/CDN Cloudflare R2 URL for material ID {}: {}", id, presignedUrl);
                 return ResponseEntity.status(HttpStatus.FOUND)
                         .location(URI.create(presignedUrl))
+                        .cacheControl(CacheControl.noCache().mustRevalidate())
+                        .header("Pragma", "no-cache")
+                        .header("Expires", "0")
                         .build();
             }
 
@@ -668,7 +672,9 @@ public class ResourceService {
                 } else {
                     headers.setContentDisposition(ContentDisposition.inline().filename(baseName, StandardCharsets.UTF_8).build());
                 }
-                headers.setCacheControl(CacheControl.maxAge(1, java.util.concurrent.TimeUnit.HOURS).cachePrivate());
+                headers.setCacheControl(CacheControl.noCache().mustRevalidate());
+                headers.add("Pragma", "no-cache");
+                headers.add("Expires", "0");
 
                 return ResponseEntity.ok()
                         .headers(headers)
@@ -729,7 +735,9 @@ public class ResourceService {
             } else {
                 headers.setContentDisposition(ContentDisposition.inline().filename(baseName, StandardCharsets.UTF_8).build());
             }
-            headers.setCacheControl(CacheControl.maxAge(1, java.util.concurrent.TimeUnit.HOURS).cachePrivate());
+            headers.setCacheControl(CacheControl.noCache().mustRevalidate());
+            headers.add("Pragma", "no-cache");
+            headers.add("Expires", "0");
 
             return ResponseEntity.ok()
                     .headers(headers)
