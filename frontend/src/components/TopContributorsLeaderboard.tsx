@@ -135,49 +135,49 @@ function FormalHonorCard({ contributor, rank, language }: FormalHonorCardProps) 
     }
   };
 
-  // Formal Theme Profiles
+  // Formal Theme Profiles (Dual Light / Dark Theme Support)
   const theme = {
     1: {
-      cardBg: "from-indigo-950/70 via-slate-900/90 to-slate-950/95",
-      border: "border-indigo-500/40 hover:border-indigo-400/80",
-      glowRing: "shadow-[0_12px_40px_-10px_rgba(99,102,241,0.35)]",
+      cardBg: "from-indigo-50/90 via-white to-blue-50/80 dark:from-indigo-950/70 dark:via-slate-900/90 dark:to-slate-950/95",
+      border: "border-indigo-200/90 hover:border-indigo-400 dark:border-indigo-500/40 dark:hover:border-indigo-400/80",
+      glowRing: "shadow-xl shadow-indigo-500/10 dark:shadow-[0_12px_40px_-10px_rgba(99,102,241,0.35)]",
       haloPulse: "bg-indigo-500/15",
       badgeText: "Lead Contributor",
       badgeTextBn: "প্রধান অবদানকারী",
       rankTag: "Rank #1",
-      rankTagColor: "text-amber-300 bg-amber-500/15 border-amber-500/30",
-      pointPill: "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30",
-      accentGlow: "bg-indigo-500/20",
-      avatarRing: "ring-2 ring-amber-400/80 shadow-[0_0_20px_rgba(251,191,36,0.3)]",
-      avatarFallback: "bg-gradient-to-tr from-indigo-700 via-blue-700 to-amber-500 text-white",
+      rankTagColor: "text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-500/15 border-amber-300/80 dark:border-amber-500/30",
+      pointPill: "bg-indigo-50 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30",
+      accentGlow: "bg-indigo-500/15 dark:bg-indigo-500/20",
+      avatarRing: "ring-2 ring-amber-400/90 shadow-[0_0_20px_rgba(251,191,36,0.25)]",
+      avatarFallback: "bg-gradient-to-tr from-indigo-600 via-blue-600 to-amber-500 text-white",
     },
     2: {
-      cardBg: "from-teal-950/60 via-slate-900/90 to-slate-950/95",
-      border: "border-teal-500/35 hover:border-teal-400/70",
-      glowRing: "shadow-[0_10px_35px_-10px_rgba(20,184,166,0.25)]",
+      cardBg: "from-teal-50/90 via-white to-emerald-50/80 dark:from-teal-950/60 dark:via-slate-900/90 dark:to-slate-950/95",
+      border: "border-teal-200/90 hover:border-teal-400 dark:border-teal-500/35 dark:hover:border-teal-400/70",
+      glowRing: "shadow-lg shadow-teal-500/10 dark:shadow-[0_10px_35px_-10px_rgba(20,184,166,0.25)]",
       haloPulse: "bg-teal-500/15",
       badgeText: "Senior Contributor",
       badgeTextBn: "সিনিয়র কন্ট্রিবিউটর",
       rankTag: "Rank #2",
-      rankTagColor: "text-teal-300 bg-teal-500/15 border-teal-500/30",
-      pointPill: "bg-teal-600/20 text-teal-300 border border-teal-500/30",
+      rankTagColor: "text-teal-800 dark:text-teal-300 bg-teal-100 dark:bg-teal-500/15 border-teal-300/80 dark:border-teal-500/30",
+      pointPill: "bg-teal-50 dark:bg-teal-600/20 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-500/30",
       accentGlow: "bg-teal-500/15",
-      avatarRing: "ring-2 ring-teal-400/80 shadow-[0_0_20px_rgba(20,184,166,0.3)]",
-      avatarFallback: "bg-gradient-to-tr from-teal-700 via-emerald-700 to-cyan-500 text-white",
+      avatarRing: "ring-2 ring-teal-400/90 shadow-[0_0_20px_rgba(20,184,166,0.25)]",
+      avatarFallback: "bg-gradient-to-tr from-teal-600 via-emerald-600 to-cyan-500 text-white",
     },
     3: {
-      cardBg: "from-purple-950/60 via-slate-900/90 to-slate-950/95",
-      border: "border-purple-500/35 hover:border-purple-400/70",
-      glowRing: "shadow-[0_10px_35px_-10px_rgba(168,85,247,0.25)]",
+      cardBg: "from-purple-50/90 via-white to-pink-50/80 dark:from-purple-950/60 dark:via-slate-900/90 dark:to-slate-950/95",
+      border: "border-purple-200/90 hover:border-purple-400 dark:border-purple-500/35 dark:hover:border-purple-400/70",
+      glowRing: "shadow-lg shadow-purple-500/10 dark:shadow-[0_10px_35px_-10px_rgba(168,85,247,0.25)]",
       haloPulse: "bg-purple-500/15",
       badgeText: "Distinguished",
       badgeTextBn: "সম্মানিত অবদানকারী",
       rankTag: "Rank #3",
-      rankTagColor: "text-purple-300 bg-purple-500/15 border-purple-500/30",
-      pointPill: "bg-purple-600/20 text-purple-300 border border-purple-500/30",
+      rankTagColor: "text-purple-800 dark:text-purple-300 bg-purple-100 dark:bg-purple-500/15 border-purple-300/80 dark:border-purple-500/30",
+      pointPill: "bg-purple-50 dark:bg-purple-600/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30",
       accentGlow: "bg-purple-500/15",
-      avatarRing: "ring-2 ring-purple-400/80 shadow-[0_0_20px_rgba(168,85,247,0.3)]",
-      avatarFallback: "bg-gradient-to-tr from-purple-700 via-fuchsia-700 to-pink-500 text-white",
+      avatarRing: "ring-2 ring-purple-400/90 shadow-[0_0_20px_rgba(168,85,247,0.25)]",
+      avatarFallback: "bg-gradient-to-tr from-purple-600 via-fuchsia-600 to-pink-500 text-white",
     },
   }[rank];
 
@@ -243,7 +243,7 @@ function FormalHonorCard({ contributor, rank, language }: FormalHonorCardProps) 
             <span>{theme.rankTag}</span>
           </span>
 
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300 dark:text-slate-300">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300">
             {language === "bn" ? theme.badgeTextBn : theme.badgeText}
           </span>
         </div>
@@ -282,7 +282,7 @@ function FormalHonorCard({ contributor, rank, language }: FormalHonorCardProps) 
             <div
               className={`absolute ${
                 rank === 1 ? "-top-2 -right-2 w-7 h-7" : "-bottom-1.5 -right-1.5 w-6 h-6"
-              } rounded-full flex items-center justify-center shadow-md border border-white/40 dark:border-slate-800 ${
+              } rounded-full flex items-center justify-center shadow-md border border-white dark:border-slate-800 ${
                 rank === 1
                   ? "bg-amber-500 text-slate-950"
                   : rank === 2
@@ -309,17 +309,17 @@ function FormalHonorCard({ contributor, rank, language }: FormalHonorCardProps) 
             style={{ transform: "translateZ(30px)", transformStyle: "preserve-3d" }}
           >
             <h3
-              className={`font-black text-white tracking-tight ${
+              className={`font-black text-slate-900 dark:text-white tracking-tight ${
                 rank === 1 ? "text-lg sm:text-xl" : "text-base sm:text-lg"
               }`}
             >
               {contributor.name}
             </h3>
-            <div className="flex items-center justify-center gap-1.5 text-xs text-slate-400 font-mono">
+            <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-mono">
               {contributor.studentId && <span>{contributor.studentId}</span>}
               {contributor.studentId && contributor.department && <span>•</span>}
               {contributor.department && (
-                <span className="px-2 py-0.5 rounded-md bg-white/10 text-slate-300 font-semibold border border-white/10">
+                <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 font-semibold border border-slate-200 dark:border-white/10">
                   {contributor.department}
                 </span>
               )}
@@ -330,10 +330,10 @@ function FormalHonorCard({ contributor, rank, language }: FormalHonorCardProps) 
           {/* VERIFIED CONTRIBUTIONS STATUS                         */}
           {/* ===================================================== */}
           <div
-            className="w-full pt-3 mt-1 border-t border-slate-800/80 flex items-center justify-between text-xs"
+            className="w-full pt-3 mt-1 border-t border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between text-xs"
             style={{ transform: "translateZ(30px)", transformStyle: "preserve-3d" }}
           >
-            <span className="text-slate-400 font-medium">
+            <span className="text-slate-500 dark:text-slate-400 font-medium">
               {language === "bn" ? "অর্জিত পয়েন্ট:" : "Earned Points:"}
             </span>
             <span
@@ -350,7 +350,7 @@ function FormalHonorCard({ contributor, rank, language }: FormalHonorCardProps) 
 
       {/* Subtle Ground Ambient Puddle */}
       <div
-        className={`w-3/4 h-3 -mt-1 rounded-full ${theme.accentGlow} blur-md pointer-events-none`}
+        className={`w-3/4 h-3 -mt-1 rounded-full ${theme.accentGlow} blur-md pointer-events-none opacity-40 dark:opacity-100`}
       />
     </div>
   );
@@ -450,9 +450,9 @@ export default function TopContributorsLeaderboard() {
         </div>
 
         {/* Stats Pill */}
-        <div className="flex items-center gap-2.5 self-start md:self-auto shrink-0 bg-slate-900/80 text-white px-4 py-2.5 rounded-2xl border border-slate-700/80 shadow-md backdrop-blur-md">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-          <UserCheck className="w-4 h-4 text-emerald-400" />
+        <div className="flex items-center gap-2.5 self-start md:self-auto shrink-0 bg-white/90 dark:bg-slate-900/80 text-slate-800 dark:text-white px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-xs dark:shadow-md backdrop-blur-md">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <UserCheck className="w-4 h-4 text-emerald-500" />
           <span className="text-xs font-bold tracking-wide">
             {contributors.length} {language === "bn" ? "জন স্বীকৃতিপ্রাপ্ত" : "Students Recognized"}
           </span>
