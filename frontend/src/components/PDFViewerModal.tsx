@@ -29,6 +29,7 @@ import {
   Loader2,
   RefreshCw,
   Eye,
+  GripVertical,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { formatSemesterDisplay } from "@/lib/academicSemester";
@@ -260,6 +261,8 @@ export default function PDFViewerModal({
   const [activePdfPage, setActivePdfPage] = useState(1);
   const [pageExtraRotations, setPageExtraRotations] = useState<Record<number, number>>({});
   const [pageOrder, setPageOrder] = useState<number[]>([]);
+  const [draggedCardIndex, setDraggedCardIndex] = useState<number | null>(null);
+  const [dragOverCardIndex, setDragOverCardIndex] = useState<number | null>(null);
   const [pageOrganizerOpen, setPageOrganizerOpen] = useState(false);
   const [autoAlignMixedPdf, setAutoAlignMixedPdf] = useState(true);
   const [autoAlignedPagesList, setAutoAlignedPagesList] = useState<number[]>([]);
@@ -692,6 +695,26 @@ export default function PDFViewerModal({
       setPageOrder(nextOrder);
       await rebuildPdfWithRotations(pageExtraRotations, autoAlignMixedPdf, nextOrder);
       toast.success(`Position updated: Page ${idxA + 1} ↔ Page ${idxB + 1}`);
+    },
+    [rawPdfBytes, pdfPageCount, pageOrder, pageExtraRotations, autoAlignMixedPdf, rebuildPdfWithRotations]
+  );
+
+  const handleMovePageOrder = useCallback(
+    async (fromIdx: number, toIdx: number) => {
+      if (!rawPdfBytes || pdfPageCount <= 1 || fromIdx === toIdx) return;
+      const effectiveOrder =
+        pageOrder.length === pdfPageCount && pageOrder.length > 0
+          ? [...pageOrder]
+          : Array.from({ length: pdfPageCount }, (_, i) => i + 1);
+      if (fromIdx < 0 || fromIdx >= effectiveOrder.length || toIdx < 0 || toIdx >= effectiveOrder.length) return;
+
+      const nextOrder = [...effectiveOrder];
+      const [movedItem] = nextOrder.splice(fromIdx, 1);
+      nextOrder.splice(toIdx, 0, movedItem);
+
+      setPageOrder(nextOrder);
+      await rebuildPdfWithRotations(pageExtraRotations, autoAlignMixedPdf, nextOrder);
+      toast.success(`Page moved: Page ${fromIdx + 1} ➔ Position ${toIdx + 1}`);
     },
     [rawPdfBytes, pdfPageCount, pageOrder, pageExtraRotations, autoAlignMixedPdf, rebuildPdfWithRotations]
   );
@@ -1761,7 +1784,7 @@ export default function PDFViewerModal({
                 <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-2">
                   <span className="font-bold">Tip:</span>
                   <span>
-                    Use <strong>Move Earlier (←)</strong> or <strong>Move Later (→)</strong> to swap page positions, or click <strong>Reverse All</strong> if pages were scanned in reverse. Click <strong>Save & Persist to Server</strong> when done.
+                    মাউস দিয়ে চেপে ধরে টেনে <strong>(Drag & Drop)</strong> যেকোনো পেজ নতুন পজিশনে ছেড়ে দিন (PDF Marker-এর মতো), অথবা <strong>(← / →)</strong> তীর বোতাম ব্যবহার করুন। সাজানো শেষ হলে <strong>Save & Persist to Server</strong> এ ক্লিক করুন।
                   </span>
                 </div>
 
@@ -1770,15 +1793,76 @@ export default function PDFViewerModal({
                     const extraRot = pageExtraRotations[origNum] || 0;
                     const isFirst = idx === 0;
                     const isLast = idx === pageOrder.length - 1;
+                    const isDragging = draggedCardIndex === idx;
+                    const isDragOver = dragOverCardIndex === idx && !isDragging;
 
                     return (
                       <div
                         key={`page-card-${origNum}-${idx}`}
-                        className="bg-slate-950/80 rounded-2xl border border-slate-800 hover:border-slate-700 p-3.5 flex flex-col gap-2.5 transition-all shadow-md group"
+                        draggable
+                        onDragStart={(e) => {
+                          setDraggedCardIndex(idx);
+                          e.dataTransfer.setData("text/plain", String(idx));
+                          e.dataTransfer.effectAllowed = "move";
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                          if (dragOverCardIndex !== idx) {
+                            setDragOverCardIndex(idx);
+                          }
+                        }}
+                        onDragEnter={(e) => {
+                          e.preventDefault();
+                          if (dragOverCardIndex !== idx) {
+                            setDragOverCardIndex(idx);
+                          }
+                        }}
+                        onDragLeave={(e) => {
+                          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                          if (dragOverCardIndex === idx) {
+                            setDragOverCardIndex(null);
+                          }
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (draggedCardIndex !== null && draggedCardIndex !== idx) {
+                            void handleMovePageOrder(draggedCardIndex, idx);
+                          }
+                          setDraggedCardIndex(null);
+                          setDragOverCardIndex(null);
+                        }}
+                        onDragEnd={() => {
+                          setDraggedCardIndex(null);
+                          setDragOverCardIndex(null);
+                        }}
+                        className={`relative select-none bg-slate-950/80 rounded-2xl border transition-all duration-150 p-3.5 flex flex-col gap-2.5 shadow-md group cursor-grab active:cursor-grabbing ${
+                          isDragging
+                            ? "opacity-30 scale-95 border-amber-500/80 border-dashed ring-2 ring-amber-500/50 shadow-inner"
+                            : isDragOver
+                            ? "border-amber-400 ring-2 ring-amber-400/80 bg-amber-950/30 scale-[1.03] shadow-xl shadow-amber-500/20 z-10"
+                            : "border-slate-800 hover:border-slate-700 hover:shadow-lg"
+                        }`}
                       >
-                        {/* Card Header */}
+                        {/* Drop Target Badge Indicator */}
+                        {isDragOver && (
+                          <div className="absolute inset-x-2 -top-3 z-20 flex justify-center pointer-events-none animate-bounce">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500 text-slate-950 shadow-lg flex items-center gap-1">
+                              Drop to make Page {idx + 1}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Card Header with Drag Handle */}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
+                            <div
+                              className="p-1 -ml-1 text-slate-500 group-hover:text-amber-400 cursor-grab active:cursor-grabbing transition-colors"
+                              title="Click and drag with mouse to change page position"
+                            >
+                              <GripVertical className="w-4 h-4" />
+                            </div>
                             <span className="w-6 h-6 rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-xs font-black">
                               {idx + 1}
                             </span>
@@ -1799,15 +1883,21 @@ export default function PDFViewerModal({
                         </div>
 
                         {/* Visual Thumbnail */}
-                        <PageThumbnail
-                          pdfBytes={rawPdfBytes}
-                          blobUrl={blobUrl}
-                          pageNum={origNum}
-                          rotation={extraRot}
-                        />
+                        <div className="pointer-events-none">
+                          <PageThumbnail
+                            pdfBytes={rawPdfBytes}
+                            blobUrl={blobUrl}
+                            pageNum={origNum}
+                            rotation={extraRot}
+                          />
+                        </div>
 
-                        {/* Action Buttons */}
-                        <div className="grid grid-cols-4 gap-1 pt-1">
+                        {/* Action Buttons (Clicks shouldn't trigger drag) */}
+                        <div
+                          draggable={false}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          className="grid grid-cols-4 gap-1 pt-1"
+                        >
                           <button
                             type="button"
                             disabled={isFirst}
