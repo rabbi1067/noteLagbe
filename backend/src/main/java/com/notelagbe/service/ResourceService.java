@@ -175,9 +175,14 @@ public class ResourceService {
                 ? java.util.Collections.emptySet()
                 : subscriptionService.getUnlockedTeacherIds(user, course);
 
-        // Mask the direct file URLs for resources the student has not unlocked (full course or gifted faculty)
-        return resources.stream().map(r -> {
+        // Sort chronologically (latest academic year and semester season first, then ID descending)
+        // and mask direct file URLs for resources the student has not unlocked (full course or gifted faculty)
+        return resources.stream()
+                .sorted(Comparator.comparingInt(this::calculateSemesterWeight).reversed()
+                        .thenComparing(Resource::getId, Comparator.reverseOrder()))
+                .map(r -> {
             boolean resourceUnlocked = fullCourseUnlocked
+                    || isUploader(user, r)
                     || (r.getTeacher() != null && unlockedTeacherIds.contains(r.getTeacher().getId()))
                     || (r.getTeacher() == null && fullCourseUnlocked);
             if (!resourceUnlocked) {
@@ -188,6 +193,25 @@ public class ResourceService {
             }
             return r;
         }).toList();
+    }
+
+    private int calculateSemesterWeight(Resource r) {
+        if (r == null) return 0;
+        int year = r.getAcademicYear() > 0 ? r.getAcademicYear() : 2024;
+        String sem = r.getSemesterName() != null ? r.getSemesterName().toLowerCase().trim() : "";
+        if (year <= 2000) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\b(20\\d{2})\\b").matcher(sem);
+            if (m.find()) {
+                try {
+                    year = Integer.parseInt(m.group(1));
+                } catch (Exception ignored) {}
+            }
+        }
+        int term = 0;
+        if (sem.contains("fall")) term = 3;
+        else if (sem.contains("summer")) term = 2;
+        else if (sem.contains("spring")) term = 1;
+        return year * 10 + term;
     }
 
     private Resource maskLockedResource(Resource r) {

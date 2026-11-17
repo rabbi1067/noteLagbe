@@ -1133,6 +1133,9 @@ export default function AdminDashboardPage() {
       notifyDataChanged("contribution", "approved", targetId);
       notifyDataChanged("subscription", "unlocked", targetId);
       notifyDataChanged("resource", "approved", resourceId);
+      if (contribEditCourseCode.trim()) {
+        notifyDataChanged("course", "updated", contribEditCourseCode.trim());
+      }
       confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
       toast.success("Contribution updated and approved! Published with correct details.");
       setEditingContribution(null);
@@ -2988,6 +2991,9 @@ export default function AdminDashboardPage() {
       notifyDataChanged("contribution", "approved", id);
       notifyDataChanged("subscription", "unlocked", id);
       notifyDataChanged("resource", "approved", id);
+      if (targetItem?.courseCode) {
+        notifyDataChanged("course", "updated", targetItem.courseCode);
+      }
     } catch (err: any) {
       setContributions(prevContributions);
       setResources(prevResources);

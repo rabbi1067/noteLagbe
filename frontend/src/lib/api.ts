@@ -584,8 +584,12 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       endpoint.startsWith("/notices");
 
     const cacheKey = `${token ? "auth" : "guest"}:${endpoint}`;
+    const noCache =
+      options?.cache === "no-store" ||
+      (options?.headers as any)?.["Cache-Control"] === "no-cache" ||
+      (options?.headers as any)?.["Pragma"] === "no-cache";
 
-    if (isCacheable && typeof window !== "undefined") {
+    if (isCacheable && typeof window !== "undefined" && !noCache) {
       const cached = clientGetCache.get(cacheKey);
       if (cached && cached.expiry > Date.now()) {
         return Promise.resolve(cached.data as T);
@@ -758,8 +762,8 @@ export const api = {
 
   // Resources API
   resources: {
-    getByCourse: (code: string) => request<any[]>(`/resources/course/${code}`),
-    getByTeacher: (teacherId: number) => request<any[]>(`/resources/teacher/${teacherId}`),
+    getByCourse: (code: string, options?: RequestInit) => request<any[]>(`/resources/course/${code}`, options),
+    getByTeacher: (teacherId: number, options?: RequestInit) => request<any[]>(`/resources/teacher/${teacherId}`, options),
     getById: (id: number) => request<any>(`/resources/${id}`),
     downloadFile: (id: number, fallbackFilename = `material_${id}.pdf`) =>
       downloadAuthorizedBlob(

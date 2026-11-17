@@ -138,15 +138,16 @@ export default function CourseDetailPage() {
   const [hasReviewedCourse, setHasReviewedCourse] = useState(false);
 
   // Silent background revalidation without blocking user or resetting UI
-  const loadCourseData = useCallback(async (isSilent = false) => {
+  const loadCourseData = useCallback(async (isSilent = false, forceFresh = false) => {
     if (!code) return;
     if (!isSilent && !course) {
       setLoading(true);
     }
     try {
+      const fetchOpts = forceFresh ? ({ cache: "no-store" } as RequestInit) : undefined;
       const [cData, rData, revData] = await Promise.all([
         api.courses.getByCode(code),
-        api.resources.getByCourse(code),
+        api.resources.getByCourse(code, fetchOpts),
         api.reviews.getByCourse(code),
       ]);
 
@@ -174,15 +175,15 @@ export default function CourseDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [code, course]);
+  }, [code, course, user?.id]);
 
   useEffect(() => {
     if (code) {
       // Discover companion course immediately from local catalog in 0ms
       tryFindCompanionCourse(code);
 
-      // Revalidate live data silently in background
-      loadCourseData(true);
+      // Revalidate live data silently in background with fresh fetch
+      loadCourseData(true, true);
 
       if (isAuthenticated) {
         api.reviews.check(code)
@@ -190,23 +191,31 @@ export default function CourseDetailPage() {
           .catch(() => {});
       }
     }
-  }, [code, isAuthenticated, user?.id]);
+  }, [code, isAuthenticated, user?.id, loadCourseData]);
 
   // Enterprise Live Sync: Refreshes course details and materials immediately when admin updates
   useDataSync(() => {
-    loadCourseData(true);
+    try {
+      const userKey = user?.id ? String(user.id) : "anon";
+      localStorage.removeItem(`notelagbe_res_u${userKey}_${code.toUpperCase()}`);
+    } catch {}
+    loadCourseData(true, true);
   });
 
   // Auto-recover when sleeping backend wakes up
   useEffect(() => {
     const handleAwake = () => {
-      loadCourseData(true);
+      try {
+        const userKey = user?.id ? String(user.id) : "anon";
+        localStorage.removeItem(`notelagbe_res_u${userKey}_${code.toUpperCase()}`);
+      } catch {}
+      loadCourseData(true, true);
     };
     window.addEventListener("notelagbe:backend-awake", handleAwake);
     return () => {
       window.removeEventListener("notelagbe:backend-awake", handleAwake);
     };
-  }, [loadCourseData]);
+  }, [loadCourseData, code, user?.id]);
 
   // Auto-retry if course has catalog materials but resources array is empty (due to idle cold start)
   useEffect(() => {
@@ -310,6 +319,14 @@ export default function CourseDetailPage() {
     (res: any): boolean => {
       if (!res) return false;
       if (isSuperAdmin && superAdminTestLocked) return false;
+      // Contributor student always has unlocked access to view their own contributed material
+      if (
+        user?.id &&
+        (res.uploader?.id === user.id ||
+          (user.studentId && res.contributorStudentId === user.studentId))
+      ) {
+        return true;
+      }
       if (isCourseUnlocked) return true;
       const tId = res.teacher?.id;
       if (tId == null) {
@@ -320,7 +337,7 @@ export default function CourseDetailPage() {
         Boolean(course?.unlockedTeacherIds?.some((id: number) => Number(id) === Number(tId)))
       );
     },
-    [isSuperAdmin, superAdminTestLocked, isCourseUnlocked, hasUnlockedForTeacher, code, course?.unlockedTeacherIds]
+    [isSuperAdmin, superAdminTestLocked, user?.id, user?.studentId, isCourseUnlocked, hasUnlockedForTeacher, code, course?.unlockedTeacherIds]
   );
 
   const handleUnlockCourse = async () => {
@@ -618,7 +635,7 @@ export default function CourseDetailPage() {
     }
     // Strict separation:
     if (!isLabCourse) {
-      // Theory course: allowed types
+      // Theory course: allowed types (including any student-contributed notes or reports)
       if (
         res.type !== "NOTE" &&
         res.type !== "MID_QUESTION" &&
@@ -626,7 +643,11 @@ export default function CourseDetailPage() {
         res.type !== "QUIZ_CT" &&
         res.type !== "DOC_NOTE" &&
         res.type !== "QUESTION_COURSE_IN" &&
-        res.type !== "OTHERS"
+        res.type !== "OTHERS" &&
+        res.type !== "LAB_HAND_NOTE" &&
+        res.type !== "LAB_REPORT" &&
+        res.type !== "LAB_MANUAL" &&
+        res.type !== "LAB_QUIZ"
       ) {
         return false;
       }
@@ -639,20 +660,76 @@ export default function CourseDetailPage() {
     return true;
   });
 
+// Helper to compute semester chronological sort weight (Latest semester gets highest score)
+function parseSemesterWeight(semesterName?: string, academicYear?: number | string): number {
+  let year = typeof academicYear === "number" ? academicYear : parseInt(String(academicYear || ""), 10);
+  const semStr = (semesterName || "").toLowerCase().trim();
+
+  if (!year || isNaN(year) || year < 2000) {
+    const match = semStr.match(/\b(20\d{2})\b/);
+    if (match) {
+      year = parseInt(match[1], 10);
+    } else {
+      year = 2024;
+    }
+  }
+
+  let termWeight = 0;
+  if (semStr.includes("fall")) termWeight = 3;
+  else if (semStr.includes("summer")) termWeight = 2;
+  else if (semStr.includes("spring")) termWeight = 1;
+
+  return year * 10 + termWeight;
+}
+
+function sortMaterialsBySemesterDesc(materials: any[]): any[] {
+  return [...materials].sort((a, b) => {
+    const weightA = parseSemesterWeight(a.semesterName, a.academicYear);
+    const weightB = parseSemesterWeight(b.semesterName, b.academicYear);
+    if (weightB !== weightA) {
+      return weightB - weightA; // Newer semester first!
+    }
+    return (b.id || 0) - (a.id || 0);
+  });
+}
+
   // Theory Categories: hand notes, mid, final, sate quiz, and doc file note
-  const handNotes = facultyFiltered.filter(r => r.type === "NOTE" || r.type === "OTHERS");
-  const midtermExams = facultyFiltered.filter(r => r.type === "MID_QUESTION");
-  const finalExams = facultyFiltered.filter(r => r.type === "FINAL_QUESTION");
-  const quizCTs = facultyFiltered.filter(r => r.type === "QUIZ_CT" || r.type === "QUESTION_COURSE_IN");
-  const docNotes = facultyFiltered.filter(r => r.type === "DOC_NOTE" || r.fileUrl?.match(/\.(doc|docx|odt|txt|rtf)$/i) || r.title?.toLowerCase().includes(".doc"));
+  const handNotes = sortMaterialsBySemesterDesc(facultyFiltered.filter(r => r.type === "NOTE" || r.type === "OTHERS" || r.type === "LAB_HAND_NOTE" || r.type === "LAB_REPORT" || r.type === "LAB_MANUAL"));
+  const midtermExams = sortMaterialsBySemesterDesc(facultyFiltered.filter(r => r.type === "MID_QUESTION"));
+  const finalExams = sortMaterialsBySemesterDesc(facultyFiltered.filter(r => r.type === "FINAL_QUESTION"));
+  const quizCTs = sortMaterialsBySemesterDesc(facultyFiltered.filter(r => r.type === "QUIZ_CT" || r.type === "QUESTION_COURSE_IN" || r.type === "LAB_QUIZ"));
+  const docNotes = sortMaterialsBySemesterDesc(facultyFiltered.filter(r => r.type === "DOC_NOTE" || r.fileUrl?.match(/\.(doc|docx|odt|txt|rtf)$/i) || r.title?.toLowerCase().includes(".doc")));
 
   // Lab Categories: hand notes, sate quiz, lab final, project link (live/github), and doc file note
-  const labHandNotes = facultyFiltered.filter(r => r.type === "LAB_HAND_NOTE" || r.type === "LAB_REPORT" || (r.type === "NOTE" && isLabCourse) || (r.type === "OTHERS" && isLabCourse));
-  const labQuizzes = facultyFiltered.filter(r => r.type === "LAB_QUIZ" || (r.type === "QUIZ_CT" && isLabCourse));
-  const labFinals = facultyFiltered.filter(r => r.type === "LAB_FINAL");
-  const projectLinks = facultyFiltered.filter(r => r.type === "PROJECT_LINK" || r.fileUrl?.includes("github.com") || r.title?.toLowerCase().includes("project"));
-  const labDocNotes = facultyFiltered.filter(r => r.type === "DOC_NOTE" || r.fileUrl?.match(/\.(doc|docx|odt|txt|rtf)$/i) || r.title?.toLowerCase().includes(".doc"));
-  const labManuals = facultyFiltered.filter(r => r.type === "LAB_MANUAL" || r.type === "QUESTION_COURSE_IN");
+  const labHandNotes = sortMaterialsBySemesterDesc(facultyFiltered.filter(r => r.type === "LAB_HAND_NOTE" || r.type === "LAB_REPORT" || (r.type === "NOTE" && isLabCourse) || (r.type === "OTHERS" && isLabCourse)));
+  const labQuizzes = sortMaterialsBySemesterDesc(facultyFiltered.filter(r => r.type === "LAB_QUIZ" || (r.type === "QUIZ_CT" && isLabCourse)));
+  const labFinals = sortMaterialsBySemesterDesc(facultyFiltered.filter(r => r.type === "LAB_FINAL"));
+  const projectLinks = sortMaterialsBySemesterDesc(facultyFiltered.filter(r => r.type === "PROJECT_LINK" || r.fileUrl?.includes("github.com") || r.title?.toLowerCase().includes("project")));
+  const labDocNotes = sortMaterialsBySemesterDesc(facultyFiltered.filter(r => r.type === "DOC_NOTE" || r.fileUrl?.match(/\.(doc|docx|odt|txt|rtf)$/i) || r.title?.toLowerCase().includes(".doc")));
+  const labManuals = sortMaterialsBySemesterDesc(facultyFiltered.filter(r => r.type === "LAB_MANUAL" || r.type === "QUESTION_COURSE_IN"));
+
+  // Total valid materials count for this course (matches exact materials displayed)
+  const validTotalMaterials = useMemo(() => {
+    return resources.filter((res) => {
+      if (!isLabCourse) {
+        return (
+          res.type === "NOTE" ||
+          res.type === "MID_QUESTION" ||
+          res.type === "FINAL_QUESTION" ||
+          res.type === "QUIZ_CT" ||
+          res.type === "DOC_NOTE" ||
+          res.type === "QUESTION_COURSE_IN" ||
+          res.type === "OTHERS" ||
+          res.type === "LAB_HAND_NOTE" ||
+          res.type === "LAB_REPORT" ||
+          res.type === "LAB_MANUAL" ||
+          res.type === "LAB_QUIZ"
+        );
+      } else {
+        return !(res.type === "MID_QUESTION" || (res.type === "FINAL_QUESTION" && !res.title?.toLowerCase().includes("lab")));
+      }
+    }).length;
+  }, [resources, isLabCourse]);
 
   // Deduplicated faculty list (from course teachers + any teachers with approved resources)
   const courseFacultyList = (() => {
@@ -1058,7 +1135,7 @@ export default function CourseDetailPage() {
                 {t("course.allFacultyMembers", "All Faculty Members")}
               </p>
               <p className="text-[11px] text-slate-500 truncate">
-                {resources.length} {t("course.totalMaterials", "Total Materials")}
+                {validTotalMaterials} {t("course.totalMaterials", "Total Materials")}
               </p>
             </div>
             {selectedFacultyId === "ALL" && (
@@ -1073,9 +1150,24 @@ export default function CourseDetailPage() {
               !isCourseUnlocked &&
               (hasUnlockedForTeacher(code, tItem.id) ||
                 Boolean(course?.unlockedTeacherIds?.some((id: number) => Number(id) === Number(tItem.id))));
-            const tRes = resources.filter(r => r.teacher?.id === tItem.id);
-            const notesCount = tRes.filter(r => r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "LAB_REPORT").length;
-            const examsCount = tRes.filter(r => r.type === "MID_QUESTION" || r.type === "FINAL_QUESTION" || r.type === "LAB_QUIZ" || r.type === "LAB_FINAL").length;
+            const tRes = resources.filter(r => {
+              if (r.teacher?.id !== tItem.id) return false;
+              if (!isLabCourse) {
+                return (
+                  r.type === "NOTE" ||
+                  r.type === "MID_QUESTION" ||
+                  r.type === "FINAL_QUESTION" ||
+                  r.type === "QUIZ_CT" ||
+                  r.type === "DOC_NOTE" ||
+                  r.type === "QUESTION_COURSE_IN" ||
+                  r.type === "OTHERS"
+                );
+              } else {
+                return !(r.type === "MID_QUESTION" || (r.type === "FINAL_QUESTION" && !r.title?.toLowerCase().includes("lab")));
+              }
+            });
+            const notesCount = tRes.filter(r => r.type === "NOTE" || r.type === "LAB_HAND_NOTE" || r.type === "LAB_REPORT" || r.type === "DOC_NOTE" || r.type === "OTHERS").length;
+            const examsCount = tRes.filter(r => r.type === "MID_QUESTION" || r.type === "FINAL_QUESTION" || r.type === "QUIZ_CT" || r.type === "LAB_QUIZ" || r.type === "LAB_FINAL").length;
 
             return (
               <button

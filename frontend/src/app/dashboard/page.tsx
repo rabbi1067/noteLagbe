@@ -450,6 +450,7 @@ export default function StudentDashboardPage() {
   useDataSync(() => {
     if (isAuthenticated) {
       void loadDashboard();
+      void refreshProfile?.().catch(() => {});
     }
   });
 

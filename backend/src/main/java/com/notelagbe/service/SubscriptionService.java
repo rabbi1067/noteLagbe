@@ -240,6 +240,10 @@ public class SubscriptionService {
         if (user.getRole() == Role.ROLE_SUPER_ADMIN && isSuperAdminTestLocked(user.getId(), resource.getCourse().getCode())) {
             return false;
         }
+        // Uploader always has access to view/download their own contributed material
+        if (resource.getUploader() != null && user.getId() != null && user.getId().equals(resource.getUploader().getId())) {
+            return true;
+        }
         if (isCourseUnlocked(user, resource.getCourse())) return true;
         return resource.getTeacher() != null && isCourseUnlocked(user, resource.getCourse(), resource.getTeacher());
     }
