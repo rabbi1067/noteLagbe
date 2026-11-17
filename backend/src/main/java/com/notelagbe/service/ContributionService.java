@@ -595,21 +595,43 @@ public class ContributionService {
             return java.util.Collections.emptyList();
         }
 
-        java.util.Map<User, Long> userCounts = approvedRequests.stream()
-                .filter(cr -> cr.getUser() != null)
-                .collect(java.util.stream.Collectors.groupingBy(ContributionRequest::getUser, java.util.stream.Collectors.counting()));
+        // Deterministic aggregation:
+        // 1. LinkedHashMap preserves user discovery order
+        // 2. Count of approved contributions
+        // 3. Latest submission timestamp (newest createdAt among approved requests)
+        // 4. Department of the contributor
+        java.util.Map<Long, User> userMap = new java.util.LinkedHashMap<>();
+        java.util.Map<Long, Integer> userCounts = new java.util.HashMap<>();
+        java.util.Map<Long, LocalDateTime> userLatestSubmission = new java.util.HashMap<>();
+        java.util.Map<Long, String> userDeptMap = new java.util.HashMap<>();
+
+        for (ContributionRequest cr : approvedRequests) {
+            if (cr.getUser() == null || cr.getUser().getId() == null) continue;
+            Long uid = cr.getUser().getId();
+            userMap.putIfAbsent(uid, cr.getUser());
+            userCounts.put(uid, userCounts.getOrDefault(uid, 0) + 1);
+
+            LocalDateTime submissionTime = cr.getCreatedAt() != null ? cr.getCreatedAt() : LocalDateTime.MIN;
+            LocalDateTime currentLatest = userLatestSubmission.get(uid);
+            if (currentLatest == null || submissionTime.isAfter(currentLatest)) {
+                userLatestSubmission.put(uid, submissionTime);
+            }
+
+            if (!userDeptMap.containsKey(uid) && cr.getUploadedResource() != null && cr.getUploadedResource().getCourse() != null) {
+                String dept = cr.getUploadedResource().getCourse().getDepartment();
+                if (dept != null && !dept.trim().isEmpty()) {
+                    userDeptMap.put(uid, dept.trim());
+                }
+            }
+        }
 
         List<ContributorLeaderboardItem> list = new java.util.ArrayList<>();
 
-        for (java.util.Map.Entry<User, Long> entry : userCounts.entrySet()) {
-            User u = entry.getKey();
-            int count = entry.getValue().intValue();
-            String userDept = approvedRequests.stream()
-                    .filter(cr -> cr.getUser() != null && cr.getUser().getId().equals(u.getId()) && cr.getUploadedResource() != null && cr.getUploadedResource().getCourse() != null)
-                    .map(cr -> cr.getUploadedResource().getCourse().getDepartment())
-                    .filter(java.util.Objects::nonNull)
-                    .findFirst()
-                    .orElse("CSE");
+        for (java.util.Map.Entry<Long, User> entry : userMap.entrySet()) {
+            Long uid = entry.getKey();
+            User u = entry.getValue();
+            int count = userCounts.getOrDefault(uid, 0);
+            String userDept = userDeptMap.getOrDefault(uid, "CSE");
 
             list.add(new ContributorLeaderboardItem(
                     0,
@@ -624,7 +646,26 @@ public class ContributionService {
             ));
         }
 
-        list.sort((a, b) -> Integer.compare(b.getApprovedContributions(), a.getApprovedContributions()));
+        // Sorting rule:
+        // 1. Highest approvedContributions first
+        // 2. Tie-breaker: Latest submission (newest contribution) first
+        // 3. Tie-breaker: Highest User ID first (deterministic)
+        list.sort((a, b) -> {
+            int scoreCompare = Integer.compare(b.getApprovedContributions(), a.getApprovedContributions());
+            if (scoreCompare != 0) {
+                return scoreCompare;
+            }
+            LocalDateTime aLatest = userLatestSubmission.getOrDefault(a.getUserId(), LocalDateTime.MIN);
+            LocalDateTime bLatest = userLatestSubmission.getOrDefault(b.getUserId(), LocalDateTime.MIN);
+            int dateCompare = bLatest.compareTo(aLatest);
+            if (dateCompare != 0) {
+                return dateCompare;
+            }
+            if (a.getUserId() != null && b.getUserId() != null) {
+                return b.getUserId().compareTo(a.getUserId());
+            }
+            return 0;
+        });
 
         List<ContributorLeaderboardItem> result = new java.util.ArrayList<>();
         int rank = 1;
