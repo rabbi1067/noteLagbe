@@ -435,7 +435,7 @@ export default function TopContributorsLeaderboard() {
       {/* ========================================================= */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs font-bold tracking-wider uppercase shadow-xs">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-100 dark:bg-blue-500/10 border border-blue-300 dark:border-blue-500/30 text-blue-700 dark:text-blue-400 text-xs font-bold tracking-wider uppercase shadow-xs">
             <Trophy className="w-4 h-4 text-amber-500" />
             <span>{language === "bn" ? "অ্যাকাডেমিক অবদানের স্বীকৃতি" : "Academic Hall of Fame"}</span>
           </div>
@@ -579,11 +579,11 @@ export default function TopContributorsLeaderboard() {
                       key={`${c.rank}-${c.name}`}
                       className={`px-5 sm:px-6 py-4 flex items-center justify-between gap-3 transition-all duration-150 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 ${
                         c.rank === 1
-                          ? "bg-indigo-50/30 dark:bg-indigo-950/20"
+                          ? "bg-indigo-50/70 dark:bg-indigo-950/20"
                           : c.rank === 2
-                          ? "bg-teal-50/30 dark:bg-teal-950/20"
+                          ? "bg-teal-50/70 dark:bg-teal-950/20"
                           : c.rank === 3
-                          ? "bg-purple-50/30 dark:bg-purple-950/20"
+                          ? "bg-purple-50/70 dark:bg-purple-950/20"
                           : ""
                       }`}
                     >
@@ -626,19 +626,19 @@ export default function TopContributorsLeaderboard() {
                               {c.name}
                             </span>
                             {c.rank === 1 && (
-                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 shrink-0 flex items-center gap-1">
+                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30 shrink-0 flex items-center gap-1">
                                 <Crown className="w-3 h-3 text-amber-400" />
                                 <span>{language === "bn" ? "প্রধান অবদানকারী" : "Lead"}</span>
                               </span>
                             )}
                             {c.rank === 2 && (
-                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-teal-500/15 text-teal-300 border border-teal-500/30 shrink-0 flex items-center gap-1">
+                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-teal-100 dark:bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-300 dark:border-teal-500/30 shrink-0 flex items-center gap-1">
                                 <Sparkles className="w-3 h-3 text-teal-400" />
                                 <span>{language === "bn" ? "সিনিয়র" : "Senior"}</span>
                               </span>
                             )}
                             {c.rank === 3 && (
-                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-300 border border-purple-500/30 shrink-0 flex items-center gap-1">
+                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-500/30 shrink-0 flex items-center gap-1">
                                 <Award className="w-3 h-3 text-purple-400" />
                                 <span>{language === "bn" ? "সম্মানিত" : "Distinguished"}</span>
                               </span>
@@ -647,7 +647,7 @@ export default function TopContributorsLeaderboard() {
                               {c.department || "CSE"}
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-400 truncate">
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                             {c.title || (language === "bn" ? "অ্যাকাডেমিক কন্ট্রিবিউটর" : "Academic Contributor")} {c.studentId ? `• ${c.studentId}` : ""}
                           </p>
                         </div>
@@ -655,8 +655,8 @@ export default function TopContributorsLeaderboard() {
 
                       {/* Right: Contributions Count */}
                       <div className="shrink-0 text-right">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20 shadow-xs">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-500/20 shadow-xs">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                           <span>{c.approvedContributions}</span>
                           <span className="hidden sm:inline font-medium text-[11px]">
                             {language === "bn" ? "পয়েন্ট" : "points"}
