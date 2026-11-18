@@ -131,12 +131,12 @@ export default function PDFCanvasViewer({
           blobUrl
             ? {
                 url: blobUrl,
-                cMapUrl: "https://unpkg.com/pdfjs-dist@3.11.174/cmaps/",
+                cMapUrl: "https://unpkg.com/pdfjs-dist@4.10.38/cmaps/",
                 cMapPacked: true,
               }
             : {
                 data: pdfBytes!.slice(0),
-                cMapUrl: "https://unpkg.com/pdfjs-dist@3.11.174/cmaps/",
+                cMapUrl: "https://unpkg.com/pdfjs-dist@4.10.38/cmaps/",
                 cMapPacked: true,
               }
         );

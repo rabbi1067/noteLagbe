@@ -177,12 +177,12 @@ function PageThumbnail({
           blobUrl
             ? {
                 url: blobUrl,
-                cMapUrl: "https://unpkg.com/pdfjs-dist@3.11.174/cmaps/",
+                cMapUrl: "https://unpkg.com/pdfjs-dist@4.10.38/cmaps/",
                 cMapPacked: true,
               }
             : {
                 data: pdfBytes as Uint8Array,
-                cMapUrl: "https://unpkg.com/pdfjs-dist@3.11.174/cmaps/",
+                cMapUrl: "https://unpkg.com/pdfjs-dist@4.10.38/cmaps/",
                 cMapPacked: true,
               }
         );

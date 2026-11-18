@@ -851,7 +851,8 @@ public class ResourceService {
 
         int lastStatusCode = 0;
         String lastErrorMsg = "";
-        int maxBytes = (int) FileUploadSecurityValidator.MAX_MATERIAL_BYTES;
+        // Cap single in-memory byte buffer to 35MB to prevent JVM heap exhaustion on 512MB RAM containers
+        int maxBytes = (int) Math.min(FileUploadSecurityValidator.MAX_MATERIAL_BYTES, 35L * 1024 * 1024);
         Map<String, String> headers = Map.of("User-Agent", "NoteLagbe-DocumentService/1.0");
 
         for (String url : candidates) {
