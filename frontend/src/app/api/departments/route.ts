@@ -5,7 +5,7 @@ import { resolveBackendBaseUrl } from "@/lib/backendUrl";
 export const dynamic = "force-dynamic";
 
 let cachedDepartmentsResponse: { payload: any; timestamp: number } | null = null;
-const CACHE_TTL_MS = 60 * 1000;
+const CACHE_TTL_MS = 15 * 1000;
 
 export async function GET(request: Request) {
   if (cachedDepartmentsResponse && Date.now() - cachedDepartmentsResponse.timestamp < CACHE_TTL_MS) {

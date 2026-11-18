@@ -19,7 +19,7 @@ public class ReviewSubmitRequest {
     private Integer rating;
 
     @NotBlank(message = "Review comment is required")
-    @Size(min = 10, max = 500, message = "Review comment must be between 10 and 500 characters")
+    @Size(min = 10, max = 1000, message = "Review comment must be between 10 and 1000 characters")
     private String comment;
 
     @Size(max = 50)

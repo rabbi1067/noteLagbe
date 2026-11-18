@@ -126,7 +126,7 @@ public class InputSanitizationService {
      * Sanitizes and validates course and faculty evaluations.
      */
     public String sanitizeAndValidateReview(String comment) {
-        return validateGenuineText(comment, "Review comment", 10, 500, true);
+        return validateGenuineText(comment, "Review comment", 10, 1000, true);
     }
 
     /**

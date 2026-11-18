@@ -190,7 +190,7 @@ public class ResourceService {
                 return maskLockedResource(r);
             }
             if (r.getFileUrl() != null && r2Service.isConfigured() && (r.getFileUrl().contains(".r2.") || r.getFileUrl().contains("r2_"))) {
-                r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 24));
+                r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 1));
             }
             return r;
         }).toList();
@@ -250,7 +250,7 @@ public class ResourceService {
                         return maskLockedResource(r);
                     }
                     if (r.getFileUrl() != null && r2Service.isConfigured() && (r.getFileUrl().contains(".r2.") || r.getFileUrl().contains("r2_"))) {
-                        r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 24));
+                        r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 1));
                     }
                     return r;
                 }).toList();
@@ -317,7 +317,7 @@ public class ResourceService {
         if (r2Service.isConfigured()) {
             for (Resource r : list) {
                 if (r.getFileUrl() != null && (r.getFileUrl().contains(".r2.") || r.getFileUrl().contains("r2_"))) {
-                    r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 24));
+                    r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 1));
                 }
             }
         }
@@ -571,7 +571,7 @@ public class ResourceService {
             return maskLockedResource(r);
         }
         if (r.getFileUrl() != null && r2Service.isConfigured() && (r.getFileUrl().contains(".r2.") || r.getFileUrl().contains("r2_"))) {
-            r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 24));
+            r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 1));
         }
         return r;
     }
@@ -749,7 +749,7 @@ public class ResourceService {
             if (targetUrl != null && (targetUrl.startsWith("http://") || targetUrl.startsWith("https://"))) {
                 String safeRedirect = targetUrl;
                 if (r2Service.isConfigured() && r2Service.hasPublicCdnUrl()) {
-                    safeRedirect = r2Service.getPresignedDownloadUrl(targetUrl, 24);
+                    safeRedirect = r2Service.getPresignedDownloadUrl(targetUrl, 1);
                 }
                 if (!safeRedirect.contains(".r2.cloudflarestorage.com")) {
                     log.warn("Streaming proxy failed for external file ID {}. Redirecting client directly: {}", id, safeRedirect);

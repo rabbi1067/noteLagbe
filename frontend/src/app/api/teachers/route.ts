@@ -5,7 +5,7 @@ import { resolveBackendBaseUrl } from "@/lib/backendUrl";
 export const dynamic = "force-dynamic";
 
 let cachedTeachersResponse: { data: any[]; timestamp: number } | null = null;
-const CACHE_TTL_MS = 30 * 1000; // 30 seconds server memory cache
+const CACHE_TTL_MS = 15 * 1000; // 15 seconds server memory cache (zero-lag freshness)
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);

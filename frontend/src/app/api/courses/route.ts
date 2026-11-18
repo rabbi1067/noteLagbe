@@ -5,7 +5,7 @@ import { resolveBackendBaseUrl } from "@/lib/backendUrl";
 export const dynamic = "force-dynamic";
 
 let cachedCoursesResponse: { data: any[]; timestamp: number } | null = null;
-const CACHE_TTL_MS = 60 * 1000; // 60 seconds server memory cache
+const CACHE_TTL_MS = 15 * 1000; // 15 seconds server memory cache (zero-lag freshness)
 
 // Pre-create catalog lookup map for instant 0ms faculty enrichment
 const catalogMap = new Map((catalogCourses as any[]).map((c) => [c.code?.toUpperCase(), c]));

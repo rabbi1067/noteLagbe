@@ -227,7 +227,7 @@ public class ContributionService {
         for (ContributionRequest cr : list) {
             Resource r = cr.getUploadedResource();
             if (r != null && r.getFileUrl() != null && (r.getFileUrl().contains(".r2.") || r.getFileUrl().contains("r2.dev") || r.getFileUrl().contains("r2_"))) {
-                r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 24));
+                r.setFileUrl(r2Service.getPresignedDownloadUrl(r.getFileUrl(), 1));
             }
         }
     }
