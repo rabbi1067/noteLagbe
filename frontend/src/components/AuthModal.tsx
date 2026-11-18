@@ -55,6 +55,7 @@ function AuthModalContent() {
   const [studentId, setStudentId] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loginWarningMessage, setLoginWarningMessage] = useState<string | null>(null);
 
   // Forgot password 3-step OTP recovery state
   const [forgotEmail, setForgotEmail] = useState("");
@@ -230,10 +231,15 @@ function AuthModalContent() {
       setWakingBackend(false);
       setLoading(true);
       try {
+        setLoginWarningMessage(null);
         await login(cleanEmail, cleanPassword);
         clearCredentialFields();
       } catch (err: any) {
-        if (err?.code !== "ACCOUNT_BLOCKED" && !err?.blocked) { toast.error(err.message || "Authentication failed"); }
+        if (err?.code !== "ACCOUNT_BLOCKED" && !err?.blocked) {
+          const msg = err.message || "Authentication failed";
+          setLoginWarningMessage(msg);
+          toast.error(msg);
+        }
       } finally {
         setLoading(false);
       }
@@ -449,6 +455,7 @@ function AuthModalContent() {
               onClick={() => {
                 setPassword("");
                 setShowPassword(false);
+                setLoginWarningMessage(null);
                 setAuthMode("signin");
               }}
               className={`py-2 rounded-lg transition-all touch-manipulation cursor-pointer active:scale-95 ${
@@ -464,6 +471,7 @@ function AuthModalContent() {
               onClick={() => {
                 setPassword("");
                 setShowPassword(false);
+                setLoginWarningMessage(null);
                 setAuthMode("register");
               }}
               className={`py-2 rounded-lg transition-all touch-manipulation cursor-pointer active:scale-95 ${
@@ -763,6 +771,12 @@ function AuthModalContent() {
         ) : (
           /* SIGN IN & REGISTER FORM */
           <form onSubmit={handleSubmit} className="space-y-3.5">
+            {loginWarningMessage && !isRegister && (
+              <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1 shadow-xs">
+                <Shield className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+                <div className="leading-relaxed whitespace-pre-wrap">{loginWarningMessage}</div>
+              </div>
+            )}
             {isRegister && (
               <div>
                 <div className="flex items-center justify-between mb-1">

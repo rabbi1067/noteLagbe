@@ -125,6 +125,27 @@ public class AuthService {
         }
     }
 
+    private void assertUserNotLocked(User user) {
+        if (user != null && user.getLockoutUntil() != null) {
+            LocalDateTime now = LocalDateTime.now();
+            if (now.isBefore(user.getLockoutUntil())) {
+                long remainingMinutes = Math.max(1, Duration.between(now, user.getLockoutUntil()).toMinutes() + 1);
+                throw new ApiException(
+                        "অ্যাকাউন্টে একাধিক ভুল প্রচেষ্টার কারণে সাময়িকভাবে ব্লক করা হয়েছে। অনুগ্রহ করে আরও "
+                                + remainingMinutes + " মিনিট পর চেষ্টা করুন। (Account temporarily locked due to multiple failed login attempts. Please try again after "
+                                + remainingMinutes + " minute" + (remainingMinutes > 1 ? "s" : "") + ".)",
+                        HttpStatus.TOO_MANY_REQUESTS
+                );
+            } else {
+                // Lockout duration has expired! Automatically unlock account
+                user.setLockoutUntil(null);
+                user.setFailedLoginAttempts(0);
+                userRepository.save(user);
+                evictCachedUser(user.getEmail());
+            }
+        }
+    }
+
     private Optional<User> findUserForLogin(String cleanEmail) {
         if (userDetailsServiceImpl != null) {
             return userDetailsServiceImpl.findUserCachedOrLoad(cleanEmail);
@@ -164,11 +185,48 @@ public class AuthService {
 
     public AuthResponse login(AuthRequest request) {
         String cleanEmail = request.getEmail().toLowerCase().trim();
-        findUserForLogin(cleanEmail).ifPresent(this::assertUserNotBlocked);
+        Optional<User> userOpt = findUserForLogin(cleanEmail);
+        if (userOpt.isPresent()) {
+            User existing = userOpt.get();
+            assertUserNotBlocked(existing);
+            assertUserNotLocked(existing);
+        }
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(cleanEmail, request.getPassword())
-        );
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(cleanEmail, request.getPassword())
+            );
+        } catch (org.springframework.security.core.AuthenticationException ex) {
+            // Check if user exists to record failed login attempt and enforce 30-minute lockout
+            Optional<User> targetUserOpt = userRepository.findByEmail(cleanEmail);
+            if (targetUserOpt.isPresent()) {
+                User u = targetUserOpt.get();
+                assertUserNotBlocked(u);
+                assertUserNotLocked(u);
+
+                int attempts = u.getFailedLoginAttempts() + 1;
+                u.setFailedLoginAttempts(attempts);
+                if (attempts >= 5) {
+                    u.setLockoutUntil(LocalDateTime.now().plusMinutes(30));
+                    userRepository.save(u);
+                    evictCachedUser(cleanEmail);
+                    throw new ApiException(
+                            "অ্যাকাউন্টে ৫ বার ভুল পাসওয়ার্ড দেওয়ার কারণে ৩০ মিনিটের জন্য সাময়িকভাবে ব্লক করা হয়েছে। ৩০ মিনিট পর স্বয়ংক্রিয়ভাবে আনলক হবে। (Account temporarily locked for 30 minutes due to 5 consecutive failed login attempts.)",
+                            HttpStatus.TOO_MANY_REQUESTS
+                    );
+                } else {
+                    userRepository.save(u);
+                    evictCachedUser(cleanEmail);
+                    int remaining = 5 - attempts;
+                    throw new ApiException(
+                            "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। আর " + remaining + " বার ভুল হলে অ্যাকাউন্ট ৩০ মিনিটের জন্য লক হয়ে যাবে। (Invalid credentials. " + remaining + " attempt" + (remaining > 1 ? "s" : "") + " remaining before a 30-minute lockout.)",
+                            HttpStatus.UNAUTHORIZED
+                    );
+                }
+            }
+            throw new ApiException("ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। (Invalid email or password.)", HttpStatus.UNAUTHORIZED);
+        }
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String token = tokenProvider.generateToken(authentication);
@@ -178,6 +236,14 @@ public class AuthService {
                 : userRepository.findByEmail(cleanEmail)
                         .orElseThrow(() -> new ApiException("User not found"));
         assertUserNotBlocked(user);
+
+        // Reset failed login attempts on successful login
+        if (user.getFailedLoginAttempts() > 0 || user.getLockoutUntil() != null) {
+            user.setFailedLoginAttempts(0);
+            user.setLockoutUntil(null);
+            userRepository.save(user);
+            evictCachedUser(user.getEmail());
+        }
 
         AuthResponse response = new AuthResponse(
                 token,
@@ -214,8 +280,7 @@ public class AuthService {
         user.setStudentId(sId);
         user.setPhone(cleanPhone);
         boolean isOwnerOrInitialAdmin = (initialAdminEmail != null && !initialAdminEmail.isBlank() && email.equalsIgnoreCase(initialAdminEmail.trim()))
-                || (ownerAdminEmail != null && !ownerAdminEmail.isBlank() && email.equalsIgnoreCase(ownerAdminEmail.trim()))
-                || email.equalsIgnoreCase("admin@seu.edu.bd");
+                || (ownerAdminEmail != null && !ownerAdminEmail.isBlank() && email.equalsIgnoreCase(ownerAdminEmail.trim()));
         if (isOwnerOrInitialAdmin) {
             user.setRole(Role.ROLE_SUPER_ADMIN);
         } else {
@@ -269,13 +334,18 @@ public class AuthService {
         Optional<User> existingUser = userRepository.findByEmail(verifiedEmail);
         User user;
         boolean isOwnerOrInitialAdmin = (initialAdminEmail != null && !initialAdminEmail.isBlank() && verifiedEmail.equalsIgnoreCase(initialAdminEmail.trim()))
-                || (ownerAdminEmail != null && !ownerAdminEmail.isBlank() && verifiedEmail.equalsIgnoreCase(ownerAdminEmail.trim()))
-                || verifiedEmail.equalsIgnoreCase("admin@seu.edu.bd");
+                || (ownerAdminEmail != null && !ownerAdminEmail.isBlank() && verifiedEmail.equalsIgnoreCase(ownerAdminEmail.trim()));
 
         if (existingUser.isPresent()) {
             user = existingUser.get();
             assertUserNotBlocked(user);
+            assertUserNotLocked(user);
             boolean updated = false;
+            if (user.getFailedLoginAttempts() > 0 || user.getLockoutUntil() != null) {
+                user.setFailedLoginAttempts(0);
+                user.setLockoutUntil(null);
+                updated = true;
+            }
             if (isOwnerOrInitialAdmin && user.getRole() != Role.ROLE_SUPER_ADMIN) {
                 user.setRole(Role.ROLE_SUPER_ADMIN);
                 updated = true;

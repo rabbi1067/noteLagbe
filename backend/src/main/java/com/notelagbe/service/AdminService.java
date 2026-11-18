@@ -308,6 +308,10 @@ public class AdminService {
         }
 
         u.setEnabled(!u.isEnabled());
+        if (u.isEnabled()) {
+            u.setLockoutUntil(null);
+            u.setFailedLoginAttempts(0);
+        }
         userRepository.save(u);
         evictCachedUser(u.getEmail());
         liveSyncService.broadcast("user", u.isEnabled() ? "unblocked" : "blocked", u.getId());

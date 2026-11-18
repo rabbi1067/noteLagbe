@@ -129,7 +129,7 @@ class ResourceDuplicateGuardTest {
     @Test
     void multiItemMaterialsAllowMultipleQuizAndCtPerSemester() {
         Object[] quiz1Row = slotRow(20L, "Quiz 1", ResourceType.QUIZ_CT, "Summer 2025", ResourceStatus.PENDING, "CSE141", 202L, "Md. Sakib Sir");
-        when(resourceRepository.findActiveDuplicateSlotsByCourseCode(eq("CSE141"), any()))
+        lenient().when(resourceRepository.findActiveDuplicateSlotsByCourseCode(eq("CSE141"), any()))
                 .thenReturn(List.<Object[]>of(quiz1Row));
 
         // Quiz 2 in same semester is allowed

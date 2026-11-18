@@ -66,6 +66,13 @@ public class User {
     @JsonIgnore
     private LocalDateTime resetOtpLastSentAt;
 
+    @JsonIgnore
+    @Column(nullable = false)
+    private int failedLoginAttempts = 0;
+
+    @JsonIgnore
+    private LocalDateTime lockoutUntil;
+
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public User() {}
@@ -134,4 +141,10 @@ public class User {
 
     public LocalDateTime getResetOtpLastSentAt() { return resetOtpLastSentAt; }
     public void setResetOtpLastSentAt(LocalDateTime resetOtpLastSentAt) { this.resetOtpLastSentAt = resetOtpLastSentAt; }
+
+    public int getFailedLoginAttempts() { return failedLoginAttempts; }
+    public void setFailedLoginAttempts(int failedLoginAttempts) { this.failedLoginAttempts = failedLoginAttempts; }
+
+    public LocalDateTime getLockoutUntil() { return lockoutUntil; }
+    public void setLockoutUntil(LocalDateTime lockoutUntil) { this.lockoutUntil = lockoutUntil; }
 }

@@ -38,6 +38,9 @@ public class RateLimitFilter implements Filter {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.notelagbe.security.JwtTokenProvider tokenProvider;
+
     // Multi-tier bucket maps with endpoint classification
     private final Map<String, BucketEntry> buckets = new ConcurrentHashMap<>();
     
@@ -110,6 +113,14 @@ public class RateLimitFilter implements Filter {
             path.startsWith("/api/sync") ||
             "/api/auth/mail-relay-verify".equals(path) ||
             (path.startsWith("/api/admin") && "GET".equalsIgnoreCase(method))) {
+            filterChain.doFilter(servletRequest, servletResponse);
+            return;
+        }
+
+        // Role-based Rate Limit Exemption for Administrative Staff
+        // Admins and Managers uploading multiple notes, questions, or performing bulk administrative tasks
+        // are completely exempt from rapid mutation shields and rate limiting throttles.
+        if (isAdminOrStaff(request)) {
             filterChain.doFilter(servletRequest, servletResponse);
             return;
         }
@@ -199,6 +210,20 @@ public class RateLimitFilter implements Filter {
         if (path.startsWith("/api/contributions")) return "contrib";
         if (path.startsWith("/api/teachers/sync-cse")) return "sync";
         return "general";
+    }
+
+    private boolean isAdminOrStaff(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ") && tokenProvider != null) {
+            String token = authHeader.substring(7).trim();
+            if (!token.isEmpty() && tokenProvider.validateToken(token)) {
+                String roles = tokenProvider.getRolesFromToken(token);
+                if (roles != null && (roles.contains("ROLE_ADMIN") || roles.contains("ROLE_SUPER_ADMIN") || roles.contains("ROLE_MANAGER"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private String getClientIP(HttpServletRequest request) {

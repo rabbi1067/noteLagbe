@@ -28,9 +28,10 @@ public class JwtTokenProvider {
             @Value("${app.jwt.expiration-ms:86400000}") long expirationMs,
             @Value("${app.jwt.refresh-expiration-ms:604800000}") long refreshExpirationMs) {
         if (secret == null || secret.trim().length() < 32) {
-            String fallback = "NoteLagbeProductionEnterpriseSecretKey2026SoutheastUniversityPlatformSecurityKey";
-            log.warn("JWT secret is not provided via JWT_SECRET env var or too short. Using deterministic enterprise secret key to maintain session stability across container restarts.");
-            this.secretKey = Keys.hmacShaKeyFor(fallback.getBytes(StandardCharsets.UTF_8));
+            log.warn("CRITICAL SECURITY NOTICE: JWT_SECRET is not configured via environment variable! Generating an ephemeral 256-bit cryptographically secure key for this session. (Ensure JWT_SECRET is set in production to maintain token validity across restarts).");
+            byte[] ephemeralKey = new byte[32];
+            new java.security.SecureRandom().nextBytes(ephemeralKey);
+            this.secretKey = Keys.hmacShaKeyFor(ephemeralKey);
         } else {
             this.secretKey = Keys.hmacShaKeyFor(secret.trim().getBytes(StandardCharsets.UTF_8));
         }
@@ -73,13 +74,25 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    public String getUsernameFromToken(String token) {
-        Claims claims = Jwts.parser()
+    public Claims getClaimsFromToken(String token) {
+        return Jwts.parser()
                 .verifyWith(secretKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-        return claims.getSubject();
+    }
+
+    public String getRolesFromToken(String token) {
+        try {
+            Claims claims = getClaimsFromToken(token);
+            return claims.get("roles", String.class);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public String getUsernameFromToken(String token) {
+        return getClaimsFromToken(token).getSubject();
     }
 
     public boolean validateToken(String token) {

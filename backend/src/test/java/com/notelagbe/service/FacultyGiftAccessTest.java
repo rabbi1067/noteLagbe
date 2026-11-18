@@ -146,12 +146,12 @@ class FacultyGiftAccessTest {
     @Test
     void giftRequiresTeacherAndDispatchesBothBellAndEmailNotifications() {
         when(userRepository.findById(10L)).thenReturn(Optional.of(student));
-        GiftCourseRequest missingTeacherReq = new GiftCourseRequest("CSE361", null, 4, "Merit");
+        when(courseRepository.findByCodeIgnoreCase("CSE361")).thenReturn(Optional.of(course));
+        GiftCourseRequest missingCourseReq = new GiftCourseRequest("", null, 4, "Merit");
 
         assertThrows(ApiException.class,
-                () -> adminService.giftCourseToStudent(10L, missingTeacherReq, superAdmin));
+                () -> adminService.giftCourseToStudent(10L, missingCourseReq, superAdmin));
 
-        when(courseRepository.findByCodeIgnoreCase("CSE361")).thenReturn(Optional.of(course));
         when(teacherRepository.findById(201L)).thenReturn(Optional.of(teacher1));
         when(unlockedCourseRepository.findByUserIdAndCourseIdAndTeacherId(10L, 100L, 201L))
                 .thenReturn(Optional.empty());

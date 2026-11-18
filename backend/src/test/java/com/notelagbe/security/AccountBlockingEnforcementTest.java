@@ -203,4 +203,64 @@ class AccountBlockingEnforcementTest {
         assertEquals(200, response.getStatus());
         assertNotNull(SecurityContextHolder.getContext().getAuthentication());
     }
+
+    @Test
+    void consecutiveFiveFailedLoginAttempts_locksAccountFor30Minutes() {
+        User student = makeBlockedStudent();
+        student.setEnabled(true);
+        student.setFailedLoginAttempts(4); // 4th attempt already failed
+        when(userRepository.findByEmail("blocked@seu.edu.bd")).thenReturn(Optional.of(student));
+        when(authenticationManager.authenticate(any())).thenThrow(new org.springframework.security.authentication.BadCredentialsException("Bad credentials"));
+
+        AuthRequest req = new AuthRequest();
+        req.setEmail("blocked@seu.edu.bd");
+        req.setPassword("wrong-password");
+
+        ApiException ex = assertThrows(ApiException.class, () -> authService.login(req));
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getStatus());
+        assertTrue(ex.getMessage().contains("৩০ মিনিটের জন্য"));
+        assertNotNull(student.getLockoutUntil());
+        assertTrue(student.getLockoutUntil().isAfter(java.time.LocalDateTime.now()));
+        verify(userRepository, times(1)).save(student);
+    }
+
+    @Test
+    void lockedAccountCannotLoginDuring30Minutes() {
+        User student = makeBlockedStudent();
+        student.setEnabled(true);
+        student.setLockoutUntil(java.time.LocalDateTime.now().plusMinutes(25));
+        when(userRepository.findByEmail("blocked@seu.edu.bd")).thenReturn(Optional.of(student));
+
+        AuthRequest req = new AuthRequest();
+        req.setEmail("blocked@seu.edu.bd");
+        req.setPassword("correct-or-wrong");
+
+        ApiException ex = assertThrows(ApiException.class, () -> authService.login(req));
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getStatus());
+        assertTrue(ex.getMessage().contains("মিনিট পর চেষ্টা করুন"));
+        verify(authenticationManager, never()).authenticate(any());
+    }
+
+    @Test
+    void expiredLockoutAutomaticallyUnlocksAccount() {
+        User student = makeBlockedStudent();
+        student.setEnabled(true);
+        student.setFailedLoginAttempts(5);
+        student.setLockoutUntil(java.time.LocalDateTime.now().minusMinutes(5)); // expired 5 mins ago
+        when(userRepository.findByEmail("blocked@seu.edu.bd")).thenReturn(Optional.of(student));
+
+        org.springframework.security.core.Authentication auth = mock(org.springframework.security.core.Authentication.class);
+        when(auth.getPrincipal()).thenReturn(new CustomUserDetails(student));
+        when(authenticationManager.authenticate(any())).thenReturn(auth);
+        when(tokenProvider.generateToken(any())).thenReturn("valid.jwt.token");
+
+        AuthRequest req = new AuthRequest();
+        req.setEmail("blocked@seu.edu.bd");
+        req.setPassword("valid-password");
+
+        assertDoesNotThrow(() -> authService.login(req));
+        assertNull(student.getLockoutUntil());
+        assertEquals(0, student.getFailedLoginAttempts());
+        verify(userRepository, atLeastOnce()).save(student);
+    }
 }
