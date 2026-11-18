@@ -31,6 +31,7 @@ import {
   SlidersHorizontal,
   Gauge,
   Camera,
+  ArrowLeftRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -840,8 +841,8 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {bn
-                  ? "সিরিয়াল (#) নির্বাচন করে, তীর বাটন চেপে, অথবা ১ নম্বরে নিতে '১ম পেজ' বাটনে ট্যাপ করুন"
-                  : "Tap '#', use arrows, or click 'Make #1' to reorder pages"}
+                  ? "ছবি পরিবর্তন করতে কার্ডে সরাসরি ট্যাপ করুন (ট্যাপ করলে ১ম পেজে চলে যাবে), '#' ড্রপডাউন নির্বাচন করুন, অথবা তীর বাটন চাপুন"
+                  : "Tap any image to select, tap selected image again to move to #1, or use '#' dropdown and arrows to reorder"}
               </p>
             </div>
 
@@ -871,8 +872,27 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                       setDragOverIdx(null);
                     }}
                     onClick={() => {
-                      setSelectedId(page.id);
-                      setIsCropping(false);
+                      if (isSelected) {
+                        // When tapped on the already selected card, change its position!
+                        if (index > 0) {
+                          movePageToIndex(index, 0);
+                          toast.success(
+                            bn
+                              ? `ছবিটিকে ১ নাম্বার পেজে আনা হয়েছে!`
+                              : `Moved to Page #1!`
+                          );
+                        } else if (pages.length > 1) {
+                          movePageToIndex(0, 1);
+                          toast.success(
+                            bn
+                              ? "ছবিটি পরবর্তী পজিশনে সরানো হয়েছে!"
+                              : "Swapped with next page!"
+                          );
+                        }
+                      } else {
+                        setSelectedId(page.id);
+                        setIsCropping(false);
+                      }
                     }}
                     className={`group rounded-2xl p-2 border transition-all cursor-pointer flex flex-col gap-2 touch-manipulation select-none ${
                       isDragTarget
@@ -935,10 +955,10 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                               );
                             }}
                             onTouchStart={(e) => e.stopPropagation()}
-                            className="px-1.5 py-0.5 rounded-md text-[9px] font-extrabold text-blue-700 dark:text-blue-300 bg-blue-100/90 dark:bg-blue-950/80 hover:bg-blue-200 border border-blue-300 dark:border-blue-800 transition-all flex items-center gap-0.5 active:scale-90 shadow-xs cursor-pointer shrink-0"
+                            className="px-2 py-0.5 rounded-lg text-[10px] font-extrabold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/80 hover:bg-blue-200 border border-blue-300 dark:border-blue-800 transition-all flex items-center gap-1 active:scale-90 shadow-xs cursor-pointer shrink-0"
                             title={bn ? "এই পেজটিকে সরাসরি ১ নাম্বার করুন" : "Set as Page #1"}
                           >
-                            <ChevronsLeft className="w-2.5 h-2.5 shrink-0" />
+                            <ChevronsLeft className="w-3 h-3 shrink-0" />
                             <span>{bn ? "১ম করুন" : "Make #1"}</span>
                           </button>
                         )}
@@ -958,9 +978,30 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                       </button>
                     </div>
 
-                    {/* Preview Thumb */}
-                    <div className="h-28 w-full rounded-xl bg-slate-200/70 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-center justify-center p-1.5 overflow-hidden">
+                    {/* Preview Thumb with Tap-to-Move Position Overlay */}
+                    <div className="relative h-28 w-full rounded-xl bg-slate-200/70 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-center justify-center p-1.5 overflow-hidden group/thumb">
                       <PageThumbnailCanvas page={page} />
+
+                      {/* Interactive Tap-to-Move Position Overlay Badge */}
+                      {isSelected && index > 0 && (
+                        <div
+                          className="absolute inset-x-1.5 bottom-1.5 py-1 px-2 rounded-lg bg-blue-600/95 hover:bg-blue-500 text-white text-[10px] font-black flex items-center justify-center gap-1 shadow-lg ring-1 ring-white/30 transition-transform active:scale-95 animate-in fade-in zoom-in-95 cursor-pointer"
+                          title={bn ? "ট্যাপ করে ১ নাম্বার পেজে আনুন" : "Tap to move to Page #1"}
+                        >
+                          <ChevronsLeft className="w-3.5 h-3.5 shrink-0" />
+                          <span>{bn ? "ট্যাপে ১ম পেজ করুন" : "Tap: Make #1"}</span>
+                        </div>
+                      )}
+
+                      {isSelected && index === 0 && pages.length > 1 && (
+                        <div
+                          className="absolute inset-x-1.5 bottom-1.5 py-1 px-2 rounded-lg bg-emerald-600/95 hover:bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center gap-1 shadow-lg ring-1 ring-white/30 transition-transform active:scale-95 animate-in fade-in zoom-in-95 cursor-pointer"
+                          title={bn ? "ট্যাপ করে অবস্থান পরিবর্তন করুন" : "Tap to swap position"}
+                        >
+                          <ArrowLeftRight className="w-3 h-3 shrink-0" />
+                          <span>{bn ? "ট্যাপে সোয়াপ করুন" : "Tap to Swap"}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Bottom row: Move left / filename / Move right */}
