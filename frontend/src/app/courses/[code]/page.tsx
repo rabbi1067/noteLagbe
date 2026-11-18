@@ -6,7 +6,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { useDataSync } from "@/lib/sync";
+import { useDataSync, notifyDataChanged } from "@/lib/sync";
 import PDFViewerModal from "@/components/PDFViewerModal";
 import CheatSheetModal from "@/components/CheatSheetModal";
 import FacultyAvatar from "@/components/FacultyAvatar";
@@ -64,6 +64,10 @@ export default function CourseDetailPage() {
   const code = (params?.code as string)?.toUpperCase();
   const { user, isAuthenticated, hasUnlocked, hasUnlockedForTeacher, setShowAuthModal, refreshProfile } = useAuth();
   const { language, t } = useLanguage();
+  const isAdmin = Boolean(
+    user &&
+    (user.role === "ROLE_ADMIN" || user.role === "ROLE_SUPER_ADMIN" || user.role === "ROLE_MANAGER")
+  );
 
   // Instant 0ms Pre-population from client storage or verified SEU curriculum catalog
   const [course, setCourse] = useState<any>(() => {
@@ -2505,6 +2509,23 @@ function sortMaterialsBySemesterDesc(materials: any[]): any[] {
         courseCode={code}
         isUnlocked={Boolean(selectedResource && isResourceUnlockedForView(selectedResource))}
         onUnlockedSuccess={loadCourseData}
+        isAdminMode={isAdmin}
+        onFileUpdated={(newUrl) => {
+          setSelectedResource((prev: any) => (prev ? { ...prev, fileUrl: newUrl, previewUrl: newUrl } : null));
+          setResources((prevList: any[]) =>
+            Array.isArray(prevList)
+              ? prevList.map((item) =>
+                  String(item.id) === String(selectedResource?.id)
+                    ? { ...item, fileUrl: newUrl, previewUrl: newUrl }
+                    : item
+                )
+              : prevList
+          );
+          if (selectedResource?.id) {
+            notifyDataChanged("resource", "updated", selectedResource.id);
+          }
+          loadCourseData();
+        }}
       />
 
       <CheatSheetModal

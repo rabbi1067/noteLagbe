@@ -41,6 +41,7 @@ import PDFViewerModal from "@/components/PDFViewerModal";
 import FacultyAvatar from "@/components/FacultyAvatar";
 import { formatSemesterDisplay } from "@/lib/academicSemester";
 import { useAuth } from "@/context/AuthContext";
+import { notifyDataChanged } from "@/lib/sync";
 import { toast } from "sonner";
 
 function sortTeacherCoursesNaturally(teacherCourses: any[]): any[] {
@@ -113,6 +114,10 @@ export default function TeacherDetailPage() {
   const id = Number(params?.id);
   const { language, t } = useLanguage();
   const { user, isAuthenticated, setShowAuthModal } = useAuth();
+  const isAdmin = Boolean(
+    user &&
+    (user.role === "ROLE_ADMIN" || user.role === "ROLE_SUPER_ADMIN" || user.role === "ROLE_MANAGER")
+  );
 
   // Instant 0ms Pre-population from client storage or verified SEU faculty directory
   const [teacher, setTeacher] = useState<any>(() => {
@@ -1158,6 +1163,25 @@ export default function TeacherDetailPage() {
           resource={activeResource}
           courseCode={activeResource.course?.code || "CSE"}
           isUnlocked={Boolean(activeResource.fileUrl)}
+          isAdminMode={isAdmin}
+          onFileUpdated={(newUrl) => {
+            setActiveResource((prev: any) => (prev ? { ...prev, fileUrl: newUrl, previewUrl: newUrl } : null));
+            setResources((prevList: any[]) =>
+              Array.isArray(prevList)
+                ? prevList.map((item) =>
+                    String(item.id) === String(activeResource?.id)
+                      ? { ...item, fileUrl: newUrl, previewUrl: newUrl }
+                      : item
+                  )
+                : prevList
+            );
+            if (activeResource?.id) {
+              notifyDataChanged("resource", "updated", activeResource.id);
+            }
+            if (id) {
+              api.resources.getByTeacher(id).then((rData) => setResources(sortResourcesDescending(rData || [])));
+            }
+          }}
           onUnlockedSuccess={() => {
             if (id) {
               api.resources.getByTeacher(id).then((rData) => setResources(sortResourcesDescending(rData || [])));

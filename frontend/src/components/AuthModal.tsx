@@ -26,6 +26,13 @@ import {
 import { toast } from "sonner";
 import { notifyDataChanged } from "@/lib/sync";
 import { api, warmupBackend } from "@/lib/api";
+import {
+  isValidAllowedEmail,
+  isValidBdPhone,
+  normalizeBdPhone,
+  EMAIL_DOMAIN_ERROR,
+  PHONE_FORMAT_ERROR,
+} from "@/lib/validation";
 
 export default function AuthModal() {
   const { showAuthModal } = useAuth();
@@ -173,6 +180,11 @@ function AuthModalContent() {
     }
 
     if (isRegister) {
+      if (!isValidAllowedEmail(cleanEmail)) {
+        toast.error(EMAIL_DOMAIN_ERROR);
+        return;
+      }
+
       const cleanName = name.trim();
       const cleanId = studentId.trim();
       const cleanPhone = phone.trim();
@@ -183,9 +195,8 @@ function AuthModalContent() {
       }
 
       if (cleanPhone) {
-        const digitsOnly = cleanPhone.replace(/\D/g, "");
-        if (digitsOnly.length < 10 || digitsOnly.length > 15) {
-          toast.error("Please enter a valid phone number (e.g. 01712345678).");
+        if (!isValidBdPhone(cleanPhone)) {
+          toast.error(PHONE_FORMAT_ERROR);
           return;
         }
       }
@@ -199,7 +210,8 @@ function AuthModalContent() {
       setWakingBackend(false);
       setLoading(true);
       try {
-        await register(cleanName, cleanEmail, cleanPassword, cleanId || undefined, cleanPhone || undefined);
+        const canonicalPhone = cleanPhone ? normalizeBdPhone(cleanPhone) : undefined;
+        await register(cleanName, cleanEmail, cleanPassword, cleanId || undefined, canonicalPhone);
         clearCredentialFields();
         notifyDataChanged("user", "created");
         notifyDataChanged("staff", "created");
@@ -775,9 +787,9 @@ function AuthModalContent() {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  University Email / Email Address <span className="text-red-500">*</span>
+                  Email Address <span className="text-red-500">*</span>
                 </label>
-                <span className="text-[10px] text-slate-400 font-mono">{email.length}/100</span>
+                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">@seu.edu.bd or @gmail.com</span>
               </div>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -789,7 +801,7 @@ function AuthModalContent() {
                   spellCheck={false}
                   required
                   maxLength={100}
-                  placeholder="name@seu.edu.bd or personal email"
+                  placeholder="e.g. 2024100000122@seu.edu.bd or name@gmail.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value.slice(0, 100))}
                   className="w-full text-xs pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -824,9 +836,9 @@ function AuthModalContent() {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Phone Number (Optional)
+                    Mobile Number (Optional)
                   </label>
-                  <span className="text-[10px] text-slate-400 font-mono">{phone.length}/15</span>
+                  <span className="text-[10px] text-slate-400 font-mono">01XXXXXXXXX</span>
                 </div>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />

@@ -14,6 +14,7 @@ import com.notelagbe.repository.CourseRepository;
 import com.notelagbe.repository.SubscriptionRepository;
 import com.notelagbe.repository.UnlockedCourseRepository;
 import com.notelagbe.repository.UserRepository;
+import com.notelagbe.util.UserValidationHelper;
 import com.notelagbe.security.CustomUserDetails;
 import com.notelagbe.security.FileUploadSecurityValidator;
 import com.notelagbe.security.JwtTokenProvider;
@@ -193,10 +194,8 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        String email = request.getEmail().toLowerCase().trim();
-        if (userRepository.existsByEmail(email)) {
-            throw new ApiException("An account with this email address already exists! Please log in instead.");
-        }
+        String email = UserValidationHelper.validateAndNormalizeEmail(request.getEmail());
+        UserValidationHelper.assertUniqueEmail(email, null, userRepository);
 
         User user = new User();
         user.setName(request.getName().trim());
@@ -245,30 +244,16 @@ public class AuthService {
     }
 
     private String normalizeAndValidateUniquePhone(String rawPhone, Long excludeUserId) {
-        if (rawPhone == null || rawPhone.trim().isEmpty()) {
-            return null;
-        }
-        String cleanPhone = rawPhone.trim().replaceAll("[^0-9+]", "");
-        if (cleanPhone.isEmpty()) {
-            return null;
-        }
-        String baseDigits = cleanPhone.replaceAll("[^0-9]", "");
-        if (baseDigits.startsWith("880") && baseDigits.length() >= 13) {
-            baseDigits = "0" + baseDigits.substring(3);
-        }
-        List<User> existingWithPhone = userRepository.findMatchingPhoneUsers(cleanPhone, baseDigits, "+88" + baseDigits);
-        boolean conflict = existingWithPhone.stream()
-                .anyMatch(existing -> excludeUserId == null || !existing.getId().equals(excludeUserId));
-        if (conflict) {
-            throw new ApiException("This phone number is already registered to another account! Please use a different phone number or log in.");
-        }
+        String cleanPhone = UserValidationHelper.validateAndNormalizePhone(rawPhone);
+        UserValidationHelper.assertUniquePhone(cleanPhone, excludeUserId, userRepository);
         return cleanPhone;
     }
 
     @Transactional
     public AuthResponse loginWithGoogle(GoogleLoginRequest request) {
         Map<String, Object> tokenClaims = verifyGoogleIdToken(request.getIdToken());
-        String verifiedEmail = String.valueOf(tokenClaims.get("email")).toLowerCase().trim();
+        String rawTokenEmail = String.valueOf(tokenClaims.get("email")).toLowerCase().trim();
+        String verifiedEmail = UserValidationHelper.validateAndNormalizeEmail(rawTokenEmail);
         if (request.getEmail() != null && !request.getEmail().isBlank()
                 && !verifiedEmail.equalsIgnoreCase(request.getEmail().trim())) {
             throw new ApiException("Google token email mismatch.", org.springframework.http.HttpStatus.UNAUTHORIZED);

@@ -15,6 +15,10 @@ public class StaffCreateRequest {
     @NotBlank(message = "Email is required")
     @Email(message = "Valid email is required")
     @Size(max = 100, message = "Email cannot exceed 100 characters")
+    @jakarta.validation.constraints.Pattern(
+            regexp = "^(?i)[a-zA-Z0-9._%+-]+@([a-zA-Z0-9-]+\\.)*(gmail\\.com|seu\\.edu\\.bd)$",
+            message = "Only Southeast University (@seu.edu.bd) or Google (@gmail.com) email addresses are allowed."
+    )
     private String email;
 
     @NotBlank(message = "Temporary password is required")

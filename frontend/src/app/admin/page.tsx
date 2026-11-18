@@ -107,6 +107,13 @@ import {
   type DuplicateSlotItem,
 } from "@/hooks/useDuplicateResourceCheck";
 import { DuplicateWarningBanner } from "@/components/DuplicateWarningBanner";
+import {
+  isValidAllowedEmail,
+  isValidBdPhone,
+  normalizeBdPhone,
+  EMAIL_DOMAIN_ERROR,
+  PHONE_FORMAT_ERROR,
+} from "@/lib/validation";
 
 interface PaginationProps {
   currentPage: number;
@@ -1267,6 +1274,7 @@ export default function AdminDashboardPage() {
   const [showStaffModal, setShowStaffModal] = useState(false);
   const [staffName, setStaffName] = useState("");
   const [staffEmail, setStaffEmail] = useState("");
+  const [staffPhone, setStaffPhone] = useState("");
   const [staffStudentId, setStaffStudentId] = useState("");
   const [staffPassword, setStaffPassword] = useState("");
   const [staffRole, setStaffRole] = useState("ROLE_STUDENT");
@@ -1889,11 +1897,12 @@ export default function AdminDashboardPage() {
 
     setSavingResource(true);
     try {
+      const resolvedFileUrl = resFileUrl.trim() || editingResource?.fileUrl || "";
       const payload: any = {
         title: resTitle.trim(),
         type: resType,
-        fileUrl: resFileUrl.trim(),
-        previewUrl: resFileUrl.trim(),
+        fileUrl: resolvedFileUrl,
+        previewUrl: resolvedFileUrl,
         courseCode: resCourseCode,
         teacherId: resTeacherId ? Number(resTeacherId) : null,
         semesterName: resSemester.trim(),
@@ -2422,8 +2431,16 @@ export default function AdminDashboardPage() {
   // ---------------- User Accounts & RBAC CRUD ----------------
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!staffName || !staffEmail || !staffPassword) {
+    if (!staffName.trim() || !staffEmail.trim() || !staffPassword.trim()) {
       toast.error("Please fill in all required fields (Name, Email, Password)");
+      return;
+    }
+    if (!isValidAllowedEmail(staffEmail)) {
+      toast.error(EMAIL_DOMAIN_ERROR);
+      return;
+    }
+    if (staffPhone.trim() && !isValidBdPhone(staffPhone)) {
+      toast.error(PHONE_FORMAT_ERROR);
       return;
     }
     if (!isSuperAdmin && staffRole !== "ROLE_STUDENT") {
@@ -2435,10 +2452,11 @@ export default function AdminDashboardPage() {
     try {
       await api.admin.createStaff({
         name: staffName.trim(),
-        email: staffEmail.trim(),
+        email: staffEmail.trim().toLowerCase(),
         password: staffPassword.trim(),
         role: roleToAssign,
         studentId: staffStudentId.trim() || undefined,
+        phone: staffPhone.trim() ? normalizeBdPhone(staffPhone) : undefined,
       });
       notifyDataChanged("user", "created");
       notifyDataChanged("staff", "created");
@@ -2447,6 +2465,7 @@ export default function AdminDashboardPage() {
       setShowStaffModal(false);
       setStaffName("");
       setStaffEmail("");
+      setStaffPhone("");
       setStaffStudentId("");
       setStaffPassword("");
       setStaffRole(isSuperAdmin ? "ROLE_ADMIN" : "ROLE_STUDENT");
@@ -2520,13 +2539,17 @@ export default function AdminDashboardPage() {
       toast.error("Please enter a valid name.");
       return;
     }
+    if (editStaffPhone.trim() && !isValidBdPhone(editStaffPhone)) {
+      toast.error(PHONE_FORMAT_ERROR);
+      return;
+    }
     setUpdatingStaff(true);
     try {
       const payload: any = {
         name: editStaffName.trim(),
         role: isSuperAdmin ? editStaffRole : "ROLE_STUDENT",
-        studentId: editStaffStudentId.trim(),
-        phone: editStaffPhone.trim() || undefined,
+        studentId: editStaffStudentId.trim() || undefined,
+        phone: editStaffPhone.trim() ? normalizeBdPhone(editStaffPhone) : undefined,
         address: editStaffAddress.trim() || undefined,
       };
       await api.admin.updateStaff(editingStaffId, payload);
@@ -11116,7 +11139,7 @@ export default function AdminDashboardPage() {
 
                   return (
                     <MultiPageUploader
-                      key={editingResource?.id ? `edit-res-${editingResource.id}` : "new-res"}
+                      key={editingResource?.id ? `edit-res-${editingResource.id}-${resFileUrl}` : `new-res-${resFileUrl}`}
                       uploadFn={api.admin.uploadMaterialFile}
                       onUploadSuccess={(res, originalFiles) => {
                         setResFileUrl(res.url);
@@ -11770,6 +11793,7 @@ export default function AdminDashboardPage() {
         const closeStaffModal = () => {
           setStaffName("");
           setStaffEmail("");
+          setStaffPhone("");
           setStaffStudentId("");
           setStaffPassword("");
           setShowStaffModal(false);
@@ -11818,7 +11842,10 @@ export default function AdminDashboardPage() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 mb-1 block">University Email *</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block">University Email *</label>
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">@seu.edu.bd or @gmail.com</span>
+                </div>
                 <input
                   name="nl-staff-email"
                   type="email"
@@ -11828,8 +11855,24 @@ export default function AdminDashboardPage() {
                   required
                   value={staffEmail}
                   onChange={(e) => setStaffEmail(e.target.value)}
-                  placeholder={staffRole === "ROLE_STUDENT" ? "2021000000012@seu.edu.bd" : "mahfuz@seu.edu.bd"}
+                  placeholder={staffRole === "ROLE_STUDENT" ? "2021000000012@seu.edu.bd or name@gmail.com" : "mahfuz@seu.edu.bd or name@gmail.com"}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block">Mobile Number (Optional)</label>
+                  <span className="text-[10px] text-slate-400 font-mono">01XXXXXXXXX</span>
+                </div>
+                <input
+                  name="nl-staff-phone"
+                  type="tel"
+                  autoComplete="off"
+                  value={staffPhone}
+                  onChange={(e) => setStaffPhone(e.target.value)}
+                  placeholder="e.g. 01712345678"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 font-mono"
                 />
               </div>
 
@@ -13349,23 +13392,23 @@ export default function AdminDashboardPage() {
           onFileUpdated={(newUrl) => {
             const targetId = viewingResource?.id;
             setViewingResource((prev: any) => (prev ? { ...prev, fileUrl: newUrl, previewUrl: newUrl } : null));
+            setResFileUrl(newUrl);
+            setResFileName(newUrl.split("/").pop() || "Fixed File");
             if (targetId) {
               setEditingResource((prev: any) =>
-                prev?.id === targetId ? { ...prev, fileUrl: newUrl, previewUrl: newUrl } : prev
+                prev && String(prev.id) === String(targetId)
+                  ? { ...prev, fileUrl: newUrl, previewUrl: newUrl }
+                  : prev
               );
-              if (editingResource?.id === targetId) {
-                setResFileUrl(newUrl);
-                setResFileName(newUrl.split("/").pop() || "Fixed File");
-              }
               setEditingContribution((prev: any) =>
-                prev?.uploadedResource?.id === targetId
+                prev?.uploadedResource && String(prev.uploadedResource.id) === String(targetId)
                   ? { ...prev, uploadedResource: { ...prev.uploadedResource, fileUrl: newUrl, previewUrl: newUrl } }
                   : prev
               );
               setResources((prevList: any[]) =>
                 Array.isArray(prevList)
                   ? prevList.map((item) =>
-                      item.id === targetId ? { ...item, fileUrl: newUrl, previewUrl: newUrl } : item
+                      String(item.id) === String(targetId) ? { ...item, fileUrl: newUrl, previewUrl: newUrl } : item
                     )
                   : prevList
               );

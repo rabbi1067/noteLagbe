@@ -18,6 +18,7 @@ import com.notelagbe.entity.*;
 import com.notelagbe.exception.ApiException;
 import com.notelagbe.exception.ResourceNotFoundException;
 import com.notelagbe.repository.*;
+import com.notelagbe.util.UserValidationHelper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -167,10 +168,8 @@ public class AdminService {
             throw new ApiException("Access Denied: Only Super Administrators can provision administrative accounts (Admin, Manager, Super Admin). Standard Admins can only register Student accounts.");
         }
 
-        String email = req.getEmail().trim().toLowerCase();
-        if (userRepository.existsByEmail(email)) {
-            throw new ApiException("An account with this email already exists: " + email);
-        }
+        String email = UserValidationHelper.validateAndNormalizeEmail(req.getEmail());
+        UserValidationHelper.assertUniqueEmail(email, null, userRepository);
 
         User u = new User();
         u.setName(req.getName().trim());
@@ -185,16 +184,8 @@ public class AdminService {
             u.setStudentId(sId);
         }
         if (req.getPhone() != null && !req.getPhone().trim().isEmpty()) {
-            String rawPhone = req.getPhone().trim();
-            String cleanPhone = rawPhone.replaceAll("[^0-9+]", "");
-            String baseDigits = cleanPhone.replaceAll("[^0-9]", "");
-            if (baseDigits.startsWith("880") && baseDigits.length() >= 13) {
-                baseDigits = "0" + baseDigits.substring(3);
-            }
-            List<User> matching = userRepository.findMatchingPhoneUsers(cleanPhone, baseDigits, "+88" + baseDigits);
-            if (!matching.isEmpty()) {
-                throw new ApiException("An account with this phone number already exists: " + rawPhone);
-            }
+            String cleanPhone = UserValidationHelper.validateAndNormalizePhone(req.getPhone());
+            UserValidationHelper.assertUniquePhone(cleanPhone, null, userRepository);
             u.setPhone(cleanPhone);
         }
         u.setAuthProvider(AuthProvider.LOCAL);
@@ -247,16 +238,8 @@ public class AdminService {
             if (rawPhone.isEmpty()) {
                 u.setPhone(null);
             } else {
-                String cleanPhone = rawPhone.replaceAll("[^0-9+]", "");
-                String baseDigits = cleanPhone.replaceAll("[^0-9]", "");
-                if (baseDigits.startsWith("880") && baseDigits.length() >= 13) {
-                    baseDigits = "0" + baseDigits.substring(3);
-                }
-                List<User> phoneMatches = userRepository.findMatchingPhoneUsers(cleanPhone, baseDigits, "+88" + baseDigits);
-                boolean conflict = phoneMatches.stream().anyMatch(existing -> !existing.getId().equals(targetUserId));
-                if (conflict) {
-                    throw new ApiException("This phone number is already registered to another account.");
-                }
+                String cleanPhone = UserValidationHelper.validateAndNormalizePhone(rawPhone);
+                UserValidationHelper.assertUniquePhone(cleanPhone, targetUserId, userRepository);
                 u.setPhone(cleanPhone);
             }
         }
@@ -653,7 +636,14 @@ public class AdminService {
         }
 
         if (phone != null) {
-            u.setPhone(phone.trim().isEmpty() ? null : phone.trim());
+            String trimmedPhone = phone.trim();
+            if (trimmedPhone.isEmpty()) {
+                u.setPhone(null);
+            } else {
+                String cleanPhone = UserValidationHelper.validateAndNormalizePhone(trimmedPhone);
+                UserValidationHelper.assertUniquePhone(cleanPhone, u.getId(), userRepository);
+                u.setPhone(cleanPhone);
+            }
         }
 
         if (address != null) {

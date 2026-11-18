@@ -11,6 +11,10 @@ public class RegisterRequest {
 
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
+    @jakarta.validation.constraints.Pattern(
+            regexp = "^(?i)[a-zA-Z0-9._%+-]+@([a-zA-Z0-9-]+\\.)*(gmail\\.com|seu\\.edu\\.bd)$",
+            message = "Only Southeast University (@seu.edu.bd) or Google (@gmail.com) email addresses are allowed."
+    )
     private String email;
 
     @NotBlank(message = "Password is required")
