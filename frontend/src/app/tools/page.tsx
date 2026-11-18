@@ -3753,10 +3753,10 @@ export default function StudentToolsPage() {
                 style={{
                   position: "relative",
                   width: "100%",
-                  minHeight: "877px",
+                  height: "100%",
                   backgroundColor: "#ffffff",
                   color: "#0E1E38",
-                  padding: "68px 56px 64px 56px",
+                  padding: "48px 40px 42px 40px",
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
@@ -3875,7 +3875,7 @@ export default function StudentToolsPage() {
                 style={{
                   position: "relative",
                   width: "100%",
-                  minHeight: "877px",
+                  height: "100%",
                   backgroundColor: "#ffffff",
                   display: "flex",
                   flexDirection: "row",
@@ -4026,9 +4026,9 @@ export default function StudentToolsPage() {
                 style={{
                   position: "relative",
                   width: "100%",
-                  minHeight: "877px",
+                  height: "100%",
                   backgroundColor: "#FCFBF8",
-                  padding: "46px",
+                  padding: "36px",
                   boxSizing: "border-box",
                   overflow: "hidden",
                   fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif",
@@ -4038,9 +4038,9 @@ export default function StudentToolsPage() {
                   style={{
                     position: "relative",
                     width: "100%",
-                    minHeight: "785px",
+                    height: "100%",
                     border: "1px solid rgba(19,36,66,0.22)",
-                    padding: "42px 38px 38px 38px",
+                    padding: "32px 28px 28px 28px",
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "space-between",
@@ -4143,9 +4143,9 @@ export default function StudentToolsPage() {
                 style={{
                   position: "relative",
                   width: "100%",
-                  minHeight: "877px",
+                  height: "100%",
                   backgroundColor: "#ffffff",
-                  padding: "66px 54px 62px 54px",
+                  padding: "48px 40px 42px 40px",
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "space-between",
@@ -4244,7 +4244,7 @@ export default function StudentToolsPage() {
           // 06. ASYMMETRIC SPINE (Southern University inspired)
           if (activeTpl.layoutStyle === "asymmetric_spine") {
             return (
-              <div className="relative w-full h-full font-sans overflow-hidden bg-white" style={{ minHeight: "840px" }}>
+              <div className="relative w-full h-full font-sans overflow-hidden bg-white">
                 {/* 1. Left Spine: Rich Multi-Layered Low-Poly Geometric Emerald Polygon Shards */}
                 <div className="absolute top-0 bottom-0 left-0 w-[30%] pointer-events-none z-0 overflow-hidden">
                   <svg className="w-full h-full" viewBox="0 0 180 842" preserveAspectRatio="none" fill="none">
@@ -4302,7 +4302,7 @@ export default function StudentToolsPage() {
                 </div>
 
                 {/* 2. Right Content Area: Crisp White Background, Clean Left Alignment, ZERO Overlap */}
-                <div className="pl-[33%] pr-6 py-6 flex-1 flex flex-col justify-between text-left relative z-10" style={{ minHeight: "840px" }}>
+                <div className="pl-[33%] pr-6 py-6 flex-1 flex flex-col justify-between text-left relative z-10 h-full">
                   {/* Header: University & Department (Top-Right) */}
                   <div className="space-y-0.5 text-left border-b border-emerald-100 pb-2">
                     <h2 className="text-xs font-black tracking-wider text-emerald-950 uppercase">
@@ -4372,7 +4372,7 @@ export default function StudentToolsPage() {
           // 03. BOLD EDITORIAL POSTER (Franklin inspired - Image 2 in feedback / Image 4 in summary)
           if (activeTpl.layoutStyle === "bold_editorial") {
             return (
-              <div className="relative w-full h-full font-sans overflow-hidden bg-white" style={{ minHeight: "840px" }}>
+              <div className="relative w-full h-full font-sans overflow-hidden bg-white">
                 {/* 1. Background Geometric Modern Planes (Top-Right and Middle-Right in Warm Mustard / Amber) */}
                 <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
                   <svg className="w-full h-full" viewBox="0 0 600 842" preserveAspectRatio="none" fill="none">
@@ -4462,7 +4462,7 @@ export default function StudentToolsPage() {
           // 04. FLOATING PILL CARDS (BUBT inspired - Image 3 in feedback / Image 5 in summary)
           if (activeTpl.layoutStyle === "floating_pill_cards") {
             return (
-              <div className="relative w-full h-full font-sans overflow-hidden bg-white flex flex-col justify-between" style={{ minHeight: "840px" }}>
+              <div className="relative w-full h-full font-sans overflow-hidden bg-white flex flex-col justify-between">
                 {/* 1. Background Isometric Honeycomb Graphic along Left Spine */}
                 <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
                   <svg className="w-full h-full" viewBox="0 0 600 842" preserveAspectRatio="none" fill="none">
@@ -4553,7 +4553,7 @@ export default function StudentToolsPage() {
                 </div>
 
                 {/* 2. Content Layer: Floating Solid White Rounded Pill Cards Balanced Across Full Height */}
-                <div className="p-6 sm:p-8 flex-1 flex flex-col justify-between text-left relative z-10" style={{ minHeight: "840px" }}>
+                <div className="p-6 sm:p-8 flex-1 flex flex-col justify-between text-left relative z-10 h-full">
                   {/* Top-Right Title Block */}
                   <div className="flex justify-end text-right">
                     <div className="space-y-1">
@@ -4619,7 +4619,7 @@ export default function StudentToolsPage() {
           // 05. HEX SPEC CHECKLIST & BADGE (Peripheral inspired - Image 4)
           if (activeTpl.layoutStyle === "hex_spec_badge") {
             return (
-              <div className="flex-1 flex flex-col justify-between w-full p-4 font-sans text-left" style={{ minHeight: "840px" }}>
+              <div className="flex-1 flex flex-col justify-between w-full h-full p-4 font-sans text-left">
                 {/* Top-Right Title */}
                 <div className="text-right space-y-0.5 pr-2">
                   <h1 className="text-xl sm:text-2xl font-black text-blue-900 tracking-tight">
@@ -4675,7 +4675,7 @@ export default function StudentToolsPage() {
           // 08. SWISS MINIMALIST STRIPE (Template #08)
           if (activeTpl.layoutStyle === "swiss_minimal") {
             return (
-              <div className="flex-1 flex flex-col justify-between w-full pl-8 pr-2 py-4 text-left font-sans" style={{ minHeight: "840px" }}>
+              <div className="flex-1 flex flex-col justify-between w-full h-full pl-8 pr-2 py-4 text-left font-sans">
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <span className="h-2 w-8 bg-blue-600 inline-block"></span>
@@ -4719,7 +4719,7 @@ export default function StudentToolsPage() {
           // 09. CYBER TERMINAL DEVELOPER (Template #09)
           if (activeTpl.layoutStyle === "cyber_terminal") {
             return (
-              <div className="flex-1 flex flex-col justify-between w-full text-left font-mono text-xs p-2" style={{ minHeight: "840px" }}>
+              <div className="flex-1 flex flex-col justify-between w-full h-full text-left font-mono text-xs p-2">
                 <div className="bg-slate-900 text-emerald-400 p-2.5 rounded-t-lg flex items-center justify-between border-b border-slate-700">
                   <span className="font-bold flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
@@ -4757,7 +4757,7 @@ export default function StudentToolsPage() {
           // 15. CAPSTONE MULTI-MEMBER TEAM (Template #15)
           if (activeTpl.layoutStyle === "team_capstone") {
             return (
-              <div className="flex-1 flex flex-col justify-between w-full text-center space-y-3 font-sans" style={{ minHeight: "840px" }}>
+              <div className="flex-1 flex flex-col justify-between w-full h-full text-center space-y-3 font-sans">
                 <div className="space-y-1">
                   <img src="/images/seu-logo.png" alt="SEU" className="w-14 h-14 object-contain mx-auto" />
                   <h1 className="text-base font-black text-blue-900 uppercase">SOUTHEAST UNIVERSITY</h1>
@@ -4816,7 +4816,7 @@ export default function StudentToolsPage() {
           // 12. CASE STUDY ANALYTICAL GRID (Template #12)
           if (activeTpl.layoutStyle === "casestudy_analytical") {
             return (
-              <div className="flex-1 flex flex-col justify-between w-full text-left font-sans text-xs p-4" style={{ minHeight: "840px" }}>
+              <div className="flex-1 flex flex-col justify-between w-full h-full text-left font-sans text-xs p-4">
                 <div className="border-b-2 border-blue-900 pb-2 flex items-center justify-between">
                   <div>
                     <h1 className="text-base font-black text-blue-950 uppercase">SOUTHEAST UNIVERSITY</h1>
@@ -5116,23 +5116,23 @@ export default function StudentToolsPage() {
 
           // 01 & 16. CLASSIC TABLE & MONOCHROME LASER (Default Academic Standard)
           return (
-            <div className="space-y-6 text-center text-slate-900 flex-1 flex flex-col justify-between w-full" style={{ minHeight: "840px" }}>
+            <div className="space-y-4 text-center text-slate-900 flex-1 flex flex-col justify-between w-full h-full">
               {/* Header: Centered Logo + University Name + Dynamic Department */}
-              <div className="space-y-3 relative z-10">
+              <div className="space-y-2 relative z-10">
                 <div className="flex justify-center">
                   <img 
                     src="/images/seu-logo.png" 
                     alt="Southeast University Logo" 
-                    className={`w-24 h-24 sm:w-28 sm:h-28 object-contain ${activeTpl.style === "BW" ? "filter grayscale contrast-125" : ""}`}
+                    className={`w-20 h-20 sm:w-24 sm:h-24 object-contain ${activeTpl.style === "BW" ? "filter grayscale contrast-125" : ""}`}
                   />
                 </div>
                 <div>
-                  <h1 className={`text-xl sm:text-2xl font-black tracking-wider uppercase font-sans ${
+                  <h1 className={`text-lg sm:text-xl font-black tracking-wider uppercase font-sans ${
                     isColor ? "text-blue-900" : "text-black"
                   }`}>
                     SOUTHEAST UNIVERSITY
                   </h1>
-                  <p className={`text-xs sm:text-sm font-bold font-sans mt-0.5 ${
+                  <p className={`text-xs font-bold font-sans mt-0.5 ${
                     isColor ? "text-slate-800" : "text-black"
                   }`}>
                     {coverDepartment || "Southeast University"}
@@ -6849,7 +6849,7 @@ export default function StudentToolsPage() {
                   return (
                 <div
                   id="seu-cover-preview"
-                  className={`w-full max-w-[620px] bg-white text-black shadow-2xl rounded-lg font-serif relative select-none overflow-hidden ${
+                  className={`w-full max-w-[540px] aspect-[210/297] bg-white text-black shadow-2xl rounded-lg font-serif relative select-none overflow-hidden ${
                     isMinimalModernCover
                       ? "p-0 border border-slate-300 shadow-slate-900/10"
                       : `p-2 sm:p-2.5 ${
@@ -6868,12 +6868,12 @@ export default function StudentToolsPage() {
                             : "border border-slate-300 shadow-slate-900/10"
                         }`
                   }`}
-                  style={{ minHeight: isMinimalModernCover ? "877px" : "840px" }}
+                  style={{ aspectRatio: "210 / 297" }}
                 >
                   {/* Outer Frame Container */}
                   <div
-                    className={`w-full flex-1 flex flex-col justify-between relative ${
-                      isCustomPaddedLayout ? "p-0" : "p-6 sm:p-10"
+                    className={`w-full h-full flex flex-col justify-between relative ${
+                      isCustomPaddedLayout ? "p-0" : "p-4 sm:p-6 md:p-8"
                     } ${
                       isCustomPaddedLayout
                         ? ""
@@ -6895,7 +6895,6 @@ export default function StudentToolsPage() {
                         ? "p-6 sm:p-9 pl-12 sm:pl-16"
                         : ""
                     }`}
-                    style={{ minHeight: isMinimalModernCover ? "877px" : "840px" }}
                   >
                     
                     {/* Generic Theme Background Graphics (Strictly for classic_table so they never conflict with handcrafted layouts) */}
