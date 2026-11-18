@@ -18,6 +18,7 @@ import {
   Pin,
   PinOff,
   Heart,
+  ThumbsDown,
   Reply,
   Volume2,
   VolumeX,
@@ -1126,10 +1127,13 @@ export default function FloatingCommunityChat() {
       prev.map((m) => {
         if (m.id === msgId) {
           const isLiked = m.likedByMe;
+          const wasDisliked = !!m.dislikedByMe;
           return {
             ...m,
             likedByMe: !isLiked,
-            likesCount: isLiked ? Math.max(0, m.likesCount - 1) : m.likesCount + 1,
+            likesCount: isLiked ? Math.max(0, (m.likesCount || 0) - 1) : (m.likesCount || 0) + 1,
+            dislikedByMe: isLiked ? m.dislikedByMe : false,
+            dislikesCount: !isLiked && wasDisliked ? Math.max(0, (m.dislikesCount || 0) - 1) : (m.dislikesCount || 0),
           };
         }
         return m;
@@ -1138,6 +1142,35 @@ export default function FloatingCommunityChat() {
 
     try {
       const updated = await api.chat.toggleLike(msgId);
+      setMessages((prev) => prev.map((m) => (m.id === msgId ? updated : m)));
+    } catch {
+      fetchChatData();
+    }
+  };
+
+  // Dislike reaction
+  const handleToggleDislike = async (msgId: number) => {
+    if (!checkAuthGuard()) return;
+
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id === msgId) {
+          const isDisliked = !!m.dislikedByMe;
+          const wasLiked = !!m.likedByMe;
+          return {
+            ...m,
+            dislikedByMe: !isDisliked,
+            dislikesCount: isDisliked ? Math.max(0, (m.dislikesCount || 0) - 1) : (m.dislikesCount || 0) + 1,
+            likedByMe: isDisliked ? m.likedByMe : false,
+            likesCount: !isDisliked && wasLiked ? Math.max(0, (m.likesCount || 0) - 1) : (m.likesCount || 0),
+          };
+        }
+        return m;
+      })
+    );
+
+    try {
+      const updated = await api.chat.toggleDislike(msgId);
       setMessages((prev) => prev.map((m) => (m.id === msgId ? updated : m)));
     } catch {
       fetchChatData();
@@ -2012,7 +2045,7 @@ export default function FloatingCommunityChat() {
                                   ? "text-rose-400 font-bold"
                                   : "text-slate-400 hover:text-rose-400"
                               }`}
-                              title={isBn ? "লাইক" : "Like"}
+                              title={isBn ? "ভালোবাসা (লাভ)" : "Love"}
                             >
                               <Heart
                                 className={`w-3.5 h-3.5 ${
@@ -2020,6 +2053,24 @@ export default function FloatingCommunityChat() {
                                 }`}
                               />
                               <span>{formatNumber(msg.likesCount || 0)}</span>
+                            </button>
+
+                            {/* Dislike */}
+                            <button
+                              onClick={() => handleToggleDislike(msg.id)}
+                              className={`flex items-center gap-1 transition-transform active:scale-125 ${
+                                msg.dislikedByMe
+                                  ? "text-amber-400 font-bold"
+                                  : "text-slate-400 hover:text-amber-400"
+                              }`}
+                              title={isBn ? "অপছন্দ (ডিসলাইক)" : "Dislike"}
+                            >
+                              <ThumbsDown
+                                className={`w-3.5 h-3.5 ${
+                                  msg.dislikedByMe ? "fill-amber-400 text-amber-400" : ""
+                                }`}
+                              />
+                              <span>{formatNumber(msg.dislikesCount || 0)}</span>
                             </button>
 
                             {/* Admin Actions */}

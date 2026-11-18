@@ -317,20 +317,49 @@ public class ChatService {
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found with ID: " + messageId));
 
         if (msg.isDeleted()) {
-            throw new ApiException("Cannot like a deleted message.");
+            throw new ApiException("Cannot react to a deleted message.");
         }
 
         Set<Long> liked = msg.getLikedUserIds();
+        Set<Long> disliked = msg.getDislikedUserIds();
         if (liked.contains(user.getId())) {
             liked.remove(user.getId());
         } else {
             liked.add(user.getId());
+            disliked.remove(user.getId());
         }
         msg.setLikesCount(liked.size());
+        msg.setDislikesCount(disliked.size());
         ChatMessage saved = chatMessageRepository.save(msg);
 
         invalidateCache();
-        liveSyncService.broadcast("chat", "message_liked", messageId);
+        liveSyncService.broadcast("chat", "message_reaction", messageId);
+        return ChatMessageDto.fromEntity(saved, user.getId());
+    }
+
+    @Transactional
+    public ChatMessageDto toggleDislike(Long messageId, User user) {
+        ChatMessage msg = chatMessageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found with ID: " + messageId));
+
+        if (msg.isDeleted()) {
+            throw new ApiException("Cannot react to a deleted message.");
+        }
+
+        Set<Long> liked = msg.getLikedUserIds();
+        Set<Long> disliked = msg.getDislikedUserIds();
+        if (disliked.contains(user.getId())) {
+            disliked.remove(user.getId());
+        } else {
+            disliked.add(user.getId());
+            liked.remove(user.getId());
+        }
+        msg.setLikesCount(liked.size());
+        msg.setDislikesCount(disliked.size());
+        ChatMessage saved = chatMessageRepository.save(msg);
+
+        invalidateCache();
+        liveSyncService.broadcast("chat", "message_reaction", messageId);
         return ChatMessageDto.fromEntity(saved, user.getId());
     }
 

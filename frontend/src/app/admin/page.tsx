@@ -10257,9 +10257,14 @@ export default function AdminDashboardPage() {
 
                               {/* Reactions */}
                               <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
-                                <span className="inline-flex items-center gap-1 font-semibold text-rose-500">
-                                  ❤️ {msg.likesCount || 0}
-                                </span>
+                                <div className="flex items-center gap-2.5 font-semibold text-xs">
+                                  <span className="inline-flex items-center gap-1 text-rose-500" title="Love Reactions">
+                                    ❤️ {msg.likesCount || 0}
+                                  </span>
+                                  <span className="inline-flex items-center gap-1 text-slate-400 dark:text-slate-500" title="Dislike Reactions">
+                                    👎 {msg.dislikesCount || 0}
+                                  </span>
+                                </div>
                               </td>
 
                               {/* Status */}

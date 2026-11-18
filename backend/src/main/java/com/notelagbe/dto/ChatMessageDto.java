@@ -20,6 +20,8 @@ public class ChatMessageDto {
     private String replyToText;
     private int likesCount;
     private boolean likedByMe;
+    private int dislikesCount;
+    private boolean dislikedByMe;
     private boolean pinned;
     private LocalDateTime pinnedAt;
     private LocalDateTime pinExpiresAt;
@@ -43,8 +45,12 @@ public class ChatMessageDto {
         dto.setReplyToId(msg.getReplyToId());
         dto.setReplyToSender(msg.getReplyToSender());
         dto.setReplyToText(msg.getReplyToText());
-        dto.setLikesCount(msg.getLikesCount());
+        int realLikes = msg.getLikedUserIds() != null ? msg.getLikedUserIds().size() : 0;
+        int realDislikes = msg.getDislikedUserIds() != null ? msg.getDislikedUserIds().size() : 0;
+        dto.setLikesCount(realLikes);
         dto.setLikedByMe(currentUserId != null && msg.getLikedUserIds() != null && msg.getLikedUserIds().contains(currentUserId));
+        dto.setDislikesCount(realDislikes);
+        dto.setDislikedByMe(currentUserId != null && msg.getDislikedUserIds() != null && msg.getDislikedUserIds().contains(currentUserId));
         dto.setPinned(msg.isPinned());
         dto.setPinnedAt(msg.getPinnedAt());
         dto.setPinExpiresAt(msg.getPinExpiresAt());
@@ -99,6 +105,12 @@ public class ChatMessageDto {
 
     public boolean isLikedByMe() { return likedByMe; }
     public void setLikedByMe(boolean likedByMe) { this.likedByMe = likedByMe; }
+
+    public int getDislikesCount() { return dislikesCount; }
+    public void setDislikesCount(int dislikesCount) { this.dislikesCount = dislikesCount; }
+
+    public boolean isDislikedByMe() { return dislikedByMe; }
+    public void setDislikedByMe(boolean dislikedByMe) { this.dislikedByMe = dislikedByMe; }
 
     public boolean isPinned() { return pinned; }
     public void setPinned(boolean pinned) { this.pinned = pinned; }

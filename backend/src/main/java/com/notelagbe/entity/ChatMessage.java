@@ -61,6 +61,13 @@ public class ChatMessage {
     @Column(name = "user_id")
     private Set<Long> likedUserIds = new HashSet<>();
 
+    private int dislikesCount = 0;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "chat_message_dislikes", joinColumns = @JoinColumn(name = "message_id"))
+    @Column(name = "user_id")
+    private Set<Long> dislikedUserIds = new HashSet<>();
+
     private boolean pinned = false;
 
     private LocalDateTime pinnedAt;
@@ -115,11 +122,21 @@ public class ChatMessage {
     public String getReplyToText() { return replyToText; }
     public void setReplyToText(String replyToText) { this.replyToText = replyToText; }
 
-    public int getLikesCount() { return likesCount; }
+    public int getLikesCount() {
+        return likedUserIds != null ? likedUserIds.size() : likesCount;
+    }
     public void setLikesCount(int likesCount) { this.likesCount = likesCount; }
 
     public Set<Long> getLikedUserIds() { return likedUserIds; }
     public void setLikedUserIds(Set<Long> likedUserIds) { this.likedUserIds = likedUserIds; }
+
+    public int getDislikesCount() {
+        return dislikedUserIds != null ? dislikedUserIds.size() : dislikesCount;
+    }
+    public void setDislikesCount(int dislikesCount) { this.dislikesCount = dislikesCount; }
+
+    public Set<Long> getDislikedUserIds() { return dislikedUserIds; }
+    public void setDislikedUserIds(Set<Long> dislikedUserIds) { this.dislikedUserIds = dislikedUserIds; }
 
     public boolean isPinned() { return pinned; }
     public void setPinned(boolean pinned) { this.pinned = pinned; }

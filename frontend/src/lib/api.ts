@@ -15,6 +15,8 @@ export interface ChatMessageDto {
   replyToText?: string | null;
   likesCount: number;
   likedByMe: boolean;
+  dislikesCount?: number;
+  dislikedByMe?: boolean;
   pinned: boolean;
   pinnedAt?: string | null;
   pinExpiresAt?: string | null;
@@ -1178,6 +1180,10 @@ export const api = {
       }),
     toggleLike: (id: number) =>
       request<ChatMessageDto>(`/chat/messages/${id}/like`, {
+        method: "POST",
+      }),
+    toggleDislike: (id: number) =>
+      request<ChatMessageDto>(`/chat/messages/${id}/dislike`, {
         method: "POST",
       }),
   },

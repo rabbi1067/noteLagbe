@@ -107,4 +107,14 @@ public class ChatController {
         }
         return ResponseEntity.ok(chatService.toggleLike(id, userDetails.getUser()));
     }
+
+    @PostMapping("/messages/{id}/dislike")
+    public ResponseEntity<ChatMessageDto> toggleDislike(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(chatService.toggleDislike(id, userDetails.getUser()));
+    }
 }

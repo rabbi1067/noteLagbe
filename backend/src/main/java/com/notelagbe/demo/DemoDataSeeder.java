@@ -830,7 +830,6 @@ public class DemoDataSeeder implements CommandLineRunner {
             pinned.setPinned(true);
             pinned.setPinnedAt(LocalDateTime.now().minusHours(2));
             pinned.setPinExpiresAt(LocalDateTime.now().plusHours(22)); // Expires in 22 hrs (total 24h)
-            pinned.setLikesCount(12);
             pinned.setCreatedAt(LocalDateTime.now().minusHours(2));
             chatMessageRepository.save(pinned);
         }
@@ -843,7 +842,6 @@ public class DemoDataSeeder implements CommandLineRunner {
         m1.setSenderRole(Role.ROLE_STUDENT);
         m1.setMessageType("TEXT");
         m1.setText("acha seu theke ki UIU te credit transfer nibe? minimum CGPA koto lage?");
-        m1.setLikesCount(2);
         m1.setCreatedAt(LocalDateTime.now().minusMinutes(25));
         chatMessageRepository.save(m1);
 
@@ -857,7 +855,6 @@ public class DemoDataSeeder implements CommandLineRunner {
         m2.setReplyToId(m1.getId());
         m2.setReplyToSender("Nihal (SEU)");
         m2.setReplyToText("acha seu theke ki UIU te credit transfer nibe? minimum CGPA koto lage?");
-        m2.setLikesCount(5);
         m2.setCreatedAt(LocalDateTime.now().minusMinutes(20));
         chatMessageRepository.save(m2);
 
@@ -868,7 +865,6 @@ public class DemoDataSeeder implements CommandLineRunner {
         m3.setSenderRole(Role.ROLE_STUDENT);
         m3.setMessageType("TEXT");
         m3.setText("CSE241 er sir er handwritten lecture notes kar kache ache? Midterm lagbe urgent!");
-        m3.setLikesCount(1);
         m3.setCreatedAt(LocalDateTime.now().minusMinutes(12));
         chatMessageRepository.save(m3);
 
@@ -883,7 +879,6 @@ public class DemoDataSeeder implements CommandLineRunner {
             m4.setReplyToId(m3.getId());
             m4.setReplyToSender("Shanto (Batch 64)");
             m4.setReplyToText("CSE241 er sir er handwritten lecture notes kar kache ache? Midterm lagbe urgent!");
-            m4.setLikesCount(7);
             m4.setCreatedAt(LocalDateTime.now().minusMinutes(5));
             chatMessageRepository.save(m4);
         }
