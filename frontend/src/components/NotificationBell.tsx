@@ -392,10 +392,13 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
             }}
             aria-hidden="true"
           />
-          <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-96 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-x-3 top-[66px] sm:top-[70px] max-w-sm sm:max-w-md mx-auto md:absolute md:inset-x-auto md:right-0 md:top-full md:mt-2 md:w-96 md:max-w-none rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[calc(100dvh-5.5rem)] md:max-h-[85vh] flex flex-col"
+          >
           
           {/* Header */}
-          <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/60 backdrop-blur-sm">
+          <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/60 backdrop-blur-sm shrink-0">
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-xs text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
                 <Bell className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
@@ -422,7 +425,7 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
 
           {/* SECTION: CAMPUS LIVE ANNOUNCEMENTS (Visible to Everyone) */}
           {activeCampusNotices.length > 0 && (
-            <div className="border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-[#0b1220]/60">
+            <div className="border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-[#0b1220]/60 shrink-0">
               <div className="px-4 py-2 flex items-center justify-between border-b border-slate-100 dark:border-slate-800/40">
                 <span className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                   <Megaphone className="w-3 h-3 text-amber-500 animate-pulse" />
@@ -433,7 +436,7 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
                   LIVE
                 </span>
               </div>
-              <div className="divide-y divide-slate-100 dark:divide-slate-800/40 max-h-[180px] overflow-y-auto">
+              <div className="divide-y divide-slate-100 dark:divide-slate-800/40 max-h-[160px] overflow-y-auto overscroll-contain">
                 {activeCampusNotices.map((n) => {
                   const isRead = readCampusNoticeIds.includes(n.id);
                   const isAlert = n.type === "ALERT";
@@ -540,7 +543,7 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
             <>
               {/* Filter Tabs & Quick Actions */}
               {notifications.length > 0 && (
-                <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/40 flex items-center justify-between text-xs">
+                <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/40 dark:bg-slate-900/40 flex items-center justify-between text-xs shrink-0">
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setFilterTab("all")}
@@ -578,7 +581,7 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
               )}
 
               {/* Notification List Feed */}
-              <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60">
+              <div className="flex-1 min-h-0 max-h-[360px] md:max-h-[440px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60 overscroll-contain">
                 {loading && notifications.length === 0 ? (
                   <div className="py-12 text-center text-slate-400">
                     <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent mx-auto mb-2" />
@@ -695,7 +698,7 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
               </div>
 
               {/* Drawer Footer */}
-              <div className="p-2.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-center flex items-center justify-between px-4">
+              <div className="p-2.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-center flex items-center justify-between px-4 shrink-0">
                 <Link
                   href="/tools"
                   onClick={() => setIsOpen(false)}
