@@ -18,6 +18,8 @@ import {
   FileDown,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronsLeft,
   GripVertical,
   Grid3X3,
   RefreshCw,
@@ -176,6 +178,14 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
       urls.forEach((url) => URL.revokeObjectURL(url));
       urls.clear();
     };
+  }, []);
+
+  // Detect touch device to safely disable native HTML5 draggable which intercepts mobile taps
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  useEffect(() => {
+    if (typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0)) {
+      setIsTouchDevice(true);
+    }
   }, []);
 
   const selectedIndex = pages.findIndex((p) => p.id === selectedId);
@@ -398,12 +408,16 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
     if (from === to || from < 0 || to < 0 || from >= pages.length || to >= pages.length) {
       return;
     }
+    const targetPageId = pages[from]?.id;
     setPages((prev) => {
       const updated = [...prev];
       const [moved] = updated.splice(from, 1);
       updated.splice(to, 0, moved);
       return updated;
     });
+    if (targetPageId) {
+      setSelectedId(targetPageId);
+    }
   };
 
   // Rotate 90deg left/right
@@ -826,8 +840,8 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {bn
-                  ? "ড্র্যাগ করে, তীর বাটন চেপে, অথবা সিরিয়াল নম্বর বদলে পেজ আগে-পরে করুন"
-                  : "Drag cards, use arrows, or pick a serial # to reorder"}
+                  ? "সিরিয়াল (#) নির্বাচন করে, তীর বাটন চেপে, অথবা ১ নম্বরে নিতে '১ম পেজ' বাটনে ট্যাপ করুন"
+                  : "Tap '#', use arrows, or click 'Make #1' to reorder pages"}
               </p>
             </div>
 
@@ -838,7 +852,7 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                 return (
                   <div
                     key={page.id}
-                    draggable
+                    draggable={!isTouchDevice}
                     onDragStart={() => setDraggedIdx(index)}
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -860,7 +874,7 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                       setSelectedId(page.id);
                       setIsCropping(false);
                     }}
-                    className={`group rounded-2xl p-2 border transition-all cursor-pointer flex flex-col gap-2 select-none ${
+                    className={`group rounded-2xl p-2 border transition-all cursor-pointer flex flex-col gap-2 touch-manipulation select-none ${
                       isDragTarget
                         ? "border-emerald-500 ring-2 ring-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-950/30"
                         : isSelected
@@ -868,38 +882,77 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                         : "border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/50 hover:border-blue-300 dark:hover:border-blue-700"
                     }`}
                   >
-                    {/* Top row: Drag grip + Serial dropdown + Delete */}
+                    {/* Top row: Drag grip + Serial dropdown + Make #1 Quick Action + Delete */}
                     <div
                       className="flex items-center justify-between gap-1"
                       onClick={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
                     >
-                      <div className="flex items-center gap-1">
-                        <GripVertical className="w-3.5 h-3.5 text-slate-400 cursor-grab shrink-0" />
-                        <select
-                          aria-label={`Serial position for page ${index + 1}`}
-                          value={index + 1}
-                          onChange={(e) =>
-                            movePageToIndex(index, Number(e.target.value) - 1)
-                          }
-                          className="text-[11px] font-mono font-black px-1.5 py-0.5 rounded-lg bg-blue-600 text-white cursor-pointer outline-none"
-                        >
-                          {pages.map((_, optIdx) => (
-                            <option
-                              key={optIdx}
-                              value={optIdx + 1}
-                              className="bg-slate-900 text-white"
-                            >
-                              #{optIdx + 1}
-                            </option>
-                          ))}
-                        </select>
+                      <div className="flex items-center gap-1 min-w-0">
+                        <GripVertical className="hidden sm:inline-block w-3.5 h-3.5 text-slate-400 cursor-grab shrink-0" />
+                        
+                        {/* Interactive Serial Select Badge */}
+                        <div className="relative inline-flex items-center shrink-0">
+                          <select
+                            aria-label={`Serial position for page ${index + 1}`}
+                            value={index + 1}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              const targetIndex = Number(e.target.value) - 1;
+                              movePageToIndex(index, targetIndex);
+                              toast.success(
+                                bn
+                                  ? `পেজ সিরিয়াল #${targetIndex + 1}-এ সেট করা হয়েছে`
+                                  : `Page set to #${targetIndex + 1}`
+                              );
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            className="appearance-none text-[11px] font-mono font-black pl-2 pr-5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white cursor-pointer outline-none shadow-xs active:scale-95 transition-all touch-manipulation"
+                          >
+                            {pages.map((_, optIdx) => (
+                              <option
+                                key={optIdx}
+                                value={optIdx + 1}
+                                className="bg-slate-900 text-white py-1"
+                              >
+                                #{optIdx + 1} {optIdx === 0 ? (bn ? "(১ম পেজ)" : "(1st)") : ""}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="w-3 h-3 text-white/90 absolute right-1.5 pointer-events-none" />
+                        </div>
+
+                        {/* Quick One-Tap 'Make #1' Pill for any card not already at index 0 */}
+                        {index > 0 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              movePageToIndex(index, 0);
+                              toast.success(
+                                bn ? "ছবিটিকে ১ নাম্বার পেজে আনা হয়েছে!" : "Moved to Page #1!"
+                              );
+                            }}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            className="px-1.5 py-0.5 rounded-md text-[9px] font-extrabold text-blue-700 dark:text-blue-300 bg-blue-100/90 dark:bg-blue-950/80 hover:bg-blue-200 border border-blue-300 dark:border-blue-800 transition-all flex items-center gap-0.5 active:scale-90 shadow-xs cursor-pointer shrink-0"
+                            title={bn ? "এই পেজটিকে সরাসরি ১ নাম্বার করুন" : "Set as Page #1"}
+                          >
+                            <ChevronsLeft className="w-2.5 h-2.5 shrink-0" />
+                            <span>{bn ? "১ম করুন" : "Make #1"}</span>
+                          </button>
+                        )}
                       </div>
 
                       <button
                         type="button"
-                        onClick={() => handleRemovePage(page.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemovePage(page.id);
+                        }}
+                        onTouchStart={(e) => e.stopPropagation()}
                         title={bn ? "পেজ মুছুন" : "Remove page"}
-                        className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60 transition-colors cursor-pointer"
+                        className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60 transition-colors cursor-pointer shrink-0"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -914,27 +967,36 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                     <div
                       className="flex items-center justify-between gap-1"
                       onClick={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
                     >
                       <button
                         type="button"
                         disabled={index === 0}
-                        onClick={() => movePageToIndex(index, index - 1)}
-                        title={bn ? "আগে নিন" : "Move earlier"}
-                        className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 hover:border-blue-400 cursor-pointer disabled:cursor-not-allowed"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          movePageToIndex(index, index - 1);
+                        }}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        title={bn ? "১ ধাপ আগে নিন" : "Move earlier"}
+                        className="p-1.5 sm:p-1 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 hover:border-blue-400 cursor-pointer disabled:cursor-not-allowed active:scale-90 transition-all touch-manipulation"
                       >
                         <ChevronLeft className="w-3.5 h-3.5" />
                       </button>
 
-                      <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 truncate max-w-[70px]">
+                      <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 truncate max-w-[65px] text-center">
                         {page.name}
                       </span>
 
                       <button
                         type="button"
                         disabled={index === pages.length - 1}
-                        onClick={() => movePageToIndex(index, index + 1)}
-                        title={bn ? "পরে নিন" : "Move later"}
-                        className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 hover:border-blue-400 cursor-pointer disabled:cursor-not-allowed"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          movePageToIndex(index, index + 1);
+                        }}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        title={bn ? "১ ধাপ পরে নিন" : "Move later"}
+                        className="p-1.5 sm:p-1 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-30 hover:border-blue-400 cursor-pointer disabled:cursor-not-allowed active:scale-90 transition-all touch-manipulation"
                       >
                         <ChevronRight className="w-3.5 h-3.5" />
                       </button>
@@ -963,13 +1025,58 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
               {/* Left 7 Cols: WYSIWYG Preview & Interactive Crop Canvas */}
               <div className="lg:col-span-7 p-4 sm:p-6 rounded-3xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-black px-2.5 py-1 rounded-lg bg-blue-600 text-white">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-mono font-black px-2.5 py-1 rounded-lg bg-blue-600 text-white shrink-0">
                       {bn
                         ? `পেজ ${resolvedSelectedIndex + 1}/${pages.length}`
                         : `Page ${resolvedSelectedIndex + 1} of ${pages.length}`}
                     </span>
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 truncate max-w-[200px] sm:max-w-xs">
+
+                    {/* Quick Move to #1 button when this active page is not page 1 */}
+                    {resolvedSelectedIndex > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          movePageToIndex(resolvedSelectedIndex, 0);
+                          toast.success(
+                            bn
+                              ? "নির্বাচিত পেজটি এখন ১ নাম্বার পেজ!"
+                              : "Selected page is now Page #1!"
+                          );
+                        }}
+                        className="px-2.5 py-1 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/70 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-all flex items-center gap-1 active:scale-95 shadow-xs cursor-pointer shrink-0"
+                        title={bn ? "এই নির্বাচিত পেজটিকে সরাসরি ১ নাম্বার করুন" : "Set this selected page as Page #1"}
+                      >
+                        <ChevronsLeft className="w-3.5 h-3.5" />
+                        <span>{bn ? "১ম পেজ করুন" : "Make #1"}</span>
+                      </button>
+                    )}
+
+                    {/* Step Reorder Buttons right in the active editor */}
+                    {pages.length > 1 && (
+                      <div className="flex items-center gap-0.5 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 shrink-0">
+                        <button
+                          type="button"
+                          disabled={resolvedSelectedIndex === 0}
+                          onClick={() => movePageToIndex(resolvedSelectedIndex, resolvedSelectedIndex - 1)}
+                          className="p-1 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer active:scale-90"
+                          title={bn ? "১ ধাপ আগে নিন" : "Move 1 position earlier"}
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={resolvedSelectedIndex === pages.length - 1}
+                          onClick={() => movePageToIndex(resolvedSelectedIndex, resolvedSelectedIndex + 1)}
+                          className="p-1 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer active:scale-90"
+                          title={bn ? "১ ধাপ পরে নিন" : "Move 1 position later"}
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 truncate max-w-[140px] sm:max-w-xs">
                       {activePage.name}
                     </span>
                   </div>
