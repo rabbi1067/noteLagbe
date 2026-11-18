@@ -58,6 +58,8 @@ export default function PricingPage() {
   // STRICT USER SPECIFICATION NUMBER: 01779326236
   const paymentNumber = "01779326236";
 
+  const isStaff = user?.role === "ROLE_ADMIN" || user?.role === "ROLE_SUPER_ADMIN" || user?.role === "ROLE_MANAGER";
+
   const planConfig = {
     SEMESTER_1: {
       name: language === "bn" ? "১-সেমিস্টার প্ল্যান (৩ মাস)" : "1-Semester Plan (3 Months)",
@@ -100,6 +102,14 @@ export default function PricingPage() {
   const handleOpenCheckout = (planKey: "SEMESTER_1" | "SEMESTER_2" | "YEAR_1_UNLIMITED") => {
     if (!isAuthenticated) {
       setShowAuthModal(true);
+      return;
+    }
+    if (isStaff) {
+      toast.info(
+        language === "bn"
+          ? "অ্যাডমিন হিসেবে আপনার অ্যাকাউন্টে ইতোমধ্যে সকল ৮৫+ কোর্সের স্থায়ী আনলিমিটেড অ্যাক্সেস সক্রিয় রয়েছে।"
+          : "Your administrative staff account already has permanent unrestricted access to all 85+ courses."
+      );
       return;
     }
     setSelectedPlan(planKey);
@@ -451,9 +461,13 @@ export default function PricingPage() {
           <div className="pt-8 space-y-2">
             <button
               onClick={() => handleOpenCheckout("SEMESTER_1")}
-              className="w-full py-3.5 px-4 rounded-2xl font-bold text-xs text-slate-900 dark:text-white bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
+              className={`w-full py-3.5 px-4 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm ${
+                isStaff
+                  ? "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                  : "text-slate-900 dark:text-white bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95"
+              }`}
             >
-              <span>{language === "bn" ? "১-সেমিস্টার প্ল্যান নিন (৳৯৯ / ৩ মাস)" : "Get 1-Semester Plan (৳99 / 3 Mos)"}</span>
+              <span>{isStaff ? (language === "bn" ? "অ্যাডমিন অ্যাক্সেস সক্রিয় ✓" : "Staff Access Active ✓") : (language === "bn" ? "১-সেমিস্টার প্ল্যান নিন (৳৯৯ / ৩ মাস)" : "Get 1-Semester Plan (৳99 / 3 Mos)")}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
             <div className="text-center pt-1">
@@ -547,10 +561,14 @@ export default function PricingPage() {
           <div className="pt-8">
             <button
               onClick={() => handleOpenCheckout("SEMESTER_2")}
-              className="w-full py-4 px-4 rounded-2xl font-black text-xs text-white bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
+              className={`w-full py-4 px-4 rounded-2xl font-black text-xs text-white transition-all flex items-center justify-center gap-2 shadow-lg ${
+                isStaff
+                  ? "bg-slate-700 hover:bg-slate-600 text-slate-200"
+                  : "bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-blue-500/25"
+              }`}
             >
               <Sparkles className="w-4 h-4" />
-              <span>{language === "bn" ? "২-সেমিস্টার প্ল্যান নিন (৳১৪৯ / ৬ মাস)" : "Get 2-Semesters Plan (৳149 / 6 Mos)"}</span>
+              <span>{isStaff ? (language === "bn" ? "অ্যাডমিন অ্যাক্সেস সক্রিয় ✓" : "Staff Access Active ✓") : (language === "bn" ? "২-সেমিস্টার প্ল্যান নিন (৳১৪৯ / ৬ মাস)" : "Get 2-Semesters Plan (৳149 / 6 Mos)")}</span>
             </button>
           </div>
         </div>
@@ -629,10 +647,14 @@ export default function PricingPage() {
           <div className="pt-8">
             <button
               onClick={() => handleOpenCheckout("YEAR_1_UNLIMITED")}
-              className="w-full py-3.5 px-4 rounded-2xl font-black text-xs text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-md shadow-purple-500/25"
+              className={`w-full py-3.5 px-4 rounded-2xl font-black text-xs text-white transition-all flex items-center justify-center gap-2 shadow-md ${
+                isStaff
+                  ? "bg-slate-700 hover:bg-slate-600 text-slate-200"
+                  : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95 shadow-purple-500/25"
+              }`}
             >
               <Sparkles className="w-4 h-4" />
-              <span>{language === "bn" ? "১-বছরের পাস নিন (৳৪৯৯ / ১ বছর)" : "Get 1-Year Pass (৳499 / 1 Year)"}</span>
+              <span>{isStaff ? (language === "bn" ? "অ্যাডমিন অ্যাক্সেস সক্রিয় ✓" : "Staff Access Active ✓") : (language === "bn" ? "১-বছরের পাস নিন (৳৪৯৯ / ১ বছর)" : "Get 1-Year Pass (৳499 / 1 Year)")}</span>
             </button>
           </div>
         </div>

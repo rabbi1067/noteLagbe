@@ -574,6 +574,42 @@ public class EmailService {
                 : "https://note-lagbe-sandy.vercel.app";
     }
 
+    private String buildEmailSocialFooterHtml(boolean darkTheme) {
+        String borderColor = darkTheme ? "rgba(255, 255, 255, 0.12)" : "#e2e8f0";
+        String labelColor = darkTheme ? "#94a3b8" : "#64748b";
+        String subColor = darkTheme ? "#64748b" : "#94a3b8";
+
+        return """
+            <div style="margin-top: 28px; padding-top: 20px; border-top: 1px solid %s; text-align: center;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: %s; margin-bottom: 12px;">
+                    Connect with Developer &amp; Founder
+                </div>
+                <div style="margin-bottom: 14px; text-align: center;">
+                    <a href="https://www.facebook.com/fazleyrabbi1067/" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin: 3px 4px; padding: 6px 14px; background: #1877F2; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-size: 11px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                        Facebook
+                    </a>
+                    <a href="https://x.com/FazleRabbi56251" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin: 3px 4px; padding: 6px 14px; background: #0f1419; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-size: 11px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; border: 1px solid rgba(255,255,255,0.2);">
+                        X (Twitter)
+                    </a>
+                    <a href="https://github.com/rabbi1067" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin: 3px 4px; padding: 6px 14px; background: #24292e; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-size: 11px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; border: 1px solid rgba(255,255,255,0.2);">
+                        GitHub
+                    </a>
+                    <a href="https://www.linkedin.com/in/fazleyrabbi1067/" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin: 3px 4px; padding: 6px 14px; background: #0A66C2; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-size: 11px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                        LinkedIn
+                    </a>
+                </div>
+                <div style="font-size: 12px; color: %s; line-height: 1.5;">
+                    NoteLagbe — Southeast University Academic Resource Archive<br>
+                    Permanent Campus: 251/A and 252, Tejgaon I/A, Dhaka-1208, Bangladesh
+                </div>
+            </div>
+            """.formatted(borderColor, labelColor, subColor);
+    }
+
+    private String buildEmailSocialFooterHtml() {
+        return buildEmailSocialFooterHtml(false);
+    }
+
     @Async
     public void sendPaymentApprovalEmail(User user, PlanType planType, double amount, String trxId, int quota, boolean unlimited) {
         if (!isEmailNotificationsEnabled()) {
@@ -630,10 +666,7 @@ public class EmailService {
                     <div style="text-align: center;">
                         <a href="%s" class="btn">Go to NoteLagbe Dashboard →</a>
                     </div>
-                    <div class="footer">
-                        NoteLagbe — Southeast University CSE Notes & Question Bank Archive<br>
-                        Permanent Campus: 251/A and 252, Tejgaon I/A, Dhaka-1208
-                    </div>
+                    %s
                 </div>
             </body>
             </html>
@@ -643,7 +676,8 @@ public class EmailService {
                 amount,
                 HtmlUtils.htmlEscape(trxId),
                 HtmlUtils.htmlEscape(quotaText),
-                HtmlUtils.htmlEscape(dashboardUrl)
+                HtmlUtils.htmlEscape(dashboardUrl),
+                buildEmailSocialFooterHtml()
         );
 
         try {
@@ -707,14 +741,11 @@ public class EmailService {
                     <div style="text-align: center;">
                         <a href="%s" class="btn">Browse & Unlock Courses →</a>
                     </div>
-                    <div class="footer">
-                        NoteLagbe — Southeast University CSE Notes & Question Bank Archive<br>
-                        Permanent Campus: 251/A and 252, Tejgaon I/A, Dhaka-1208
-                    </div>
+                    %s
                 </div>
             </body>
             </html>
-            """.formatted(HtmlUtils.htmlEscape(user.getName()), quota, quota, HtmlUtils.htmlEscape(coursesUrl));
+            """.formatted(HtmlUtils.htmlEscape(user.getName()), quota, quota, HtmlUtils.htmlEscape(coursesUrl), buildEmailSocialFooterHtml());
 
         try {
             dispatchHtmlEmail(user.getEmail(), "🎉 NoteLagbe: Your Financial Aid / Free Waiver Has Been Approved!", html);
@@ -797,14 +828,11 @@ public class EmailService {
                     <div style="text-align: center;">
                         <a href="%s" class="btn">Open %s Materials →</a>
                     </div>
-                    <div class="footer">
-                        NoteLagbe — Southeast University CSE Notes & Question Bank Archive<br>
-                        Permanent Campus: 251/A and 252, Tejgaon I/A, Dhaka-1208
-                    </div>
+                    %s
                 </div>
             </body>
             </html>
-            """.formatted(safeName, safeCode, safeTitle, safeFaculty, HtmlUtils.htmlEscape(validityStr), noteBlock, safeFaculty, safeCode, targetUrl, safeCode);
+            """.formatted(safeName, safeCode, safeTitle, safeFaculty, HtmlUtils.htmlEscape(validityStr), noteBlock, safeFaculty, safeCode, targetUrl, safeCode, buildEmailSocialFooterHtml());
 
         try {
             dispatchHtmlEmail(user.getEmail(), "🎁 NoteLagbe: Gift Access Unlocked for " + courseCode + " (" + teacherLabel + ")", html);
@@ -874,10 +902,7 @@ public class EmailService {
                     <div style="text-align: center;">
                         <a href="%s" class="btn">Explore Courses &amp; Notes →</a>
                     </div>
-                    <div class="footer">
-                        NoteLagbe — Southeast University Academic Resource Archive<br>
-                        Permanent Campus: 251/A and 252, Tejgaon I/A, Dhaka-1208
-                    </div>
+                    %s
                 </div>
             </body>
             </html>
@@ -886,7 +911,8 @@ public class EmailService {
                 HtmlUtils.htmlEscape(user.getName()),
                 HtmlUtils.htmlEscape(user.getEmail()),
                 HtmlUtils.htmlEscape(sId),
-                HtmlUtils.htmlEscape(coursesUrl)
+                HtmlUtils.htmlEscape(coursesUrl),
+                buildEmailSocialFooterHtml()
         );
 
         try {
@@ -955,10 +981,7 @@ public class EmailService {
                     <div style="text-align: center;">
                         <a href="%s" class="btn">View Unlocked Courses on Dashboard →</a>
                     </div>
-                    <div class="footer">
-                        NoteLagbe — Southeast University Academic Resource Archive<br>
-                        Permanent Campus: 251/A and 252, Tejgaon I/A, Dhaka-1208
-                    </div>
+                    %s
                 </div>
             </body>
             </html>
@@ -971,7 +994,8 @@ public class EmailService {
                 HtmlUtils.htmlEscape(cleanFeedback),
                 HtmlUtils.htmlEscape(course1Code),
                 HtmlUtils.htmlEscape(course2Code),
-                HtmlUtils.htmlEscape(dashboardUrl)
+                HtmlUtils.htmlEscape(dashboardUrl),
+                buildEmailSocialFooterHtml()
         );
 
         try {
@@ -1041,10 +1065,7 @@ public class EmailService {
                     <div style="text-align: center;">
                         <a href="%s" class="btn">Check Verification Status on NoteLagbe →</a>
                     </div>
-                    <div class="footer">
-                        NoteLagbe — Southeast University Academic Resource Archive<br>
-                        Permanent Campus: 251/A and 252, Tejgaon I/A, Dhaka-1208
-                    </div>
+                    %s
                 </div>
             </body>
             </html>
@@ -1055,7 +1076,8 @@ public class EmailService {
                 HtmlUtils.htmlEscape(methodLabel),
                 HtmlUtils.htmlEscape(senderPhone != null ? senderPhone : "N/A"),
                 HtmlUtils.htmlEscape(trxId),
-                HtmlUtils.htmlEscape(pricingUrl)
+                HtmlUtils.htmlEscape(pricingUrl),
+                buildEmailSocialFooterHtml()
         );
 
         try {
@@ -1116,13 +1138,11 @@ public class EmailService {
                     <div class="warn">
                         <strong>Didn't request this?</strong> You can safely ignore this email. No changes will be made to your account unless this code is entered and verified.
                     </div>
-                    <div class="footer">
-                        NoteLagbe — Southeast University Archive (%s)
-                    </div>
+                    %s
                 </div>
             </body>
             </html>
-            """.formatted(safeName, safeCode, expiryMinutes, HtmlUtils.htmlEscape(baseUrl));
+            """.formatted(safeName, safeCode, expiryMinutes, buildEmailSocialFooterHtml(true));
 
         try {
             dispatchHtmlEmail(cfg, user.getEmail(), "🔐 NoteLagbe Security Code: Password Reset Verification", html);
@@ -1165,16 +1185,15 @@ public class EmailService {
                         Recipient: %s<br>
                         Status: Authenticated &amp; Delivered
                     </div>
-                    <p style="font-size: 12px; color: #94a3b8; margin-top: 20px;">
-                        Southeast University NoteLagbe Automation Engine
-                    </p>
+                    %s
                 </div>
             </body>
             </html>
             """.formatted(
                 HtmlUtils.htmlEscape(cfg.provider()),
                 HtmlUtils.htmlEscape(cfg.senderEmail()),
-                HtmlUtils.htmlEscape(targetEmail.trim())
+                HtmlUtils.htmlEscape(targetEmail.trim()),
+                buildEmailSocialFooterHtml()
         );
 
         try {

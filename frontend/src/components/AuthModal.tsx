@@ -987,6 +987,39 @@ function AuthModalContent() {
               )}
             </button>
 
+            {/* Quick Switch between Sign In and Student Register */}
+            <div className="text-center pt-2">
+              {isRegister ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("signin");
+                    setLoginWarningMessage(null);
+                  }}
+                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  {language === "bn" ? "ইতোমধ্যে অ্যাকাউন্ট আছে? " : "Already have an account? "}
+                  <span className="font-bold text-blue-600 dark:text-blue-400 underline cursor-pointer">
+                    {language === "bn" ? "সাইন ইন করুন" : "Sign In"}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("register");
+                    setLoginWarningMessage(null);
+                  }}
+                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                >
+                  {language === "bn" ? "নতুন স্টুডেন্ট? " : "New SEU student? "}
+                  <span className="font-bold text-blue-600 dark:text-blue-400 underline cursor-pointer">
+                    {language === "bn" ? "এখানে রেজিস্টার করুন" : "Register here"}
+                  </span>
+                </button>
+              )}
+            </div>
+
             {loading && (wakingBackend || visibleWaitSeconds >= 4) && (
               <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-300 flex items-start gap-2">
                 <Clock className="w-3.5 h-3.5 shrink-0 mt-0.5" />
