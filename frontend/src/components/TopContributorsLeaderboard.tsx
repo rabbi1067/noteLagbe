@@ -511,43 +511,88 @@ export default function TopContributorsLeaderboard() {
           {/* ========================================================= */}
           {/* 3. SEARCH & DEPARTMENT FILTER TOOLBAR                     */}
           {/* ========================================================= */}
-          <div className="p-4 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-md backdrop-blur-xl flex flex-col sm:flex-row items-center justify-between gap-3">
-            {/* Search Input with Clear Button */}
-            <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={language === "bn" ? "শীর্ষ ৫০ জনের মধ্যে খুঁজুন..." : "Search in top 50 contributors..."}
-                className="w-full pl-9 pr-9 py-2 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
+          <div className="p-4 sm:p-5 rounded-3xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-md backdrop-blur-xl space-y-3.5">
+            {/* Top Row: Search Input + Result Count & Reset Button */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={language === "bn" ? "শীর্ষ ৫০ জনের মধ্যে নাম বা আইডি খুঁজুন..." : "Search in top 50 by name or ID..."}
+                  className="w-full pl-9 pr-9 py-2.5 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Status and Active Filter Reset */}
+              <div className="flex items-center justify-between sm:justify-end gap-3 text-xs">
+                <span className="font-semibold text-slate-500 dark:text-slate-400 font-mono">
+                  {language === "bn"
+                    ? `পাওয়া গেছে: ${filteredContributors.length} জন`
+                    : `Showing: ${filteredContributors.length} contributors`}
+                </span>
+                {(selectedDept !== "ALL" || searchQuery) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDept("ALL");
+                      setSearchQuery("");
+                    }}
+                    className="font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                  >
+                    {language === "bn" ? "রিসেট ফিল্টার" : "Reset Filter"}
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Department Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full pb-1 self-start sm:self-auto">
-              {departmentsList.map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setSelectedDept(d)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                    selectedDept === d
-                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 scale-105"
-                      : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-transparent dark:border-slate-700/50"
-                  }`}
-                >
-                  {d === "ALL" ? (language === "bn" ? "সকল ডিপার্টমেন্ট" : "All Departments") : d}
-                </button>
-              ))}
+            {/* Department Filter Pills: Wrapped naturally across lines with perfect responsiveness */}
+            <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800/70">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1 hidden sm:inline-block">
+                  {language === "bn" ? "ডিপার্টমেন্ট:" : "Dept:"}
+                </span>
+                {departmentsList.map((d) => {
+                  const isSelected = selectedDept === d;
+                  const count = d === "ALL"
+                    ? contributors.length
+                    : contributors.filter((c) => c.department?.toUpperCase() === d).length;
+                  return (
+                    <button
+                      key={d}
+                      onClick={() => setSelectedDept(d)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 scale-105"
+                          : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/50 dark:border-slate-700/50"
+                      }`}
+                    >
+                      <span>{d === "ALL" ? (language === "bn" ? "সকল ডিপার্টমেন্ট" : "All Departments") : d}</span>
+                      {count > 0 && (
+                        <span
+                          className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                            isSelected
+                              ? "bg-white/20 text-white"
+                              : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
