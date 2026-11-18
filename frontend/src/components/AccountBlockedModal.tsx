@@ -2,7 +2,7 @@
 
 import React from "react";
 import { ShieldBan, AlertTriangle, LogOut, Mail, X } from "lucide-react";
-import { useLanguage } from "@/context/LanguageContext";
+import { useLanguage, localizeErrorMessage } from "@/context/LanguageContext";
 
 export interface AccountBlockedNotice {
   reason: "auto_logout" | "login_denied";
@@ -98,7 +98,7 @@ export default function AccountBlockedModal({ notice, onClose }: AccountBlockedM
               </p>
             ) : (
               <p className="text-slate-200 font-medium">
-                {notice.message ||
+                {(notice.message ? localizeErrorMessage(notice.message, "en") : "") ||
                   (isAutoLogout
                     ? "An administrator has blocked your account from User Accounts & RBAC. You have been automatically signed out for security."
                     : "This account has been blocked by an administrator and cannot sign in right now.")}

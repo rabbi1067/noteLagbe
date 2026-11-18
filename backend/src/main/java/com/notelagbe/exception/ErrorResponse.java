@@ -9,6 +9,7 @@ public class ErrorResponse {
     private String error;
     private String code;
     private String message;
+    private String bengaliMessage;
     private String path;
     private Map<String, String> validationErrors;
 
@@ -18,6 +19,14 @@ public class ErrorResponse {
         this.status = status;
         this.error = error;
         this.message = message;
+        this.path = path;
+    }
+
+    public ErrorResponse(int status, String error, String message, String bengaliMessage, String path) {
+        this.status = status;
+        this.error = error;
+        this.message = message;
+        this.bengaliMessage = bengaliMessage;
         this.path = path;
     }
 
@@ -43,6 +52,9 @@ public class ErrorResponse {
 
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
+
+    public String getBengaliMessage() { return bengaliMessage; }
+    public void setBengaliMessage(String bengaliMessage) { this.bengaliMessage = bengaliMessage; }
 
     public String getPath() { return path; }
     public void setPath(String path) { this.path = path; }

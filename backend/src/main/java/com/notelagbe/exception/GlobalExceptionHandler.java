@@ -71,12 +71,21 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ErrorResponse> handleApiException(ApiException ex, HttpServletRequest request) {
+        String lang = request != null ? request.getHeader("Accept-Language") : null;
+        boolean isBn = lang != null && lang.toLowerCase().startsWith("bn");
+
+        // Primary message honors the requested locale:
+        String primaryMessage = (isBn && ex.getBengaliMessage() != null && !ex.getBengaliMessage().isBlank())
+                ? ex.getBengaliMessage()
+                : ex.getMessage();
+
         ErrorResponse error = new ErrorResponse(
                 ex.getStatus().value(),
                 ex.getStatus().getReasonPhrase(),
-                ex.getMessage(),
-                request.getRequestURI()
+                primaryMessage,
+                request != null ? request.getRequestURI() : ""
         );
+        error.setBengaliMessage(ex.getBengaliMessage());
         return new ResponseEntity<>(error, ex.getStatus());
     }
 

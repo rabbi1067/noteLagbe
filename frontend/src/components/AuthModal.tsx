@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { useLanguage } from "@/context/LanguageContext";
+import { useLanguage, localizeErrorMessage } from "@/context/LanguageContext";
 import { 
   X, 
   Lock, 
@@ -31,7 +31,11 @@ import {
   isValidBdPhone,
   normalizeBdPhone,
   EMAIL_DOMAIN_ERROR,
+  EMAIL_DOMAIN_ERROR_BN,
   PHONE_FORMAT_ERROR,
+  PHONE_FORMAT_ERROR_BN,
+  ALLOWED_EMAIL_HINT,
+  ALLOWED_EMAIL_HINT_BN,
 } from "@/lib/validation";
 
 export default function AuthModal() {
@@ -164,30 +168,30 @@ function AuthModalContent() {
     const cleanPassword = password;
 
     if (!cleanEmail) {
-      toast.error("Please enter your email address.");
+      toast.error(language === "bn" ? "অনুগ্রহ করে আপনার ইমেইল ঠিকানা দিন।" : "Please enter your email address.");
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      toast.error("Please enter a valid email address (e.g. name@seu.edu.bd).");
+      toast.error(language === "bn" ? "সঠিক ইমেইল ফরম্যাট দিন (e.g. name@seu.edu.bd)।" : "Please enter a valid email address (e.g. name@seu.edu.bd).");
       return;
     }
     if (cleanEmail.length > 100) {
-      toast.error("Email address cannot exceed 100 characters.");
+      toast.error(language === "bn" ? "ইমেইল ১০০ অক্ষরের বেশি হতে পারবে না।" : "Email address cannot exceed 100 characters.");
       return;
     }
 
     if (!cleanPassword || cleanPassword.length < 6) {
-      toast.error("Password must be at least 6 characters.");
+      toast.error(language === "bn" ? "পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।" : "Password must be at least 6 characters.");
       return;
     }
     if (cleanPassword.length > 64) {
-      toast.error("Password cannot exceed 64 characters.");
+      toast.error(language === "bn" ? "পাসওয়ার্ড ৬৪ অক্ষরের বেশি হতে পারবে না।" : "Password cannot exceed 64 characters.");
       return;
     }
 
     if (isRegister) {
       if (!isValidAllowedEmail(cleanEmail)) {
-        toast.error(EMAIL_DOMAIN_ERROR);
+        toast.error(language === "bn" ? EMAIL_DOMAIN_ERROR_BN : EMAIL_DOMAIN_ERROR);
         return;
       }
 
@@ -196,19 +200,19 @@ function AuthModalContent() {
       const cleanPhone = phone.trim();
 
       if (cleanName.length < 2 || cleanName.length > 60) {
-        toast.error("Full name must be between 2 and 60 characters.");
+        toast.error(language === "bn" ? "পুরো নাম ২ থেকে ৬০ অক্ষরের মধ্যে হতে হবে।" : "Full name must be between 2 and 60 characters.");
         return;
       }
 
       if (cleanPhone) {
         if (!isValidBdPhone(cleanPhone)) {
-          toast.error(PHONE_FORMAT_ERROR);
+          toast.error(language === "bn" ? PHONE_FORMAT_ERROR_BN : PHONE_FORMAT_ERROR);
           return;
         }
       }
 
       if (cleanId && (cleanId.length < 5 || cleanId.length > 20)) {
-        toast.error("Student ID must be between 5 and 20 characters.");
+        toast.error(language === "bn" ? "স্টুডেন্ট আইডি ৫ থেকে ২০ অক্ষরের মধ্যে হতে হবে।" : "Student ID must be between 5 and 20 characters.");
         return;
       }
 
@@ -222,7 +226,8 @@ function AuthModalContent() {
         notifyDataChanged("user", "created");
         notifyDataChanged("staff", "created");
       } catch (err: any) {
-        toast.error(err.message || "Registration failed");
+        const raw = err.message || (language === "bn" ? "রেজিস্ট্রেশন ব্যর্থ হয়েছে" : "Registration failed");
+        toast.error(localizeErrorMessage(raw, language));
       } finally {
         setLoading(false);
       }
@@ -236,7 +241,8 @@ function AuthModalContent() {
         clearCredentialFields();
       } catch (err: any) {
         if (err?.code !== "ACCOUNT_BLOCKED" && !err?.blocked) {
-          const msg = err.message || "Authentication failed";
+          const raw = err.message || (language === "bn" ? "লগইন ব্যর্থ হয়েছে" : "Authentication failed");
+          const msg = localizeErrorMessage(raw, language);
           setLoginWarningMessage(msg);
           toast.error(msg);
         }
@@ -427,8 +433,12 @@ function AuthModalContent() {
                 ? "পাসওয়ার্ড রিসেট করুন"
                 : "Reset Your Password"
               : isRegister
-                ? "Create Student Account"
-                : "Welcome to NoteLagbe"}
+                ? language === "bn"
+                  ? "স্টুডেন্ট অ্যাকাউন্ট তৈরি করুন"
+                  : "Create Student Account"
+                : language === "bn"
+                  ? "NoteLagbe-তে স্বাগতম"
+                  : "Welcome to NoteLagbe"}
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             {isForgot
@@ -443,7 +453,9 @@ function AuthModalContent() {
                   : language === "bn"
                     ? "আপনার অ্যাকাউন্টের জন্য নতুন পাসওয়ার্ড সেট করুন"
                     : "Create a strong new password for your account"
-              : "Southeast University Academic Resource & Question Archive"}
+              : language === "bn"
+                ? "সাউথইস্ট ইউনিভার্সিটি একাডেমিক রিসোর্স ও প্রশ্ন আর্কাইভ"
+                : "Southeast University Academic Resource & Question Archive"}
           </p>
         </div>
 
@@ -464,7 +476,7 @@ function AuthModalContent() {
                   : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              Sign In
+              {language === "bn" ? "সাইন ইন" : "Sign In"}
             </button>
             <button
               type="button"
@@ -480,7 +492,7 @@ function AuthModalContent() {
                   : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
-              Student Register
+              {language === "bn" ? "স্টুডেন্ট রেজিস্টার" : "Student Register"}
             </button>
           </div>
         )}
@@ -774,14 +786,14 @@ function AuthModalContent() {
             {loginWarningMessage && !isRegister && (
               <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1 shadow-xs">
                 <Shield className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
-                <div className="leading-relaxed whitespace-pre-wrap">{loginWarningMessage}</div>
+                <div className="leading-relaxed whitespace-pre-wrap">{localizeErrorMessage(loginWarningMessage, language)}</div>
               </div>
             )}
             {isRegister && (
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Full Name <span className="text-red-500">*</span>
+                    {language === "bn" ? "পুরো নাম" : "Full Name"} <span className="text-red-500">*</span>
                   </label>
                   <span className="text-[10px] text-slate-400 font-mono">{name.length}/60</span>
                 </div>
@@ -795,7 +807,7 @@ function AuthModalContent() {
                     required
                     minLength={2}
                     maxLength={60}
-                    placeholder="e.g. Fazle Rabbi"
+                    placeholder={language === "bn" ? "যেমন: Fazle Rabbi" : "e.g. Fazle Rabbi"}
                     value={name}
                     onChange={(e) => setName(e.target.value.slice(0, 60))}
                     className="w-full text-xs pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -807,9 +819,11 @@ function AuthModalContent() {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Email Address <span className="text-red-500">*</span>
+                  {language === "bn" ? "ইমেইল ঠিকানা" : "Email Address"} <span className="text-red-500">*</span>
                 </label>
-                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">@seu.edu.bd or @gmail.com</span>
+                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+                  {language === "bn" ? ALLOWED_EMAIL_HINT_BN : ALLOWED_EMAIL_HINT}
+                </span>
               </div>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -841,7 +855,7 @@ function AuthModalContent() {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Student ID (Optional)
+                    {language === "bn" ? "স্টুডেন্ট আইডি (ঐচ্ছিক)" : "Student ID (Optional)"}
                   </label>
                   <span className="text-[10px] text-slate-400 font-mono">{studentId.length}/20</span>
                 </div>
@@ -865,7 +879,7 @@ function AuthModalContent() {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Mobile Number (Optional)
+                    {language === "bn" ? "মোবাইল নম্বর (ঐচ্ছিক)" : "Mobile Number (Optional)"}
                   </label>
                   <span className="text-[10px] text-slate-400 font-mono">01XXXXXXXXX</span>
                 </div>
@@ -889,7 +903,7 @@ function AuthModalContent() {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Password <span className="text-red-500">*</span>
+                  {language === "bn" ? "পাসওয়ার্ড" : "Password"} <span className="text-red-500">*</span>
                 </label>
                 {authMode === "signin" ? (
                   <button
@@ -903,10 +917,12 @@ function AuthModalContent() {
                     }}
                     className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline transition-all cursor-pointer"
                   >
-                    Forgot Password?
+                    {language === "bn" ? "পাসওয়ার্ড ভুলে গেছেন?" : "Forgot Password?"}
                   </button>
                 ) : (
-                  <span className="text-[10px] text-slate-400">Min 6 characters</span>
+                  <span className="text-[10px] text-slate-400">
+                    {language === "bn" ? "কমপক্ষে ৬ অক্ষর" : "Min 6 characters"}
+                  </span>
                 )}
               </div>
               <div className="relative">
@@ -965,9 +981,9 @@ function AuthModalContent() {
                   </span>
                 </>
               ) : isRegister ? (
-                "Complete Student Registration"
+                language === "bn" ? "স্টুডেন্ট রেজিস্ট্রেশন সম্পন্ন করুন" : "Complete Student Registration"
               ) : (
-                "Sign In"
+                language === "bn" ? "সাইন ইন" : "Sign In"
               )}
             </button>
 

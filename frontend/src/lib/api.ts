@@ -1,3 +1,5 @@
+import { localizeErrorMessage } from "@/context/LanguageContext";
+
 export interface ChatMessageDto {
   id: number;
   senderId: number;
@@ -343,6 +345,7 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
 
   const headers: Record<string, string> = {
     ...(isFormData ? {} : { "Content-Type": "application/json" }),
+    "Accept-Language": isBanglaLocale() ? "bn" : "en",
     ...((options.headers as Record<string, string>) || {}),
   };
 
@@ -477,7 +480,13 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
           errorData.error === "Account Blocked" ||
           errorData.error === "Account Suspended"
       );
-      errorMessage = errorData.bengaliMessage || errorData.message || errorData.error || errorMessage;
+      const isBn = isBanglaLocale();
+      if (isBn) {
+        errorMessage = errorData.bengaliMessage || errorData.message || errorData.error || errorMessage;
+      } else {
+        errorMessage = errorData.message || errorData.error || errorMessage;
+      }
+      errorMessage = localizeErrorMessage(errorMessage, isBn ? "bn" : "en");
     } catch {
       if (response.status === 429) {
         errorMessage = isBanglaLocale()

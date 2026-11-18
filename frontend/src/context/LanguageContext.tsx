@@ -239,3 +239,151 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 };
 
 export const useLanguage = () => useContext(LanguageContext);
+
+export function getActiveLanguage(): Language {
+  if (typeof window === "undefined") return "en";
+  try {
+    const saved = localStorage.getItem("notelagbe_language");
+    return saved === "bn" ? "bn" : "en";
+  } catch {
+    return "en";
+  }
+}
+
+/**
+ * Enterprise locale-aware error message normalizer.
+ * 1. Automatically parses and separates bilingual server messages like:
+ *    "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। (Invalid email or password.)" -> returns EN or BN cleanly.
+ * 2. Translates common system/auth/rate-limiting errors to the active language.
+ * 3. Strips unneeded foreign substrings so EN users see 100% English, and BN users see 100% Bengali.
+ */
+export function localizeErrorMessage(rawMessage?: string | null, targetLang?: Language): string {
+  if (!rawMessage || typeof rawMessage !== "string") {
+    const lang = targetLang || getActiveLanguage();
+    return lang === "bn" ? "একটি অপ্রত্যাশিত সমস্যা হয়েছে।" : "An unexpected error occurred.";
+  }
+
+  const clean = rawMessage.trim();
+  const lang = targetLang || getActiveLanguage();
+
+  // Pattern A: "<Bangla text> (<English text>)" e.g. "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। (Invalid email or password.)"
+  const matchBnEn = clean.match(/^([\u0980-\u09FF\s\d।.,!?:;'\-]+?)\s*\(([^)]+)\)\s*$/);
+  if (matchBnEn) {
+    return lang === "bn" ? matchBnEn[1].trim() : matchBnEn[2].trim();
+  }
+
+  // Pattern B: "<English text> (<Bangla text>)" e.g. "Invalid email or password. (ইমেইল অথবা পাসওয়ার্ড সঠিক নয়।)"
+  const matchEnBn = clean.match(/^([A-Za-z0-9\s.,!?:;'\"\-_]+?)\s*\(([\u0980-\u09FF\s\d।.,!?:;'\-]+)\)\s*$/);
+  if (matchEnBn) {
+    return lang === "bn" ? matchEnBn[2].trim() : matchEnBn[1].trim();
+  }
+
+  // Pattern C: If English is active, but string contains Bengali characters and has a paren with English text
+  if (lang === "en" && /[\u0980-\u09FF]/.test(clean)) {
+    const parenEnglish = clean.match(/\(([A-Za-z0-9\s.,!?:;'\"\-_]+)\)/);
+    if (parenEnglish && parenEnglish[1].trim().length > 3) {
+      return parenEnglish[1].trim();
+    }
+  }
+
+  // Pattern D: If Bengali is active, strip trailing or enclosed English in parentheses
+  if (lang === "bn" && /[\u0980-\u09FF]/.test(clean)) {
+    const stripped = clean.replace(/\s*\([A-Za-z0-9\s.,!?:;'\"\-_]+\)\s*/g, "").trim();
+    if (stripped.length > 0) {
+      return stripped;
+    }
+  }
+
+  // Known dictionary translations for English locale
+  if (lang === "en") {
+    if (clean.includes("ইমেইল অথবা পাসওয়ার্ড সঠিক নয়")) {
+      const matchAttempts = clean.match(/(\d+)\s*বার ভুল হলে/);
+      if (matchAttempts) {
+        const remaining = matchAttempts[1];
+        return `Invalid credentials. ${remaining} attempt${Number(remaining) > 1 ? "s" : ""} remaining before a 30-minute lockout.`;
+      }
+      return "Invalid email or password.";
+    }
+    if (clean.includes("৫ বার ভুল পাসওয়ার্ড") || clean.includes("৩০ মিনিটের জন্য সাময়িকভাবে ব্লক")) {
+      return "Account temporarily locked for 30 minutes due to 5 consecutive failed login attempts.";
+    }
+    if (clean.includes("একাধিক ভুল প্রচেষ্টার কারণে সাময়িকভাবে ব্লক")) {
+      const matchMin = clean.match(/আরও\s*(\d+)\s*মিনিট/);
+      if (matchMin) {
+        return `Account temporarily locked due to multiple failed login attempts. Please try again after ${matchMin[1]} minute${Number(matchMin[1]) > 1 ? "s" : ""}.`;
+      }
+      return "Account temporarily locked due to multiple failed login attempts. Please try again later.";
+    }
+    if (clean.includes("খুব দ্রুত ক্লিক করছেন")) {
+      return "You are clicking too fast! Please slow down and wait a moment.";
+    }
+    if (clean.includes("অনুরোধের সীমা অতিক্রম")) {
+      return "Rate limit exceeded. Please wait a moment before trying again.";
+    }
+    if (clean.includes("এই ইমেইলটি ডাটাবেজে নেই")) {
+      return "This email does not exist in our database.";
+    }
+    if (clean.includes("সিকিউরিটি কোড পাঠানো যায়নি")) {
+      return "Unable to send security verification code. Please try again.";
+    }
+    if (clean.includes("পাসওয়ার্ড রিসেট করতে সমস্যা")) {
+      return "Failed to reset password. Please try again.";
+    }
+    if (clean.includes("নিরাপত্তার স্বার্থে ইনঅ্যাক্টিভিটির কারণে")) {
+      return "You were automatically signed out due to inactivity to protect your account. Please log in again.";
+    }
+    if (clean.includes("অ্যাকাউন্টটি অ্যাডমিনিস্ট্রেটর কর্তৃক ব্লক")) {
+      return "Your account has been blocked by an administrator. Please contact support.";
+    }
+  }
+
+  // Known dictionary translations for Bengali locale
+  if (lang === "bn") {
+    if (/bad credentials|invalid email or password/i.test(clean)) {
+      return "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়।";
+    }
+    if (/5 consecutive failed login attempts|locked for 30 minutes/i.test(clean)) {
+      return "অ্যাকাউন্টে ৫ বার ভুল পাসওয়ার্ড দেওয়ার কারণে ৩০ মিনিটের জন্য সাময়িকভাবে ব্লক করা হয়েছে। ৩০ মিনিট পর স্বয়ংক্রিয়ভাবে আনলক হবে।";
+    }
+    if (/remaining before a 30-minute lockout/i.test(clean)) {
+      const m = clean.match(/(\d+)\s*attempt/i);
+      if (m) {
+        return `ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। আর ${m[1]} বার ভুল হলে অ্যাকাউন্ট ৩০ মিনিটের জন্য লক হয়ে যাবে।`;
+      }
+      return "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। অতিরিক্ত ভুল হলে অ্যাকাউন্ট ৩০ মিনিটের জন্য লক হয়ে যাবে।";
+    }
+    if (/temporarily locked due to multiple failed login attempts/i.test(clean)) {
+      const m = clean.match(/after\s+(\d+)\s+minute/i);
+      if (m) {
+        return `অ্যাকাউন্টে একাধিক ভুল প্রচেষ্টার কারণে সাময়িকভাবে ব্লক করা হয়েছে। অনুগ্রহ করে আরও ${m[1]} মিনিট পর চেষ্টা করুন।`;
+      }
+      return "অ্যাকাউন্টে একাধিক ভুল প্রচেষ্টার কারণে সাময়িকভাবে ব্লক করা হয়েছে। অনুগ্রহ করে কিছুক্ষণ পর চেষ্টা করুন।";
+    }
+    if (/clicking too fast/i.test(clean)) {
+      return "আপনি খুব দ্রুত ক্লিক করছেন! দয়া করে কিছুক্ষণ অপেক্ষা করে আবার চেষ্টা করুন।";
+    }
+    if (/rate limit exceeded/i.test(clean)) {
+      return "অনুরোধের সীমা অতিক্রম করেছে। দয়া করে কিছুক্ষণ অপেক্ষা করে আবার চেষ্টা করুন।";
+    }
+    if (/email does not exist/i.test(clean)) {
+      return "এই ইমেইলটি ডাটাবেজে নেই।";
+    }
+    if (/student id is already registered/i.test(clean)) {
+      return "এই স্টুডেন্ট আইডিটি দিয়ে ইতিমধ্যে অ্যাকাউন্ট খোলা হয়েছে!";
+    }
+    if (/email is already registered/i.test(clean)) {
+      return "এই ইমেইলটি দিয়ে ইতিমধ্যে অ্যাকাউন্ট খোলা হয়েছে!";
+    }
+    if (/registration failed/i.test(clean)) {
+      return "রেজিস্ট্রেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।";
+    }
+    if (/authentication failed/i.test(clean)) {
+      return "লগইন করা যায়নি। ইমেইল ও পাসওয়ার্ড যাচাই করুন।";
+    }
+    if (/account has been blocked/i.test(clean)) {
+      return "আপনার অ্যাকাউন্টটি অ্যাডমিনিস্ট্রেটর কর্তৃক ব্লক করা হয়েছে।";
+    }
+  }
+
+  return clean;
+}

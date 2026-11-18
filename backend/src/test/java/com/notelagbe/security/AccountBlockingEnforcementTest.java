@@ -218,7 +218,7 @@ class AccountBlockingEnforcementTest {
 
         ApiException ex = assertThrows(ApiException.class, () -> authService.login(req));
         assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getStatus());
-        assertTrue(ex.getMessage().contains("৩০ মিনিটের জন্য"));
+        assertTrue(ex.getMessage().contains("30 minutes") || (ex.getBengaliMessage() != null && ex.getBengaliMessage().contains("৩০ মিনিটের জন্য")));
         assertNotNull(student.getLockoutUntil());
         assertTrue(student.getLockoutUntil().isAfter(java.time.LocalDateTime.now()));
         verify(userRepository, times(1)).save(student);
@@ -237,7 +237,7 @@ class AccountBlockingEnforcementTest {
 
         ApiException ex = assertThrows(ApiException.class, () -> authService.login(req));
         assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getStatus());
-        assertTrue(ex.getMessage().contains("মিনিট পর চেষ্টা করুন"));
+        assertTrue(ex.getMessage().contains("minute") || (ex.getBengaliMessage() != null && ex.getBengaliMessage().contains("মিনিট পর চেষ্টা করুন")));
         verify(authenticationManager, never()).authenticate(any());
     }
 

@@ -131,9 +131,10 @@ public class AuthService {
             if (now.isBefore(user.getLockoutUntil())) {
                 long remainingMinutes = Math.max(1, Duration.between(now, user.getLockoutUntil()).toMinutes() + 1);
                 throw new ApiException(
+                        "Account temporarily locked due to multiple failed login attempts. Please try again after "
+                                + remainingMinutes + " minute" + (remainingMinutes > 1 ? "s" : "") + ".",
                         "অ্যাকাউন্টে একাধিক ভুল প্রচেষ্টার কারণে সাময়িকভাবে ব্লক করা হয়েছে। অনুগ্রহ করে আরও "
-                                + remainingMinutes + " মিনিট পর চেষ্টা করুন। (Account temporarily locked due to multiple failed login attempts. Please try again after "
-                                + remainingMinutes + " minute" + (remainingMinutes > 1 ? "s" : "") + ".)",
+                                + remainingMinutes + " মিনিট পর চেষ্টা করুন।",
                         HttpStatus.TOO_MANY_REQUESTS
                 );
             } else {
@@ -212,7 +213,8 @@ public class AuthService {
                     userRepository.save(u);
                     evictCachedUser(cleanEmail);
                     throw new ApiException(
-                            "অ্যাকাউন্টে ৫ বার ভুল পাসওয়ার্ড দেওয়ার কারণে ৩০ মিনিটের জন্য সাময়িকভাবে ব্লক করা হয়েছে। ৩০ মিনিট পর স্বয়ংক্রিয়ভাবে আনলক হবে। (Account temporarily locked for 30 minutes due to 5 consecutive failed login attempts.)",
+                            "Account temporarily locked for 30 minutes due to 5 consecutive failed login attempts.",
+                            "অ্যাকাউন্টে ৫ বার ভুল পাসওয়ার্ড দেওয়ার কারণে ৩০ মিনিটের জন্য সাময়িকভাবে ব্লক করা হয়েছে। ৩০ মিনিট পর স্বয়ংক্রিয়ভাবে আনলক হবে।",
                             HttpStatus.TOO_MANY_REQUESTS
                     );
                 } else {
@@ -220,12 +222,17 @@ public class AuthService {
                     evictCachedUser(cleanEmail);
                     int remaining = 5 - attempts;
                     throw new ApiException(
-                            "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। আর " + remaining + " বার ভুল হলে অ্যাকাউন্ট ৩০ মিনিটের জন্য লক হয়ে যাবে। (Invalid credentials. " + remaining + " attempt" + (remaining > 1 ? "s" : "") + " remaining before a 30-minute lockout.)",
+                            "Invalid credentials. " + remaining + " attempt" + (remaining > 1 ? "s" : "") + " remaining before a 30-minute lockout.",
+                            "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। আর " + remaining + " বার ভুল হলে অ্যাকাউন্ট ৩০ মিনিটের জন্য লক হয়ে যাবে।",
                             HttpStatus.UNAUTHORIZED
                     );
                 }
             }
-            throw new ApiException("ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। (Invalid email or password.)", HttpStatus.UNAUTHORIZED);
+            throw new ApiException(
+                    "Invalid email or password.",
+                    "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়।",
+                    HttpStatus.UNAUTHORIZED
+            );
         }
 
         SecurityContextHolder.getContext().setAuthentication(authentication);

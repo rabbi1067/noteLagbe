@@ -6,6 +6,7 @@ import { api, getToken, setToken, removeToken, warmupBackend, clearClientApiCach
 import { subscribeToSync, SyncPayload } from "@/lib/sync";
 import { toast } from "sonner";
 import AccountBlockedModal, { AccountBlockedNotice } from "@/components/AccountBlockedModal";
+import { getActiveLanguage } from "@/context/LanguageContext";
 
 export interface UnlockedCourseDetail {
   id?: number;
@@ -255,8 +256,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearInterval(checkInterval);
         toast.dismiss("inactivity-warn");
         logout(false);
+        const isBn = getActiveLanguage() === "bn";
         toast.error(
-          "🔒 Security Session Timeout: You were automatically signed out due to inactivity to protect your account. Please log in again.",
+          isBn
+            ? "🔒 নিরাপত্তার স্বার্থে ইনঅ্যাক্টিভিটির কারণে স্বয়ংক্রিয়ভাবে লগ-আউট করা হয়েছে। অনুগ্রহ করে আবার লগইন করুন।"
+            : "🔒 Security Session Timeout: You were automatically signed out due to inactivity to protect your account. Please log in again.",
           { duration: 8000 }
         );
         return;
@@ -266,8 +270,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (elapsed >= IDLE_TIMEOUT_MS - WARNING_THRESHOLD_MS && !warningToastShown) {
         warningToastShown = true;
         const minutesLeft = Math.ceil((IDLE_TIMEOUT_MS - elapsed) / 60000);
+        const isBn = getActiveLanguage() === "bn";
         toast.warning(
-          `⚠️ Inactivity Warning: Your session will expire in ${minutesLeft} minute(s) due to inactivity for security. Click anywhere or press a key to stay logged in.`,
+          isBn
+            ? `⚠️ ইনঅ্যাক্টিভিটি সতর্কতা: নিরাপত্তার জন্য আর ${minutesLeft} মিনিটের মধ্যে আপনার সেশন শেষ হবে। লগইন থাকতে কোথাও ক্লিক করুন।`
+            : `⚠️ Inactivity Warning: Your session will expire in ${minutesLeft} minute(s) due to inactivity for security. Click anywhere or press a key to stay logged in.`,
           { id: "inactivity-warn", duration: 12000 }
         );
       }
@@ -276,7 +283,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Cross-tab and 401 session-expired listener
     const handleSessionExpired = () => {
       logout(false);
-      toast.info("Session expired or signed out from another tab.");
+      const isBn = getActiveLanguage() === "bn";
+      toast.info(isBn ? "সেশন শেষ হয়েছে অথবা অন্য ট্যাব থেকে লগ আউট করা হয়েছে।" : "Session expired or signed out from another tab.");
     };
 
     const handleStorageChange = (e: StorageEvent) => {
@@ -428,7 +436,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       applySessionFromAuthResponse(res);
       setShowAuthModal(false);
       setBlockedNotice(null);
-      toast.success(`Welcome back, ${res.name}!`);
+      const isBn = getActiveLanguage() === "bn";
+      toast.success(isBn ? `স্বাগতম, ${res.name}!` : `Welcome back, ${res.name}!`);
 
       // Strict Role-Based Redirection
       const isStaff = res.role === "ROLE_ADMIN" || res.role === "ROLE_SUPER_ADMIN" || res.role === "ROLE_MANAGER";
@@ -463,7 +472,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setTokenState(res.token);
     applySessionFromAuthResponse(res);
     setShowAuthModal(false);
-    toast.success("Student account created successfully! Welcome to NoteLagbe.");
+    const isBn = getActiveLanguage() === "bn";
+    toast.success(isBn ? "স্টুডেন্ট অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে! NoteLagbe-তে স্বাগতম।" : "Student account created successfully! Welcome to NoteLagbe.");
     router.push("/dashboard");
   };
 
@@ -471,7 +481,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     api.auth.logout().catch(() => {});
     clearLocalSession();
     if (showToast) {
-      toast.info("Signed out successfully.");
+      const isBn = getActiveLanguage() === "bn";
+      toast.info(isBn ? "সফলভাবে সাইন আউট হয়েছেন।" : "Signed out successfully.");
     }
     if (typeof window !== "undefined") {
       if (window.location.pathname.startsWith("/admin") || window.location.pathname.startsWith("/dashboard")) {
