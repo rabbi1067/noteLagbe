@@ -49,6 +49,13 @@ public class ContributionService {
     private final CloudflareR2Service r2Service;
     private final CloudinaryService cloudinaryService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private EmailService emailService;
+
+    public void setEmailService(EmailService emailService) {
+        this.emailService = emailService;
+    }
+
     public ContributionService(ContributionRequestRepository contributionRequestRepository,
                                ResourceRepository resourceRepository,
                                CourseRepository courseRepository,
@@ -364,6 +371,22 @@ public class ContributionService {
             );
         } catch (Exception e) {
             log.warn("Failed to dispatch contribution approval notification: {}", e.getMessage());
+        }
+
+        // Trigger Async Email Notification to contributor
+        if (emailService != null) {
+            try {
+                emailService.sendContributionApprovalEmail(
+                        contributor,
+                        res.getTitle(),
+                        res.getCourse() != null ? res.getCourse().getCode() : "SEU Course",
+                        c1Code,
+                        c2Code,
+                        cr.getAdminFeedback()
+                );
+            } catch (Exception e) {
+                log.warn("Failed to dispatch contribution approval email: {}", e.getMessage());
+            }
         }
 
         ContributionRequest saved = contributionRequestRepository.save(cr);

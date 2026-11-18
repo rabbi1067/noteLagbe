@@ -52,6 +52,7 @@ export default function PricingPage() {
   const [reason, setReason] = useState("");
   const [waiverLoading, setWaiverLoading] = useState(false);
   const [myWaiver, setMyWaiver] = useState<any | null>(null);
+  const [myPendingPayment, setMyPendingPayment] = useState<any | null>(null);
   const [isReapplying, setIsReapplying] = useState(false);
 
   // STRICT USER SPECIFICATION NUMBER: 01779326236
@@ -145,10 +146,15 @@ export default function PricingPage() {
 
       notifyDataChanged("payment", "created");
       confetti({ particleCount: 100, spread: 80, origin: { y: 0.6 } });
-      toast.success("Payment submitted successfully! Admin will verify and activate your course quota promptly.");
+      toast.success(
+        language === "bn"
+          ? "পেমেন্ট রিকোয়েস্ট সফলভাবে জমা হয়েছে! অ্যাডমিন Transaction ID যাচাই করে অনুমোদন দেওয়া পর্যন্ত অপেক্ষা করুন।"
+          : "Payment submitted successfully! Please wait while an administrator checks and accepts your transaction."
+      );
       setShowCheckoutModal(false);
       setSenderPhone("");
       setTransactionId("");
+      void fetchMyPayments();
     } catch (err: any) {
       toast.error(err.message || "Failed to submit payment. Please verify your TrxID.");
     } finally {
@@ -162,6 +168,25 @@ export default function PricingPage() {
       setStudentId(user.studentId);
     }
   }, [user]);
+
+  const fetchMyPayments = React.useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const list = await api.payments.getMy();
+      if (list && list.length > 0) {
+        const pending = list.find((p: any) => p.status === "PENDING");
+        setMyPendingPayment(pending || null);
+      } else {
+        setMyPendingPayment(null);
+      }
+    } catch {
+      setMyPendingPayment(null);
+    }
+  }, [isAuthenticated]);
+
+  React.useEffect(() => {
+    fetchMyPayments();
+  }, [fetchMyPayments]);
 
   const fetchMyWaiver = React.useCallback(async () => {
     if (!isAuthenticated) return;
@@ -184,6 +209,7 @@ export default function PricingPage() {
   // Enterprise Live Sync: Instantly updates waiver approval & payment status
   useDataSync(() => {
     fetchMyWaiver();
+    fetchMyPayments();
     if (isAuthenticated) {
       refreshProfile().catch(() => {});
     }
@@ -306,6 +332,45 @@ export default function PricingPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Pending Payment Verification Notice */}
+      {myPendingPayment && (
+        <div className="max-w-4xl mx-auto p-5 sm:p-6 rounded-3xl bg-amber-500/10 border-2 border-amber-500/40 text-amber-900 dark:text-amber-200 shadow-xl space-y-3.5 animate-in fade-in slide-in-from-top-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+                <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400 animate-pulse" />
+              </div>
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-700 dark:text-amber-300">
+                  {language === "bn" ? "ভেরিফিকেশন প্রক্রিয়াধীন" : "Verification Under Review"}
+                </span>
+                <h4 className="font-black text-base sm:text-lg text-slate-900 dark:text-white mt-1">
+                  {language === "bn"
+                    ? `আপনার ${myPendingPayment.planType?.replace("_", " ")} পেমেন্ট যাচাই চলছে ⏳`
+                    : `Your ${myPendingPayment.planType?.replace("_", " ")} Payment is Under Review ⏳`}
+                </h4>
+              </div>
+            </div>
+            <div className="text-left sm:text-right text-xs font-mono font-bold text-amber-800 dark:text-amber-300 bg-amber-500/15 px-3 py-1.5 rounded-xl border border-amber-500/30">
+              TrxID: {myPendingPayment.transactionId}
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-amber-500/20 text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed space-y-1.5">
+            <p>
+              {language === "bn"
+                ? "আপনার পেমেন্ট ভেরিফিকেশন রিকোয়েস্টটি সফলভাবে জমা হয়েছে। অ্যাডমিন TrxID যাচাই করে অনুমোদন (Accept) দেওয়া পর্যন্ত অনুগ্রহ করে অপেক্ষা করুন।"
+                : "Your payment verification request has been successfully received. Please wait while an administrator checks and accepts your transaction."}
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+              {language === "bn"
+                ? "⏱️ সাধারণত ১৫–৩০ মিনিটের মধ্যে যাচাই সম্পন্ন হয়। অনুমোদন হওয়া মাত্রই কোর্স কোটা স্বয়ংক্রিয়ভাবে সক্রিয় হবে এবং আপনার ইমেইলে কনফার্মেশন পাঠানো হবে।"
+                : "⏱️ Approvals typically take 15–30 minutes. Once approved, your course quota will activate automatically and you will receive an email."}
+            </p>
+          </div>
         </div>
       )}
 

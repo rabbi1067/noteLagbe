@@ -1,6 +1,7 @@
 package com.notelagbe.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.notelagbe.entity.PaymentMethod;
 import com.notelagbe.entity.PlanType;
 import com.notelagbe.entity.SystemSetting;
 import com.notelagbe.entity.User;
@@ -810,6 +811,258 @@ public class EmailService {
             log.info("Course gift email sent successfully to {} ({} - {})", user.getEmail(), courseCode, teacherLabel);
         } catch (Exception e) {
             log.warn("Failed to send course gift email to {}: {}", user.getEmail(), e.getMessage());
+        }
+    }
+
+    @Async
+    public void sendStudentWelcomeEmail(User user) {
+        if (!isEmailNotificationsEnabled()) {
+            log.info("Skipping email notification: Email notifications are disabled by admin.");
+            return;
+        }
+        if (user == null || !hasText(user.getEmail())) {
+            return;
+        }
+        if (!isSmtpConfigured()) {
+            log.info("Email delivery not configured. Skipping welcome email dispatch for {} - simulation mode.", user.getEmail());
+            return;
+        }
+
+        String coursesUrl = resolveFrontendBaseUrl() + "/courses";
+        String sId = hasText(user.getStudentId()) ? user.getStudentId() : "Not Provided";
+
+        String html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
+                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+                    .badge { display: inline-block; padding: 4px 12px; background: #e0f2fe; color: #0284c7; border-radius: 999px; font-size: 12px; font-weight: bold; }
+                    .title { font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 8px; margin-bottom: 8px; }
+                    .box { background: #f1f5f9; border-radius: 14px; padding: 18px; margin: 20px 0; }
+                    .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+                    .label { color: #64748b; font-weight: 500; }
+                    .val { color: #0f172a; font-weight: 700; font-family: monospace; }
+                    .feature-list { list-style: none; padding: 0; margin: 16px 0; }
+                    .feature-item { margin-bottom: 10px; font-size: 14px; color: #334155; line-height: 1.5; }
+                    .btn { display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: bold; font-size: 14px; margin-top: 16px; }
+                    .footer { margin-top: 28px; font-size: 12px; color: #94a3b8; text-align: center; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <span class="badge">Southeast University • Official Academic Platform</span>
+                    <div class="title">Welcome to NoteLagbe! 🎓</div>
+                    <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+                        Dear <strong>%s</strong>,<br>
+                        Welcome to NoteLagbe, the comprehensive academic resource, lecture hand note archive, and exam question bank for Southeast University. Your student profile is active and ready to use!
+                    </p>
+                    <div class="box">
+                        <div class="row"><span class="label">Full Name:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Registered Email:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Student ID:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Account Status:</span><span class="val" style="color: #16a34a;">Active Student</span></div>
+                    </div>
+                    <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-top: 20px;">What You Can Do on NoteLagbe:</div>
+                    <ul class="feature-list">
+                        <li class="feature-item">📚 <strong>Course Archive:</strong> Access lecture hand notes, midterm &amp; final question papers, and lab manuals from all SEU faculty.</li>
+                        <li class="feature-item">🤖 <strong>AI Exam Revision Copilot:</strong> Get concise exam revision cheat sheets, repeated questions breakdown, and faculty-focused preparation tips.</li>
+                        <li class="feature-item">🎁 <strong>Contribute &amp; Unlock Free:</strong> Upload 1 hand note or exam paper and get 2 courses completely unlocked for a full semester (90 days) free!</li>
+                    </ul>
+                    <div style="text-align: center;">
+                        <a href="%s" class="btn">Explore Courses &amp; Notes →</a>
+                    </div>
+                    <div class="footer">
+                        NoteLagbe — Southeast University Academic Resource Archive<br>
+                        Permanent Campus: 251/A and 252, Tejgaon I/A, Dhaka-1208
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.formatted(
+                HtmlUtils.htmlEscape(user.getName()),
+                HtmlUtils.htmlEscape(user.getName()),
+                HtmlUtils.htmlEscape(user.getEmail()),
+                HtmlUtils.htmlEscape(sId),
+                HtmlUtils.htmlEscape(coursesUrl)
+        );
+
+        try {
+            dispatchHtmlEmail(user.getEmail(), "🎓 Welcome to NoteLagbe! Your SEU Student Account is Active", html);
+            log.info("Student welcome email sent successfully to: {}", user.getEmail());
+        } catch (Exception e) {
+            log.warn("Failed to send student welcome email to {}: {}", user.getEmail(), e.getMessage());
+        }
+    }
+
+    @Async
+    public void sendContributionApprovalEmail(User user, String materialTitle, String courseCode, String course1Code, String course2Code, String adminFeedback) {
+        if (!isEmailNotificationsEnabled()) {
+            log.info("Skipping email notification: Email notifications are disabled by admin.");
+            return;
+        }
+        if (user == null || !hasText(user.getEmail())) {
+            return;
+        }
+        if (!isSmtpConfigured()) {
+            log.info("Email delivery not configured. Skipping live contribution approval email dispatch for {} - simulation mode.", user.getEmail());
+            return;
+        }
+
+        String dashboardUrl = resolveFrontendBaseUrl() + "/dashboard";
+        String cleanFeedback = hasText(adminFeedback) ? adminFeedback : "Approved by Administrator. 2 courses unlocked for 90 days free!";
+
+        String html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
+                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+                    .badge { display: inline-block; padding: 4px 12px; background: #dcfce7; color: #15803d; border-radius: 999px; font-size: 12px; font-weight: bold; }
+                    .title { font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 8px; margin-bottom: 8px; }
+                    .box { background: #f1f5f9; border-radius: 14px; padding: 18px; margin: 20px 0; }
+                    .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+                    .label { color: #64748b; font-weight: 500; }
+                    .val { color: #0f172a; font-weight: 700; }
+                    .btn { display: inline-block; background: #16a34a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: bold; font-size: 14px; margin-top: 16px; }
+                    .footer { margin-top: 28px; font-size: 12px; color: #94a3b8; text-align: center; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <span class="badge">Academic Contribution Verified &amp; Approved</span>
+                    <div class="title">Your Contribution is Approved! 🎉</div>
+                    <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+                        Dear <strong>%s</strong>,<br>
+                        Thank you for contributing to the Southeast University student community! Your uploaded academic material has been verified by the administration and is now live on NoteLagbe.
+                    </p>
+                    <div class="box">
+                        <div class="row"><span class="label">Material Title:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Course Code:</span><span class="val" style="font-family: monospace;">%s</span></div>
+                        <div class="row"><span class="label">Reward Courses:</span><span class="val" style="color: #16a34a; font-family: monospace;">%s &amp; %s</span></div>
+                        <div class="row"><span class="label">Reward Access:</span><span class="val" style="color: #16a34a;">3 Months (90 Days) Free Access</span></div>
+                    </div>
+                    <div style="background: #f8fafc; border-left: 4px solid #16a34a; padding: 12px 16px; border-radius: 0 10px 10px 0; margin: 16px 0; font-size: 13px; color: #334155;">
+                        <strong>Admin Feedback:</strong> %s
+                    </div>
+                    <p style="font-size: 13px; color: #64748b; line-height: 1.6;">
+                        Your requested reward courses (<strong>%s</strong> and <strong>%s</strong>) have been automatically unlocked on your account with full access to all lecture notes and exam archives.
+                    </p>
+                    <div style="text-align: center;">
+                        <a href="%s" class="btn">View Unlocked Courses on Dashboard →</a>
+                    </div>
+                    <div class="footer">
+                        NoteLagbe — Southeast University Academic Resource Archive<br>
+                        Permanent Campus: 251/A and 252, Tejgaon I/A, Dhaka-1208
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.formatted(
+                HtmlUtils.htmlEscape(user.getName()),
+                HtmlUtils.htmlEscape(materialTitle),
+                HtmlUtils.htmlEscape(courseCode),
+                HtmlUtils.htmlEscape(course1Code),
+                HtmlUtils.htmlEscape(course2Code),
+                HtmlUtils.htmlEscape(cleanFeedback),
+                HtmlUtils.htmlEscape(course1Code),
+                HtmlUtils.htmlEscape(course2Code),
+                HtmlUtils.htmlEscape(dashboardUrl)
+        );
+
+        try {
+            dispatchHtmlEmail(user.getEmail(), "🎉 Academic Contribution Approved! 2 Courses Unlocked Free (" + courseCode + ")", html);
+            log.info("Contribution approval email sent successfully to: {}", user.getEmail());
+        } catch (Exception e) {
+            log.warn("Failed to send contribution approval email to {}: {}", user.getEmail(), e.getMessage());
+        }
+    }
+
+    @Async
+    public void sendPaymentSubmissionPendingEmail(User user, PlanType planType, double amount, String trxId, PaymentMethod method, String senderPhone) {
+        if (!isEmailNotificationsEnabled()) {
+            log.info("Skipping email notification: Email notifications are disabled by admin.");
+            return;
+        }
+        if (user == null || !hasText(user.getEmail())) {
+            return;
+        }
+        if (!isSmtpConfigured()) {
+            log.info("Email delivery not configured. Skipping payment submission pending email for {} - simulation mode.", user.getEmail());
+            return;
+        }
+
+        String pricingUrl = resolveFrontendBaseUrl() + "/pricing";
+        String methodLabel = method != null ? method.name() : "Mobile Banking";
+
+        String html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
+                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+                    .badge { display: inline-block; padding: 4px 12px; background: #fef3c7; color: #b45309; border-radius: 999px; font-size: 12px; font-weight: bold; }
+                    .title { font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 8px; margin-bottom: 8px; }
+                    .box { background: #f1f5f9; border-radius: 14px; padding: 18px; margin: 20px 0; }
+                    .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+                    .label { color: #64748b; font-weight: 500; }
+                    .val { color: #0f172a; font-weight: 700; font-family: monospace; }
+                    .instruction-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin: 18px 0; font-size: 13px; color: #92400e; line-height: 1.6; }
+                    .btn { display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: bold; font-size: 14px; margin-top: 16px; }
+                    .footer { margin-top: 28px; font-size: 12px; color: #94a3b8; text-align: center; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <span class="badge">NoteLagbe • Payment Verification Pending</span>
+                    <div class="title">Payment Submission Received ⏳</div>
+                    <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+                        Dear <strong>%s</strong>,<br>
+                        We have successfully received your payment verification request on NoteLagbe. Your transaction has been logged and queued for administrative review.
+                    </p>
+                    <div class="box">
+                        <div class="row"><span class="label">Plan Selected:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Amount:</span><span class="val">৳%.0f</span></div>
+                        <div class="row"><span class="label">Payment Method:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Sender Number:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Transaction ID:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Verification Status:</span><span class="val" style="color: #b45309;">Under Admin Review (যাচাই চলছে)</span></div>
+                    </div>
+                    <div class="instruction-box">
+                        <strong>📌 পরবর্তী পদক্ষেপ / What to do next:</strong><br>
+                        অ্যাডমিনিস্ট্রেটর আপনার Transaction ID মোবাইল ব্যাংকিং লেজারের সাথে যাচাই করছেন। সাধারণত <strong>১৫ থেকে ৩০ মিনিটের</strong> মধ্যে ভেরিফিকেশন সম্পন্ন হয়। অ্যাডমিন অনুমোদন (Accept) দেওয়ার সাথে সাথে আপনার কোর্স আনলক কোটা স্বয়ংক্রিয়ভাবে সক্রিয় হয়ে যাবে এবং আপনি আরেকটি কনফার্মেশন ইমেইল পাবেন।
+                    </div>
+                    <div style="text-align: center;">
+                        <a href="%s" class="btn">Check Verification Status on NoteLagbe →</a>
+                    </div>
+                    <div class="footer">
+                        NoteLagbe — Southeast University Academic Resource Archive<br>
+                        Permanent Campus: 251/A and 252, Tejgaon I/A, Dhaka-1208
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.formatted(
+                HtmlUtils.htmlEscape(user.getName()),
+                HtmlUtils.htmlEscape(planType.getDisplayName()),
+                amount,
+                HtmlUtils.htmlEscape(methodLabel),
+                HtmlUtils.htmlEscape(senderPhone != null ? senderPhone : "N/A"),
+                HtmlUtils.htmlEscape(trxId),
+                HtmlUtils.htmlEscape(pricingUrl)
+        );
+
+        try {
+            dispatchHtmlEmail(user.getEmail(), "⏳ NoteLagbe: Payment Received — Under Admin Verification (" + trxId + ")", html);
+            log.info("Payment submission pending email sent successfully to: {}", user.getEmail());
+        } catch (Exception e) {
+            log.warn("Failed to send payment submission pending email to {}: {}", user.getEmail(), e.getMessage());
         }
     }
 

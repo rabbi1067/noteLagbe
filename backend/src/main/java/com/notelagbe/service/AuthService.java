@@ -67,6 +67,7 @@ public class AuthService {
     private final CloudinaryService cloudinaryService;
     private final EmailService emailService;
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AuthService.class);
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
     private static final int OTP_EXPIRY_MINUTES = 10;
@@ -299,6 +300,13 @@ public class AuthService {
         evictCachedUser(user.getEmail());
         liveSyncService.broadcast("user", "created", user.getId());
         liveSyncService.broadcast("staff", "created", user.getId());
+
+        // Dispatch Welcome Email to newly registered student
+        try {
+            emailService.sendStudentWelcomeEmail(user);
+        } catch (Exception e) {
+            log.warn("Failed to dispatch welcome email to {}: {}", user.getEmail(), e.getMessage());
+        }
 
         String token = tokenProvider.generateTokenFromUser(user);
 

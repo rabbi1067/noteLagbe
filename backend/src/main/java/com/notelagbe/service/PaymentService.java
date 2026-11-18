@@ -102,6 +102,29 @@ public class PaymentService {
             throw new ApiException("A payment verification request with this Transaction ID was just submitted. Please wait for admin review.", org.springframework.http.HttpStatus.CONFLICT);
         }
 
+        // Create in-app notification informing user of pending verification
+        try {
+            notificationService.createNotification(
+                    user,
+                    "Payment Under Review: " + saved.getPlanType().getDisplayName() + " ⏳",
+                    "Your payment verification request (TrxID: " + cleanTrx + ") has been received. Please wait while an administrator checks and approves your payment.",
+                    "PAYMENT_SUBMITTED",
+                    "/pricing"
+            );
+        } catch (Exception ignored) {}
+
+        // Trigger Async Email Notification to student confirming submission
+        try {
+            emailService.sendPaymentSubmissionPendingEmail(
+                    user,
+                    saved.getPlanType(),
+                    saved.getAmount(),
+                    saved.getTransactionId(),
+                    saved.getPaymentMethod(),
+                    saved.getSenderPhone()
+            );
+        } catch (Exception ignored) {}
+
         liveSyncService.broadcast("payment", "created", saved.getId());
         return saved;
     }
