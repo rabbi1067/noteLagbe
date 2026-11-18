@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
@@ -14,6 +14,7 @@ import {
   Phone, 
   MapPin, 
   BookOpen, 
+  ArrowLeft,
   ArrowRight, 
   Award, 
   ChevronRight,
@@ -111,6 +112,7 @@ function sortResourcesDescending(list: any[]): any[] {
 
 export default function TeacherDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = Number(params?.id);
   const { language, t } = useLanguage();
   const { user, isAuthenticated, setShowAuthModal } = useAuth();
@@ -497,7 +499,35 @@ export default function TeacherDetailPage() {
   const remainingCount = filteredCourses.length - displayedCourses.length;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6 sm:space-y-10">
+      
+      {/* Back Navigation Bar */}
+      <div className="flex items-center justify-between gap-4">
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+            } else {
+              router.push("/teachers");
+            }
+          }}
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 shadow-xs transition-all cursor-pointer group active:scale-95"
+          title={language === "bn" ? "পূর্ববর্তী পেজে ফিরে যান" : "Back to Faculty Directory"}
+        >
+          <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1 text-blue-600 dark:text-blue-400 shrink-0" />
+          <span>{language === "bn" ? "ফ্যাকাল্টি তালিকায় ফিরে যান" : "Back to Faculty Directory"}</span>
+        </button>
+
+        {/* Breadcrumb indicator */}
+        <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+          <Link href="/teachers" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+            {language === "bn" ? "শিক্ষকবৃন্দ" : "Faculty"}
+          </Link>
+          <span>/</span>
+          <span className="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[200px]">{teacher.name}</span>
+        </div>
+      </div>
       
       {/* 1. FACULTY HEADER PROFILE CARD */}
       <div className="p-8 sm:p-10 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">

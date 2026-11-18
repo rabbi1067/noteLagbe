@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -13,6 +13,7 @@ import FacultyAvatar from "@/components/FacultyAvatar";
 import { formatSemesterDisplay } from "@/lib/academicSemester";
 import { 
   BookOpen, 
+  ArrowLeft,
   FileText, 
   Sparkles, 
   Lock, 
@@ -61,6 +62,7 @@ import coursesCatalogData from "@/data/courses_catalog.json";
 
 export default function CourseDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const code = (params?.code as string)?.toUpperCase();
   const { user, isAuthenticated, hasUnlocked, hasUnlockedForTeacher, setShowAuthModal, refreshProfile } = useAuth();
   const { language, t } = useLanguage();
@@ -761,7 +763,35 @@ function sortMaterialsBySemesterDesc(materials: any[]): any[] {
     : null;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+      
+      {/* Back Navigation Bar */}
+      <div className="flex items-center justify-between gap-4">
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+            } else {
+              router.push("/courses");
+            }
+          }}
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 shadow-xs transition-all cursor-pointer group active:scale-95"
+          title={language === "bn" ? "পূর্ববর্তী পেজে ফিরে যান" : "Back to Courses"}
+        >
+          <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1 text-blue-600 dark:text-blue-400 shrink-0" />
+          <span>{language === "bn" ? "কোর্স তালিকায় ফিরে যান" : "Back to Courses"}</span>
+        </button>
+
+        {/* Breadcrumb indicator */}
+        <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+          <Link href="/courses" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+            {language === "bn" ? "কোর্সসমূহ" : "Courses"}
+          </Link>
+          <span>/</span>
+          <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{course?.code || code}</span>
+        </div>
+      </div>
       
       {/* 0. SUPER ADMIN TESTING CONTROLLER BANNER */}
       {isSuperAdmin && (
@@ -1383,15 +1413,17 @@ function sortMaterialsBySemesterDesc(materials: any[]): any[] {
             {/* 1. Lab Hand Notes */}
             {(activeTab === "ALL" || activeTab === "LAB_HAND_NOTE") && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <BookMarked className="w-4 h-4 text-teal-600" />
-                    <span>{language === "bn" ? "হ্যান্ড নোট" : "Hand Notes"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-400">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                      <BookMarked className="w-4 h-4 text-teal-600 shrink-0" />
+                      <span>{language === "bn" ? "হ্যান্ড নোট" : "Hand Notes"}</span>
+                    </h3>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-400 whitespace-nowrap shrink-0 inline-flex items-center gap-1">
                       {labHandNotes.length}
                     </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-semibold hidden sm:inline-block">
                     {language === "bn" ? "ব্যবহারিক ক্লাস লেকচার ও প্র্যাকটিক্যাল কোড শিট" : "Practical Class Lectures & Code Cheatsheets"}
                   </span>
                 </div>
@@ -1420,15 +1452,17 @@ function sortMaterialsBySemesterDesc(materials: any[]): any[] {
             {/* 2. Lab Quiz */}
             {(activeTab === "ALL" || activeTab === "LAB_QUIZ") && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <HelpCircle className="w-4 h-4 text-purple-600" />
-                    <span>{language === "bn" ? "ল্যাব কুইজ" : "Lab Quizzes"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                      <HelpCircle className="w-4 h-4 text-purple-600 shrink-0" />
+                      <span>{language === "bn" ? "ল্যাব কুইজ" : "Lab Quizzes"}</span>
+                    </h3>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400 whitespace-nowrap shrink-0 inline-flex items-center gap-1">
                       {labQuizzes.length}
                     </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-semibold hidden sm:inline-block">
                     {language === "bn" ? "ব্যবহারিক কোডিং কুইজ ও কমান্ড টেস্ট" : "Practical Coding & Command Quizzes"}
                   </span>
                 </div>
@@ -1457,15 +1491,17 @@ function sortMaterialsBySemesterDesc(materials: any[]): any[] {
             {/* 3. Lab Final */}
             {(activeTab === "ALL" || activeTab === "LAB_FINAL") && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Award className="w-4 h-4 text-rose-600" />
-                    <span>{language === "bn" ? "ল্যাব ফাইনাল" : "Lab Final"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Award className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>{language === "bn" ? "ল্যাব ফাইনাল" : "Lab Final"}</span>
+                    </h3>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-400 whitespace-nowrap shrink-0 inline-flex items-center gap-1">
                       {labFinals.length}
                     </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-semibold hidden sm:inline-block">
                     {language === "bn" ? "ল্যাব ফাইনাল প্রবলেম সেট ও ভাইভা প্রশ্নব্যাংক" : "Lab Final Problem Sets & Viva Question Bank"}
                   </span>
                 </div>
@@ -1494,15 +1530,17 @@ function sortMaterialsBySemesterDesc(materials: any[]): any[] {
             {/* 4. Project Links (Live Demo or GitHub Source Code) */}
             {(activeTab === "ALL" || activeTab === "PROJECT_LINK") && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <ExternalLink className="w-4 h-4 text-emerald-600" />
-                    <span>{language === "bn" ? "প্রজেক্ট লিংক" : "Project Links"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                      <ExternalLink className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{language === "bn" ? "প্রজেক্ট লিংক" : "Project Links"}</span>
+                    </h3>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 whitespace-nowrap shrink-0 inline-flex items-center gap-1">
                       {projectLinks.length}
                     </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-semibold hidden sm:inline-block">
                     {language === "bn" ? "লাইভ ওয়েব ডেমো ও গিটহাব সোর্স কোড রিপোজিটরি" : "Live Web Demos & GitHub Source Codes"}
                   </span>
                 </div>
@@ -1531,15 +1569,17 @@ function sortMaterialsBySemesterDesc(materials: any[]): any[] {
             {/* 5. Doc File Notes */}
             {(activeTab === "ALL" || activeTab === "DOC_NOTE") && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-cyan-600" />
-                    <span>{language === "bn" ? "ডক ফাইল নোট" : "Doc File Notes"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-400">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-cyan-600 shrink-0" />
+                      <span>{language === "bn" ? "ডক ফাইল নোট" : "Doc File Notes"}</span>
+                    </h3>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-400 whitespace-nowrap shrink-0 inline-flex items-center gap-1">
                       {labDocNotes.length}
                     </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-semibold hidden sm:inline-block">
                     {language === "bn" ? "ওয়ার্ড ফাইল (.docx) ও ল্যাব রিপোর্ট টেমপ্লেট" : "Word (.docx) Documentation & Report Templates"}
                   </span>
                 </div>
@@ -1602,15 +1642,17 @@ function sortMaterialsBySemesterDesc(materials: any[]): any[] {
             {/* SECTION A: HAND NOTES */}
             {(activeTab === "ALL" || activeTab === "NOTES") && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <BookMarked className="w-4 h-4 text-emerald-600" />
-                    <span>{language === "bn" ? "হ্যান্ড নোট" : "Hand Notes"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                      <BookMarked className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{language === "bn" ? "হ্যান্ড নোট" : "Hand Notes"}</span>
+                    </h3>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 whitespace-nowrap shrink-0 inline-flex items-center gap-1">
                       {handNotes.length}
                     </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-semibold hidden sm:inline-block">
                     {language === "bn" ? "লেকচার হ্যান্ড নোট ও ক্লাস স্লাইড" : "Lecture Hand Notes & Class Slides"}
                   </span>
                 </div>
@@ -1639,15 +1681,17 @@ function sortMaterialsBySemesterDesc(materials: any[]): any[] {
             {/* SECTION B: MIDTERM EXAMINATION QUESTIONS */}
             {(activeTab === "ALL" || activeTab === "MIDTERM") && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-blue-600" />
-                    <span>{language === "bn" ? "মিডটার্ম" : "Midterm Examination Papers"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400">
-                      {midtermExams.length} {language === "bn" ? "টি সেমিস্টার" : "Semesters"}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                      <span>{language === "bn" ? "মিডটার্ম" : "Midterm Examination Papers"}</span>
+                    </h3>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 whitespace-nowrap shrink-0 inline-flex items-center gap-1">
+                      {midtermExams.length} {language === "bn" ? "টি সেমিস্টার" : (midtermExams.length === 1 ? "Semester" : "Semesters")}
                     </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-semibold hidden sm:inline-block">
                     {language === "bn" ? "বিগত সেমিস্টারের মিডটার্ম প্রশ্ন আর্কাইভ" : "Multi-Semester Midterm Archive"}
                   </span>
                 </div>
@@ -1676,15 +1720,17 @@ function sortMaterialsBySemesterDesc(materials: any[]): any[] {
             {/* SECTION C: FINAL EXAMINATION QUESTIONS */}
             {(activeTab === "ALL" || activeTab === "FINAL") && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <GraduationCap className="w-4 h-4 text-indigo-600" />
-                    <span>{language === "bn" ? "ফাইনাল" : "Final Examination Papers"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400">
-                      {finalExams.length} {language === "bn" ? "টি সেমিস্টার" : "Semesters"}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                      <GraduationCap className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <span>{language === "bn" ? "ফাইনাল" : "Final Examination Papers"}</span>
+                    </h3>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 whitespace-nowrap shrink-0 inline-flex items-center gap-1">
+                      {finalExams.length} {language === "bn" ? "টি সেমিস্টার" : (finalExams.length === 1 ? "Semester" : "Semesters")}
                     </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-semibold hidden sm:inline-block">
                     {language === "bn" ? "বিগত সেমিস্টারের ফাইনাল পরীক্ষা প্রশ্ন আর্কাইভ" : "Multi-Semester Final Exam Archive"}
                   </span>
                 </div>
@@ -1713,15 +1759,17 @@ function sortMaterialsBySemesterDesc(materials: any[]): any[] {
             {/* SECTION D: QUIZ / CLASS TEST (CT) */}
             {(activeTab === "ALL" || activeTab === "QUIZ") && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <HelpCircle className="w-4 h-4 text-purple-600" />
-                    <span>{language === "bn" ? "কুইজ ও ক্লাস টেস্ট (CT)" : "Quiz & Class Test (CT) Papers"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                      <HelpCircle className="w-4 h-4 text-purple-600 shrink-0" />
+                      <span>{language === "bn" ? "কুইজ ও ক্লাস টেস্ট (CT)" : "Quiz & Class Test (CT) Papers"}</span>
+                    </h3>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400 whitespace-nowrap shrink-0 inline-flex items-center gap-1">
                       {quizCTs.length}
                     </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-semibold hidden sm:inline-block">
                     {language === "bn" ? "সেমিস্টার কুইজ ও ক্লাস টেস্ট সলিউশন" : "Semester Quizzes, Spot Tests & Questions"}
                   </span>
                 </div>
@@ -1750,15 +1798,17 @@ function sortMaterialsBySemesterDesc(materials: any[]): any[] {
             {/* SECTION E: DOC FILE NOTES */}
             {(activeTab === "ALL" || activeTab === "DOC_NOTE") && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-cyan-600" />
-                    <span>{language === "bn" ? "ডক ফাইল নোট" : "Doc File Notes"}</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-400">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-cyan-600 shrink-0" />
+                      <span>{language === "bn" ? "ডক ফাইল নোট" : "Doc File Notes"}</span>
+                    </h3>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-400 whitespace-nowrap shrink-0 inline-flex items-center gap-1">
                       {docNotes.length}
                     </span>
-                  </h3>
-                  <span className="text-[11px] text-slate-500 font-semibold">
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-semibold hidden sm:inline-block">
                     {language === "bn" ? "ওয়ার্ড ফাইল (.docx), লেকচার ড্রাফট ও এডিটেবল নোটস" : "Editable Word (.docx) Lecture Guides, Summaries & Outlines"}
                   </span>
                 </div>
