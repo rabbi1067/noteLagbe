@@ -31,6 +31,7 @@ import {
   Pause,
   AlertTriangle,
   RotateCcw,
+  MoreVertical,
   Loader2,
   Users,
   ExternalLink,
@@ -206,7 +207,7 @@ export default function FloatingCommunityChat() {
   const [isMobileScreen, setIsMobileScreen] = useState(false);
   useEffect(() => {
     const handleResize = () => {
-      setIsMobileScreen(window.innerWidth < 1024);
+      setIsMobileScreen(window.innerWidth < 960);
     };
     handleResize();
     window.addEventListener("resize", handleResize);
@@ -220,6 +221,26 @@ export default function FloatingCommunityChat() {
   const isProgrammaticScrollRef = useRef<boolean>(false);
   const prevMsgCountRef = useRef<number>(0);
   const isFetchingRef = useRef(false);
+
+  // Chat Preferences Dropdown Popover (Notifications, Sound, Position Reset)
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const settingsMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(e.target as Node)) {
+        setShowSettingsMenu(false);
+      }
+    };
+    if (showSettingsMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [showSettingsMenu]);
 
   // Highlighted message state (for jumping to pinned message)
   const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null);
@@ -1621,58 +1642,21 @@ export default function FloatingCommunityChat() {
               </div>
             </div>
 
-            {/* Right: Action Buttons (Minimalist & Sleek) */}
-            <div className="flex items-center gap-1 shrink-0">
-              {/* Day / Night Theme Toggle */}
-              {/* Notification ON/OFF Toggle */}
+            {/* Right: Modern, Unified Action Bar (Consistent Glassmorphism) */}
+            <div className="flex items-center gap-1.5 shrink-0 relative" ref={settingsMenuRef}>
+              
+              {/* 1. Quick Mute / Sound Toggle */}
               <button
                 type="button"
-                onClick={handleToggleNotifications}
-                className={`p-1.5 rounded-xl transition-all border ${
-                  notificationsEnabled
-                    ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25 shadow-xs"
-                    : isDark
-                    ? "bg-slate-800/80 border-slate-700 text-slate-500 hover:text-slate-300"
-                    : "bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-600"
-                }`}
-                title={
-                  notificationsEnabled
-                    ? isBn
-                      ? "নোটিফিকেশন চালু (বন্ধ করতে ক্লিক করুন)"
-                      : "Notifications ON (click to mute)"
-                    : isBn
-                    ? "নোটিফিকেশন বন্ধ (চালু করতে ক্লিক করুন)"
-                    : "Notifications OFF (click to enable)"
-                }
-                aria-label="Toggle notifications"
-              >
-                {notificationsEnabled ? (
-                  <Bell className="w-3.5 h-3.5 fill-amber-400/20" />
-                ) : (
-                  <BellOff className="w-3.5 h-3.5" />
-                )}
-              </button>
-
-              {/* 1-Click Reset to Default Corner (Desktop Only) */}
-              {!isMobileScreen && (
-                <button
-                  onClick={handleResetPosition}
-                  className="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 transition-colors"
-                  title={isBn ? "ডিফল্ট কর্নারে রিসেট করুন" : "Reset position to corner"}
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-              )}
-
-              {/* Sound Notification Toggle */}
-              <button
                 onClick={handleToggleSound}
-                className={`p-1.5 rounded-xl border transition-all ${
+                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
                   soundEnabled
-                    ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                    ? isDark
+                      ? "bg-slate-800/80 border-slate-700/80 text-emerald-400 hover:bg-slate-700/80 hover:text-emerald-300 shadow-xs active:scale-95"
+                      : "bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100 active:scale-95"
                     : isDark
-                    ? "bg-slate-800/80 border-slate-700 text-slate-500 hover:text-slate-300"
-                    : "bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-600"
+                    ? "bg-slate-800/50 border-slate-700/50 text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 active:scale-95"
+                    : "bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-600 active:scale-95"
                 }`}
                 title={
                   soundEnabled
@@ -1683,30 +1667,155 @@ export default function FloatingCommunityChat() {
                     ? "সাউন্ড বন্ধ (চালু করতে ক্লিক করুন)"
                     : "Sound muted (click to unmute)"
                 }
+                aria-label="Toggle chat sound"
               >
                 {soundEnabled ? (
-                  <Volume2 className="w-3.5 h-3.5" />
+                  <Volume2 className="w-4 h-4" />
                 ) : (
-                  <VolumeX className="w-3.5 h-3.5" />
+                  <VolumeX className="w-4 h-4" />
                 )}
               </button>
 
-              {/* Minimize */}
-              <button
-                onClick={() => handleToggleOpen(false)}
-                className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-                title={isBn ? "ছোট করুন" : "Minimize"}
-              >
-                <Minus className="w-3.5 h-3.5" />
-              </button>
+              {/* 2. Chat Preferences / Settings Menu Button */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+                    showSettingsMenu
+                      ? "bg-cyan-500/20 border-cyan-400/50 text-cyan-400 shadow-xs"
+                      : isDark
+                      ? "bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-700/60 active:scale-95"
+                      : "bg-slate-100 border-slate-200 text-slate-500 hover:text-slate-900 active:scale-95"
+                  }`}
+                  title={isBn ? "চ্যাটরুম সেটিংস" : "Chat Settings"}
+                  aria-label="Chat Settings"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
 
-              {/* Close */}
+                {/* Glassmorphic Preferences Popover Menu */}
+                {showSettingsMenu && (
+                  <div
+                    className={`absolute right-0 mt-2 w-64 rounded-2xl border shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150 ${
+                      isDark
+                        ? "bg-[#0c1322]/95 backdrop-blur-xl border-slate-700/80 text-slate-100 shadow-[0_15px_35px_rgba(0,0,0,0.6)]"
+                        : "bg-white/95 backdrop-blur-xl border-slate-200 text-slate-900 shadow-xl"
+                    }`}
+                  >
+                    <div className="px-3 py-2 border-b border-slate-200/60 dark:border-slate-800/80">
+                      <p className="text-xs font-bold flex items-center gap-1.5 text-slate-900 dark:text-white">
+                        <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <span>{isBn ? "ক্যাম্পাস লাইভ প্রেফারেন্স" : "Chatroom Preferences"}</span>
+                      </p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        {isBn ? "নোটিফিকেশন ও সাউন্ড নিয়ন্ত্রণ করুন" : "Manage notifications & audio alerts"}
+                      </p>
+                    </div>
+
+                    <div className="py-1 space-y-1">
+                      {/* Push Notification Toggle Item */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleToggleNotifications();
+                        }}
+                        className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-left transition-colors cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                            notificationsEnabled
+                              ? "bg-amber-500/15 text-amber-400"
+                              : "bg-slate-200 dark:bg-slate-800 text-slate-400"
+                          }`}>
+                            {notificationsEnabled ? (
+                              <Bell className="w-3.5 h-3.5 fill-amber-400/20" />
+                            ) : (
+                              <BellOff className="w-3.5 h-3.5" />
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">
+                              {isBn ? "পুশ নোটিফিকেশন" : "Desktop Alerts"}
+                            </span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
+                              {notificationsEnabled
+                                ? (isBn ? "চালু আছে" : "Active on incoming chats")
+                                : (isBn ? "মিউট করা" : "Muted")}
+                            </span>
+                          </div>
+                        </div>
+                        <div className={`w-8 h-4.5 rounded-full transition-colors p-0.5 shrink-0 ${notificationsEnabled ? "bg-cyan-500" : "bg-slate-300 dark:bg-slate-700"}`}>
+                          <div className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${notificationsEnabled ? "translate-x-3.5" : "translate-x-0"}`} />
+                        </div>
+                      </button>
+
+                      {/* Sound Effects Toggle Item */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleToggleSound();
+                        }}
+                        className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-left transition-colors cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                            soundEnabled
+                              ? "bg-emerald-500/15 text-emerald-400"
+                              : "bg-slate-200 dark:bg-slate-800 text-slate-400"
+                          }`}>
+                            {soundEnabled ? (
+                              <Volume2 className="w-3.5 h-3.5" />
+                            ) : (
+                              <VolumeX className="w-3.5 h-3.5" />
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">
+                              {isBn ? "মেসেজ সাউন্ড" : "Chat Sound Effects"}
+                            </span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
+                              {soundEnabled ? (isBn ? "শব্দ বাজবে" : "Play incoming chime") : (isBn ? "মিউট করা" : "Silent mode")}
+                            </span>
+                          </div>
+                        </div>
+                        <div className={`w-8 h-4.5 rounded-full transition-colors p-0.5 shrink-0 ${soundEnabled ? "bg-cyan-500" : "bg-slate-300 dark:bg-slate-700"}`}>
+                          <div className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${soundEnabled ? "translate-x-3.5" : "translate-x-0"}`} />
+                        </div>
+                      </button>
+
+                      {/* Reset Position (Desktop only) */}
+                      {!isMobileScreen && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleResetPosition();
+                            setShowSettingsMenu(false);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:text-cyan-500 dark:hover:text-cyan-400 text-left transition-colors cursor-pointer text-xs font-semibold border-t border-slate-200/60 dark:border-slate-800/60 mt-1"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>{isBn ? "ডিফল্ট কর্নারে রিসেট করুন" : "Reset Window to Corner"}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Single Dismiss / Close Button */}
               <button
+                type="button"
                 onClick={() => handleToggleOpen(false)}
-                className="p-1.5 rounded-xl hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 transition-colors"
-                title={isBn ? "বন্ধ করুন" : "Close"}
+                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 ${
+                  isDark
+                    ? "border-slate-700/60 bg-slate-800/50 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 hover:border-rose-500/40"
+                    : "border-slate-200 bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 hover:border-rose-300"
+                }`}
+                title={isBn ? "চ্যাট বন্ধ করুন" : "Close Chat"}
+                aria-label="Close Chat"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
           </div>
