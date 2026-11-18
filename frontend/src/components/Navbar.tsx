@@ -72,25 +72,41 @@ export default function Navbar() {
     };
   }, [userDropdownOpen]);
 
+  const handleNotificationOpenChange = useCallback((open: boolean) => {
+    setNotificationOpen(open);
+  }, []);
+
   // Global listener to dismiss user dropdown when other popovers open
   useEffect(() => {
-    const handleClose = () => setUserDropdownOpen(false);
+    const handleClose = (e: any) => {
+      if (e?.detail?.source !== "user-dropdown") {
+        setUserDropdownOpen(false);
+      }
+    };
     window.addEventListener("notelagbe-close-dropdowns", handleClose);
     return () => window.removeEventListener("notelagbe-close-dropdowns", handleClose);
   }, []);
 
-  const handleToggleUserDropdown = () => {
-    if (!userDropdownOpen) {
-      // Senior-engineer touch: Dismiss any mobile keyboard & blur active input (e.g. search box)
-      if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
-        document.activeElement.blur();
+  const handleToggleUserDropdown = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setUserDropdownOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        // Senior-engineer touch: Dismiss any mobile keyboard & blur active input (e.g. search box)
+        if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        // Broadcast close event for other open popovers
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("notelagbe-close-dropdowns", {
+              detail: { source: "user-dropdown" },
+            })
+          );
+        }
       }
-      // Broadcast close event for other open popovers
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("notelagbe-close-dropdowns"));
-      }
-    }
-    setUserDropdownOpen((prev) => !prev);
+      return next;
+    });
   };
 
   if (pathname.startsWith("/admin")) {
@@ -169,7 +185,7 @@ export default function Navbar() {
             
             {/* In-App Notifications Bell (Campus Announcements & Personal Alerts) */}
             <div className="shrink-0">
-              <NotificationBell onOpenChange={(open) => setNotificationOpen(open)} />
+              <NotificationBell onOpenChange={handleNotificationOpenChange} />
             </div>
 
             {/* Language Switcher Pill (Compact single-token on mobile, full pill on md+) */}
@@ -214,7 +230,7 @@ export default function Navbar() {
                     type="button"
                     onClick={handleToggleUserDropdown}
                     aria-expanded={userDropdownOpen}
-                    className="flex items-center gap-1.5 lg:gap-2 p-1 sm:p-1 xl:px-2.5 xl:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer shrink-0"
+                    className="relative z-50 flex items-center gap-1.5 lg:gap-2 p-1 sm:p-1 xl:px-2.5 xl:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer shrink-0"
                     title={user.name}
                     aria-label="User Account Menu"
                   >
@@ -241,17 +257,11 @@ export default function Navbar() {
                   {/* Dropdown Menu & Event-Capturing Backdrop */}
                   {userDropdownOpen && (
                     <>
-                      {/* Full-screen backdrop to intercept outside clicks/taps and prevent background click-through/focus */}
+                      {/* Full-screen backdrop to intercept outside clicks/taps without blocking the button */}
                       <div
                         className="fixed inset-0 z-40 bg-black/10 dark:bg-black/25 backdrop-blur-[0.5px] transition-opacity animate-in fade-in duration-150 cursor-default"
                         onClick={(e) => {
                           e.stopPropagation();
-                          e.preventDefault();
-                          setUserDropdownOpen(false);
-                        }}
-                        onTouchStart={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
                           setUserDropdownOpen(false);
                         }}
                         aria-hidden="true"

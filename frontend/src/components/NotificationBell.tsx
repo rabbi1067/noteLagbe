@@ -75,14 +75,23 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
   const [filterTab, setFilterTab] = useState<"all" | "unread">("all");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Notify parent component about open state changes
+  // Notify parent component about open state changes safely
+  const onOpenChangeRef = useRef(onOpenChange);
   useEffect(() => {
-    onOpenChange?.(isOpen);
-  }, [isOpen, onOpenChange]);
+    onOpenChangeRef.current = onOpenChange;
+  }, [onOpenChange]);
 
-  // Global listener to dismiss notifications when other popovers open
   useEffect(() => {
-    const handleClose = () => setIsOpen(false);
+    onOpenChangeRef.current?.(isOpen);
+  }, [isOpen]);
+
+  // Global listener to dismiss notifications when other popovers open (ignoring self)
+  useEffect(() => {
+    const handleClose = (e: any) => {
+      if (e?.detail?.source !== "notification-bell") {
+        setIsOpen(false);
+      }
+    };
     window.addEventListener("notelagbe-close-dropdowns", handleClose);
     return () => window.removeEventListener("notelagbe-close-dropdowns", handleClose);
   }, []);
@@ -211,22 +220,30 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
     };
   }, [isOpen]);
 
-  const handleToggle = () => {
-    if (!isOpen) {
-      // Dismiss any mobile keyboard and blur focused inputs (e.g. search)
-      if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
-        document.activeElement.blur();
+  const handleToggle = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setIsOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        // Dismiss any mobile keyboard and blur focused inputs (e.g. search)
+        if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        // Broadcast close event for any other open popovers (tagged with source)
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("notelagbe-close-dropdowns", {
+              detail: { source: "notification-bell" },
+            })
+          );
+        }
+        fetchCampusNotices();
+        if (isAuthenticated) {
+          fetchNotifications();
+        }
       }
-      // Broadcast close event for any other open popovers
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("notelagbe-close-dropdowns"));
-      }
-      fetchCampusNotices();
-      if (isAuthenticated) {
-        fetchNotifications();
-      }
-    }
-    setIsOpen(!isOpen);
+      return next;
+    });
   };
 
   // Filter active and unexpired campus notices
@@ -353,12 +370,14 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
 
   return (
     <div className="relative shrink-0" ref={dropdownRef}>
-      {/* Bell Action Button */}
+      {/* Bell Action Button - z-50 ensures it remains clickable above the z-40 backdrop */}
       <button
+        type="button"
         onClick={handleToggle}
-        className={`relative p-2 rounded-xl border transition-all ${
+        aria-expanded={isOpen}
+        className={`relative z-50 p-2 rounded-xl border transition-all cursor-pointer ${
           isOpen
-            ? "bg-blue-50 dark:bg-blue-950/60 border-blue-400 text-blue-600 dark:text-blue-400 shadow-sm"
+            ? "bg-blue-50 dark:bg-blue-950/60 border-blue-400 text-blue-600 dark:text-blue-400 shadow-sm ring-2 ring-blue-500/20"
             : totalBadgeCount > 0
             ? "border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:border-blue-500 shadow-sm"
             : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-blue-400 hover:text-blue-600"
@@ -377,17 +396,11 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
       {/* Notifications Drawer & Event-Capturing Backdrop */}
       {isOpen && (
         <>
-          {/* Full-screen backdrop to intercept outside clicks/taps and prevent background click-through/focus */}
+          {/* Full-screen backdrop to intercept outside clicks/taps without blocking the button */}
           <div
             className="fixed inset-0 z-40 bg-black/10 dark:bg-black/25 backdrop-blur-[0.5px] transition-opacity animate-in fade-in duration-150 cursor-default"
             onClick={(e) => {
               e.stopPropagation();
-              e.preventDefault();
-              setIsOpen(false);
-            }}
-            onTouchStart={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
               setIsOpen(false);
             }}
             aria-hidden="true"
