@@ -45,6 +45,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark w-full max-w-full overflow-x-hidden" suppressHydrationWarning>
       <head>
+        <link rel="preconnect" href="https://notelagbe-backend.onrender.com" crossOrigin="" />
+        <link rel="dns-prefetch" href="https://notelagbe-backend.onrender.com" />
         <script
           dangerouslySetInnerHTML={{
             __html: `

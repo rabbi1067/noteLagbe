@@ -154,6 +154,11 @@ function AuthModalContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Immediately dismiss mobile virtual keyboard so viewport unfreezes and transitions instantly
+    if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
     const cleanEmail = email.trim().toLowerCase();
     const cleanPassword = password;
 
@@ -446,7 +451,7 @@ function AuthModalContent() {
                 setShowPassword(false);
                 setAuthMode("signin");
               }}
-              className={`py-2 rounded-lg transition-all ${
+              className={`py-2 rounded-lg transition-all touch-manipulation cursor-pointer active:scale-95 ${
                 !isRegister
                   ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold"
                   : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
@@ -461,7 +466,7 @@ function AuthModalContent() {
                 setShowPassword(false);
                 setAuthMode("register");
               }}
-              className={`py-2 rounded-lg transition-all ${
+              className={`py-2 rounded-lg transition-all touch-manipulation cursor-pointer active:scale-95 ${
                 isRegister
                   ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold"
                   : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
@@ -757,7 +762,7 @@ function AuthModalContent() {
           </div>
         ) : (
           /* SIGN IN & REGISTER FORM */
-          <form onSubmit={handleSubmit} autoComplete="off" className="space-y-3.5">
+          <form onSubmit={handleSubmit} className="space-y-3.5">
             {isRegister && (
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -769,9 +774,10 @@ function AuthModalContent() {
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
-                    name="nl-register-name"
+                    name="name"
                     type="text"
-                    autoComplete="off"
+                    autoComplete="name"
+                    autoCapitalize="words"
                     required
                     minLength={2}
                     maxLength={60}
@@ -794,16 +800,24 @@ function AuthModalContent() {
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
-                  name="nl-auth-email"
+                  name="email"
                   type="email"
-                  autoComplete="off"
+                  inputMode="email"
+                  autoComplete="username"
                   autoCapitalize="none"
+                  autoCorrect="off"
                   spellCheck={false}
                   required
                   maxLength={100}
                   placeholder="e.g. 2024100000122@seu.edu.bd or name@gmail.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value.slice(0, 100))}
+                  onChange={(e) => {
+                    const val = e.target.value.slice(0, 100);
+                    setEmail(val);
+                    if (val.length === 1) {
+                      void warmupBackend();
+                    }
+                  }}
                   className="w-full text-xs pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -818,8 +832,9 @@ function AuthModalContent() {
                   <span className="text-[10px] text-slate-400 font-mono">{studentId.length}/20</span>
                 </div>
                 <input
-                  name="nl-register-student-id"
+                  name="studentId"
                   type="text"
+                  inputMode="numeric"
                   autoComplete="off"
                   autoCapitalize="none"
                   spellCheck={false}
@@ -843,9 +858,10 @@ function AuthModalContent() {
                 <div className="relative">
                   <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
-                    name="nl-register-phone"
+                    name="phone"
                     type="tel"
-                    autoComplete="off"
+                    inputMode="tel"
+                    autoComplete="tel"
                     maxLength={15}
                     placeholder="e.g. 01712345678"
                     value={phone}
@@ -882,9 +898,12 @@ function AuthModalContent() {
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
-                  name="nl-auth-password"
+                  name={isRegister ? "new-password" : "current-password"}
                   type={showPassword ? "text" : "password"}
-                  autoComplete="new-password"
+                  autoComplete={isRegister ? "new-password" : "current-password"}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   required
                   minLength={6}
                   maxLength={64}
@@ -912,7 +931,7 @@ function AuthModalContent() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.99] transition-all shadow-md shadow-blue-500/25 disabled:opacity-70 mt-2 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 active:scale-[0.99] transition-all shadow-md shadow-blue-500/25 disabled:opacity-70 mt-2 flex items-center justify-center gap-2 cursor-pointer touch-manipulation select-none"
             >
               {loading ? (
                 <>

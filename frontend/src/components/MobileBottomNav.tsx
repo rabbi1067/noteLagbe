@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
+import { warmupBackend } from "@/lib/api";
 import { 
   BookOpen, 
   GraduationCap, 
@@ -33,6 +34,7 @@ import BrandLogo, { NoteLagbeIcon } from "@/components/BrandLogo";
 
 export default function MobileBottomNav() {
   const pathname = usePathname() || "";
+  const router = useRouter();
   const { user, isAuthenticated, isAdmin, logout, setShowAuthModal } = useAuth();
   const { language, toggleLanguage, t } = useLanguage();
   const { toggleTheme, isDark } = useTheme();
@@ -81,13 +83,17 @@ export default function MobileBottomNav() {
   useEffect(() => {
     if (drawerOpen) {
       document.body.style.overflow = "hidden";
+      if (!isAuthenticated) {
+        void warmupBackend();
+        router.prefetch("/dashboard");
+      }
     } else {
       document.body.style.overflow = "";
     }
     return () => {
       document.body.style.overflow = "";
     };
-  }, [drawerOpen]);
+  }, [drawerOpen, isAuthenticated, router]);
 
   // Don't render on admin dashboard
   if (pathname.startsWith("/admin")) {
@@ -475,11 +481,15 @@ export default function MobileBottomNav() {
               ) : (
                 <button
                   type="button"
+                  onTouchStart={() => {
+                    void warmupBackend();
+                    router.prefetch("/dashboard");
+                  }}
                   onClick={() => {
                     setDrawerOpen(false);
                     setShowAuthModal(true);
                   }}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 cursor-pointer active:scale-98 transition-all"
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 cursor-pointer active:scale-98 transition-all touch-manipulation"
                 >
                   <User className="w-4 h-4" />
                   <span>{language === "bn" ? "লগইন / সাইন আপ" : "Sign In to NoteLagbe"}</span>

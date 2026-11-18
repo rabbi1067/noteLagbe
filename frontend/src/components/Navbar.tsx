@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
+import { warmupBackend } from "@/lib/api";
 import { 
   BookOpen, 
   Search, 
@@ -27,12 +28,20 @@ import BrandLogo from "@/components/BrandLogo";
 
 export default function Navbar() {
   const pathname = usePathname() || "";
+  const router = useRouter();
   const { user, isAuthenticated, isAdmin, logout, setShowAuthModal } = useAuth();
   const { language, toggleLanguage, t } = useLanguage();
   const { theme, toggleTheme, isDark } = useTheme();
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const userDropdownRef = useRef<HTMLDivElement>(null);
+
+  const handlePrewarmAuth = useCallback(() => {
+    if (!isAuthenticated) {
+      void warmupBackend();
+      router.prefetch("/dashboard");
+    }
+  }, [isAuthenticated, router]);
 
   // Auto-close dropdown when navigating routes
   useEffect(() => {
@@ -311,7 +320,9 @@ export default function Navbar() {
               ) : (
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="py-1.5 px-3 sm:py-2 sm:px-4 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all shadow-md shadow-blue-500/20 whitespace-nowrap cursor-pointer"
+                  onPointerEnter={handlePrewarmAuth}
+                  onTouchStart={handlePrewarmAuth}
+                  className="py-1.5 px-3 sm:py-2 sm:px-4 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all shadow-md shadow-blue-500/20 whitespace-nowrap cursor-pointer touch-manipulation"
                 >
                   {t("nav.signIn", "Sign In")}
                 </button>
