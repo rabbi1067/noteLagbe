@@ -32,6 +32,8 @@ import {
   Gauge,
   Camera,
   ArrowLeftRight,
+  X,
+  Target,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -150,6 +152,10 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
   // Reorder drag state
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  // Interactive Tap-to-Move & Tap-to-Swap arbitrary position reordering
+  const [reorderingFromIdx, setReorderingFromIdx] = useState<number | null>(null);
+  const [reorderMode, setReorderMode] = useState<"move" | "swap">("move");
 
   // Export settings & live size estimation states
   const [exportOptions, setExportOptions] = useState<PdfExportOptions>(DEFAULT_EXPORT_OPTIONS);
@@ -327,6 +333,7 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
 
   // Remove a single page and free its temporary ObjectURL
   const handleRemovePage = (id: string) => {
+    setReorderingFromIdx(null);
     setPages((prev) => {
       const idx = prev.findIndex((p) => p.id === id);
       const removed = prev[idx];
@@ -350,6 +357,7 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
 
   // Clear all temporary images
   const handleClearAll = () => {
+    setReorderingFromIdx(null);
     pages.forEach((p) => {
       if (objectUrlsRef.current.has(p.previewUrl)) {
         URL.revokeObjectURL(p.previewUrl);
@@ -414,6 +422,24 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
       const updated = [...prev];
       const [moved] = updated.splice(from, 1);
       updated.splice(to, 0, moved);
+      return updated;
+    });
+    if (targetPageId) {
+      setSelectedId(targetPageId);
+    }
+  };
+
+  // Swap position of two pages directly
+  const swapPages = (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= pages.length || to >= pages.length) {
+      return;
+    }
+    const targetPageId = pages[from]?.id;
+    setPages((prev) => {
+      const updated = [...prev];
+      const temp = updated[from];
+      updated[from] = updated[to];
+      updated[to] = temp;
       return updated;
     });
     if (targetPageId) {
@@ -818,7 +844,10 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
         /* Active Workspace */
         <div className="space-y-6">
           {/* Page Serial Bar (Upload Order + Drag & Drop + Manual Serial Picker) */}
-          <div className="p-4 sm:p-5 rounded-3xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
+          <div
+            id="pdf-page-serial-bar"
+            className="p-4 sm:p-5 rounded-3xl bg-white/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3"
+          >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />
@@ -841,19 +870,121 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {bn
-                  ? "ছবি পরিবর্তন করতে কার্ডে সরাসরি ট্যাপ করুন (ট্যাপ করলে ১ম পেজে চলে যাবে), '#' ড্রপডাউন নির্বাচন করুন, অথবা তীর বাটন চাপুন"
-                  : "Tap any image to select, tap selected image again to move to #1, or use '#' dropdown and arrows to reorder"}
+                  ? "ট্যাপ করে যেকোনো পজিশনে সরান: কার্ডে 'সরান' চাপুন অথবা সিলেক্টেড কার্ডে ট্যাপ করে লক্ষ্য কার্ডে ট্যাপ করুন (#২ থেকে #১০ বা যেকোনো স্থানে)"
+                  : "Tap to reorder anywhere: Tap 'Move' on any card, or tap selected card then tap destination card (#2 to #10)"}
               </p>
             </div>
+
+            {/* Interactive Tap-to-Move Target Selector Banner */}
+            {reorderingFromIdx !== null && reorderingFromIdx < pages.length && (
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-blue-500/15 to-emerald-500/15 border-2 border-amber-500/90 dark:border-amber-400 shadow-lg space-y-2.5 animate-in fade-in slide-in-from-top-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping" />
+                    <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+                      {bn
+                        ? `পেজ #${reorderingFromIdx + 1} সরানোর জন্য তৈরি — যেকোনো কার্ডে ট্যাপ করুন অথবা নিচে নম্বর বাছুন:`
+                        : `Moving Page #${reorderingFromIdx + 1} — Tap any card or number below to place here:`}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {/* Move vs Swap Mode Switcher */}
+                    <div className="flex items-center rounded-lg border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 p-0.5 text-[11px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setReorderMode("move")}
+                        className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                          reorderMode === "move"
+                            ? "bg-blue-600 text-white shadow-xs"
+                            : "text-slate-600 dark:text-slate-300 hover:text-blue-600"
+                        }`}
+                        title={bn ? "স্থান পরিবর্তন / ইনসার্ট (বাকী পেজগুলো সিরিয়ালে সাজবে)" : "Move/Insert to target position"}
+                      >
+                        {bn ? "সরান (Move)" : "Move"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReorderMode("swap")}
+                        className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                          reorderMode === "swap"
+                            ? "bg-purple-600 text-white shadow-xs"
+                            : "text-slate-600 dark:text-slate-300 hover:text-purple-600"
+                        }`}
+                        title={bn ? "দুই পেজের অবস্থান অদলবদল (Swap)" : "Swap positions directly"}
+                      >
+                        {bn ? "অদলবদল (Swap)" : "Swap"}
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setReorderingFromIdx(null)}
+                      className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 active:scale-95 shadow-xs"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>{bn ? "বাতিল" : "Cancel"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick 1-Tap Numeric Destination Chips */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 no-scrollbar">
+                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 shrink-0">
+                    {bn ? "সরাসরি পেজ নম্বর বেছে নিন:" : "Quick jump to page:"}
+                  </span>
+                  {pages.map((_, pIdx) => {
+                    const isSource = pIdx === reorderingFromIdx;
+                    return (
+                      <button
+                        key={pIdx}
+                        type="button"
+                        disabled={isSource}
+                        onClick={() => {
+                          const from = reorderingFromIdx;
+                          if (reorderMode === "swap") {
+                            swapPages(from, pIdx);
+                            toast.success(
+                              bn
+                                ? `পেজ #${from + 1} এবং #${pIdx + 1} অদলবদল করা হয়েছে!`
+                                : `Swapped Page #${from + 1} with Page #${pIdx + 1}!`
+                            );
+                          } else {
+                            movePageToIndex(from, pIdx);
+                            toast.success(
+                              bn
+                                ? `ছবিটিকে #${from + 1} থেকে #${pIdx + 1} নাম্বার পেজে সরানো হয়েছে!`
+                                : `Moved page from #${from + 1} to #${pIdx + 1}!`
+                            );
+                          }
+                          setReorderingFromIdx(null);
+                        }}
+                        className={`min-w-[34px] h-8 px-2 rounded-xl text-xs font-mono font-black transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-90 ${
+                          isSource
+                            ? "bg-amber-500 text-white ring-2 ring-amber-300 dark:ring-amber-600 cursor-default opacity-80"
+                            : "bg-white dark:bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-700 shadow-xs"
+                        }`}
+                        title={bn ? `পেজ #${pIdx + 1}-এ নিয়ে যান` : `Move to Page #${pIdx + 1}`}
+                      >
+                        #{pIdx + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {pages.map((page, index) => {
                 const isSelected = activePage?.id === page.id;
                 const isDragTarget = dragOverIdx === index && draggedIdx !== index;
+                const isReorderingSource = reorderingFromIdx === index;
+                const isReorderingTarget = reorderingFromIdx !== null && reorderingFromIdx !== index;
+
                 return (
                   <div
                     key={page.id}
-                    draggable={!isTouchDevice}
+                    draggable={!isTouchDevice && reorderingFromIdx === null}
                     onDragStart={() => setDraggedIdx(index)}
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -872,37 +1003,54 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                       setDragOverIdx(null);
                     }}
                     onClick={() => {
-                      if (isSelected) {
-                        // When tapped on the already selected card, change its position!
-                        if (index > 0) {
-                          movePageToIndex(index, 0);
-                          toast.success(
-                            bn
-                              ? `ছবিটিকে ১ নাম্বার পেজে আনা হয়েছে!`
-                              : `Moved to Page #1!`
-                          );
-                        } else if (pages.length > 1) {
-                          movePageToIndex(0, 1);
-                          toast.success(
-                            bn
-                              ? "ছবিটি পরবর্তী পজিশনে সরানো হয়েছে!"
-                              : "Swapped with next page!"
-                          );
+                      if (reorderingFromIdx !== null) {
+                        if (reorderingFromIdx === index) {
+                          setReorderingFromIdx(null);
+                        } else {
+                          const from = reorderingFromIdx;
+                          if (reorderMode === "swap") {
+                            swapPages(from, index);
+                            toast.success(
+                              bn
+                                ? `পেজ #${from + 1} এবং #${index + 1} অদলবদল করা হয়েছে!`
+                                : `Swapped Page #${from + 1} with Page #${index + 1}!`
+                            );
+                          } else {
+                            movePageToIndex(from, index);
+                            toast.success(
+                              bn
+                                ? `ছবিটিকে #${from + 1} থেকে #${index + 1} নাম্বার পেজে নেওয়া হয়েছে!`
+                                : `Moved page from #${from + 1} to #${index + 1}!`
+                            );
+                          }
+                          setReorderingFromIdx(null);
                         }
+                      } else if (isSelected) {
+                        // Tapped on the already selected card: activate move mode!
+                        setReorderingFromIdx(index);
+                        toast.info(
+                          bn
+                            ? `পেজ #${index + 1} নির্বাচন করা হয়েছে — যে পজিশনে নিতে চান সেই কার্ড বা নাম্বারে ট্যাপ করুন!`
+                            : `Page #${index + 1} selected — Tap any destination card or number to place here!`
+                        );
                       } else {
                         setSelectedId(page.id);
                         setIsCropping(false);
                       }
                     }}
                     className={`group rounded-2xl p-2 border transition-all cursor-pointer flex flex-col gap-2 touch-manipulation select-none ${
-                      isDragTarget
+                      isReorderingSource
+                        ? "border-amber-500 ring-4 ring-amber-500/40 bg-amber-50/60 dark:bg-amber-950/40 shadow-xl scale-[1.02]"
+                        : isReorderingTarget
+                        ? "border-emerald-500 ring-2 ring-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/40 shadow-md hover:ring-4 hover:ring-emerald-500/80 hover:scale-[1.03]"
+                        : isDragTarget
                         ? "border-emerald-500 ring-2 ring-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-950/30"
                         : isSelected
                         ? "border-blue-600 ring-2 ring-blue-600/20 bg-blue-50/50 dark:bg-blue-950/30 shadow-md"
                         : "border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/50 hover:border-blue-300 dark:hover:border-blue-700"
                     }`}
                   >
-                    {/* Top row: Drag grip + Serial dropdown + Make #1 Quick Action + Delete */}
+                    {/* Top row: Drag grip + Serial dropdown + Move action + Make #1 Quick Action + Delete */}
                     <div
                       className="flex items-center justify-between gap-1"
                       onClick={(e) => e.stopPropagation()}
@@ -943,6 +1091,34 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                           <ChevronDown className="w-3 h-3 text-white/90 absolute right-1.5 pointer-events-none" />
                         </div>
 
+                        {/* Dedicated Reorder Button on Every Card */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (reorderingFromIdx === index) {
+                              setReorderingFromIdx(null);
+                            } else {
+                              setReorderingFromIdx(index);
+                              toast.info(
+                                bn
+                                  ? `পেজ #${index + 1} নির্বাচন করা হয়েছে — যে পজিশনে নিতে চান সেই কার্ড বা নাম্বারে ট্যাপ করুন!`
+                                  : `Page #${index + 1} chosen — Tap any destination card or number!`
+                              );
+                            }
+                          }}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          title={bn ? `পেজ #${index + 1}-এর পজিশন পরিবর্তন করুন` : `Change position of Page #${index + 1}`}
+                          className={`px-1.5 sm:px-2 py-0.5 rounded-lg text-[10px] font-extrabold transition-all flex items-center gap-1 active:scale-90 shadow-xs cursor-pointer shrink-0 ${
+                            isReorderingSource
+                              ? "bg-amber-500 text-white ring-2 ring-amber-300 dark:ring-amber-600 animate-pulse"
+                              : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/70 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-800"
+                          }`}
+                        >
+                          <ArrowLeftRight className="w-3 h-3 shrink-0" />
+                          <span>{bn ? "সরান" : "Move"}</span>
+                        </button>
+
                         {/* Quick One-Tap 'Make #1' Pill for any card not already at index 0 */}
                         {index > 0 && (
                           <button
@@ -955,11 +1131,11 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                               );
                             }}
                             onTouchStart={(e) => e.stopPropagation()}
-                            className="px-2 py-0.5 rounded-lg text-[10px] font-extrabold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/80 hover:bg-blue-200 border border-blue-300 dark:border-blue-800 transition-all flex items-center gap-1 active:scale-90 shadow-xs cursor-pointer shrink-0"
+                            className="hidden sm:flex px-1.5 py-0.5 rounded-lg text-[10px] font-extrabold text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 transition-all items-center gap-0.5 active:scale-90 shadow-xs cursor-pointer shrink-0"
                             title={bn ? "এই পেজটিকে সরাসরি ১ নাম্বার করুন" : "Set as Page #1"}
                           >
                             <ChevronsLeft className="w-3 h-3 shrink-0" />
-                            <span>{bn ? "১ম করুন" : "Make #1"}</span>
+                            <span>{bn ? "১ম" : "#1"}</span>
                           </button>
                         )}
                       </div>
@@ -968,6 +1144,7 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (reorderingFromIdx === index) setReorderingFromIdx(null);
                           handleRemovePage(page.id);
                         }}
                         onTouchStart={(e) => e.stopPropagation()}
@@ -982,24 +1159,36 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                     <div className="relative h-28 w-full rounded-xl bg-slate-200/70 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 flex items-center justify-center p-1.5 overflow-hidden group/thumb">
                       <PageThumbnailCanvas page={page} />
 
-                      {/* Interactive Tap-to-Move Position Overlay Badge */}
-                      {isSelected && index > 0 && (
+                      {/* Moving Source Badge */}
+                      {isReorderingSource && (
                         <div
-                          className="absolute inset-x-1.5 bottom-1.5 py-1 px-2 rounded-lg bg-blue-600/95 hover:bg-blue-500 text-white text-[10px] font-black flex items-center justify-center gap-1 shadow-lg ring-1 ring-white/30 transition-transform active:scale-95 animate-in fade-in zoom-in-95 cursor-pointer"
-                          title={bn ? "ট্যাপ করে ১ নাম্বার পেজে আনুন" : "Tap to move to Page #1"}
+                          className="absolute inset-x-1.5 bottom-1.5 py-1 px-1.5 rounded-lg bg-amber-500 text-white text-[10px] font-black flex items-center justify-center gap-1 shadow-lg ring-1 ring-white/40 animate-pulse cursor-pointer"
+                          title={bn ? "মুভ মোড বাতিল করতে ট্যাপ করুন" : "Tap to cancel move"}
                         >
-                          <ChevronsLeft className="w-3.5 h-3.5 shrink-0" />
-                          <span>{bn ? "ট্যাপে ১ম পেজ করুন" : "Tap: Make #1"}</span>
+                          <X className="w-3.5 h-3.5 shrink-0" />
+                          <span>{bn ? "বাতিল করতে ট্যাপ করুন" : "Tap to Cancel"}</span>
                         </div>
                       )}
 
-                      {isSelected && index === 0 && pages.length > 1 && (
+                      {/* Moving Target Badge */}
+                      {isReorderingTarget && (
                         <div
-                          className="absolute inset-x-1.5 bottom-1.5 py-1 px-2 rounded-lg bg-emerald-600/95 hover:bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center gap-1 shadow-lg ring-1 ring-white/30 transition-transform active:scale-95 animate-in fade-in zoom-in-95 cursor-pointer"
-                          title={bn ? "ট্যাপ করে অবস্থান পরিবর্তন করুন" : "Tap to swap position"}
+                          className="absolute inset-x-1.5 bottom-1.5 py-1.5 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center gap-1 shadow-xl ring-2 ring-white/50 transition-transform active:scale-95 animate-in fade-in zoom-in-95 cursor-pointer"
+                          title={bn ? `ট্যাপ করে পেজ #${reorderingFromIdx + 1}-কে এখানে আনুন` : `Tap to place here as Page #${index + 1}`}
+                        >
+                          <Target className="w-3.5 h-3.5 shrink-0" />
+                          <span>{bn ? `🎯 #${index + 1}-এ আনুন` : `🎯 Move Here (#${index + 1})`}</span>
+                        </div>
+                      )}
+
+                      {/* Selected Card Badge when not in reorder mode */}
+                      {reorderingFromIdx === null && isSelected && (
+                        <div
+                          className="absolute inset-x-1.5 bottom-1.5 py-1 px-1.5 rounded-lg bg-blue-600/95 hover:bg-blue-500 text-white text-[10px] font-black flex items-center justify-center gap-1 shadow-lg ring-1 ring-white/30 transition-transform active:scale-95 animate-in fade-in zoom-in-95 cursor-pointer"
+                          title={bn ? "ট্যাপ করে যেকোনো পজিশনে সরান" : "Tap to reorder position"}
                         >
                           <ArrowLeftRight className="w-3 h-3 shrink-0" />
-                          <span>{bn ? "ট্যাপে সোয়াপ করুন" : "Tap to Swap"}</span>
+                          <span>{bn ? "⇄ ট্যাপে পজিশন সরান" : "⇄ Tap to Move"}</span>
                         </div>
                       )}
                     </div>
@@ -1093,27 +1282,56 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
                       </button>
                     )}
 
-                    {/* Step Reorder Buttons right in the active editor */}
+                    {/* Step Reorder & Move Buttons right in the active editor */}
                     {pages.length > 1 && (
-                      <div className="flex items-center gap-0.5 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 shrink-0">
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
-                          disabled={resolvedSelectedIndex === 0}
-                          onClick={() => movePageToIndex(resolvedSelectedIndex, resolvedSelectedIndex - 1)}
-                          className="p-1 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer active:scale-90"
-                          title={bn ? "১ ধাপ আগে নিন" : "Move 1 position earlier"}
+                          onClick={() => {
+                            if (reorderingFromIdx === resolvedSelectedIndex) {
+                              setReorderingFromIdx(null);
+                            } else {
+                              setReorderingFromIdx(resolvedSelectedIndex);
+                              toast.info(
+                                bn
+                                  ? `পেজ #${resolvedSelectedIndex + 1} নির্বাচন করা হয়েছে — যে পজিশনে নিতে চান সেই কার্ড বা নাম্বারে ট্যাপ করুন!`
+                                  : `Page #${resolvedSelectedIndex + 1} chosen — Tap any destination card or number!`
+                              );
+                              const el = document.getElementById("pdf-page-serial-bar");
+                              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 active:scale-95 shadow-xs cursor-pointer shrink-0 ${
+                            reorderingFromIdx === resolvedSelectedIndex
+                              ? "bg-amber-500 text-white ring-2 ring-amber-300 dark:ring-amber-600 animate-pulse"
+                              : "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/70 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60"
+                          }`}
+                          title={bn ? "যেকোনো পজিশনে সরান (#১-#১০)" : "Move to any position (#1-#10)"}
                         >
-                          <ChevronLeft className="w-3.5 h-3.5" />
+                          <ArrowLeftRight className="w-3.5 h-3.5" />
+                          <span>{bn ? "পজিশন সরান" : "Move Position"}</span>
                         </button>
-                        <button
-                          type="button"
-                          disabled={resolvedSelectedIndex === pages.length - 1}
-                          onClick={() => movePageToIndex(resolvedSelectedIndex, resolvedSelectedIndex + 1)}
-                          className="p-1 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer active:scale-90"
-                          title={bn ? "১ ধাপ পরে নিন" : "Move 1 position later"}
-                        >
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
+
+                        <div className="flex items-center gap-0.5 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 shrink-0">
+                          <button
+                            type="button"
+                            disabled={resolvedSelectedIndex === 0}
+                            onClick={() => movePageToIndex(resolvedSelectedIndex, resolvedSelectedIndex - 1)}
+                            className="p-1 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer active:scale-90"
+                            title={bn ? "১ ধাপ আগে নিন" : "Move 1 position earlier"}
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={resolvedSelectedIndex === pages.length - 1}
+                            onClick={() => movePageToIndex(resolvedSelectedIndex, resolvedSelectedIndex + 1)}
+                            className="p-1 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer active:scale-90"
+                            title={bn ? "১ ধাপ পরে নিন" : "Move 1 position later"}
+                          >
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     )}
 
