@@ -749,14 +749,15 @@ public class AdminController {
     }
 
     // ==========================================
-    // Free Access Waiver Management
+    // Free Access Waiver Management (Super Admin Exclusive)
     // ==========================================
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @GetMapping("/waivers")
     public ResponseEntity<List<WaiverRequest>> getWaivers(@RequestParam(required = false) PaymentStatus status) {
         return ResponseEntity.ok(waiverService.getWaivers(status));
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @PostMapping("/waivers/{id}/approve")
     public ResponseEntity<WaiverRequest> approveWaiver(
             @PathVariable Long id,
@@ -782,7 +783,7 @@ public class AdminController {
         return ResponseEntity.ok(w);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @PostMapping("/waivers/{id}/reject")
     public ResponseEntity<WaiverRequest> rejectWaiver(
             @PathVariable Long id,

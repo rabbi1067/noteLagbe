@@ -483,4 +483,47 @@ class SecurityHardeningAndPaywallTest {
             service.shutdown();
         }
     }
+
+    @Test
+    void superAdminExclusivityEnforcedOnPaymentsAndWaivers() throws Exception {
+        Class<?> adminControllerClass = com.notelagbe.controller.AdminController.class;
+
+        // Verify Payments endpoints strictly require SUPER_ADMIN
+        org.springframework.security.access.prepost.PreAuthorize getPaymentsAuth =
+                adminControllerClass.getMethod("getPayments", com.notelagbe.entity.PaymentStatus.class)
+                        .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+        assertNotNull(getPaymentsAuth);
+        assertEquals("hasRole('SUPER_ADMIN')", getPaymentsAuth.value());
+
+        org.springframework.security.access.prepost.PreAuthorize approvePaymentAuth =
+                adminControllerClass.getMethod("approvePayment", Long.class, Map.class, CustomUserDetails.class)
+                        .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+        assertNotNull(approvePaymentAuth);
+        assertEquals("hasRole('SUPER_ADMIN')", approvePaymentAuth.value());
+
+        org.springframework.security.access.prepost.PreAuthorize rejectPaymentAuth =
+                adminControllerClass.getMethod("rejectPayment", Long.class, Map.class, CustomUserDetails.class)
+                        .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+        assertNotNull(rejectPaymentAuth);
+        assertEquals("hasRole('SUPER_ADMIN')", rejectPaymentAuth.value());
+
+        // Verify Waivers endpoints strictly require SUPER_ADMIN
+        org.springframework.security.access.prepost.PreAuthorize getWaiversAuth =
+                adminControllerClass.getMethod("getWaivers", com.notelagbe.entity.PaymentStatus.class)
+                        .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+        assertNotNull(getWaiversAuth);
+        assertEquals("hasRole('SUPER_ADMIN')", getWaiversAuth.value());
+
+        org.springframework.security.access.prepost.PreAuthorize approveWaiverAuth =
+                adminControllerClass.getMethod("approveWaiver", Long.class, Map.class, CustomUserDetails.class)
+                        .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+        assertNotNull(approveWaiverAuth);
+        assertEquals("hasRole('SUPER_ADMIN')", approveWaiverAuth.value());
+
+        org.springframework.security.access.prepost.PreAuthorize rejectWaiverAuth =
+                adminControllerClass.getMethod("rejectWaiver", Long.class, Map.class, CustomUserDetails.class)
+                        .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+        assertNotNull(rejectWaiverAuth);
+        assertEquals("hasRole('SUPER_ADMIN')", rejectWaiverAuth.value());
+    }
 }

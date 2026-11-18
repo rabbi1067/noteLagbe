@@ -101,6 +101,7 @@ import FacultyAvatar from "@/components/FacultyAvatar";
 import { DeleteConfirmationModal, DeleteSuccessModal } from "@/components/DeleteConfirmationModal";
 import MultiPageUploader from "@/components/MultiPageUploader";
 import PDFViewerModal from "@/components/PDFViewerModal";
+import PaymentApproveModal from "@/components/PaymentApproveModal";
 import {
   useDuplicateResourceCheck,
   invalidateDuplicateSlotCache,
@@ -445,6 +446,8 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [resources, setResources] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
+  const [paymentToApprove, setPaymentToApprove] = useState<any | null>(null);
+  const [isApprovingPaymentModal, setIsApprovingPaymentModal] = useState<boolean>(false);
   const [staffList, setStaffList] = useState<any[]>([]);
   const [contributions, setContributions] = useState<any[]>([]);
   const [waivers, setWaivers] = useState<any[]>([]);
@@ -1605,9 +1608,9 @@ export default function AdminDashboardPage() {
     };
   }, [isAdmin]);
 
-  // Restrict payments tab strictly to Super Admin
+  // Restrict payments and waivers tabs strictly to Super Admin
   useEffect(() => {
-    if (isSuperAdmin || activeTab !== "payments") return;
+    if (isSuperAdmin || (activeTab !== "payments" && activeTab !== "waivers")) return;
     let active = true;
     queueMicrotask(() => {
       if (active) setActiveTab("overview");
@@ -2912,31 +2915,56 @@ export default function AdminDashboardPage() {
     );
   };
 
-  const handleApprovePayment = async (id: number) => {
-    const actionKey = `payment-${id}`;
+  const handleOpenPaymentApproveModal = (p: any) => {
     if (processingQueueKey) return;
+    setPaymentToApprove(p);
+  };
+
+  const handleApprovePayment = (id: number) => {
+    const targetItem = payments.find((p) => p.id === id);
+    if (targetItem) {
+      handleOpenPaymentApproveModal(targetItem);
+    }
+  };
+
+  const handleConfirmPaymentApprove = async (id: number, notes: string) => {
+    const actionKey = `payment-${id}`;
+    if (isApprovingPaymentModal || processingQueueKey) return;
     const targetItem = payments.find((p) => p.id === id);
     if (!targetItem) return;
 
     const prevPayments = payments;
     markSelfQueueMutation();
     setProcessingQueueKey(actionKey);
+    setIsApprovingPaymentModal(true);
 
     // Instant optimistic update (0ms UI latency)
     setPayments((prev) =>
       prev.map((p) => (p.id === id ? { ...p, status: "APPROVED" as const } : p))
     );
-    confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
-    toast.success("Payment approved! 6 courses unlocked for student.");
+
+    const planLabel = targetItem.planType === "YEAR_1_UNLIMITED"
+      ? "1-Year Annual Pass (Unlimited Courses)"
+      : targetItem.planType === "SEMESTER_2"
+      ? "2-Semesters Plan (12 Courses)"
+      : "1-Semester Plan (6 Courses)";
 
     try {
-      const updated = await api.admin.approvePayment(id);
+      const updated = await api.admin.approvePayment(id, notes);
       applyStatusUpdate(setPayments, id, updated, "APPROVED");
       notifyDataChanged("payment", "approved", id);
+      confetti({ particleCount: 75, spread: 80, origin: { y: 0.6 } });
+      toast.success(
+        language === "bn"
+          ? `পেমেন্ট অনুমোদিত হয়েছে! ${targetItem.user?.name || "স্টুডেন্ট"}-এর জন্য ${planLabel} সক্রিয় করা হয়েছে।`
+          : `Payment approved! ${planLabel} successfully activated for ${targetItem.user?.name || "student"}.`
+      );
+      setPaymentToApprove(null);
     } catch (err: any) {
       setPayments(prevPayments);
       toast.error(err.message || "Failed to approve payment. Restored to pending.");
     } finally {
+      setIsApprovingPaymentModal(false);
       setProcessingQueueKey(null);
     }
   };
@@ -4753,31 +4781,33 @@ export default function AdminDashboardPage() {
                   </span>
                 </button>
 
-                <button
-                  onClick={() => {
-                    setActiveTab("waivers");
-                    setMobileSidebarOpen(false);
-                  }}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all ${
-                    activeTab === "waivers"
-                      ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-600/25"
-                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Award className="w-4 h-4" />
-                    <span>Financial Waivers</span>
-                  </div>
-                  <span
-                    className={`font-mono text-[11px] px-2 py-0.5 rounded-lg ${
-                      pendingWaiversCount > 0
-                        ? "bg-purple-500 text-white font-extrabold"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-transparent"
+                {isSuperAdmin && (
+                  <button
+                    onClick={() => {
+                      setActiveTab("waivers");
+                      setMobileSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all ${
+                      activeTab === "waivers"
+                        ? "bg-blue-600 text-white font-bold shadow-md shadow-blue-600/25"
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60"
                     }`}
                   >
-                    {pendingWaiversCount}
-                  </span>
-                </button>
+                    <div className="flex items-center gap-3">
+                      <Award className="w-4 h-4" />
+                      <span>Financial Waivers</span>
+                    </div>
+                    <span
+                      className={`font-mono text-[11px] px-2 py-0.5 rounded-lg ${
+                        pendingWaiversCount > 0
+                          ? "bg-purple-500 text-white font-extrabold"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-transparent"
+                      }`}
+                    >
+                      {pendingWaiversCount}
+                    </span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => {
@@ -7233,15 +7263,15 @@ export default function AdminDashboardPage() {
                                 <button
                                   type="button"
                                   disabled={Boolean(processingQueueKey)}
-                                  onClick={() => handleApprovePayment(p.id)}
+                                  onClick={() => handleOpenPaymentApproveModal(p)}
                                   className="px-4 py-2.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer"
                                 >
                                   {processingQueueKey === `payment-${p.id}` ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
                                   ) : (
-                                    <Check className="w-4 h-4" />
+                                    <CheckCircle2 className="w-4 h-4" />
                                   )}
-                                  <span>{processingQueueKey === `payment-${p.id}` ? "Processing..." : "Approve & Unlock 6"}</span>
+                                  <span>{processingQueueKey === `payment-${p.id}` ? "Processing..." : language === "bn" ? "যাচাই ও অনুমোদন" : "Review & Approve"}</span>
                                 </button>
                                 <button
                                   type="button"
@@ -13575,6 +13605,15 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Super Admin Subscription Payment Approval Confirmation Modal */}
+      <PaymentApproveModal
+        isOpen={Boolean(paymentToApprove)}
+        payment={paymentToApprove}
+        onClose={() => setPaymentToApprove(null)}
+        onConfirm={handleConfirmPaymentApprove}
+        isLoading={isApprovingPaymentModal}
+      />
     </div>
   );
 }
