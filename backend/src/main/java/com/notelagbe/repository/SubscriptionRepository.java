@@ -20,6 +20,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
 
     List<Subscription> findByUserIdOrderByStartDateDesc(Long userId);
     List<Subscription> findByActiveTrueAndEndDateBefore(LocalDateTime dateTime);
+    List<Subscription> findByUserIdAndActiveTrueAndEndDateAfter(Long userId, LocalDateTime dateTime);
     @Query("SELECT COUNT(DISTINCT s.user.id) FROM Subscription s WHERE s.active = true AND (s.endDate IS NULL OR s.endDate >= :now)")
     long countActiveSubscribers(@Param("now") LocalDateTime now);
     void deleteByUserId(Long userId);

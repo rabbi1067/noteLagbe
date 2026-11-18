@@ -261,10 +261,16 @@ public class SubscriptionService {
             changed = true;
             sub.setActive(false);
             subscriptionRepository.save(sub);
-            unlockedCourseRepository.deleteByUserIdAndSourceIn(
-                    sub.getUser().getId(),
-                    List.of(UnlockSource.PURCHASED_QUOTA, UnlockSource.YEAR_UNLIMITED)
-            );
+            boolean hasOtherActiveSub = subscriptionRepository
+                    .findByUserIdAndActiveTrueAndEndDateAfter(sub.getUser().getId(), now)
+                    .stream()
+                    .anyMatch(s -> !s.getId().equals(sub.getId()));
+            if (!hasOtherActiveSub) {
+                unlockedCourseRepository.deleteByUserIdAndSourceIn(
+                        sub.getUser().getId(),
+                        List.of(UnlockSource.PURCHASED_QUOTA, UnlockSource.YEAR_UNLIMITED)
+                );
+            }
             try {
                 notificationService.createNotification(
                         sub.getUser(),

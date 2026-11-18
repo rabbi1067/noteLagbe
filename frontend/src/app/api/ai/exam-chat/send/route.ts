@@ -95,6 +95,36 @@ function detectBufferMime(buf: Buffer, headerMime?: string): string {
   return "application/pdf";
 }
 
+function isSafeInspectionHost(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return false;
+    }
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === "localhost" ||
+      host.endsWith(".local") ||
+      host.endsWith(".internal") ||
+      host.startsWith("127.") ||
+      host.startsWith("192.168.") ||
+      host.startsWith("10.") ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) ||
+      host === "169.254.169.254" ||
+      host === "::1" ||
+      host === "0.0.0.0"
+    ) {
+      return false;
+    }
+    const isCloudinary = host === "res.cloudinary.com" || host.endsWith(".cloudinary.com");
+    const isCloudflareR2 = host.endsWith(".r2.cloudflarestorage.com") || host.endsWith(".r2.dev");
+    const isNoteLagbe = host.endsWith("notelagbe.com") || host.includes("vercel.app") || host.includes("onrender.com");
+    return isCloudinary || isCloudflareR2 || isNoteLagbe;
+  } catch {
+    return false;
+  }
+}
+
 async function extractTextFromPdfBuffer(pdfBuffer: Buffer): Promise<string> {
   try {
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.js");
@@ -1761,7 +1791,7 @@ export async function POST(req: NextRequest) {
           if (targetUrl.startsWith("/")) {
             targetUrl = `${backendBase}${targetUrl}`;
           }
-          if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+          if ((targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) && isSafeInspectionHost(targetUrl)) {
             const fileRes = await fetch(targetUrl, { signal: AbortSignal.timeout(15000) });
             if (fileRes.ok) {
               const ct = fileRes.headers.get("content-type") || "";
@@ -1787,7 +1817,7 @@ export async function POST(req: NextRequest) {
             // Follow redirect if 301/302/307 (Cloudflare R2 / S3 presigned URL requires clean headers without Authorization)
             if (fileRes.status >= 300 && fileRes.status < 400) {
               const redirectLocation = fileRes.headers.get("location");
-              if (redirectLocation) {
+              if (redirectLocation && isSafeInspectionHost(redirectLocation)) {
                 fileRes = await fetch(redirectLocation, {
                   signal: AbortSignal.timeout(15000),
                 });

@@ -55,9 +55,13 @@ export async function GET(request: NextRequest) {
   try {
     const backendUrl = resolveBackendBaseUrl();
     const queryString = searchParams.toString();
+    const clientIp = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "";
     const res = await fetch(`${backendUrl}/api/courses${queryString ? `?${queryString}` : ""}`, {
       signal: controller.signal,
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        ...(clientIp ? { "X-Forwarded-For": clientIp } : {}),
+      },
       cache: "no-store",
     });
 

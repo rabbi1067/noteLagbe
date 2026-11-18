@@ -181,6 +181,8 @@ export function setToken(token: string) {
   if (typeof window !== "undefined") {
     localStorage.setItem("notelagbe_token", token);
     localStorage.setItem("notelagbe_last_activity", String(Date.now()));
+    const isSecure = window.location.protocol === "https:";
+    document.cookie = `notelagbe_token=${encodeURIComponent(token)}; path=/; max-age=604800; SameSite=Strict${isSecure ? "; Secure" : ""}`;
   }
 }
 
@@ -189,6 +191,7 @@ export function removeToken() {
     localStorage.removeItem("notelagbe_token");
     localStorage.removeItem("notelagbe_user");
     localStorage.removeItem("notelagbe_last_activity");
+    document.cookie = "notelagbe_token=; path=/; max-age=0; SameSite=Strict";
   }
 }
 

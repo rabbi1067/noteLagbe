@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 let cachedDepartmentsResponse: { payload: any; timestamp: number } | null = null;
 const CACHE_TTL_MS = 60 * 1000;
 
-export async function GET() {
+export async function GET(request: Request) {
   if (cachedDepartmentsResponse && Date.now() - cachedDepartmentsResponse.timestamp < CACHE_TTL_MS) {
     return NextResponse.json(cachedDepartmentsResponse.payload, {
       headers: {
@@ -22,9 +22,13 @@ export async function GET() {
   const timeoutId = setTimeout(() => controller.abort(), 2500);
   try {
     const backendUrl = resolveBackendBaseUrl();
+    const clientIp = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "";
     const backendRes = await fetch(`${backendUrl}/api/departments`, {
       signal: controller.signal,
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        ...(clientIp ? { "X-Forwarded-For": clientIp } : {}),
+      },
       cache: "no-store",
     });
 

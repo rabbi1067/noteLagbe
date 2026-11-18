@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "waiver_requests")
+@Table(name = "waiver_requests", indexes = {
+        @Index(name = "idx_waiver_user_status", columnList = "user_id, status")
+})
 public class WaiverRequest {
 
     @Id

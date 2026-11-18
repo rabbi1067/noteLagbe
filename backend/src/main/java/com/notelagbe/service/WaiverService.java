@@ -48,9 +48,9 @@ public class WaiverService {
     }
 
     @Transactional
-    public WaiverRequest submitWaiver(WaiverSubmitRequest request, User user) {
+    public synchronized WaiverRequest submitWaiver(WaiverSubmitRequest request, User user) {
         if (waiverRequestRepository.existsByUserIdAndStatus(user.getId(), PaymentStatus.PENDING)) {
-            throw new ApiException("You already have an active waiver request currently pending review. Please wait for administrator verification.");
+            throw new ApiException("You already have an active waiver request currently pending review. Please wait for administrator verification.", org.springframework.http.HttpStatus.CONFLICT);
         }
 
         // Enforce input sanitization & genuine content verification

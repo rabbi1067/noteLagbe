@@ -41,6 +41,9 @@ interface AnalysisResult {
 function isSafeInspectionHost(urlStr: string): boolean {
   try {
     const parsed = new URL(urlStr);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return false;
+    }
     const host = parsed.hostname.toLowerCase();
     if (
       host === "localhost" ||
@@ -49,12 +52,17 @@ function isSafeInspectionHost(urlStr: string): boolean {
       host.startsWith("127.") ||
       host.startsWith("192.168.") ||
       host.startsWith("10.") ||
-      host.startsWith("172.") ||
-      host === "169.254.169.254"
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) ||
+      host === "169.254.169.254" ||
+      host === "::1" ||
+      host === "0.0.0.0"
     ) {
       return false;
     }
-    return parsed.protocol === "https:" || parsed.protocol === "http:";
+    const isCloudinary = host === "res.cloudinary.com" || host.endsWith(".cloudinary.com");
+    const isCloudflareR2 = host.endsWith(".r2.cloudflarestorage.com") || host.endsWith(".r2.dev");
+    const isNoteLagbe = host.endsWith("notelagbe.com") || host.includes("vercel.app") || host.includes("onrender.com");
+    return isCloudinary || isCloudflareR2 || isNoteLagbe;
   } catch {
     return false;
   }

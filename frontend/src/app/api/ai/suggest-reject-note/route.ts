@@ -37,6 +37,36 @@ function detectBufferMime(buf: Buffer, headerMime?: string): string {
   return "image/jpeg";
 }
 
+function isSafeInspectionHost(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return false;
+    }
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === "localhost" ||
+      host.endsWith(".local") ||
+      host.endsWith(".internal") ||
+      host.startsWith("127.") ||
+      host.startsWith("192.168.") ||
+      host.startsWith("10.") ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) ||
+      host === "169.254.169.254" ||
+      host === "::1" ||
+      host === "0.0.0.0"
+    ) {
+      return false;
+    }
+    const isCloudinary = host === "res.cloudinary.com" || host.endsWith(".cloudinary.com");
+    const isCloudflareR2 = host.endsWith(".r2.cloudflarestorage.com") || host.endsWith(".r2.dev");
+    const isNoteLagbe = host.endsWith("notelagbe.com") || host.includes("vercel.app") || host.includes("onrender.com");
+    return isCloudinary || isCloudflareR2 || isNoteLagbe;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const authCheck = await verifyApiAuth(req);
@@ -96,7 +126,7 @@ export async function POST(req: NextRequest) {
           inspectionUrl = inspectionUrl.replace(/\.pdf(\?.*)?$/i, ".jpg").replace("/image/upload/", "/image/upload/pg_1,w_1200/");
         }
 
-        if (inspectionUrl && /^https?:\/\//i.test(inspectionUrl)) {
+        if (inspectionUrl && /^https?:\/\//i.test(inspectionUrl) && isSafeInspectionHost(inspectionUrl)) {
           try {
             const fetchRes = await fetch(inspectionUrl, { signal: AbortSignal.timeout(8000) });
             if (fetchRes.ok) {

@@ -11,9 +11,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 @Service
 public class LiveSyncService {
@@ -23,12 +21,20 @@ public class LiveSyncService {
     // Thread-safe collection of active SSE client subscriptions
     private final CopyOnWriteArrayList<SseEmitter> emitters = new CopyOnWriteArrayList<>();
 
-    // Offload SSE fan-out so stalled client sockets never delay HTTP auth or write transactions
-    private final ExecutorService broadcastExecutor = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "livesync-broadcaster");
-        t.setDaemon(true);
-        return t;
-    });
+    // Multi-threaded executor with bounded work queue to avoid head-of-line blocking
+    private final ExecutorService broadcastExecutor = new ThreadPoolExecutor(
+            2,
+            8,
+            60L,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(250),
+            r -> {
+                Thread t = new Thread(r, "livesync-broadcaster");
+                t.setDaemon(true);
+                return t;
+            },
+            new ThreadPoolExecutor.DiscardOldestPolicy()
+    );
 
     @PreDestroy
     public void shutdown() {

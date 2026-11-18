@@ -59,7 +59,6 @@ public class SecurityConfig {
                     "/api/notices/**",
                     "/api/contributions/leaderboard",
                     "/api/advising/**",
-                    "/h2-console/**",
                     "/error"
                 ).permitAll()
 
@@ -76,6 +75,7 @@ public class SecurityConfig {
                 // Admin & Staff Sync and Management Endpoints
                 .requestMatchers(HttpMethod.POST, "/api/departments/sync", "/api/teachers/sync-cse").hasAnyRole("ADMIN", "SUPER_ADMIN", "MANAGER")
                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN", "MANAGER")
+                .requestMatchers("/h2-console/**").hasRole("SUPER_ADMIN")
 
                 // Authenticated Endpoints for Students & Admins
                 .requestMatchers("/api/courses/**", "/api/student/**", "/api/reviews/**", "/api/contributions/**", "/api/payments/**", "/api/waivers/**", "/api/notifications/**", "/api/chat/**", "/api/ai/**").authenticated()
