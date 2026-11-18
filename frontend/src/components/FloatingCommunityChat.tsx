@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
 import { api, ChatMessageDto } from "@/lib/api";
-import { subscribeToSync } from "@/lib/sync";
+import { subscribeToSync, notifyDataChanged } from "@/lib/sync";
 import { toast } from "sonner";
 import {
   MessageSquare,
@@ -41,9 +41,10 @@ import {
   Image as ImageIcon,
   ZoomIn,
   Download,
+  ArrowLeft,
 } from "lucide-react";
 
-// Web Audio synthesizer chime for incoming messages (zero asset dependency)
+// Dual-harmonic Web Audio synthesizer chime for incoming messages (zero asset dependency)
 function playIncomingChime() {
   try {
     const AudioContextClass =
@@ -51,18 +52,34 @@ function playIncomingChime() {
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
     const ctx = new AudioContextClass();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
     const now = ctx.currentTime;
-    osc.frequency.setValueAtTime(659.25, now); // E5
-    osc.frequency.exponentialRampToValueAtTime(880, now + 0.12); // A5
-    gain.gain.setValueAtTime(0.08, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.35);
+
+    // Tone 1: 587.33 Hz (D5)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(587.33, now);
+    gain1.gain.setValueAtTime(0.08, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.16);
+
+    // Tone 2: 880 Hz (A5)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(880, now + 0.08);
+    gain2.gain.setValueAtTime(0.09, now + 0.08);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.08);
+    osc2.stop(now + 0.35);
   } catch {
     // Gracefully handle browser autoplay blocks
   }
@@ -129,15 +146,34 @@ export default function FloatingCommunityChat() {
 
   // Notification ON/OFF toggle (default true, stored in localStorage)
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
-  // Sound notification toggle (default true, stored in session)
+  // Sound notification toggle (default true, stored in localStorage)
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+
+  // Messenger-Style In-App Notification Banner State
+  const [incomingBanner, setIncomingBanner] = useState<{
+    id: number;
+    senderName: string;
+    senderAvatarUrl?: string | null;
+    senderRole?: string;
+    text: string;
+  } | null>(null);
+  const bannerTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastMessageIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem("notelagbe_chat_notifications");
-      if (stored !== null) setNotificationsEnabled(stored !== "false");
-      const storedSound = sessionStorage.getItem("notelagbe_chat_sound");
-      if (storedSound !== null) setSoundEnabled(storedSound !== "false");
+      if (stored !== null) {
+        setNotificationsEnabled(stored !== "false");
+      } else {
+        localStorage.setItem("notelagbe_chat_notifications", "true");
+      }
+      const storedSound = localStorage.getItem("notelagbe_chat_sound");
+      if (storedSound !== null) {
+        setSoundEnabled(storedSound !== "false");
+      } else {
+        localStorage.setItem("notelagbe_chat_sound", "true");
+      }
     } catch {}
   }, []);
 
@@ -531,6 +567,9 @@ export default function FloatingCommunityChat() {
           Notification.requestPermission().catch(() => {});
         }
       }
+      if (!next) {
+        setIncomingBanner(null);
+      }
       toast(
         next
           ? isBn
@@ -539,7 +578,7 @@ export default function FloatingCommunityChat() {
           : isBn
           ? "🔕 চ্যাট নোটিফিকেশন বন্ধ করা হয়েছে"
           : "🔕 Chat notifications turned OFF",
-        { duration: 2000 }
+        { duration: 2200 }
       );
       return next;
     });
@@ -550,8 +589,20 @@ export default function FloatingCommunityChat() {
     if (e) e.stopPropagation();
     setSoundEnabled((prev) => {
       const next = !prev;
-      sessionStorage.setItem("notelagbe_chat_sound", String(next));
+      if (typeof window !== "undefined") {
+        localStorage.setItem("notelagbe_chat_sound", String(next));
+      }
       if (next) playIncomingChime();
+      toast(
+        next
+          ? isBn
+            ? "🔊 মেসেজ সাউন্ড চালু করা হয়েছে"
+            : "🔊 Chat sound enabled"
+          : isBn
+          ? "🔇 মেসেজ সাউন্ড মিউট করা হয়েছে"
+          : "🔇 Chat sound muted",
+        { duration: 2200 }
+      );
       return next;
     });
   };
@@ -559,7 +610,13 @@ export default function FloatingCommunityChat() {
   // Toggle open
   const handleToggleOpen = (openState: boolean) => {
     setIsOpen(openState);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("notelagbe-chat-state", { detail: { isOpen: openState } })
+      );
+    }
     if (openState) {
+      setIncomingBanner(null);
       markMessagesAsRead(messages);
       // When opening: align with bubble's location but strictly clamped so the entire window is 100% on screen
       const next = clampWindowPos(bubblePosRef.current.x, bubblePosRef.current.y);
@@ -586,7 +643,6 @@ export default function FloatingCommunityChat() {
   // Event-driven data fetcher with in-flight deduplication
   const fetchChatData = useCallback(async () => {
     if (isFetchingRef.current) return;
-    if (typeof document !== "undefined" && document.hidden) return;
 
     try {
       isFetchingRef.current = true;
@@ -597,58 +653,67 @@ export default function FloatingCommunityChat() {
       ]);
 
       if (msgs && Array.isArray(msgs)) {
-        if (
-          prevMsgCountRef.current > 0 &&
-          msgs.length > prevMsgCountRef.current
-        ) {
-          const latest = msgs[msgs.length - 1];
-          if (latest && (!user || latest.senderId !== user.id)) {
+        if (lastMessageIdRef.current !== null) {
+          const newMsgs = msgs.filter(
+            (m) =>
+              m.id > (lastMessageIdRef.current ?? 0) &&
+              (!user || m.senderId !== user.id)
+          );
+          if (newMsgs.length > 0) {
+            const latest = newMsgs[newMsgs.length - 1];
             if (notificationsEnabled) {
               if (soundEnabled) playIncomingChime();
-              // Show popup notification on top right side if chat is closed
+              // Show interactive popup notification on top if chat is closed
               if (!isOpen) {
-                toast(
-                  `${latest.senderName}: ${
-                    latest.text ||
-                    (latest.messageType === "VOICE"
-                      ? isBn
-                        ? "🎙️ ভয়েস মেসেজ"
-                        : "🎙️ Voice Note"
-                      : isBn
-                      ? "📷 ছবি"
-                      : "📷 Image")
-                  }`,
-                  {
-                    position: "top-right",
-                    description: isBn ? "ক্যাম্পাস চ্যাটে নতুন বার্তা" : "New campus message",
-                    action: {
-                      label: isBn ? "দেখুন" : "View",
-                      onClick: () => handleToggleOpen(true),
-                    },
-                  }
-                );
+                const messageSnippet =
+                  latest.text ||
+                  (latest.messageType === "VOICE"
+                    ? isBn
+                      ? "🎙️ ভয়েস মেসেজ"
+                      : "🎙️ Voice Note"
+                    : isBn
+                    ? "📷 ছবি"
+                    : "📷 Image");
 
+                setIncomingBanner({
+                  id: latest.id,
+                  senderName: latest.senderName,
+                  senderAvatarUrl: latest.senderAvatarUrl,
+                  senderRole: latest.senderRole,
+                  text: messageSnippet,
+                });
+
+                if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+                bannerTimerRef.current = setTimeout(() => {
+                  setIncomingBanner(null);
+                }, 6500);
+
+                // Native phone/browser push notification
                 if (
-                  typeof document !== "undefined" &&
-                  document.hidden &&
                   typeof window !== "undefined" &&
                   "Notification" in window &&
                   Notification.permission === "granted"
                 ) {
                   try {
-                    new Notification(`SEU Campus Live: ${latest.senderName}`, {
-                      body:
-                        latest.text ||
-                        (latest.messageType === "VOICE"
-                          ? "🎙️ Voice Note"
-                          : "📷 Image"),
-                      icon: "/images/seu-logo.png",
+                    const notif = new Notification(`SEU Campus Live: ${latest.senderName}`, {
+                      body: messageSnippet,
+                      icon: latest.senderAvatarUrl || "/icon.png",
+                      tag: `chat-msg-${latest.id}`,
                     });
+                    notif.onclick = () => {
+                      window.focus();
+                      handleToggleOpen(true);
+                      notif.close();
+                    };
                   } catch {}
                 }
               }
             }
           }
+        }
+
+        if (msgs.length > 0) {
+          lastMessageIdRef.current = msgs[msgs.length - 1].id;
         }
         prevMsgCountRef.current = msgs.length;
         setMessages(msgs);
@@ -669,12 +734,12 @@ export default function FloatingCommunityChat() {
   useEffect(() => {
     if (!mounted) return;
 
-    // Defer background chat hydration while closed so initial page requests (Hero, Courses, Auth) finish faster on mobile
+    // Defer background chat hydration while closed so initial page requests finish faster
     const initialTimer = isOpen
       ? null
       : setTimeout(() => {
           void fetchChatData();
-        }, 1800);
+        }, 1200);
 
     if (isOpen) {
       void fetchChatData();
@@ -687,12 +752,10 @@ export default function FloatingCommunityChat() {
       }
     });
 
-    // Relaxed background heartbeat (30s when open, 60s when closed, paused if background tab)
+    // Real-time heartbeat (5s when closed, 10s when open)
     const interval = setInterval(() => {
-      if (typeof document !== "undefined" && !document.hidden) {
-        void fetchChatData();
-      }
-    }, isOpen ? 30000 : 60000);
+      void fetchChatData();
+    }, isOpen ? 10000 : 5000);
 
     return () => {
       if (initialTimer) clearTimeout(initialTimer);
@@ -843,6 +906,8 @@ export default function FloatingCommunityChat() {
       setInputText("");
       setReplyTo(null);
       prevMsgCountRef.current += 1;
+      lastMessageIdRef.current = newMsg.id;
+      notifyDataChanged("chat", "message_created", newMsg.id);
       toast.success(isBn ? "ছবি পাঠানো হয়েছে!" : "Image sent successfully!");
     } catch (err: unknown) {
       toast.error(
@@ -910,6 +975,8 @@ export default function FloatingCommunityChat() {
       setReplyTo(null);
       setProfanityWarning(false);
       prevMsgCountRef.current += 1;
+      lastMessageIdRef.current = newMsg.id;
+      notifyDataChanged("chat", "message_created", newMsg.id);
     } catch (err: unknown) {
       toast.error(
         err instanceof Error
@@ -1070,6 +1137,8 @@ export default function FloatingCommunityChat() {
       setVoiceDuration(0);
       setReplyTo(null);
       prevMsgCountRef.current += 1;
+      lastMessageIdRef.current = newMsg.id;
+      notifyDataChanged("chat", "message_created", newMsg.id);
       toast.success(isBn ? "ভয়েস নোট পাঠানো হয়েছে!" : "Voice note sent!");
     } catch (err: unknown) {
       toast.error(
@@ -1554,7 +1623,7 @@ export default function FloatingCommunityChat() {
                   height: pathname?.startsWith("/admin") ? "100dvh" : "calc(100dvh - 64px - env(safe-area-inset-bottom, 0px))",
                   maxHeight: "none",
                   transform: "none",
-                  zIndex: 35,
+                  zIndex: 55,
                   willChange: "auto",
                   transition: "none",
                 }
@@ -1574,7 +1643,7 @@ export default function FloatingCommunityChat() {
           }
           className={
             isMobileScreen
-              ? `w-full h-full flex flex-col rounded-none overflow-hidden select-none transition-colors duration-200 border-none shadow-none pt-16 ${
+              ? `w-full h-full flex flex-col rounded-none overflow-hidden select-none transition-colors duration-200 border-none shadow-none ${
                   isDark
                     ? "bg-[#090d16] text-slate-100"
                     : "bg-slate-50 text-slate-800"
@@ -1589,11 +1658,11 @@ export default function FloatingCommunityChat() {
           {/* Radiant Top Neon Light Strip */}
           <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_12px_#22d3ee] shrink-0" />
 
-          {/* Header Bar (Direct Drag Handle on Desktop + Fixed Navigation on Mobile) */}
+          {/* Header Bar (Direct Drag Handle on Desktop + Fixed Navigation with Back Arrow on Mobile) */}
           <div
             onPointerDown={isMobileScreen ? undefined : handleHeaderPointerDown}
             onDoubleClick={isMobileScreen ? undefined : handleResetPosition}
-            className={`relative px-4 py-3 border-b flex items-center justify-between select-none transition-colors ${
+            className={`relative px-3.5 py-2.5 sm:px-4 sm:py-3 border-b flex items-center justify-between select-none transition-colors ${
               isMobileScreen ? "cursor-default" : "cursor-grab active:cursor-grabbing"
             } ${
               isDark
@@ -1608,20 +1677,25 @@ export default function FloatingCommunityChat() {
                 : undefined
             }
           >
-            {/* Left: Avatar + Title + Integrated Online Status */}
+            {/* Left: Back Arrow (to go back / close chat) + Title + Integrated Online Status */}
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="relative w-8 h-8 rounded-full p-[1.5px] bg-gradient-to-br from-cyan-400 via-indigo-500 to-fuchsia-500 shadow-[0_0_12px_rgba(34,211,238,0.35)] shrink-0">
-                <div className={`w-full h-full rounded-full flex items-center justify-center overflow-hidden relative ${
-                  isDark ? "bg-slate-950" : "bg-white"
-                }`}>
-                  <div className="absolute top-0.5 left-1 w-3.5 h-1.5 bg-white/40 rounded-full blur-[0.5px]" />
-                  <MessageSquare className="w-4 h-4 text-cyan-400 drop-shadow" />
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={() => handleToggleOpen(false)}
+                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs shrink-0 active:scale-95 ${
+                  isDark
+                    ? "bg-slate-800/80 border-slate-700/80 text-white hover:bg-slate-700/80 hover:text-cyan-400"
+                    : "bg-white border-slate-200 text-slate-800 hover:bg-slate-100 hover:text-cyan-600"
+                }`}
+                title={isBn ? "ফিরে যান" : "Go Back"}
+                aria-label="Go Back"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
 
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <h3 className={`text-sm font-bold tracking-wide flex items-center gap-1 truncate ${
+                  <h3 className={`text-sm sm:text-base font-bold tracking-wide flex items-center gap-1 truncate ${
                     isDark ? "text-white" : "text-slate-900"
                   }`}>
                     {isBn ? "SEU ক্যাম্পাস লাইভ" : "SEU Campus Live"}
@@ -1642,181 +1716,67 @@ export default function FloatingCommunityChat() {
               </div>
             </div>
 
-            {/* Right: Modern, Unified Action Bar (Consistent Glassmorphism) */}
-            <div className="flex items-center gap-1.5 shrink-0 relative" ref={settingsMenuRef}>
-              
+            {/* Right: Sound Toggle + Notification Toggle (Close button REMOVED!) */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {/* 1. Quick Mute / Sound Toggle */}
               <button
                 type="button"
                 onClick={handleToggleSound}
-                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+                className={`w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 ${
                   soundEnabled
                     ? isDark
-                      ? "bg-slate-800/80 border-slate-700/80 text-emerald-400 hover:bg-slate-700/80 hover:text-emerald-300 shadow-xs active:scale-95"
-                      : "bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100 active:scale-95"
+                      ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25"
+                      : "bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100"
                     : isDark
-                    ? "bg-slate-800/50 border-slate-700/50 text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 active:scale-95"
-                    : "bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-600 active:scale-95"
+                    ? "bg-slate-800/60 border-slate-700/60 text-slate-500 hover:text-slate-300"
+                    : "bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-600"
                 }`}
                 title={
                   soundEnabled
-                    ? isBn
-                      ? "সাউন্ড চালু (মিউট করতে ক্লিক করুন)"
-                      : "Sound ON (click to mute)"
-                    : isBn
-                    ? "সাউন্ড বন্ধ (চালু করতে ক্লিক করুন)"
-                    : "Sound muted (click to unmute)"
+                    ? isBn ? "সাউন্ড চালু (মিউট করতে ক্লিক করুন)" : "Sound ON (click to mute)"
+                    : isBn ? "সাউন্ড বন্ধ (চালু করতে ক্লিক করুন)" : "Sound MUTED (click to unmute)"
                 }
                 aria-label="Toggle chat sound"
               >
-                {soundEnabled ? (
-                  <Volume2 className="w-4 h-4" />
-                ) : (
-                  <VolumeX className="w-4 h-4" />
-                )}
+                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
               </button>
 
-              {/* 2. Chat Preferences / Settings Menu Button */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
-                    showSettingsMenu
-                      ? "bg-cyan-500/20 border-cyan-400/50 text-cyan-400 shadow-xs"
-                      : isDark
-                      ? "bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-700/60 active:scale-95"
-                      : "bg-slate-100 border-slate-200 text-slate-500 hover:text-slate-900 active:scale-95"
-                  }`}
-                  title={isBn ? "চ্যাটরুম সেটিংস" : "Chat Settings"}
-                  aria-label="Chat Settings"
-                >
-                  <MoreVertical className="w-4 h-4" />
-                </button>
-
-                {/* Glassmorphic Preferences Popover Menu */}
-                {showSettingsMenu && (
-                  <div
-                    className={`absolute right-0 mt-2 w-64 rounded-2xl border shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150 ${
-                      isDark
-                        ? "bg-[#0c1322]/95 backdrop-blur-xl border-slate-700/80 text-slate-100 shadow-[0_15px_35px_rgba(0,0,0,0.6)]"
-                        : "bg-white/95 backdrop-blur-xl border-slate-200 text-slate-900 shadow-xl"
-                    }`}
-                  >
-                    <div className="px-3 py-2 border-b border-slate-200/60 dark:border-slate-800/80">
-                      <p className="text-xs font-bold flex items-center gap-1.5 text-slate-900 dark:text-white">
-                        <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                        <span>{isBn ? "ক্যাম্পাস লাইভ প্রেফারেন্স" : "Chatroom Preferences"}</span>
-                      </p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        {isBn ? "নোটিফিকেশন ও সাউন্ড নিয়ন্ত্রণ করুন" : "Manage notifications & audio alerts"}
-                      </p>
-                    </div>
-
-                    <div className="py-1 space-y-1">
-                      {/* Push Notification Toggle Item */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleToggleNotifications();
-                        }}
-                        className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-left transition-colors cursor-pointer group"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                            notificationsEnabled
-                              ? "bg-amber-500/15 text-amber-400"
-                              : "bg-slate-200 dark:bg-slate-800 text-slate-400"
-                          }`}>
-                            {notificationsEnabled ? (
-                              <Bell className="w-3.5 h-3.5 fill-amber-400/20" />
-                            ) : (
-                              <BellOff className="w-3.5 h-3.5" />
-                            )}
-                          </div>
-                          <div>
-                            <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">
-                              {isBn ? "পুশ নোটিফিকেশন" : "Desktop Alerts"}
-                            </span>
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
-                              {notificationsEnabled
-                                ? (isBn ? "চালু আছে" : "Active on incoming chats")
-                                : (isBn ? "মিউট করা" : "Muted")}
-                            </span>
-                          </div>
-                        </div>
-                        <div className={`w-8 h-4.5 rounded-full transition-colors p-0.5 shrink-0 ${notificationsEnabled ? "bg-cyan-500" : "bg-slate-300 dark:bg-slate-700"}`}>
-                          <div className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${notificationsEnabled ? "translate-x-3.5" : "translate-x-0"}`} />
-                        </div>
-                      </button>
-
-                      {/* Sound Effects Toggle Item */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleToggleSound();
-                        }}
-                        className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-left transition-colors cursor-pointer group"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                            soundEnabled
-                              ? "bg-emerald-500/15 text-emerald-400"
-                              : "bg-slate-200 dark:bg-slate-800 text-slate-400"
-                          }`}>
-                            {soundEnabled ? (
-                              <Volume2 className="w-3.5 h-3.5" />
-                            ) : (
-                              <VolumeX className="w-3.5 h-3.5" />
-                            )}
-                          </div>
-                          <div>
-                            <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">
-                              {isBn ? "মেসেজ সাউন্ড" : "Chat Sound Effects"}
-                            </span>
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400 block">
-                              {soundEnabled ? (isBn ? "শব্দ বাজবে" : "Play incoming chime") : (isBn ? "মিউট করা" : "Silent mode")}
-                            </span>
-                          </div>
-                        </div>
-                        <div className={`w-8 h-4.5 rounded-full transition-colors p-0.5 shrink-0 ${soundEnabled ? "bg-cyan-500" : "bg-slate-300 dark:bg-slate-700"}`}>
-                          <div className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${soundEnabled ? "translate-x-3.5" : "translate-x-0"}`} />
-                        </div>
-                      </button>
-
-                      {/* Reset Position (Desktop only) */}
-                      {!isMobileScreen && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleResetPosition();
-                            setShowSettingsMenu(false);
-                          }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-600 dark:text-slate-300 hover:text-cyan-500 dark:hover:text-cyan-400 text-left transition-colors cursor-pointer text-xs font-semibold border-t border-slate-200/60 dark:border-slate-800/60 mt-1"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>{isBn ? "ডিফল্ট কর্নারে রিসেট করুন" : "Reset Window to Corner"}</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 3. Single Dismiss / Close Button */}
+              {/* 2. Notification Toggle */}
               <button
                 type="button"
-                onClick={() => handleToggleOpen(false)}
-                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 ${
-                  isDark
-                    ? "border-slate-700/60 bg-slate-800/50 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 hover:border-rose-500/40"
-                    : "border-slate-200 bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 hover:border-rose-300"
+                onClick={handleToggleNotifications}
+                className={`w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 ${
+                  notificationsEnabled
+                    ? isDark
+                      ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
+                      : "bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100"
+                    : isDark
+                    ? "bg-slate-800/60 border-slate-700/60 text-slate-500 hover:text-slate-300"
+                    : "bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-600"
                 }`}
-                title={isBn ? "চ্যাট বন্ধ করুন" : "Close Chat"}
-                aria-label="Close Chat"
+                title={
+                  notificationsEnabled
+                    ? isBn ? "নোটিফিকেশন চালু (বন্ধ করতে ক্লিক করুন)" : "Notifications ON (click to mute)"
+                    : isBn ? "নোটিফিকেশন বন্ধ (চালু করতে ক্লিক করুন)" : "Notifications OFF (click to enable)"
+                }
+                aria-label="Toggle chat notifications"
               >
-                <X className="w-4 h-4" />
+                {notificationsEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
               </button>
+
+              {/* 3. On desktop only: reset position */}
+              {!isMobileScreen && (
+                <button
+                  type="button"
+                  onClick={handleResetPosition}
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 ${
+                    isDark ? "bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-white" : "bg-slate-100 border-slate-200 text-slate-500 hover:text-slate-900"
+                  }`}
+                  title={isBn ? "ডিফল্ট কর্নারে রিসেট করুন" : "Reset window to corner"}
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -2650,6 +2610,80 @@ export default function FloatingCommunityChat() {
                 <span>{isBn ? "বন্ধ করুন" : "Close"}</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 Messenger-Style Live Incoming Message Floating Banner */}
+      {!isOpen && incomingBanner && notificationsEnabled && (
+        <div
+          role="alert"
+          onClick={() => {
+            handleToggleOpen(true);
+            setIncomingBanner(null);
+          }}
+          className="fixed top-3 inset-x-3 sm:inset-x-auto sm:right-6 sm:top-5 z-[99999] max-w-sm sm:max-w-md mx-auto sm:mx-0 p-3 sm:p-3.5 rounded-2xl sm:rounded-3xl bg-slate-900/98 dark:bg-[#0c1322]/98 backdrop-blur-2xl border border-cyan-500/40 shadow-[0_20px_50px_rgba(0,0,0,0.7),0_0_25px_rgba(34,211,238,0.25)] text-white cursor-pointer transition-all animate-in slide-in-from-top-4 fade-in duration-300 hover:scale-[1.02] active:scale-[0.99] select-none group"
+        >
+          <div className="flex items-start gap-3">
+            {/* Sender Avatar / Initial */}
+            <div className="relative shrink-0 mt-0.5">
+              {incomingBanner.senderAvatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={incomingBanner.senderAvatarUrl}
+                  alt={incomingBanner.senderName}
+                  className="w-10 h-10 rounded-full object-cover border-2 border-cyan-400 shadow-md shadow-cyan-500/20"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-600 via-indigo-600 to-purple-600 border-2 border-cyan-400 flex items-center justify-center text-white text-xs font-bold uppercase shadow-md shadow-cyan-500/20">
+                  {incomingBanner.senderName.slice(0, 2)}
+                </div>
+              )}
+              {/* Online pulse dot */}
+              <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-900 shadow-[0_0_8px_#34d399]" />
+            </div>
+
+            {/* Notification Body */}
+            <div className="flex-1 min-w-0 pr-6">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-extrabold text-white truncate max-w-[140px] sm:max-w-[180px]">
+                  {incomingBanner.senderName}
+                </span>
+
+                {incomingBanner.senderRole?.toUpperCase() === "ADMIN" && (
+                  <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-bold">
+                    Admin
+                  </span>
+                )}
+
+                <span className="text-[10px] text-cyan-400 font-medium ml-auto">
+                  {isBn ? "ক্যাম্পাস লাইভ" : "Campus Live"}
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-200 mt-1 line-clamp-2 leading-relaxed break-words font-medium">
+                {incomingBanner.text}
+              </p>
+
+              <div className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-cyan-400 group-hover:text-cyan-300">
+                <span>{isBn ? "রিপ্লাই দিতে ট্যাপ করুন" : "Tap to open & reply"}</span>
+                <span className="transition-transform group-hover:translate-x-0.5">→</span>
+              </div>
+            </div>
+
+            {/* Dismiss X */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIncomingBanner(null);
+              }}
+              className="absolute top-2.5 right-2.5 w-6 h-6 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors"
+              title={isBn ? "নোটিফিকেশন বন্ধ করুন" : "Dismiss"}
+              aria-label="Dismiss notification"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       )}
