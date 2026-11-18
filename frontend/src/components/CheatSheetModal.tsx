@@ -29,6 +29,7 @@ import {
   Tag,
   Zap,
   Upload,
+  Code,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
@@ -752,27 +753,105 @@ export default function CheatSheetModal({
     }
   };
 
-  // Simple Markdown & LaTeX formatter for clean rendering of bold text, lists, code, and math equations
+  // Simple Markdown & LaTeX formatter for clean rendering of bold text, lists, code, tables, and math equations
   const renderFormattedContent = (content: string) => {
     const lines = content.split("\n");
     let inCodeBlock = false;
     let codeBuffer: string[] = [];
     let inMathBlock = false;
     let mathBuffer: string[] = [];
+    let inTable = false;
+    let tableBuffer: string[] = [];
 
     const elements: React.ReactNode[] = [];
+
+    const flushTable = (keyPrefix: string) => {
+      if (tableBuffer.length === 0) return;
+      const tLines = [...tableBuffer];
+      tableBuffer = [];
+      inTable = false;
+
+      const cleanRows = tLines.map((l) => l.trim()).filter((l) => l.length > 0);
+      if (cleanRows.length === 0) return;
+
+      const headerLine = cleanRows[0];
+      const headerCells = headerLine
+        .split("|")
+        .map((c) => c.trim())
+        .filter((c, i, arr) => !(i === 0 && c === "") && !(i === arr.length - 1 && c === ""));
+
+      let startIndex = 1;
+      if (cleanRows.length > 1 && /^\|?[\s\-:|]+\|?$/.test(cleanRows[1])) {
+        startIndex = 2;
+      }
+
+      const bodyRows = cleanRows.slice(startIndex).map((rowLine) => {
+        return rowLine
+          .split("|")
+          .map((c) => c.trim())
+          .filter((c, i, arr) => !(i === 0 && c === "") && !(i === arr.length - 1 && c === ""));
+      });
+
+      elements.push(
+        <div
+          key={`${keyPrefix}-table`}
+          className="my-2.5 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 shadow-xs max-w-full"
+        >
+          <table className="w-full text-left text-xs sm:text-[13px] border-collapse min-w-[260px]">
+            <thead>
+              <tr className="bg-slate-100/90 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-700/80">
+                {headerCells.map((h, hi) => (
+                  <th key={hi} className="px-3 py-2 font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                    {renderInlineText(h)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200/60 dark:divide-slate-800/60">
+              {bodyRows.map((rCells, ri) => (
+                <tr key={ri} className="hover:bg-blue-50/40 dark:hover:bg-slate-800/40 transition-colors">
+                  {rCells.map((c, ci) => (
+                    <td key={ci} className="px-3 py-2 text-slate-700 dark:text-slate-300">
+                      {renderInlineText(c)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    };
 
     lines.forEach((line, index) => {
       // 1. Code blocks (```)
       if (line.trim().startsWith("```")) {
+        if (inTable) flushTable(`tbl-pre-${index}`);
         if (inCodeBlock) {
+          const codeText = codeBuffer.join("\n");
           elements.push(
-            <pre
+            <div
               key={`code-${index}`}
-              className="p-3 my-2 rounded-xl bg-slate-900 text-emerald-400 font-mono text-xs overflow-x-auto border border-slate-800"
+              className="my-2.5 rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden shadow-sm"
             >
-              <code>{codeBuffer.join("\n")}</code>
-            </pre>
+              <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900/90 border-b border-slate-800 text-[10px] font-mono text-slate-400">
+                <span className="flex items-center gap-1.5 font-bold text-slate-300">
+                  <Code className="w-3 h-3 text-emerald-400" />
+                  <span>Code</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCopyText(codeText, index)}
+                  className="text-slate-400 hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  <Copy className="w-2.5 h-2.5" />
+                  <span>Copy</span>
+                </button>
+              </div>
+              <pre className="p-3 text-emerald-400 font-mono text-xs overflow-x-auto leading-relaxed">
+                <code>{codeText}</code>
+              </pre>
+            </div>
           );
           codeBuffer = [];
           inCodeBlock = false;
@@ -791,11 +870,12 @@ export default function CheatSheetModal({
 
       // 2. Multi-line Display Math Blocks ($$...$$ or \[...\])
       if (trimmed === "$$" || trimmed === "\\[") {
+        if (inTable) flushTable(`tbl-math-${index}`);
         if (inMathBlock) {
           elements.push(
             <div
               key={`math-${index}`}
-              className="my-3 py-3 px-4 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900 to-indigo-950/40 border border-slate-700/70 dark:border-slate-800 shadow-xl overflow-x-auto text-center"
+              className="my-2.5 py-2.5 px-3 sm:py-3 sm:px-4 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900 to-indigo-950/40 border border-slate-700/70 dark:border-slate-800 shadow-xl overflow-x-auto text-center"
             >
               <div
                 className="inline-block text-slate-100 min-w-full text-center"
@@ -819,7 +899,7 @@ export default function CheatSheetModal({
           elements.push(
             <div
               key={`math-${index}`}
-              className="my-3 py-3 px-4 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900 to-indigo-950/40 border border-slate-700/70 dark:border-slate-800 shadow-xl overflow-x-auto text-center"
+              className="my-2.5 py-2.5 px-3 sm:py-3 sm:px-4 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900 to-indigo-950/40 border border-slate-700/70 dark:border-slate-800 shadow-xl overflow-x-auto text-center"
             >
               <div
                 className="inline-block text-slate-100 min-w-full text-center"
@@ -837,6 +917,15 @@ export default function CheatSheetModal({
         return;
       }
 
+      // Check for Markdown table rows
+      if (trimmed.startsWith("|") && (trimmed.endsWith("|") || trimmed.includes("|"))) {
+        inTable = true;
+        tableBuffer.push(line);
+        return;
+      } else if (inTable) {
+        flushTable(`tbl-${index}`);
+      }
+
       // 3. Single-line Display Math ($$math$$ or \[math\])
       if (
         (trimmed.startsWith("$$") && trimmed.endsWith("$$") && trimmed.length > 2) ||
@@ -848,7 +937,7 @@ export default function CheatSheetModal({
         elements.push(
           <div
             key={`math-${index}`}
-            className="my-3 py-3 px-4 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900 to-indigo-950/40 border border-slate-700/70 dark:border-slate-800 shadow-xl overflow-x-auto text-center"
+            className="my-2.5 py-2.5 px-3 sm:py-3 sm:px-4 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900 to-indigo-950/40 border border-slate-700/70 dark:border-slate-800 shadow-xl overflow-x-auto text-center"
           >
             <div
               className="inline-block text-slate-100 min-w-full text-center"
@@ -862,7 +951,7 @@ export default function CheatSheetModal({
       }
 
       if (!trimmed) {
-        elements.push(<div key={`empty-${index}`} className="h-2" />);
+        elements.push(<div key={`empty-${index}`} className="h-1.5" />);
         return;
       }
 
@@ -882,7 +971,7 @@ export default function CheatSheetModal({
         elements.push(
           <h2
             key={`h1-${index}`}
-            className="text-base font-black text-slate-900 dark:text-white mt-3 mb-1.5 flex items-center gap-2"
+            className="text-sm sm:text-base font-black text-slate-900 dark:text-white mt-3 mb-1.5 flex items-center gap-2"
           >
             <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
             <span>{renderInlineText(trimmed.replace(/^#\s+/, ""))}</span>
@@ -894,7 +983,7 @@ export default function CheatSheetModal({
         elements.push(
           <h3
             key={`h2-${index}`}
-            className="text-sm font-black text-slate-900 dark:text-white mt-2.5 mb-1 flex items-center gap-1.5"
+            className="text-xs sm:text-sm font-black text-slate-900 dark:text-white mt-2.5 mb-1 flex items-center gap-1.5"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
             <span>{renderInlineText(trimmed.replace(/^##\s+/, ""))}</span>
@@ -906,9 +995,9 @@ export default function CheatSheetModal({
         elements.push(
           <h4
             key={`h3-${index}`}
-            className="text-sm font-black text-slate-900 dark:text-white mt-2 mb-1 flex items-center gap-1.5"
+            className="text-xs sm:text-sm font-black text-slate-900 dark:text-white mt-2 mb-1 flex items-center gap-1.5"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />
             <span>{renderInlineText(trimmed.replace(/^###\s+/, ""))}</span>
           </h4>
         );
@@ -932,10 +1021,10 @@ export default function CheatSheetModal({
         elements.push(
           <div
             key={`li-${index}`}
-            className="flex items-start gap-2 my-0.5 pl-2 text-xs text-slate-700 dark:text-slate-300"
+            className="flex items-start gap-2 my-0.5 pl-1.5 sm:pl-2 text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed"
           >
-            <span className="text-blue-500 mt-0.5">•</span>
-            <span>{renderInlineText(bulletText)}</span>
+            <span className="text-blue-500 font-bold mt-0.5">•</span>
+            <div className="flex-1 min-w-0">{renderInlineText(bulletText)}</div>
           </div>
         );
         return;
@@ -946,12 +1035,12 @@ export default function CheatSheetModal({
         elements.push(
           <div
             key={`num-${index}`}
-            className="flex items-start gap-2 my-0.5 pl-2 text-xs text-slate-700 dark:text-slate-300"
+            className="flex items-start gap-2 my-0.5 pl-1.5 sm:pl-2 text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed"
           >
             <span className="font-bold text-blue-600 dark:text-blue-400 shrink-0">
               {trimmed.match(/^\d+\./)?.[0]}
             </span>
-            <span>{renderInlineText(trimmed.replace(/^\d+\.\s+/, ""))}</span>
+            <div className="flex-1 min-w-0">{renderInlineText(trimmed.replace(/^\d+\.\s+/, ""))}</div>
           </div>
         );
         return;
@@ -974,21 +1063,42 @@ export default function CheatSheetModal({
       elements.push(
         <p
           key={`p-${index}`}
-          className="my-1.5 text-xs text-slate-700 dark:text-slate-300 leading-relaxed"
+          className="my-1 text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed break-words"
         >
           {renderInlineText(line)}
         </p>
       );
     });
 
+    if (inTable && tableBuffer.length > 0) {
+      flushTable("tbl-end");
+    }
+
     if (inCodeBlock && codeBuffer.length > 0) {
+      const codeText = codeBuffer.join("\n");
       elements.push(
-        <pre
+        <div
           key={`code-end`}
-          className="p-3 my-2 rounded-xl bg-slate-900 text-emerald-400 font-mono text-xs overflow-x-auto border border-slate-800"
+          className="my-2.5 rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden shadow-sm"
         >
-          <code>{codeBuffer.join("\n")}</code>
-        </pre>
+          <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900/90 border-b border-slate-800 text-[10px] font-mono text-slate-400">
+            <span className="flex items-center gap-1.5 font-bold text-slate-300">
+              <Code className="w-3 h-3 text-emerald-400" />
+              <span>Code</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => handleCopyText(codeText, 9999)}
+              className="text-slate-400 hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              <Copy className="w-2.5 h-2.5" />
+              <span>Copy</span>
+            </button>
+          </div>
+          <pre className="p-3 text-emerald-400 font-mono text-xs overflow-x-auto leading-relaxed">
+            <code>{codeText}</code>
+          </pre>
+        </div>
       );
     }
 
@@ -996,7 +1106,7 @@ export default function CheatSheetModal({
       elements.push(
         <div
           key={`math-end`}
-          className="my-3 py-3 px-4 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900 to-indigo-950/40 border border-slate-700/70 dark:border-slate-800 shadow-xl overflow-x-auto text-center"
+          className="my-2.5 py-2.5 px-3 sm:py-3 sm:px-4 rounded-2xl bg-gradient-to-r from-slate-900/95 via-slate-900 to-indigo-950/40 border border-slate-700/70 dark:border-slate-800 shadow-xl overflow-x-auto text-center"
         >
           <div
             className="inline-block text-slate-100 min-w-full text-center"
@@ -1036,7 +1146,7 @@ export default function CheatSheetModal({
         return (
           <code
             key={i}
-            className="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-mono text-[11px] font-bold border border-blue-200/50 dark:border-slate-700"
+            className="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-mono text-[11px] font-bold border border-blue-200/50 dark:border-slate-700 break-all"
           >
             {part.slice(1, -1)}
           </code>
@@ -1098,39 +1208,42 @@ export default function CheatSheetModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
       <div
-        className="w-full max-w-4xl h-[92vh] max-h-[850px] rounded-3xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden"
+        className="w-full h-full sm:h-[92vh] sm:max-h-[850px] sm:max-w-4xl sm:rounded-3xl bg-white dark:bg-slate-950 sm:border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ================================================================= */}
         {/* 1. MODAL TOP BAR                                                  */}
         {/* ================================================================= */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-purple-50/50 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/40 gap-3 shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2.5 rounded-2xl bg-gradient-to-br from-amber-500 via-purple-600 to-blue-600 text-white shadow-md shadow-purple-500/20 shrink-0">
-              <Sparkles className="w-5 h-5 animate-pulse" />
+        <div className="flex items-center justify-between px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-purple-50/50 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/40 gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-500 via-purple-600 to-blue-600 text-white shadow-md shadow-purple-500/20 shrink-0">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-black text-base text-slate-900 dark:text-white truncate">
-                  {language === "bn" ? "এআই এক্সাম রিভিশন কো-পাইলট ও স্টাডি মেন্টর" : "AI Exam Revision Copilot & Study Mentor"}
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="font-black text-sm sm:text-base text-slate-900 dark:text-white truncate">
+                  {language === "bn" ? "এআই এক্সাম কো-পাইলট" : "AI Exam Copilot"}
                 </span>
-                <span className="text-xs font-mono font-black px-2.5 py-0.5 rounded-lg bg-blue-600 text-white shrink-0">
+                <span className="text-[10px] sm:text-xs font-mono font-black px-2 py-0.5 rounded-md sm:rounded-lg bg-blue-600 text-white shrink-0">
                   {courseCode}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                {courseTitle || (language === "bn" ? "অ্যাকাডেমিক কোর্স আর্কাইভ" : "Academic Course Archive")} • {courseDepartment || "CSE"} • Southeast University
+              <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                <span className="hidden sm:inline">
+                  {courseTitle || (language === "bn" ? "অ্যাকাডেমিক কোর্স আর্কাইভ" : "Academic Course Archive")} •{" "}
+                </span>
+                {courseDepartment || "CSE"} • Southeast University
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {activeTab === "cheatsheet" && (
               <button
                 onClick={handlePrint}
-                className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors shadow-sm cursor-pointer"
+                className="p-1.5 sm:p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors shadow-sm cursor-pointer"
                 title="Print Cheat Sheet"
               >
                 <Printer className="w-4 h-4" />
@@ -1141,17 +1254,18 @@ export default function CheatSheetModal({
               <button
                 type="button"
                 onClick={() => setShowClearConfirmModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 p-1.5 sm:px-3 sm:py-1.5 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900 transition-colors cursor-pointer"
                 title={language === "bn" ? "চ্যাট ক্লিয়ার করুন" : "Clear conversation"}
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>{language === "bn" ? "ক্লিয়ার চ্যাট" : "Clear Chat"}</span>
+                <span className="hidden sm:inline">{language === "bn" ? "ক্লিয়ার চ্যাট" : "Clear Chat"}</span>
               </button>
             )}
 
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Close modal"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1161,47 +1275,47 @@ export default function CheatSheetModal({
         {/* ================================================================= */}
         {/* 2. SUB-BAR: TABS & FACULTY SELECTOR                              */}
         {/* ================================================================= */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3.5 sm:px-6 py-2 sm:py-2.5 border-b border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 shrink-0">
           {/* Dual Tabs */}
-          <div className="inline-flex items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-bold shrink-0">
+          <div className="inline-flex items-center gap-1 p-0.5 sm:p-1 rounded-xl sm:rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-bold shrink-0 self-start sm:self-auto">
             <button
               onClick={() => setActiveTab("chat")}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg sm:rounded-xl transition-all cursor-pointer ${
                 activeTab === "chat"
                   ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm font-black"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               <MessageSquare className="w-3.5 h-3.5" />
-              <span>{language === "bn" ? "এআই এক্সাম কো-পাইলট" : "AI Exam Copilot"}</span>
+              <span>{language === "bn" ? "এআই কো-পাইলট" : "AI Exam Copilot"}</span>
             </button>
 
             <button
               onClick={() => setActiveTab("cheatsheet")}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition-all cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg sm:rounded-xl transition-all cursor-pointer ${
                 activeTab === "cheatsheet"
                   ? "bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-sm font-black"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>{language === "bn" ? "কুইক রিভিশন গাইড" : "Quick Revision Guide"}</span>
+              <span>{language === "bn" ? "রিভিশন গাইড" : "Quick Revision Guide"}</span>
             </button>
           </div>
 
           {/* Faculty Selector & Rolling Retention Pill */}
-          <div className="flex items-center gap-2 flex-wrap justify-between sm:justify-end flex-1">
+          <div className="flex items-center gap-2 flex-wrap justify-between sm:justify-end">
             {teachers.length > 0 && activeTab === "chat" && (
               <div className="inline-flex items-center gap-1.5 text-xs">
                 <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
-                  {language === "bn" ? "শিক্ষক ফোকাস:" : "Faculty Focus:"}
+                  {language === "bn" ? "শিক্ষক:" : "Faculty:"}
                 </span>
                 <select
                   value={selectedTeacherId || ""}
                   onChange={(e) => setSelectedTeacherId(e.target.value ? Number(e.target.value) : null)}
-                  className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  className="px-2 py-1 rounded-lg sm:rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer max-w-[150px] sm:max-w-none truncate"
                 >
-                  <option value="">{language === "bn" ? "সকল শিক্ষক (All Teachers)" : "All Teachers"}</option>
+                  <option value="">{language === "bn" ? "সকল শিক্ষক" : "All Teachers"}</option>
                   {teachers.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.name} {t.initial ? `[${t.initial}]` : ""}
@@ -1212,10 +1326,10 @@ export default function CheatSheetModal({
             )}
 
             {/* 7-Day Sliding Window Badge */}
-            <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold shrink-0">
+            <div className="inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg sm:rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold shrink-0">
               <Clock className="w-3 h-3" />
               <span>
-                {language === "bn" ? "রোলিং ৭ দিনের মেমোরি" : "7-Day Sliding Retention"}
+                {language === "bn" ? "৭ দিনের মেমোরি" : "7-Day Memory"}
               </span>
             </div>
           </div>
@@ -1271,12 +1385,12 @@ export default function CheatSheetModal({
                 </div>
               ) : messages.length === 0 ? (
                 /* Empty Chat Welcome State */
-                <div className="py-12 sm:py-16 text-center space-y-4 max-w-lg mx-auto">
-                  <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-blue-600 to-purple-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-purple-500/20">
-                    <Bot className="w-7 h-7" />
+                <div className="py-6 sm:py-16 text-center space-y-4 max-w-lg mx-auto">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-blue-600 to-purple-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-purple-500/20">
+                    <Bot className="w-6 h-6 sm:w-7 sm:h-7" />
                   </div>
                   <div className="space-y-1">
-                    <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
                       {language === "bn"
                         ? "স্বাগতম! আমি আপনার AI Exam Revision Copilot"
                         : "Welcome to AI Exam Revision Copilot"}
@@ -1299,9 +1413,9 @@ export default function CheatSheetModal({
                           key={i}
                           onClick={() => handleSendMessage(prompt)}
                           disabled={sending}
-                          className="p-2.5 rounded-2xl bg-white dark:bg-slate-900 hover:bg-blue-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-left text-xs font-medium text-slate-800 dark:text-slate-200 transition-all shadow-sm hover:border-blue-400 flex items-center justify-between group cursor-pointer"
+                          className="p-2.5 sm:p-3 rounded-2xl bg-white dark:bg-slate-900 hover:bg-blue-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-left text-xs font-medium text-slate-800 dark:text-slate-200 transition-all shadow-sm hover:border-blue-400 flex items-center justify-between group cursor-pointer gap-2"
                         >
-                          <span className="truncate pr-2">{prompt}</span>
+                          <span className="pr-1 line-clamp-2 sm:line-clamp-1 leading-snug">{prompt}</span>
                           <Send className="w-3.5 h-3.5 text-blue-500 opacity-60 group-hover:opacity-100 shrink-0" />
                         </button>
                       ))}
@@ -1366,34 +1480,34 @@ export default function CheatSheetModal({
                 </div>
               ) : (
                 /* Chat Messages Timeline */
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {messages.map((msg, index) => {
                     const isUser = msg.role === "user";
 
                     return (
                       <div
                         key={msg.id || index}
-                        className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"} animate-in fade-in duration-150`}
+                        className={`flex gap-2 sm:gap-3 ${isUser ? "justify-end" : "justify-start"} animate-in fade-in duration-150`}
                       >
                         {!isUser && (
-                          <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-amber-500 via-purple-600 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
-                            <Bot className="w-4 h-4" />
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-500 via-purple-600 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+                            <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </div>
                         )}
 
-                        <div className={`max-w-[85%] sm:max-w-[78%] space-y-1`}>
+                        <div className={`max-w-[92%] sm:max-w-[80%] space-y-1`}>
                           <div
-                            className={`p-3.5 sm:p-4 rounded-3xl text-xs sm:text-[13px] shadow-sm leading-relaxed ${
+                            className={`p-3 sm:p-4 rounded-2xl sm:rounded-3xl text-xs sm:text-[13px] shadow-sm leading-relaxed overflow-hidden break-words ${
                               isUser
-                                ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-tr-sm ml-auto"
-                                : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-sm relative group"
+                                ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-tr-xs ml-auto"
+                                : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-xs relative group"
                             }`}
                           >
                             {/* Copy button for AI replies */}
                             {!isUser && (
                               <button
                                 onClick={() => handleCopyText(msg.content, index)}
-                                className="absolute top-2.5 right-2.5 p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                                className="absolute top-2 right-2 p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors opacity-80 sm:opacity-0 group-hover:opacity-100 cursor-pointer"
                                 title="Copy answer"
                               >
                                 {copiedIndex === index ? (
@@ -1409,7 +1523,7 @@ export default function CheatSheetModal({
                                 {(msg.paperTitle || msg.fileUrl || msg.fileName) && (
                                   <div className="flex items-center gap-1.5 px-2.5 py-1 mb-2 rounded-xl bg-white/20 text-white text-[10px] font-semibold border border-white/20">
                                     <FileText className="w-3 h-3 text-white shrink-0" />
-                                    <span className="truncate max-w-[240px] sm:max-w-md">
+                                    <span className="truncate max-w-[200px] sm:max-w-md">
                                       {language === "bn" ? "সংযুক্ত প্রশ্নপত্র:" : "Attached Paper:"} {msg.fileName || msg.paperTitle || "Exam Paper"}
                                     </span>
                                     <span className="ml-auto px-1.5 py-0.2 rounded bg-black/30 text-[9px] font-mono font-bold">
@@ -1417,10 +1531,10 @@ export default function CheatSheetModal({
                                     </span>
                                   </div>
                                 )}
-                                <p className="whitespace-pre-wrap">{msg.content}</p>
+                                <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                               </div>
                             ) : (
-                              <div className="space-y-1">{renderFormattedContent(msg.content)}</div>
+                              <div className="space-y-1 text-slate-800 dark:text-slate-100 break-words">{renderFormattedContent(msg.content)}</div>
                             )}
                           </div>
 
@@ -1472,7 +1586,7 @@ export default function CheatSheetModal({
 
             {/* Interactive Past Exam Papers Bank Drawer (Toggled from the button beside text input) */}
             {isQuestionLinkerOpen && allLinkedItems.length > 0 && (
-              <div className="border-t border-slate-200/90 dark:border-slate-800/90 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-4 sm:px-6 py-3.5 shrink-0 shadow-2xl space-y-3 max-h-[460px] sm:max-h-[520px] overflow-y-auto animate-in slide-in-from-bottom-2 duration-150">
+              <div className="border-t border-slate-200/90 dark:border-slate-800/90 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md px-3 sm:px-6 py-3 shrink-0 shadow-2xl space-y-2.5 max-h-[55vh] sm:max-h-[520px] overflow-y-auto animate-in slide-in-from-bottom-2 duration-150">
                 {/* Drawer Header */}
                 <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-2">
                   <div className="flex items-center gap-2">
@@ -1763,18 +1877,18 @@ export default function CheatSheetModal({
             )}
 
             {/* Message Input Form */}
-            <div className="p-3 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+            <div className="p-2.5 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shrink-0">
               {/* Active Uploaded Real File Chip */}
               {uploadedFile && (
-                <div className="flex items-center gap-2 px-3 py-1.5 mb-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-semibold w-fit animate-in fade-in shadow-sm">
+                <div className="flex items-center gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 mb-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-semibold w-fit max-w-full animate-in fade-in shadow-xs">
                   <FileText className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span className="truncate max-w-[220px] sm:max-w-md font-bold">
-                    {language === "bn" ? "আপলোডকৃত প্রশ্নপত্র:" : "Attached Exam Paper:"} {uploadedFile.name}
+                  <span className="truncate max-w-[180px] sm:max-w-md font-bold">
+                    {language === "bn" ? "আপলোডকৃত:" : "Attached:"} {uploadedFile.name}
                   </span>
-                  <span className="px-1.5 py-0.2 rounded bg-emerald-600 text-white text-[9px] font-mono font-bold">
+                  <span className="px-1.5 py-0.2 rounded bg-emerald-600 text-white text-[9px] font-mono font-bold shrink-0">
                     {uploadedFile.mimeType.includes("image") ? "IMAGE" : "PDF"}
                   </span>
-                  <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-mono">
+                  <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-mono shrink-0 hidden sm:inline">
                     {(uploadedFile.size / 1024).toFixed(1)} KB
                   </span>
                   <button
@@ -1790,13 +1904,13 @@ export default function CheatSheetModal({
 
               {/* Linked Past Question Paper Chip */}
               {!uploadedFile && pendingAttachment && (
-                <div className="flex items-center gap-2 px-3 py-1.5 mb-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900/60 text-blue-700 dark:text-blue-300 text-xs font-semibold w-fit animate-in fade-in">
+                <div className="flex items-center gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5 mb-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900/60 text-blue-700 dark:text-blue-300 text-xs font-semibold w-fit max-w-full animate-in fade-in shadow-xs">
                   <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                  <span className="truncate max-w-[240px] sm:max-w-md">
-                    {language === "bn" ? "সংযুক্ত প্রশ্নপত্র:" : "Attached Exam Paper:"} {pendingAttachment.paperTitle || "Past Paper"}
+                  <span className="truncate max-w-[200px] sm:max-w-md">
+                    {language === "bn" ? "সংযুক্ত প্রশ্নপত্র:" : "Attached Paper:"} {pendingAttachment.paperTitle || "Past Paper"}
                   </span>
                   {pendingAttachment.fileUrl && (
-                    <span className="px-1.5 py-0.2 rounded bg-blue-600 text-white text-[9px] font-mono font-bold">
+                    <span className="px-1.5 py-0.2 rounded bg-blue-600 text-white text-[9px] font-mono font-bold shrink-0">
                       PDF
                     </span>
                   )}
@@ -1816,95 +1930,144 @@ export default function CheatSheetModal({
                   e.preventDefault();
                   handleSendMessage();
                 }}
-                className="flex items-center gap-2"
+                className="space-y-2"
               >
-                {/* Real PDF / Image Upload Button with native file picker */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="hidden"
-                  accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp"
-                  onChange={handleFileSelect}
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploadingFile || sending}
-                  className="px-3 py-3 rounded-2xl border text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm bg-slate-100 hover:bg-emerald-50 dark:bg-slate-800 dark:hover:bg-emerald-950/40 border-slate-200 dark:border-slate-700 hover:border-emerald-500 text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400"
-                  title={language === "bn" ? "ডিভাইস থেকে আসল পিডিএফ বা প্রশ্নপত্রের ছবি আপলোড করুন" : "Upload authentic PDF or question photo"}
-                >
-                  <Upload className="w-4 h-4 text-emerald-500" />
-                  <span className="hidden sm:inline">
-                    {language === "bn" ? "পিডিএফ আপলোড" : "Upload PDF"}
-                  </span>
-                </button>
+                {/* Mobile-Only Action Toolbar (Upload Paper + Exam Papers Archive + Voice/Shortcuts) */}
+                <div className="flex sm:hidden items-center justify-between gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingFile || sending}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-emerald-50 dark:bg-slate-800 dark:hover:bg-emerald-950/40 border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400 shrink-0 cursor-pointer transition-all active:scale-95"
+                      title={language === "bn" ? "ডিভাইস থেকে পিডিএফ বা প্রশ্নপত্রের ছবি আপলোড করুন" : "Upload authentic PDF or question photo"}
+                    >
+                      <Upload className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>{language === "bn" ? "পিডিএফ / ছবি" : "PDF / Photo"}</span>
+                    </button>
 
-                {/* Link Past Question Button Beside Text Field */}
-                {allLinkedItems.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setIsQuestionLinkerOpen(!isQuestionLinkerOpen)}
-                    className={`px-3 py-3 rounded-2xl border text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm ${
-                      isQuestionLinkerOpen
-                        ? "bg-blue-600 border-blue-500 text-white shadow-blue-500/25"
-                        : "bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-blue-400"
-                    }`}
-                    title={language === "bn" ? "বিগত প্রশ্নপত্র ও প্রশ্ন লিংক করুন" : "Link Past Exam Question"}
-                  >
-                    <BookOpen className={`w-4 h-4 ${isQuestionLinkerOpen ? "text-white" : "text-blue-500 dark:text-blue-400"}`} />
-                    <span className="hidden sm:inline">
-                      {language === "bn" ? "প্রশ্ন লিংক" : "Link Question"}
-                    </span>
-                    {isQuestionLinkerOpen ? (
-                      <ChevronDown className="w-3.5 h-3.5 rotate-180 transition-transform" />
-                    ) : (
-                      <ChevronDown className="w-3.5 h-3.5 transition-transform" />
+                    {allLinkedItems.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsQuestionLinkerOpen(!isQuestionLinkerOpen)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold shrink-0 cursor-pointer transition-all active:scale-95 ${
+                          isQuestionLinkerOpen
+                            ? "bg-blue-600 border-blue-500 text-white shadow-xs"
+                            : "bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-blue-400"
+                        }`}
+                      >
+                        <BookOpen className={`w-3.5 h-3.5 ${isQuestionLinkerOpen ? "text-white" : "text-blue-500 dark:text-blue-400"}`} />
+                        <span>{language === "bn" ? "বিগত প্রশ্নসমূহ" : "Past Papers"}</span>
+                        <span className="px-1.5 py-0.2 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-[9px] font-mono">
+                          {allLinkedItems.length}
+                        </span>
+                        <ChevronDown className={`w-3 h-3 transition-transform ${isQuestionLinkerOpen ? "rotate-180" : ""}`} />
+                      </button>
                     )}
-                  </button>
-                )}
+                  </div>
 
-                <div className="flex-1 relative">
-                  <input
-                    type="text"
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    placeholder={
-                      language === "bn"
-                        ? uploadedFile
-                          ? `সংযুক্ত "${uploadedFile.name}" সম্পর্কে প্রশ্ন করুন (যেমন: সব সলভ দাও, ১ নং সমাধান)...`
-                          : activeTeacher
-                          ? `${activeTeacher.name} [${teacherInit}] স্যারের পরীক্ষার সাজেশন বা প্রশ্ন লিখুন...`
-                          : "যেকোনো পরীক্ষার প্রশ্ন লিখুন বা 'পিডিএফ আপলোড' / 'প্রশ্ন লিংক' করুন..."
-                        : uploadedFile
-                        ? `Ask question about "${uploadedFile.name}" (e.g. solve paper, solve Q1)...`
-                        : activeTeacher
-                        ? `Ask exam question or tips for ${activeTeacher.name}...`
-                        : "Ask exam question, or 'Upload PDF' / 'Link Question'..."
-                    }
-                    disabled={sending}
-                    className="w-full pl-4 pr-10 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                  />
+                  <span className="text-[10px] text-slate-400 shrink-0 font-medium">
+                    {messages.length} {language === "bn" ? "বার্তা" : "msgs"}
+                  </span>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={(!inputMessage.trim() && !uploadedFile) || sending}
-                  className="px-4 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
-                >
-                  <Send className="w-4 h-4" />
-                  <span className="hidden sm:inline">{language === "bn" ? "পাঠান" : "Send"}</span>
-                </button>
+                {/* Main Input Row */}
+                <div className="flex items-center gap-2">
+                  {/* Real PDF / Image Upload Button with native file picker (Desktop Only) */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp"
+                    onChange={handleFileSelect}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingFile || sending}
+                    className="hidden sm:flex px-3 py-3 rounded-2xl border text-xs font-bold transition-all items-center gap-1.5 shrink-0 cursor-pointer shadow-sm bg-slate-100 hover:bg-emerald-50 dark:bg-slate-800 dark:hover:bg-emerald-950/40 border-slate-200 dark:border-slate-700 hover:border-emerald-500 text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400"
+                    title={language === "bn" ? "ডিভাইস থেকে আসল পিডিএফ বা প্রশ্নপত্রের ছবি আপলোড করুন" : "Upload authentic PDF or question photo"}
+                  >
+                    <Upload className="w-4 h-4 text-emerald-500" />
+                    <span>
+                      {language === "bn" ? "পিডিএফ আপলোড" : "Upload PDF"}
+                    </span>
+                  </button>
+
+                  {/* Link Past Question Button Beside Text Field (Desktop Only) */}
+                  {allLinkedItems.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setIsQuestionLinkerOpen(!isQuestionLinkerOpen)}
+                      className={`hidden sm:flex px-3 py-3 rounded-2xl border text-xs font-bold transition-all items-center gap-1.5 shrink-0 cursor-pointer shadow-sm ${
+                        isQuestionLinkerOpen
+                          ? "bg-blue-600 border-blue-500 text-white shadow-blue-500/25"
+                          : "bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-blue-400"
+                      }`}
+                      title={language === "bn" ? "বিগত প্রশ্নপত্র ও প্রশ্ন লিংক করুন" : "Link Past Exam Question"}
+                    >
+                      <BookOpen className={`w-4 h-4 ${isQuestionLinkerOpen ? "text-white" : "text-blue-500 dark:text-blue-400"}`} />
+                      <span>
+                        {language === "bn" ? "প্রশ্ন লিংক" : "Link Question"}
+                      </span>
+                      {isQuestionLinkerOpen ? (
+                        <ChevronDown className="w-3.5 h-3.5 rotate-180 transition-transform" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 transition-transform" />
+                      )}
+                    </button>
+                  )}
+
+                  {/* Full-width text input on Mobile, spacious on Desktop */}
+                  <div className="flex-1 relative min-w-0">
+                    <input
+                      type="text"
+                      value={inputMessage}
+                      onChange={(e) => setInputMessage(e.target.value)}
+                      placeholder={
+                        language === "bn"
+                          ? uploadedFile
+                            ? `"${uploadedFile.name}" সম্পর্কে প্রশ্ন লিখুন...`
+                            : activeTeacher
+                            ? `${teacherInit || activeTeacher.name} স্যারের পরীক্ষার প্রশ্ন বা সাজেশন লিখুন...`
+                            : "যেকোনো পরীক্ষার প্রশ্ন বা টপিক লিখুন..."
+                          : uploadedFile
+                          ? `Ask about "${uploadedFile.name}"...`
+                          : activeTeacher
+                          ? `Ask exam question or tips for ${teacherInit || activeTeacher.name}...`
+                          : "Ask exam question, chapter or topic..."
+                      }
+                      disabled={sending}
+                      className="w-full pl-3.5 sm:pl-4 pr-3 sm:pr-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    />
+                  </div>
+
+                  {/* Send Button */}
+                  <button
+                    type="submit"
+                    disabled={(!inputMessage.trim() && !uploadedFile) || sending}
+                    className="p-2.5 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span className="hidden sm:inline">{language === "bn" ? "পাঠান" : "Send"}</span>
+                  </button>
+                </div>
               </form>
 
               {/* Rolling 7-Day Auto-Purge Explanation */}
               <div className="flex items-center justify-between mt-2 text-[10px] text-slate-400 px-1">
                 <span className="flex items-center gap-1">
                   <Clock className="w-3 h-3 text-emerald-500" />
-                  {language === "bn"
-                    ? "চ্যাট কনভার্সেশন সর্বোচ্চ ৭ দিন সংরক্ষিত থাকে এবং ৭ দিন পর স্বয়ংক্রিয়ভাবে মুছে যায়।"
-                    : "Conversations are saved for 7 rolling days only and auto-purged daily."}
+                  <span className="hidden sm:inline">
+                    {language === "bn"
+                      ? "চ্যাট কনভার্সেশন সর্বোচ্চ ৭ দিন সংরক্ষিত থাকে এবং ৭ দিন পর স্বয়ংক্রিয়ভাবে মুছে যায়।"
+                      : "Conversations are saved for 7 rolling days only and auto-purged daily."}
+                  </span>
+                  <span className="sm:hidden">
+                    {language === "bn" ? "৭ দিন সংরক্ষিত থাকে" : "Saved for 7 days"}
+                  </span>
                 </span>
-                <span>
+                <span className="hidden sm:inline">
                   {messages.length} {language === "bn" ? "টি বার্তা" : "messages"}
                 </span>
               </div>
@@ -1914,7 +2077,7 @@ export default function CheatSheetModal({
           /* =============================================================== */
           /* 5. TAB 2: INSTANT STRUCTURED REVISION CHEAT SHEET               */
           /* =============================================================== */
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs sm:text-sm bg-white dark:bg-slate-950">
+          <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-4 sm:space-y-6 text-xs sm:text-sm bg-white dark:bg-slate-950">
             {sheetLoading ? (
               <div className="py-20 text-center text-slate-400 space-y-3">
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent mx-auto" />
