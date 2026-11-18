@@ -62,8 +62,8 @@ export default function Navbar() {
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-[#0b1120]/95 backdrop-blur-md transition-colors print:hidden">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-1 sm:gap-2 lg:gap-4 min-w-0">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-5 lg:px-4 xl:px-8">
+        <div className="flex items-center justify-between h-16 gap-1 sm:gap-2 lg:gap-3 xl:gap-4 min-w-0">
           
           {/* Logo & Brand */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -71,7 +71,7 @@ export default function Navbar() {
           </div>
 
           {/* Desktop & Tablet Landscape Nav Links */}
-          <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1 2xl:gap-1.5 shrink-0 ml-auto mr-2 xl:mr-3">
+          <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1 2xl:gap-1.5 shrink-0 ml-auto mr-1.5 xl:mr-3">
             <Link href="/courses" className={getDesktopNavLinkClass("/courses")}>
               <span>{t("nav.courses", "Courses & Notes")}</span>
             </Link>

@@ -2,6 +2,7 @@
 
 @theme {
   --breakpoint-xs: 30rem;
+  --breakpoint-lg: 60rem; /* 960px: Enables desktop mode for mobile "Desktop site" (980px) and landscape tablets */
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
