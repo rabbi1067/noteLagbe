@@ -2539,6 +2539,14 @@ export default function AdminDashboardPage() {
       toast.error("Please enter a valid name.");
       return;
     }
+    if (!editStaffEmail.trim()) {
+      toast.error("Email address is required.");
+      return;
+    }
+    if (!isValidAllowedEmail(editStaffEmail)) {
+      toast.error(EMAIL_DOMAIN_ERROR);
+      return;
+    }
     if (editStaffPhone.trim() && !isValidBdPhone(editStaffPhone)) {
       toast.error(PHONE_FORMAT_ERROR);
       return;
@@ -2547,6 +2555,7 @@ export default function AdminDashboardPage() {
     try {
       const payload: any = {
         name: editStaffName.trim(),
+        email: editStaffEmail.trim().toLowerCase(),
         role: isSuperAdmin ? editStaffRole : "ROLE_STUDENT",
         studentId: editStaffStudentId.trim() || undefined,
         phone: editStaffPhone.trim() ? normalizeBdPhone(editStaffPhone) : undefined,
@@ -12005,24 +12014,24 @@ export default function AdminDashboardPage() {
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block">University Email</label>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                    <Lock className="w-2.5 h-2.5" />
-                    Fixed / Non-editable
-                  </span>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block">University Email *</label>
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">@seu.edu.bd or @gmail.com</span>
                 </div>
                 <div className="relative">
                   <input
                     type="email"
-                    disabled
-                    readOnly
+                    required
                     value={editStaffEmail}
-                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed select-none"
+                    onChange={(e) => setEditStaffEmail(e.target.value)}
+                    placeholder="e.g. 2021000000012@seu.edu.bd or student@gmail.com"
+                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 font-medium text-xs"
                   />
-                  <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <Mail className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
                 <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
-                  University registration email is permanent and locked for security identity.
+                  {language === "bn"
+                    ? "অ্যাডমিন ক্লিয়ারেন্স: আপনি স্টুডেন্টের ইমেইল পরিবর্তন করতে পারবেন (@seu.edu.bd অথবা @gmail.com)।"
+                    : "Admin Clearance: You can edit student email. Must be @seu.edu.bd or @gmail.com."}
                 </p>
               </div>
 

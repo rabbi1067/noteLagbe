@@ -215,9 +215,20 @@ public class AdminService {
             }
         }
 
-        // Email is immutable once registered (Security/Identity constraint)
-
         final Long targetUserId = u.getId();
+        String oldEmail = u.getEmail();
+
+        // Administrator can update user/student email with strict domain & uniqueness validation
+        if (payload.containsKey("email") && payload.get("email") != null) {
+            String rawEmail = payload.get("email").toString().trim();
+            if (!rawEmail.isEmpty() && !rawEmail.equalsIgnoreCase(oldEmail)) {
+                String cleanEmail = UserValidationHelper.validateAndNormalizeEmail(rawEmail);
+                UserValidationHelper.assertUniqueEmail(cleanEmail, targetUserId, userRepository);
+                u.setEmail(cleanEmail);
+                evictCachedUser(oldEmail);
+                evictCachedUser(cleanEmail);
+            }
+        }
 
         if (payload.containsKey("studentId")) {
             String sId = payload.get("studentId") != null ? payload.get("studentId").toString().trim() : "";
