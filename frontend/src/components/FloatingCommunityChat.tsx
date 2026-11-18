@@ -1677,20 +1677,31 @@ export default function FloatingCommunityChat() {
                 : undefined
             }
           >
-            {/* Left: Back Arrow (to go back / close chat) + Title + Integrated Online Status */}
+            {/* Left: Back Arrow (Mobile) / Close Icon (Desktop) + Title + Integrated Online Status */}
             <div className="flex items-center gap-2.5 min-w-0">
               <button
                 type="button"
                 onClick={() => handleToggleOpen(false)}
-                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs shrink-0 active:scale-95 ${
+                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs shrink-0 active:scale-95 group ${
                   isDark
                     ? "bg-slate-800/80 border-slate-700/80 text-white hover:bg-slate-700/80 hover:text-cyan-400"
                     : "bg-white border-slate-200 text-slate-800 hover:bg-slate-100 hover:text-cyan-600"
                 }`}
-                title={isBn ? "ফিরে যান" : "Go Back"}
-                aria-label="Go Back"
+                title={
+                  isMobileScreen
+                    ? (isBn ? "ফিরে যান" : "Go Back")
+                    : (isBn ? "চ্যাট বন্ধ করুন" : "Close Chat")
+                }
+                aria-label={
+                  isMobileScreen
+                    ? (isBn ? "ফিরে যান" : "Go Back")
+                    : (isBn ? "চ্যাট বন্ধ করুন" : "Close Chat")
+                }
               >
-                <ArrowLeft className="w-5 h-5" />
+                {/* Mobile view: back arrow */}
+                <ArrowLeft className="w-5 h-5 sm:hidden" />
+                {/* Desktop view: close icon */}
+                <X className="w-5 h-5 hidden sm:block transition-transform duration-200 group-hover:scale-110" />
               </button>
 
               <div className="min-w-0">
