@@ -405,7 +405,7 @@ export default function AdminDashboardPage() {
   const profileDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
         setProfileDropdownOpen(false);
       }
@@ -417,10 +417,12 @@ export default function AdminDashboardPage() {
     };
     if (profileDropdownOpen) {
       document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside, { passive: true });
       document.addEventListener("keydown", handleKeyDown);
     }
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [profileDropdownOpen]);
@@ -4277,7 +4279,12 @@ export default function AdminDashboardPage() {
           {/* Interactive Executive Profile & Session Dropdown */}
           <div className="relative pl-2 sm:pl-3 border-l border-slate-200 dark:border-slate-800" ref={profileDropdownRef}>
             <button
-              onClick={() => setProfileDropdownOpen((prev) => !prev)}
+              onClick={() => {
+                if (!profileDropdownOpen && typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+                  document.activeElement.blur();
+                }
+                setProfileDropdownOpen((prev) => !prev);
+              }}
               className={`flex items-center gap-1.5 lg:gap-2.5 p-1 lg:px-2.5 lg:py-1.5 rounded-2xl transition-all duration-150 border cursor-pointer select-none ${
                 profileDropdownOpen
                   ? "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 shadow-sm"
@@ -4309,11 +4316,27 @@ export default function AdminDashboardPage() {
               />
             </button>
 
-            {/* Dropdown Menu Panel */}
+            {/* Dropdown Menu Panel & Event-Capturing Backdrop */}
             {profileDropdownOpen && (
-              <div
-                className="absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150 space-y-1.5 text-xs select-none"
-              >
+              <>
+                {/* Full-screen backdrop to intercept outside clicks/taps and prevent background click-through */}
+                <div
+                  className="fixed inset-0 z-40 bg-black/10 dark:bg-black/25 backdrop-blur-[0.5px] transition-opacity animate-in fade-in duration-150 cursor-default"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setProfileDropdownOpen(false);
+                  }}
+                  onTouchStart={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setProfileDropdownOpen(false);
+                  }}
+                  aria-hidden="true"
+                />
+                <div
+                  className="absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150 space-y-1.5 text-xs select-none"
+                >
                 {/* User Info Header Card */}
                 <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800/80 flex items-center gap-3">
                   <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-black text-base flex items-center justify-center shrink-0 shadow-md shadow-purple-500/20 overflow-hidden">
@@ -4465,6 +4488,7 @@ export default function AdminDashboardPage() {
                   </button>
                 </div>
               </div>
+              </>
             )}
           </div>
         </div>

@@ -38,6 +38,10 @@ export interface CampusNoticeItem {
   updatedAt?: string;
 }
 
+export interface NotificationBellProps {
+  onOpenChange?: (isOpen: boolean) => void;
+}
+
 function formatRelativeTime(dateString?: string): string {
   if (!dateString) return "Just now";
   try {
@@ -59,7 +63,7 @@ function formatRelativeTime(dateString?: string): string {
   }
 }
 
-export default function NotificationBell() {
+export default function NotificationBell({ onOpenChange }: NotificationBellProps = {}) {
   const { isAuthenticated, setShowAuthModal } = useAuth();
   const router = useRouter();
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -70,6 +74,18 @@ export default function NotificationBell() {
   const [loading, setLoading] = useState<boolean>(false);
   const [filterTab, setFilterTab] = useState<"all" | "unread">("all");
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Notify parent component about open state changes
+  useEffect(() => {
+    onOpenChange?.(isOpen);
+  }, [isOpen, onOpenChange]);
+
+  // Global listener to dismiss notifications when other popovers open
+  useEffect(() => {
+    const handleClose = () => setIsOpen(false);
+    window.addEventListener("notelagbe-close-dropdowns", handleClose);
+    return () => window.removeEventListener("notelagbe-close-dropdowns", handleClose);
+  }, []);
 
   const fetchCampusNotices = async () => {
     try {
@@ -171,23 +187,40 @@ export default function NotificationBell() {
     }
   });
 
-  // Handle click outside to close dropdown
+  // Handle click outside to close dropdown (supports mouse, touch, and Escape key)
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
         setIsOpen(false);
       }
     }
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside, { passive: true });
+      document.addEventListener("keydown", handleKeyDown);
     }
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen]);
 
   const handleToggle = () => {
     if (!isOpen) {
+      // Dismiss any mobile keyboard and blur focused inputs (e.g. search)
+      if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+      // Broadcast close event for any other open popovers
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("notelagbe-close-dropdowns"));
+      }
       fetchCampusNotices();
       if (isAuthenticated) {
         fetchNotifications();
@@ -341,9 +374,25 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {/* Notifications Drawer */}
+      {/* Notifications Drawer & Event-Capturing Backdrop */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-96 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <>
+          {/* Full-screen backdrop to intercept outside clicks/taps and prevent background click-through/focus */}
+          <div
+            className="fixed inset-0 z-40 bg-black/10 dark:bg-black/25 backdrop-blur-[0.5px] transition-opacity animate-in fade-in duration-150 cursor-default"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              setIsOpen(false);
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              setIsOpen(false);
+            }}
+            aria-hidden="true"
+          />
+          <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-96 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
           
           {/* Header */}
           <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-800/60 backdrop-blur-sm">
@@ -666,6 +715,7 @@ export default function NotificationBell() {
             </>
           )}
         </div>
+        </>
       )}
     </div>
   );

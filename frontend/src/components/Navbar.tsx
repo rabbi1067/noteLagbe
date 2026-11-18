@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -31,6 +31,58 @@ export default function Navbar() {
   const { language, toggleLanguage, t } = useLanguage();
   const { theme, toggleTheme, isDark } = useTheme();
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const userDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Auto-close dropdown when navigating routes
+  useEffect(() => {
+    setUserDropdownOpen(false);
+  }, [pathname]);
+
+  // Handle click outside to close dropdown (supports mouse, touch, and Escape key)
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) {
+        setUserDropdownOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setUserDropdownOpen(false);
+      }
+    }
+    if (userDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside, { passive: true });
+      document.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [userDropdownOpen]);
+
+  // Global listener to dismiss user dropdown when other popovers open
+  useEffect(() => {
+    const handleClose = () => setUserDropdownOpen(false);
+    window.addEventListener("notelagbe-close-dropdowns", handleClose);
+    return () => window.removeEventListener("notelagbe-close-dropdowns", handleClose);
+  }, []);
+
+  const handleToggleUserDropdown = () => {
+    if (!userDropdownOpen) {
+      // Senior-engineer touch: Dismiss any mobile keyboard & blur active input (e.g. search box)
+      if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+      // Broadcast close event for other open popovers
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("notelagbe-close-dropdowns"));
+      }
+    }
+    setUserDropdownOpen((prev) => !prev);
+  };
 
   if (pathname.startsWith("/admin")) {
     return null;
@@ -61,7 +113,7 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-[#0b1120]/95 backdrop-blur-md transition-colors print:hidden">
+      <header className={`fixed top-0 left-0 right-0 ${userDropdownOpen || notificationOpen ? "z-50" : "z-40"} w-full border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-[#0b1120]/95 backdrop-blur-md transition-colors print:hidden`}>
         <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-5 lg:px-4 xl:px-8">
         <div className="flex items-center justify-between h-16 gap-1 sm:gap-2 lg:gap-3 xl:gap-4 min-w-0">
           
@@ -108,7 +160,7 @@ export default function Navbar() {
             
             {/* In-App Notifications Bell (Campus Announcements & Personal Alerts) */}
             <div className="shrink-0">
-              <NotificationBell />
+              <NotificationBell onOpenChange={(open) => setNotificationOpen(open)} />
             </div>
 
             {/* Language Switcher Pill (Compact single-token on mobile, full pill on md+) */}
@@ -148,9 +200,11 @@ export default function Navbar() {
             {/* User Profile or Sign In Button */}
             <div className="flex items-center justify-end shrink-0">
               {isAuthenticated && user ? (
-                <div className="relative">
+                <div className="relative" ref={userDropdownRef}>
                   <button
-                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                    type="button"
+                    onClick={handleToggleUserDropdown}
+                    aria-expanded={userDropdownOpen}
                     className="flex items-center gap-1.5 lg:gap-2 p-1 sm:p-1 xl:px-2.5 xl:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm cursor-pointer shrink-0"
                     title={user.name}
                     aria-label="User Account Menu"
@@ -175,65 +229,83 @@ export default function Navbar() {
                     </div>
                   </button>
 
-                  {/* Dropdown Menu */}
+                  {/* Dropdown Menu & Event-Capturing Backdrop */}
                   {userDropdownOpen && (
-                    <div 
-                      className="absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl py-2 z-50 text-xs animate-in fade-in zoom-in-95 duration-150"
-                      onClick={() => setUserDropdownOpen(false)}
-                    >
-                      <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
-                        <p className="font-bold text-slate-900 dark:text-white truncate">{user.name}</p>
-                        <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
-                      </div>
-
-                      {isAdmin ? (
-                        <Link
-                          href="/admin"
-                          className="flex items-center gap-2 px-4 py-2.5 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 font-bold"
-                        >
-                          <ShieldCheck className="w-4 h-4" />
-                          {t("nav.adminPanel", "Admin Control Center")}
-                        </Link>
-                      ) : (
-                        <>
-                          <Link
-                            href="/dashboard"
-                            className="flex items-center gap-2 px-4 py-2.5 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold"
-                          >
-                            <GraduationCap className="w-4 h-4" />
-                            {t("nav.dashboard", "Student Dashboard")}
-                          </Link>
-                          <Link
-                            href="/dashboard?tab=profile"
-                            className="flex items-center gap-2 px-4 py-2.5 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold"
-                          >
-                            <User className="w-4 h-4 text-blue-500" />
-                            <span>{language === "bn" ? "প্রোফাইল ও পাসওয়ার্ড" : "Student Profile & Settings"}</span>
-                          </Link>
-                        </>
-                      )}
-
-                      <Link
-                        href="/pricing"
-                        className="flex items-center gap-2 px-4 py-2.5 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold"
-                      >
-                        <Sparkles className="w-4 h-4" />
-                        {t("nav.subscription", "Subscription & Plans")}
-                      </Link>
-
-                      <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
-
-                      <button
-                        onClick={() => {
+                    <>
+                      {/* Full-screen backdrop to intercept outside clicks/taps and prevent background click-through/focus */}
+                      <div
+                        className="fixed inset-0 z-40 bg-black/10 dark:bg-black/25 backdrop-blur-[0.5px] transition-opacity animate-in fade-in duration-150 cursor-default"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
                           setUserDropdownOpen(false);
-                          logout();
                         }}
-                        className="w-full text-left flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 font-semibold"
+                        onTouchStart={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setUserDropdownOpen(false);
+                        }}
+                        aria-hidden="true"
+                      />
+
+                      <div 
+                        className="absolute right-0 mt-2 w-60 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl py-2 z-50 text-xs animate-in fade-in zoom-in-95 duration-150"
+                        onClick={() => setUserDropdownOpen(false)}
                       >
-                        <LogOut className="w-4 h-4" />
-                        {t("nav.signOut", "Sign Out")}
-                      </button>
-                    </div>
+                        <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
+                          <p className="font-bold text-slate-900 dark:text-white truncate">{user.name}</p>
+                          <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
+                        </div>
+
+                        {isAdmin ? (
+                          <Link
+                            href="/admin"
+                            className="flex items-center gap-2 px-4 py-2.5 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 font-bold"
+                          >
+                            <ShieldCheck className="w-4 h-4" />
+                            {t("nav.adminPanel", "Admin Control Center")}
+                          </Link>
+                        ) : (
+                          <>
+                            <Link
+                              href="/dashboard"
+                              className="flex items-center gap-2 px-4 py-2.5 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold"
+                            >
+                              <GraduationCap className="w-4 h-4" />
+                              {t("nav.dashboard", "Student Dashboard")}
+                            </Link>
+                            <Link
+                              href="/dashboard?tab=profile"
+                              className="flex items-center gap-2 px-4 py-2.5 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold"
+                            >
+                              <User className="w-4 h-4 text-blue-500" />
+                              <span>{language === "bn" ? "প্রোফাইল ও পাসওয়ার্ড" : "Student Profile & Settings"}</span>
+                            </Link>
+                          </>
+                        )}
+
+                        <Link
+                          href="/pricing"
+                          className="flex items-center gap-2 px-4 py-2.5 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold"
+                        >
+                          <Sparkles className="w-4 h-4" />
+                          {t("nav.subscription", "Subscription & Plans")}
+                        </Link>
+
+                        <div className="border-t border-slate-100 dark:border-slate-800 my-1" />
+
+                        <button
+                          onClick={() => {
+                            setUserDropdownOpen(false);
+                            logout();
+                          }}
+                          className="w-full text-left flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 font-semibold"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          {t("nav.signOut", "Sign Out")}
+                        </button>
+                      </div>
+                    </>
                   )}
                 </div>
               ) : (
