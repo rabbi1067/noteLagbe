@@ -3765,11 +3765,6 @@ export default function StudentToolsPage() {
                   fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif",
                 }}
               >
-                {/* Top Navy & Gold Architectural Accent Bar */}
-                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "6px", backgroundColor: "#0E1E38", display: "flex", justifyContent: "center" }}>
-                  <div style={{ width: "170px", height: "6px", backgroundColor: "#A8843F" }} />
-                </div>
-
                 {/* Soft Watermark Crest */}
                 <img
                   src="/images/seu-logo.png"
@@ -5226,9 +5221,6 @@ export default function StudentToolsPage() {
           if (tpl.layoutStyle === "imperial_ledger") {
             return (
               <div className="w-full aspect-[210/297] bg-white text-[#0E1E38] rounded-xl p-3.5 shadow-md border border-slate-300 dark:border-slate-700/80 flex flex-col justify-between relative overflow-hidden select-none">
-                <div className="absolute top-0 inset-x-0 h-1 bg-[#0E1E38] flex justify-center">
-                  <div className="w-12 h-full bg-[#A8843F]" />
-                </div>
                 <div className="text-center pt-1">
                   <img src="/images/seu-logo.png" alt="SEU" className="w-5 h-5 mx-auto mb-1 object-contain" />
                   <div className="text-[5.5px] font-serif font-bold tracking-widest uppercase">Southeast University</div>
