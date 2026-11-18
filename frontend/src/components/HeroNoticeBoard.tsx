@@ -47,31 +47,10 @@ export default function HeroNoticeBoard() {
       const link = notice.link.trim();
       if (link.startsWith("http://") || link.startsWith("https://")) {
         window.open(link, "_blank", "noopener,noreferrer");
-      } else {
-        router.push(link);
+        return;
       }
-      return;
     }
-    // If no explicit link is set, check if notice is about courses, notes, exams, questions
-    const textLower = (notice.text || "").toLowerCase();
-    if (
-      textLower.includes("course") ||
-      textLower.includes("note") ||
-      textLower.includes("exam") ||
-      textLower.includes("midterm") ||
-      textLower.includes("final") ||
-      textLower.includes("routine") ||
-      textLower.includes("question") ||
-      textLower.includes("paper") ||
-      textLower.includes("archive") ||
-      textLower.includes("কোর্স") ||
-      textLower.includes("নোট") ||
-      textLower.includes("পরীক্ষা")
-    ) {
-      router.push("/courses");
-      return;
-    }
-    // Otherwise open the rich Notice Details Modal
+    // Always open the rich Notice Details Modal so the student can read the full notice comfortably!
     setSelectedNotice(notice);
   };
 
@@ -171,28 +150,29 @@ export default function HeroNoticeBoard() {
 
   const renderTypeBadge = (type?: string) => {
     const t = (type || "INFO").toUpperCase();
+    const badgeClass = "px-1.5 py-0.5 sm:px-2 sm:py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider shadow-xs shrink-0";
     switch (t) {
       case "ALERT":
         return (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-600 text-white shadow-xs shrink-0">
+          <span className={`${badgeClass} bg-red-600 text-white`}>
             {language === "bn" ? "জরুরি" : "ALERT"}
           </span>
         );
       case "IMPORTANT":
         return (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-black shadow-xs shrink-0">
+          <span className={`${badgeClass} bg-amber-400 text-black`}>
             {language === "bn" ? "নোটিশ" : "NOTICE"}
           </span>
         );
       case "UPDATE":
         return (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-white shadow-xs shrink-0">
+          <span className={`${badgeClass} bg-emerald-500 text-white`}>
             {language === "bn" ? "আপডেট" : "UPDATE"}
           </span>
         );
       default:
         return (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-600 text-white shadow-xs shrink-0">
+          <span className={`${badgeClass} bg-blue-600 text-white`}>
             {language === "bn" ? "তথ্য" : "INFO"}
           </span>
         );
@@ -203,88 +183,97 @@ export default function HeroNoticeBoard() {
   const duration = Math.max(30, loopedItems.length * 10);
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 mb-2 min-h-[48px] sm:min-h-[52px]">
+    <div className="w-full max-w-5xl mx-auto px-2 sm:px-4 mb-2 min-h-[44px] sm:min-h-[52px]">
       {/* Eye-catching glowing marquee ribbon */}
       <div 
-        className="group relative flex items-center h-12 sm:h-13 rounded-full bg-gradient-to-r from-[#0a1532] via-[#0f214e] to-[#0a1532] border-2 border-amber-400/80 dark:border-amber-400/70 shadow-[0_4px_30px_rgba(245,158,11,0.28)] dark:shadow-[0_4px_35px_rgba(245,158,11,0.22)] backdrop-blur-xl overflow-hidden transition-all duration-300 hover:border-amber-300 p-1"
+        className="group relative flex items-center h-10 sm:h-12 md:h-13 rounded-full bg-gradient-to-r from-[#0a1532] via-[#0f214e] to-[#0a1532] border border-amber-400/80 sm:border-2 dark:border-amber-400/70 shadow-[0_4px_25px_rgba(245,158,11,0.25)] dark:shadow-[0_4px_35px_rgba(245,158,11,0.22)] backdrop-blur-xl overflow-hidden transition-all duration-300 hover:border-amber-300 p-0.5 sm:p-1"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
+        onTouchStart={() => setIsPaused(true)}
+        onTouchEnd={() => setTimeout(() => setIsPaused(false), 2500)}
       >
-        {/* Left Floating Radiant Live Badge */}
-        <div className="relative z-20 shrink-0 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white shadow-md shadow-red-500/40 select-none">
-          <span className="relative flex h-2.5 w-2.5">
+        {/* Left Floating Radiant Live Badge - Ultra Compact on Mobile */}
+        <div className="relative z-20 shrink-0 flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white shadow-md shadow-red-500/40 select-none">
+          <span className="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-90"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-white"></span>
           </span>
-          <Megaphone className="w-3.5 h-3.5 text-white shrink-0 drop-shadow" />
-          <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-white whitespace-nowrap drop-shadow">
-            {language === "bn" ? "লাইভ নোটিশ" : "LIVE NOTICE"}
+          <Megaphone className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white shrink-0 drop-shadow" />
+          <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-white whitespace-nowrap drop-shadow">
+            <span className="inline sm:hidden">{language === "bn" ? "লাইভ" : "LIVE"}</span>
+            <span className="hidden sm:inline">{language === "bn" ? "লাইভ নোটিশ" : "LIVE NOTICE"}</span>
           </span>
         </div>
 
         {/* Continuous Scrolling Marquee Track with CSS Mask for edge fading */}
         <div 
-          className="flex-1 overflow-hidden relative h-full flex items-center mx-2"
+          className="flex-1 overflow-hidden relative h-full flex items-center mx-1 sm:mx-2"
           style={{
-            maskImage: "linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)",
-            WebkitMaskImage: "linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)"
+            maskImage: "linear-gradient(to right, transparent, black 10px, black calc(100% - 10px), transparent)",
+            WebkitMaskImage: "linear-gradient(to right, transparent, black 10px, black calc(100% - 10px), transparent)"
           }}
         >
           <div 
-            className={`animate-continuous-marquee flex items-center gap-8 sm:gap-12 ${isPaused ? "is-marquee-paused" : ""}`}
+            className={`animate-continuous-marquee flex items-center gap-5 sm:gap-10 ${isPaused ? "is-marquee-paused" : ""}`}
             style={{
               animationDuration: `${duration}s`,
               animationPlayState: isPaused ? "paused" : "running"
             }}
           >
             {/* Set 1 */}
-            <div className="flex items-center gap-8 sm:gap-12 shrink-0">
+            <div className="flex items-center gap-5 sm:gap-10 shrink-0">
               {loopedItems.map((notice, index) => (
                 <div 
                   key={`set1-${notice.id}-${index}`} 
                   onClick={() => handleNoticeClick(notice)}
-                  className="flex items-center gap-2.5 shrink-0 cursor-pointer group/item hover:bg-white/10 px-2.5 py-1 rounded-full transition-all active:scale-[0.98]"
+                  className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 cursor-pointer group/item hover:bg-white/10 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full transition-all active:scale-[0.98]"
                   title={language === "bn" ? "নোটিশটি দেখতে ক্লিক করুন" : "Click to view this notice"}
                 >
                   {renderTypeIcon(notice.type)}
                   {renderTypeBadge(notice.type)}
                   
-                  <span className="text-xs sm:text-sm font-bold text-white group-hover/item:text-amber-300 drop-shadow-xs whitespace-nowrap transition-colors">
+                  <span className="text-[11px] sm:text-xs md:text-sm font-bold text-white group-hover/item:text-amber-300 drop-shadow-xs whitespace-nowrap transition-colors">
                     {notice.text}
                   </span>
 
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-black group-hover/item:bg-white transition-all shadow-xs shrink-0">
+                  <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-black group-hover/item:bg-white transition-all shadow-xs shrink-0">
                     <span>{language === "bn" ? "দেখুন" : "Explore"}</span>
                     <ExternalLink className="w-2.5 h-2.5 shrink-0" />
                   </span>
+                  <span className="sm:hidden text-amber-400 text-[10px] font-bold shrink-0">
+                    ↗
+                  </span>
 
-                  <span className="text-amber-400/80 text-xs select-none pl-2 font-mono">✦</span>
+                  <span className="text-amber-400/80 text-xs select-none pl-1 sm:pl-2 font-mono">✦</span>
                 </div>
               ))}
             </div>
 
             {/* Set 2 (Identical for seamless infinite scroll loop) */}
-            <div className="flex items-center gap-8 sm:gap-12 shrink-0" aria-hidden="true">
+            <div className="flex items-center gap-5 sm:gap-10 shrink-0" aria-hidden="true">
               {loopedItems.map((notice, index) => (
                 <div 
                   key={`set2-${notice.id}-${index}`} 
                   onClick={() => handleNoticeClick(notice)}
-                  className="flex items-center gap-2.5 shrink-0 cursor-pointer group/item hover:bg-white/10 px-2.5 py-1 rounded-full transition-all active:scale-[0.98]"
+                  className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 cursor-pointer group/item hover:bg-white/10 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full transition-all active:scale-[0.98]"
                   title={language === "bn" ? "নোটিশটি দেখতে ক্লিক করুন" : "Click to view this notice"}
                 >
                   {renderTypeIcon(notice.type)}
                   {renderTypeBadge(notice.type)}
                   
-                  <span className="text-xs sm:text-sm font-bold text-white group-hover/item:text-amber-300 drop-shadow-xs whitespace-nowrap transition-colors">
+                  <span className="text-[11px] sm:text-xs md:text-sm font-bold text-white group-hover/item:text-amber-300 drop-shadow-xs whitespace-nowrap transition-colors">
                     {notice.text}
                   </span>
 
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-black group-hover/item:bg-white transition-all shadow-xs shrink-0">
+                  <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-black group-hover/item:bg-white transition-all shadow-xs shrink-0">
                     <span>{language === "bn" ? "দেখুন" : "Explore"}</span>
                     <ExternalLink className="w-2.5 h-2.5 shrink-0" />
                   </span>
+                  <span className="sm:hidden text-amber-400 text-[10px] font-bold shrink-0">
+                    ↗
+                  </span>
 
-                  <span className="text-amber-400/80 text-xs select-none pl-2 font-mono">✦</span>
+                  <span className="text-amber-400/80 text-xs select-none pl-1 sm:pl-2 font-mono">✦</span>
                 </div>
               ))}
             </div>
@@ -292,18 +281,18 @@ export default function HeroNoticeBoard() {
         </div>
 
         {/* Right Floating Pause / Play Button */}
-        <div className="relative z-20 shrink-0 flex items-center pr-1">
+        <div className="relative z-20 shrink-0 flex items-center pr-1 sm:pr-1.5">
           <button
             type="button"
             onClick={() => setIsPaused(!isPaused)}
-            className="w-8 h-8 rounded-full bg-slate-800/90 hover:bg-amber-400 hover:text-black text-amber-300 flex items-center justify-center transition-all cursor-pointer border border-amber-400/50 shadow-md"
+            className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-slate-800/90 hover:bg-amber-400 hover:text-black text-amber-300 flex items-center justify-center transition-all cursor-pointer border border-amber-400/50 shadow-md"
             title={isPaused ? "Play Marquee Ticker" : "Pause Marquee Ticker"}
             aria-label={isPaused ? "Play" : "Pause"}
           >
             {isPaused ? (
-              <Play className="w-3.5 h-3.5 fill-current text-emerald-400 ml-0.5" />
+              <Play className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 fill-current text-emerald-400 ml-0.5" />
             ) : (
-              <Pause className="w-3.5 h-3.5 fill-current" />
+              <Pause className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 fill-current" />
             )}
           </button>
         </div>
