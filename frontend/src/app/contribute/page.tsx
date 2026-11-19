@@ -40,6 +40,7 @@ import confetti from "canvas-confetti";
 import SearchableCourseSelect, { sortCoursesNaturally } from "@/components/SearchableCourseSelect";
 import SearchableTeacherSelect from "@/components/SearchableTeacherSelect";
 import SearchableSemesterSelect from "@/components/SearchableSemesterSelect";
+import SearchableResourceTypeSelect from "@/components/SearchableResourceTypeSelect";
 import GoogleDrivePublicGuideModal from "@/components/GoogleDrivePublicGuideModal";
 import TopContributorsLeaderboard from "@/components/TopContributorsLeaderboard";
 import LiveRemainingCountdown from "@/components/LiveRemainingCountdown";
@@ -63,15 +64,17 @@ const DEPARTMENTS = [
 ];
 
 export const RESOURCE_TYPE_LABELS: Record<string, { en: string; bn: string }> = {
-  NOTE: { en: "Lecture Hand Note", bn: "লেকচার হ্যান্ড নোট" },
-  MID_QUESTION: { en: "Midterm Question Paper", bn: "মিডটার্ম পরীক্ষার প্রশ্ন" },
-  FINAL_QUESTION: { en: "Final Exam Paper", bn: "ফাইনাল পরীক্ষার প্রশ্ন" },
+  MID_QUESTION: { en: "Midterm Question Paper", bn: "মিডটার্ম পরীক্ষার প্রশ্নপত্র" },
+  FINAL_QUESTION: { en: "Final Exam Paper", bn: "ফাইনাল পরীক্ষার প্রশ্নপত্র" },
   QUIZ_CT: { en: "Quiz & Class Test (CT)", bn: "কুইজ ও ক্লাস টেস্ট (CT)" },
-  LAB_MANUAL: { en: "Lab Manual / Code", bn: "ল্যাব ম্যানুয়াল / কোড" },
-  LAB_QUIZ: { en: "Lab Quiz / Viva", bn: "ল্যাব কুইজ / ভাইভা" },
-  LAB_FINAL: { en: "Lab Final Exam", bn: "ল্যাব ফাইনাল পরীক্ষা" },
-  LAB_REPORT: { en: "Lab Report Sheet", bn: "ল্যাব রিপোর্ট" },
+  NOTE: { en: "Lecture Notes (Handwritten / Slides)", bn: "লেকচার নোট (হস্তলিখিত / স্লাইড)" },
+  QUESTION_COURSE_IN: { en: "Course-In Materials / Assignment", bn: "কোর্স-ইন ম্যাটেরিয়াল / এসাইনমেন্ট" },
+  LAB_MANUAL: { en: "Lab Manual & Code Solution", bn: "ল্যাব ম্যানুয়াল ও কোড সমাধান" },
+  LAB_REPORT: { en: "Lab Report / Project Report", bn: "ল্যাব রিপোর্ট ও প্রজেক্ট রিপোর্ট" },
+  LAB_QUIZ: { en: "Lab Quiz & Viva Question", bn: "ল্যাব কুইজ ও ভাইভা প্রশ্ন" },
+  LAB_FINAL: { en: "Lab Final Exam Paper", bn: "ল্যাব ফাইনাল পরীক্ষার প্রশ্ন" },
   LAB_HAND_NOTE: { en: "Lab Hand Note", bn: "ল্যাব হ্যান্ড নোট" },
+  OTHERS: { en: "Other Academic Materials", bn: "অন্যান্য অ্যাকাডেমিক ম্যাটেরিয়াল" },
 };
 
 import {
@@ -174,7 +177,8 @@ export default function ContributePage() {
     setRequestedCourseCode2("");
     setRequestedTeacherId2("");
     setAiAnalysis(null);
-    setHasAttemptedSubmit(false);
+    setHasAttemptedStep1(false);
+    setHasAttemptedFinalSubmit(false);
     setTouchedFields({});
   };
 
@@ -221,8 +225,11 @@ export default function ContributePage() {
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | number>("");
   const [allTeachers, setAllTeachers] = useState<any[]>([]);
 
-  // Validation state: only display required field warnings after user attempts submission or touches a field
-  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+  // Validation states:
+  // Step 1 validation highlights only after user attempts to proceed from Step 1
+  const [hasAttemptedStep1, setHasAttemptedStep1] = useState(false);
+  // Step 2 validation highlights ONLY after user explicitly attempts final submission
+  const [hasAttemptedFinalSubmit, setHasAttemptedFinalSubmit] = useState(false);
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
 
   const contribDupCheck = useDuplicateResourceCheck({
@@ -618,7 +625,7 @@ export default function ContributePage() {
   };
 
   const validateStep1 = async (): Promise<boolean> => {
-    setHasAttemptedSubmit(true);
+    setHasAttemptedStep1(true);
     if (!isAuthenticated) {
       setShowAuthModal(true);
       return false;
@@ -778,6 +785,7 @@ export default function ContributePage() {
   const handleProceedToStep2 = async () => {
     const valid = await validateStep1();
     if (valid) {
+      setHasAttemptedFinalSubmit(false);
       setFormStep(2);
       document.getElementById("submission-form-container")?.scrollIntoView({ behavior: "smooth" });
     }
@@ -790,7 +798,7 @@ export default function ContributePage() {
       return;
     }
 
-    setHasAttemptedSubmit(true);
+    setHasAttemptedFinalSubmit(true);
     if (!isAuthenticated) {
       setShowAuthModal(true);
       return;
@@ -954,7 +962,8 @@ export default function ContributePage() {
       setRequestedTeacherId1("");
       setRequestedCourseCode2("");
       setRequestedTeacherId2("");
-      setHasAttemptedSubmit(false);
+      setHasAttemptedStep1(false);
+      setHasAttemptedFinalSubmit(false);
       setTouchedFields({});
 
       invalidateDuplicateSlotCache(courseCode);
@@ -1054,7 +1063,7 @@ export default function ContributePage() {
                 <span className="text-slate-400 text-[11px] font-semibold">{language === "bn" ? "ম্যাটেরিয়াল টাইটেল ও ধরণ" : "Title & Material Category"}</span>
                 <p className="font-bold text-white truncate">{submissionSuccessData.title}</p>
                 <p className="text-[11px] text-emerald-400 font-medium">
-                  {RESOURCE_TYPE_LABELS[submissionSuccessData.resourceType]?.[language] || submissionSuccessData.resourceType}
+                  {RESOURCE_TYPE_LABELS[submissionSuccessData.resourceType]?.[language === "bn" ? "bn" : "en"] || submissionSuccessData.resourceType}
                 </p>
               </div>
 
@@ -1368,58 +1377,23 @@ export default function ContributePage() {
             </div>
           </div>
 
-          {/* Row 1: Resource Type * AND Target Course * (with Inline Searchable Combobox) */}
+          {/* Row 1: Resource Type * AND Target Course * (with Professional Searchable Comboboxes) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
             
-            {/* Resource Type Dropdown with Empty Required Default */}
+            {/* Professional Searchable Resource Type Combobox */}
             <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                {language === "bn" ? "ম্যাটেরিয়ালের ধরন" : "Resource Type"} <span className="text-red-500">*</span>
-              </label>
-              <select
+              <SearchableResourceTypeSelect
+                label={language === "bn" ? "ম্যাটেরিয়ালের ধরন" : "Resource Type"}
+                required
                 value={resourceType}
-                onChange={(e) => {
-                  handleResourceTypeChange(e.target.value);
+                onChange={(val) => {
+                  handleResourceTypeChange(val);
                   setTouchedFields((prev) => ({ ...prev, resourceType: true }));
                 }}
-                onBlur={() => setTouchedFields((prev) => ({ ...prev, resourceType: true }))}
-                className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm bg-white dark:bg-slate-800 border transition-all focus:outline-none font-semibold ${
-                  (hasAttemptedSubmit || touchedFields.resourceType) && !resourceType
-                    ? "border-amber-500 dark:border-amber-500 ring-2 ring-amber-500/20 text-slate-700 dark:text-slate-300"
-                    : !resourceType
-                    ? "border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:border-emerald-500 shadow-2xs hover:border-slate-400 dark:hover:border-slate-600"
-                    : "border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:border-emerald-500 shadow-2xs hover:border-slate-400 dark:hover:border-slate-600"
-                }`}
-              >
-                <option value="" disabled>
-                  {language === "bn" ? "-- ম্যাটেরিয়ালের ধরন নির্বাচন করুন (বাধ্যতামূলক) --" : "-- Select Resource Type (Required) --"}
-                </option>
-                <option value="NOTE">
-                  {language === "bn" ? "লেকচার নোট (হস্তলিখিত / স্লাইড)" : "Lecture Notes (Handwritten / Slides)"}
-                </option>
-                <option value="QUIZ_CT">
-                  {language === "bn" ? "ক্লাস টেস্ট / কুইজ প্রশ্নপত্র (Quiz / CT)" : "Class Test / Quiz Question (Quiz / CT)"}
-                </option>
-                <option value="MID_QUESTION">
-                  {language === "bn" ? "মিডটার্ম পরীক্ষার প্রশ্নপত্র (Midterm Exam)" : "Midterm Examination Paper"}
-                </option>
-                <option value="FINAL_QUESTION">
-                  {language === "bn" ? "ফাইনাল পরীক্ষার প্রশ্নপত্র (Final Exam)" : "Final Examination Paper"}
-                </option>
-                <option value="QUESTION_COURSE_IN">
-                  {language === "bn" ? "কোর্স-ইন ম্যাটেরিয়াল / এসাইনমেন্ট" : "Course-In Materials / Assignment"}
-                </option>
-                <option value="LAB_MANUAL">
-                  {language === "bn" ? "ল্যাব ম্যানুয়াল / কোড সমাধান" : "Lab Manual / Code Solution"}
-                </option>
-                <option value="LAB_REPORT">
-                  {language === "bn" ? "ল্যাব রিপোর্ট / প্রজেক্ট রিপোর্ট" : "Lab Report / Project Report"}
-                </option>
-                <option value="OTHERS">
-                  {language === "bn" ? "অন্যান্য অ্যাকাডেমিক ম্যাটেরিয়াল (Others)" : "Other Academic Materials (Others)"}
-                </option>
-              </select>
-              {(hasAttemptedSubmit || touchedFields.resourceType) && !resourceType && (
+                error={Boolean((hasAttemptedStep1 || touchedFields.resourceType) && !resourceType)}
+                language={language}
+              />
+              {(hasAttemptedStep1 || touchedFields.resourceType) && !resourceType && (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium pt-0.5 animate-in fade-in">
                   ⚠️ {language === "bn" ? "ম্যাটেরিয়ালের ধরন নির্বাচন করা আবশ্যক" : "Resource type selection is required"}
                 </p>
@@ -1453,7 +1427,7 @@ export default function ContributePage() {
                   ? "💡 আপনি যে বিষয়ের স্টাডি ম্যাটেরিয়াল দিচ্ছেন সেই কোর্সটি এখানে সিলেক্ট করুন।"
                   : "💡 Select the specific subject whose notes or exam paper you are contributing."}
               </p>
-              {(hasAttemptedSubmit || touchedFields.courseCode) && !courseCode && (
+              {(hasAttemptedStep1 || touchedFields.courseCode) && !courseCode && (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium pt-0.5 animate-in fade-in">
                   ⚠️ {language === "bn" ? "যে কোর্সের নোট দিচ্ছেন তা নির্বাচন করা আবশ্যক" : "Contributing course selection is required"}
                 </p>
@@ -1498,7 +1472,7 @@ export default function ContributePage() {
               allowGeneral={false}
               language={language}
             />
-            {hasAttemptedSubmit && !selectedTeacherId && (
+            {(hasAttemptedStep1 || touchedFields.teacherId) && !selectedTeacherId && (
               <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium pt-1 animate-in fade-in">
                 ⚠️ {language === "bn" ? "কোর্স শিক্ষক নির্বাচন করা আবশ্যক" : "Course faculty selection is required"}
               </p>
@@ -1637,7 +1611,7 @@ export default function ContributePage() {
                 }}
                 required
                 language={language}
-                error={contribDupCheck.isDuplicate || (hasAttemptedSubmit && !semester.trim())}
+                error={contribDupCheck.isDuplicate || ((hasAttemptedStep1 || touchedFields.semester) && !semester.trim())}
                 placeholder={
                   language === "bn"
                     ? "সেমিস্টার খুঁজুন বা নির্বাচন করুন (বাধ্যতামূলক)..."
@@ -1645,7 +1619,7 @@ export default function ContributePage() {
                 }
               />
 
-              {hasAttemptedSubmit && !semester.trim() && (
+              {(hasAttemptedStep1 || touchedFields.semester) && !semester.trim() && (
                 <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium pt-1 animate-in fade-in">
                   ⚠️ {language === "bn" ? "সেমিস্টার নির্বাচন করা আবশ্যক" : "Semester selection is required"}
                 </p>
@@ -2237,16 +2211,36 @@ export default function ContributePage() {
               </div>
             </div>
 
-            {/* Validation warnings */}
-            {hasAttemptedSubmit && (!requestedCourseCode1 || !requestedCourseCode2 || !requestedTeacherId1 || !requestedTeacherId2) && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1.5 pt-1 animate-in fade-in">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-                <span>
-                  {language === "bn"
-                    ? "৩ মাসের ফ্রি অ্যাক্সেস পেতে অবশ্যই ২টি পছন্দের কোর্স এবং উভয় কোর্সের সংশ্লিষ্ট শিক্ষক/ফ্যাকাল্টি নির্বাচন করুন (বাধ্যতামূলক)।"
-                    : "You must choose both 2 reward courses and their assigned faculties to unlock 3 months free access (Required)."}
-                </span>
-              </p>
+            {/* Validation warnings - ONLY shown if student explicitly clicked submit on Step 2 with missing selections */}
+            {hasAttemptedFinalSubmit && (!requestedCourseCode1 || !requestedCourseCode2 || !requestedTeacherId1 || !requestedTeacherId2) && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-300 animate-in fade-in">
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold">
+                    {language === "bn"
+                      ? "৩ মাসের ফ্রি অ্যাক্সেস পেতে অবশ্যই ২টি পছন্দের কোর্স এবং উভয় কোর্সের সংশ্লিষ্ট শিক্ষক/ফ্যাকাল্টি নির্বাচন করুন (বাধ্যতামূলক)।"
+                      : "You must choose both 2 reward courses and their assigned faculties to unlock 3 months free access (Required)."}
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-amber-700 dark:text-amber-400 pt-0.5">
+                    <span className="flex items-center gap-1">
+                      {requestedCourseCode1 && requestedTeacherId1 ? "✓" : "•"} {language === "bn" ? "১ম পুরস্কার" : "1st Reward"}:{" "}
+                      {requestedCourseCode1 && requestedTeacherId1
+                        ? (language === "bn" ? "কোর্স ও শিক্ষক সম্পন্ন" : "Course & Faculty Selected")
+                        : !requestedCourseCode1
+                        ? (language === "bn" ? "কোর্স নির্বাচন করুন" : "Pick 1st course")
+                        : (language === "bn" ? "শিক্ষক নির্বাচন করুন" : "Pick assigned faculty")}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      {requestedCourseCode2 && requestedTeacherId2 ? "✓" : "•"} {language === "bn" ? "২য় পুরস্কার" : "2nd Reward"}:{" "}
+                      {requestedCourseCode2 && requestedTeacherId2
+                        ? (language === "bn" ? "কোর্স ও শিক্ষক সম্পন্ন" : "Course & Faculty Selected")
+                        : !requestedCourseCode2
+                        ? (language === "bn" ? "কোর্স নির্বাচন করুন" : "Pick 2nd course")
+                        : (language === "bn" ? "শিক্ষক নির্বাচন করুন" : "Pick assigned faculty")}
+                    </span>
+                  </div>
+                </div>
+              </div>
             )}
 
             {requestedCourseCode1 && requestedCourseCode2 && requestedCourseCode1.toLowerCase() === requestedCourseCode2.toLowerCase() && (
@@ -2316,39 +2310,55 @@ export default function ContributePage() {
               <span>{language === "bn" ? "পূর্বের ধাপ (ম্যাটেরিয়াল এডিট)" : "Back (Edit Material)"}</span>
             </button>
 
-            <button
-              type="submit"
-              disabled={
-                loading ||
-                linkStatus === "restricted" ||
-                contribDupCheck.isDuplicate ||
-                !requestedCourseCode1 ||
-                !requestedCourseCode2 ||
-                !requestedTeacherId1 ||
-                !requestedTeacherId2 ||
-                req1Teachers.length === 0 ||
-                req2Teachers.length === 0 ||
-                requestedCourseCode1.toLowerCase() === requestedCourseCode2.toLowerCase()
-              }
-              className="w-full sm:flex-1 py-3.5 rounded-2xl text-xs sm:text-sm font-black text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 shadow-xl shadow-emerald-500/25 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
-            >
-              {loading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>{language === "bn" ? "ম্যাটেরিয়াল জমা হচ্ছে..." : "Submitting Contribution..."}</span>
-                </>
-              ) : (
-                <>
-                  <Gift className="w-4 h-4" />
-                  <span>
-                    {language === "bn"
-                      ? "অবদান জমা দিন ও ২টি কোর্স ৩ মাস ফ্রি নিন"
-                      : "Submit Contribution & Unlock 2 Courses Free"}
-                  </span>
-                  <Check className="w-4 h-4" />
-                </>
-              )}
-            </button>
+            {(() => {
+              const isStep2Complete = Boolean(
+                requestedCourseCode1 &&
+                requestedCourseCode2 &&
+                requestedTeacherId1 &&
+                requestedTeacherId2 &&
+                req1Teachers.length > 0 &&
+                req2Teachers.length > 0 &&
+                requestedCourseCode1.toLowerCase() !== requestedCourseCode2.toLowerCase()
+              );
+
+              return (
+                <button
+                  type="submit"
+                  disabled={loading || linkStatus === "restricted" || contribDupCheck.isDuplicate}
+                  className={`w-full sm:flex-1 py-3.5 rounded-2xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    isStep2Complete && !contribDupCheck.isDuplicate && linkStatus !== "restricted"
+                      ? "text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 shadow-xl shadow-emerald-500/25 hover:scale-[1.01] active:scale-[0.99]"
+                      : "text-slate-100 bg-slate-800 hover:bg-slate-700/90 border border-slate-700/80 shadow-md"
+                  }`}
+                >
+                  {loading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>{language === "bn" ? "ম্যাটেরিয়াল জমা হচ্ছে..." : "Submitting Contribution..."}</span>
+                    </>
+                  ) : isStep2Complete ? (
+                    <>
+                      <Gift className="w-4 h-4" />
+                      <span>
+                        {language === "bn"
+                          ? "অবদান জমা দিন ও ২টি কোর্স ৩ মাস ফ্রি নিন"
+                          : "Submit Contribution & Unlock 2 Courses Free"}
+                      </span>
+                      <Check className="w-4 h-4" />
+                    </>
+                  ) : (
+                    <>
+                      <Gift className="w-4 h-4 text-emerald-400" />
+                      <span>
+                        {language === "bn"
+                          ? "অবদান জমা দিন (২টি কোর্স ও শিক্ষক নির্বাচন সম্পন্ন করুন)"
+                          : "Submit Contribution (Pick 2 Courses & Assigned Faculties)"}
+                      </span>
+                    </>
+                  )}
+                </button>
+              );
+            })()}
           </div>
         </div>
       )}
