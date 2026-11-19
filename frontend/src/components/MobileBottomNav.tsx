@@ -201,7 +201,7 @@ export default function MobileBottomNav() {
           >
             <div className="relative">
               <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform" />
-              {chatUnseenCount > 0 && !isChatOpen ? (
+              {isAuthenticated && user && chatUnseenCount > 0 && !isChatOpen ? (
                 <span className="absolute -top-1.5 -right-2.5 min-w-4 h-4 px-1 rounded-full bg-rose-600 text-white text-[9px] font-black flex items-center justify-center shadow-[0_0_8px_rgba(225,29,72,0.8)] border border-white dark:border-slate-900 animate-in zoom-in-75">
                   {chatUnseenCount > 99 ? "99+" : chatUnseenCount}
                 </span>

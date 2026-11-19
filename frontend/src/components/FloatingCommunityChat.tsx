@@ -252,38 +252,65 @@ export default function FloatingCommunityChat() {
   const [previewAudio, setPreviewAudio] = useState<HTMLAudioElement | null>(null);
   const [isPreviewPlaying, setIsPreviewPlaying] = useState<boolean>(false);
 
-  // Per-student unseen messages count
+  // Per-student unseen messages count (strictly for authenticated students)
   const [unseenCount, setUnseenCount] = useState<number>(0);
 
   // Read marker helper: update read status in localStorage for current student
   const markMessagesAsRead = useCallback(
     (msgList: ChatMessageDto[]) => {
       if (typeof window === "undefined" || msgList.length === 0) return;
+      if (!isAuthenticated || !user?.id) {
+        setUnseenCount(0);
+        return;
+      }
       const maxId = Math.max(...msgList.map((m) => m.id));
-      const storageKey = user?.id ? `notelagbe_chat_read_${user.id}` : "notelagbe_chat_read_guest";
-      localStorage.setItem(storageKey, String(maxId));
+      const storageKey = `notelagbe_chat_read_${user.id}`;
+      try {
+        localStorage.setItem(storageKey, String(maxId));
+      } catch {}
       setUnseenCount(0);
     },
-    [user?.id]
+    [user?.id, isAuthenticated]
   );
 
-  // Calculate unseen count based on student's lastReadId
+  // Calculate unseen count based on student's lastReadId (strictly authenticated)
   const updateUnseenCount = useCallback(
     (msgList: ChatMessageDto[], chatIsOpen: boolean) => {
       if (typeof window === "undefined") return;
+      // Without login: NEVER count or show unseen message count!
+      if (!isAuthenticated || !user?.id) {
+        setUnseenCount(0);
+        return;
+      }
       if (chatIsOpen) {
         markMessagesAsRead(msgList);
         return;
       }
-      const storageKey = user?.id ? `notelagbe_chat_read_${user.id}` : "notelagbe_chat_read_guest";
-      const lastReadId = Number(localStorage.getItem(storageKey) || 0);
+      const storageKey = `notelagbe_chat_read_${user.id}`;
+      let savedLastRead: string | null = null;
+      try {
+        savedLastRead = localStorage.getItem(storageKey);
+      } catch {}
+
+      // On first ever visit for a signed-in user, anchor baseline to latest message
+      // so historical messages don't overwhelm the student as "unseen"
+      if (savedLastRead === null) {
+        const maxId = msgList.length > 0 ? Math.max(...msgList.map((m) => m.id)) : 0;
+        try {
+          localStorage.setItem(storageKey, String(maxId));
+        } catch {}
+        setUnseenCount(0);
+        return;
+      }
+
+      const lastReadId = Number(savedLastRead || 0);
       // Count unseen messages that were NOT sent by the current user
       const unseen = msgList.filter(
-        (m) => m.id > lastReadId && (!user || m.senderId !== user.id)
+        (m) => m.id > lastReadId && m.senderId !== user.id
       ).length;
       setUnseenCount(unseen);
     },
-    [user, markMessagesAsRead]
+    [user?.id, isAuthenticated, markMessagesAsRead]
   );
 
   // Voice playback state
@@ -439,12 +466,13 @@ export default function FloatingCommunityChat() {
     }
   }, [isOpen]);
 
-  // Broadcast unseen messages count to MobileBottomNav
+  // Broadcast unseen messages count to MobileBottomNav (strictly 0 for unauthenticated visitors)
   useEffect(() => {
     if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("notelagbe-chat-unseen", { detail: { count: unseenCount } }));
+      const countToSend = isAuthenticated && user?.id ? unseenCount : 0;
+      window.dispatchEvent(new CustomEvent("notelagbe-chat-unseen", { detail: { count: countToSend } }));
     }
-  }, [unseenCount]);
+  }, [unseenCount, isAuthenticated, user?.id]);
 
   // Lock background page scroll on mobile and tablet when full-page chat is open
   useEffect(() => {
@@ -712,7 +740,8 @@ export default function FloatingCommunityChat() {
           );
           if (newMsgs.length > 0) {
             const latest = newMsgs[newMsgs.length - 1];
-            if (notificationsEnabled) {
+            // Only play incoming chimes or show toast banners for authenticated community members
+            if (isAuthenticated && user && notificationsEnabled) {
               if (soundEnabled) playIncomingChime();
               // Show interactive popup notification on top if chat is closed
               if (!isOpen) {
@@ -817,8 +846,12 @@ export default function FloatingCommunityChat() {
 
   // Sync unseen count when user logs in/out or messages update
   useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      setUnseenCount(0);
+      return;
+    }
     updateUnseenCount(messages, isOpen);
-  }, [user?.id, updateUnseenCount, messages, isOpen]);
+  }, [user?.id, isAuthenticated, updateUnseenCount, messages, isOpen]);
 
   // Auto-scroll on new messages (only if user is already near bottom or just opened chat, and not navigating programmatically)
   useEffect(() => {
@@ -1631,8 +1664,8 @@ export default function FloatingCommunityChat() {
             </div>
           </div>
 
-          {/* Per-Student Unread Badge: only shown if there are unseen messages for this student */}
-          {unseenCount > 0 && (
+          {/* Per-Student Unread Badge: strictly authenticated only */}
+          {isAuthenticated && user && unseenCount > 0 && (
             <div 
               className="absolute -top-1.5 -right-1.5 min-w-[24px] h-[24px] px-1.5 rounded-full bg-gradient-to-r from-red-600 via-rose-600 to-red-500 text-white text-[11px] font-black tracking-normal flex items-center justify-center shadow-[0_4px_16px_rgba(225,29,72,0.9),0_0_8px_rgba(239,68,68,0.7)] border-2 border-white animate-in zoom-in-75 duration-200 z-20 pointer-events-none select-none ring-2 ring-rose-500/50"
               style={{
