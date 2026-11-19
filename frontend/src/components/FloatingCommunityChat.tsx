@@ -1677,32 +1677,33 @@ export default function FloatingCommunityChat() {
                 : undefined
             }
           >
-            {/* Left: Back Arrow (Mobile) / Close Icon (Desktop) + Title + Integrated Online Status */}
+            {/* Left: SEU Official Logo Emblem + Title + Integrated Online Status */}
             <div className="flex items-center gap-2.5 min-w-0">
-              <button
-                type="button"
-                onClick={() => handleToggleOpen(false)}
-                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs shrink-0 active:scale-95 group ${
-                  isDark
-                    ? "bg-slate-800/80 border-slate-700/80 text-white hover:bg-slate-700/80 hover:text-cyan-400"
-                    : "bg-white border-slate-200 text-slate-800 hover:bg-slate-100 hover:text-cyan-600"
-                }`}
-                title={
-                  isMobileScreen
-                    ? (isBn ? "ফিরে যান" : "Go Back")
-                    : (isBn ? "চ্যাট বন্ধ করুন" : "Close Chat")
-                }
-                aria-label={
-                  isMobileScreen
-                    ? (isBn ? "ফিরে যান" : "Go Back")
-                    : (isBn ? "চ্যাট বন্ধ করুন" : "Close Chat")
-                }
-              >
-                {/* Mobile view: back arrow */}
-                <ArrowLeft className="w-5 h-5 sm:hidden" />
-                {/* Desktop view: close icon */}
-                <X className="w-5 h-5 hidden sm:block transition-transform duration-200 group-hover:scale-110" />
-              </button>
+              <div className="relative shrink-0 select-none">
+                <div
+                  className={`w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-xl flex items-center justify-center p-1 border shadow-xs transition-transform duration-200 ${
+                    isDark
+                      ? "bg-slate-800/90 border-slate-700/80 shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+                      : "bg-white border-slate-200 shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
+                  }`}
+                >
+                  <img
+                    src="/images/seu-logo.png"
+                    alt="SEU Logo"
+                    className="w-full h-full object-contain drop-shadow-xs"
+                  />
+                </div>
+                {/* Live Pulse Dot on bottom-right of logo */}
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 ${
+                    isDark ? "border-slate-900" : "border-white"
+                  } ${
+                    activeUsersCount > 0
+                      ? "bg-emerald-400 shadow-[0_0_6px_#34d399] animate-pulse"
+                      : "bg-slate-400"
+                  }`}
+                />
+              </div>
 
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
@@ -1727,7 +1728,7 @@ export default function FloatingCommunityChat() {
               </div>
             </div>
 
-            {/* Right: Sound Toggle + Notification Toggle (Close button REMOVED!) */}
+            {/* Right: Sound Toggle + Notification Toggle + Reset Position (Desktop) + Close Button */}
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {/* 1. Quick Mute / Sound Toggle */}
               <button
@@ -1780,7 +1781,7 @@ export default function FloatingCommunityChat() {
                 <button
                   type="button"
                   onClick={handleResetPosition}
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 ${
+                  className={`w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 ${
                     isDark ? "bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-white" : "bg-slate-100 border-slate-200 text-slate-500 hover:text-slate-900"
                   }`}
                   title={isBn ? "ডিফল্ট কর্নারে রিসেট করুন" : "Reset window to corner"}
@@ -1788,6 +1789,21 @@ export default function FloatingCommunityChat() {
                   <RotateCcw className="w-3.5 h-3.5" />
                 </button>
               )}
+
+              {/* 4. Close Button (Right Corner) */}
+              <button
+                type="button"
+                onClick={() => handleToggleOpen(false)}
+                className={`w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 group ${
+                  isDark
+                    ? "bg-slate-800/80 border-slate-700/80 text-slate-400 hover:bg-rose-500/20 hover:border-rose-500/40 hover:text-rose-300"
+                    : "bg-white border-slate-200 text-slate-600 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600"
+                }`}
+                title={isBn ? "চ্যাট বন্ধ করুন" : "Close Chat"}
+                aria-label={isBn ? "চ্যাট বন্ধ করুন" : "Close Chat"}
+              >
+                <X className="w-4 h-4 sm:w-4.5 sm:h-4.5 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-90" />
+              </button>
             </div>
           </div>
 
