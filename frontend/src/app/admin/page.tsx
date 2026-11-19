@@ -7824,9 +7824,9 @@ export default function AdminDashboardPage() {
                               {isApproved ? "✓ 2 Reward Courses permanently unlocked for student:" : "🎁 2 Reward Courses to be permanently unlocked:"}
                             </p>
                             <p className="font-mono mt-0.5">
-                              1. {c.requestedCourse1?.code} ({c.requestedCourse1?.title})
+                              1. {c.requestedCourse1?.code} ({c.requestedCourse1?.title}){c.requestedTeacher1 ? ` — Faculty: ${c.requestedTeacher1.name} (${c.requestedTeacher1.initial})` : ""}
                               <br />
-                              2. {c.requestedCourse2?.code} ({c.requestedCourse2?.title})
+                              2. {c.requestedCourse2?.code} ({c.requestedCourse2?.title}){c.requestedTeacher2 ? ` — Faculty: ${c.requestedTeacher2.name} (${c.requestedTeacher2.initial})` : ""}
                             </p>
                           </div>
 
@@ -13380,8 +13380,8 @@ export default function AdminDashboardPage() {
               <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-400">
                 <span className="font-bold">🎁 2 Reward Courses will be unlocked upon approval:</span>
                 <p className="font-mono text-[11px] mt-0.5">
-                  1. {editingContribution.requestedCourse1?.code} ({editingContribution.requestedCourse1?.title})<br />
-                  2. {editingContribution.requestedCourse2?.code} ({editingContribution.requestedCourse2?.title})
+                  1. {editingContribution.requestedCourse1?.code} ({editingContribution.requestedCourse1?.title}){editingContribution.requestedTeacher1 ? ` — Faculty: ${editingContribution.requestedTeacher1.name} (${editingContribution.requestedTeacher1.initial})` : ""}<br />
+                  2. {editingContribution.requestedCourse2?.code} ({editingContribution.requestedCourse2?.title}){editingContribution.requestedTeacher2 ? ` — Faculty: ${editingContribution.requestedTeacher2.name} (${editingContribution.requestedTeacher2.initial})` : ""}
                 </p>
               </div>
 

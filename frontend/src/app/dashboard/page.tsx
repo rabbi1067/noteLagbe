@@ -1505,7 +1505,7 @@ export default function StudentDashboardPage() {
                   <div className="truncate mr-2">
                     <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{item.uploadedResource?.title}</p>
                     <p className="text-[10px] text-slate-500 mt-0.5">
-                      Reward Courses: {item.requestedCourse1?.code}, {item.requestedCourse2?.code}
+                      Reward Courses: {item.requestedCourse1?.code}{item.requestedTeacher1 ? ` (${item.requestedTeacher1.initial || item.requestedTeacher1.name})` : ""}, {item.requestedCourse2?.code}{item.requestedTeacher2 ? ` (${item.requestedTeacher2.initial || item.requestedTeacher2.name})` : ""}
                     </p>
                   </div>
                   <span
@@ -1613,8 +1613,8 @@ export default function StudentDashboardPage() {
                     {item.uploadedResource?.title || "Academic Contribution"}
                   </p>
                   <p className="text-slate-500 dark:text-slate-400 text-[11px]">
-                    Requested Rewards: <strong className="text-slate-700 dark:text-slate-300">{item.requestedCourse1?.code || "N/A"}</strong> and{" "}
-                    <strong className="text-slate-700 dark:text-slate-300">{item.requestedCourse2?.code || "N/A"}</strong>
+                    Requested Rewards: <strong className="text-slate-700 dark:text-slate-300">{item.requestedCourse1?.code || "N/A"}{item.requestedTeacher1 ? ` (${item.requestedTeacher1.initial || item.requestedTeacher1.name})` : ""}</strong> and{" "}
+                    <strong className="text-slate-700 dark:text-slate-300">{item.requestedCourse2?.code || "N/A"}{item.requestedTeacher2 ? ` (${item.requestedTeacher2.initial || item.requestedTeacher2.name})` : ""}</strong>
                   </p>
                   {item.adminNote && (
                     <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">

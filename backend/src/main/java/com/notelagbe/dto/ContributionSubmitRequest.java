@@ -38,9 +38,13 @@ public class ContributionSubmitRequest {
     @Size(min = 3, max = 15, message = "First reward course code must be between 3 and 15 characters")
     private String requestedCourseCode1;
 
+    private Long requestedTeacherId1;
+
     @NotBlank(message = "Second reward course code is required")
     @Size(min = 3, max = 15, message = "Second reward course code must be between 3 and 15 characters")
     private String requestedCourseCode2;
+
+    private Long requestedTeacherId2;
 
     public ContributionSubmitRequest() {}
 
@@ -74,6 +78,12 @@ public class ContributionSubmitRequest {
     public String getRequestedCourseCode1() { return requestedCourseCode1; }
     public void setRequestedCourseCode1(String requestedCourseCode1) { this.requestedCourseCode1 = requestedCourseCode1; }
 
+    public Long getRequestedTeacherId1() { return requestedTeacherId1; }
+    public void setRequestedTeacherId1(Long requestedTeacherId1) { this.requestedTeacherId1 = requestedTeacherId1; }
+
     public String getRequestedCourseCode2() { return requestedCourseCode2; }
     public void setRequestedCourseCode2(String requestedCourseCode2) { this.requestedCourseCode2 = requestedCourseCode2; }
+
+    public Long getRequestedTeacherId2() { return requestedTeacherId2; }
+    public void setRequestedTeacherId2(Long requestedTeacherId2) { this.requestedTeacherId2 = requestedTeacherId2; }
 }

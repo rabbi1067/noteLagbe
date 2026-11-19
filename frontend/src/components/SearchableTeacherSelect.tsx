@@ -18,10 +18,12 @@ interface SearchableTeacherSelectProps {
   teachers: TeacherOption[];
   placeholder?: string;
   required?: boolean;
+  disabled?: boolean;
   allowGeneral?: boolean;
   generalLabel?: string;
   generalSubLabel?: string;
   compact?: boolean;
+  variant?: "default" | "reward";
   dropdownClassName?: string;
   language?: string;
 }
@@ -33,10 +35,12 @@ export default function SearchableTeacherSelect({
   teachers,
   placeholder = "Search faculty by name or initial (e.g. Masum, DAKM, Yusuf)...",
   required = false,
+  disabled = false,
   allowGeneral = true,
   generalLabel,
   generalSubLabel,
   compact = false,
+  variant = "default",
   dropdownClassName,
   language = "en",
 }: SearchableTeacherSelectProps) {
@@ -45,6 +49,7 @@ export default function SearchableTeacherSelect({
   const [isFocused, setIsFocused] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isReward = variant === "reward";
 
   // Find currently selected teacher
   const selectedTeacher = value
@@ -158,77 +163,92 @@ export default function SearchableTeacherSelect({
   return (
     <div className={`relative w-full ${compact ? "space-y-0" : "space-y-1"}`} ref={containerRef}>
       {label && (
-        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+        <label className={`block text-xs font-bold ${
+          isReward
+            ? "text-emerald-800 dark:text-emerald-300"
+            : "text-slate-700 dark:text-slate-300"
+        }`}>
           {label} {required && <span className="text-red-500">*</span>}
         </label>
       )}
 
-      {/* Single Interactive Combobox Input (NO EXTRA SEARCH FIELD) */}
+      {/* Single Interactive Combobox Input */}
       <div
         className={`relative flex items-center w-full rounded-xl transition-all border ${
-          compact
+          disabled
+            ? "opacity-60 cursor-not-allowed bg-slate-100 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800"
+            : compact
             ? "bg-slate-900 border-purple-500/30 text-purple-200 shadow-xs"
-            : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xs hover:border-slate-400 dark:hover:border-slate-600"
-        } ${
-          isOpen || isFocused
-            ? compact
-              ? "ring-2 ring-purple-500 border-purple-500 bg-slate-900"
+            : isOpen || isFocused
+            ? isReward
+              ? "ring-2 ring-emerald-500 border-emerald-500 bg-white dark:bg-slate-800"
               : "ring-2 ring-blue-500 border-blue-500 bg-white dark:bg-slate-800"
-            : ""
+            : isReward
+            ? "border-emerald-300 dark:border-emerald-800/80 bg-white dark:bg-slate-800/90 shadow-2xs"
+            : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-2xs hover:border-slate-400 dark:hover:border-slate-600"
         }`}
       >
-        <div className={`${compact ? "pl-2.5 pr-1.5" : "pl-3.5 pr-2"} pointer-events-none ${compact ? "text-purple-400" : "text-slate-500 dark:text-slate-400"}`}>
+        <div className={`${compact ? "pl-2.5 pr-1.5" : "pl-3.5 pr-2"} pointer-events-none ${
+          disabled ? "text-slate-400" : isReward ? "text-emerald-600 dark:text-emerald-400" : compact ? "text-purple-400" : "text-slate-500 dark:text-slate-400"
+        }`}>
           <User className={`${compact ? "w-3.5 h-3.5" : "w-4 h-4"}`} />
         </div>
 
         <input
           ref={inputRef}
           type="text"
+          disabled={disabled}
           value={query}
           onChange={(e) => {
+            if (disabled) return;
             setQuery(e.target.value);
             if (!isOpen) setIsOpen(true);
           }}
           onFocus={() => {
+            if (disabled) return;
             setIsFocused(true);
             setIsOpen(true);
             inputRef.current?.select();
           }}
           placeholder={placeholder}
           className={`w-full font-semibold bg-transparent focus:outline-none placeholder:font-normal truncate ${
-            compact
+            disabled
+              ? "cursor-not-allowed text-slate-400 placeholder:text-slate-400/80 py-2.5 pr-10 text-xs sm:text-sm"
+              : compact
               ? "py-1.5 pr-12 text-xs text-purple-200 placeholder:text-purple-300/50"
               : "py-2.5 pr-14 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-slate-400"
           }`}
         />
 
-        <div className={`absolute ${compact ? "right-1.5" : "right-2.5"} flex items-center gap-0.5`}>
-          {Boolean(value) && (
+        {!disabled && (
+          <div className={`absolute ${compact ? "right-1.5" : "right-2.5"} flex items-center gap-0.5`}>
+            {Boolean(value) && (
+              <button
+                type="button"
+                onClick={handleClear}
+                title={language === "bn" ? "মুছে ফেলুন" : "Clear selection"}
+                className="p-1 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={handleClear}
-              title={language === "bn" ? "মুছে ফেলুন" : "Clear selection"}
-              className="p-1 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              onClick={() => {
+                setIsOpen(!isOpen);
+                if (!isOpen) inputRef.current?.focus();
+              }}
+              className="p-1 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
             >
-              <X className="w-3.5 h-3.5" />
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
             </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => {
-              setIsOpen(!isOpen);
-              if (!isOpen) inputRef.current?.focus();
-            }}
-            className="p-1 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
-          >
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Floating Dropdown List of Filtered Faculty */}
-      {isOpen && (
+      {isOpen && !disabled && (
         <div className={`absolute left-0 min-w-[320px] sm:min-w-[360px] max-w-[90vw] top-full mt-1.5 z-50 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150 ${dropdownClassName || ""}`}>
           {/* Header Info */}
           <div className="px-3.5 py-2 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 font-medium">
@@ -288,19 +308,29 @@ export default function SearchableTeacherSelect({
                     onClick={() => handleSelect(t)}
                     className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center justify-between gap-2.5 transition-colors text-xs ${
                       isSelected
-                        ? "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold"
+                        ? isReward
+                          ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold border-l-2 border-emerald-500"
+                          : "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold"
                         : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200"
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-bold text-[11px] flex items-center justify-center shrink-0">
+                      <div className={`w-7 h-7 rounded-lg font-bold text-[11px] flex items-center justify-center shrink-0 ${
+                        isReward
+                          ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300"
+                          : "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300"
+                      }`}>
                         {t.initial || t.name.substring(0, 2).toUpperCase()}
                       </div>
                       <div className="truncate">
                         <div className="flex items-center gap-1.5 truncate">
                           <span className="font-semibold truncate">{t.name}</span>
                           {t.initial && (
-                            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-50 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shrink-0">
+                            <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${
+                              isReward
+                                ? "bg-emerald-50 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                                : "bg-purple-50 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800"
+                            }`}>
                               [{t.initial}]
                             </span>
                           )}
@@ -315,7 +345,7 @@ export default function SearchableTeacherSelect({
                     </div>
 
                     {isSelected && (
-                      <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <Check className={`w-4 h-4 shrink-0 ${isReward ? "text-emerald-600 dark:text-emerald-400" : "text-blue-600 dark:text-blue-400"}`} />
                     )}
                   </button>
                 );

@@ -24,8 +24,16 @@ public class ContributionRequest {
     private Course requestedCourse1;
 
     @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "requested_teacher1_id")
+    private Teacher requestedTeacher1;
+
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "requested_course2_id", nullable = false)
     private Course requestedCourse2;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "requested_teacher2_id")
+    private Teacher requestedTeacher2;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
@@ -52,8 +60,14 @@ public class ContributionRequest {
     public Course getRequestedCourse1() { return requestedCourse1; }
     public void setRequestedCourse1(Course requestedCourse1) { this.requestedCourse1 = requestedCourse1; }
 
+    public Teacher getRequestedTeacher1() { return requestedTeacher1; }
+    public void setRequestedTeacher1(Teacher requestedTeacher1) { this.requestedTeacher1 = requestedTeacher1; }
+
     public Course getRequestedCourse2() { return requestedCourse2; }
     public void setRequestedCourse2(Course requestedCourse2) { this.requestedCourse2 = requestedCourse2; }
+
+    public Teacher getRequestedTeacher2() { return requestedTeacher2; }
+    public void setRequestedTeacher2(Teacher requestedTeacher2) { this.requestedTeacher2 = requestedTeacher2; }
 
     public ResourceStatus getStatus() { return status; }
     public void setStatus(ResourceStatus status) { this.status = status; }

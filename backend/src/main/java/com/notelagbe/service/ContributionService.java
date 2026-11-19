@@ -199,12 +199,24 @@ public class ContributionService {
         resource.setStatus(ResourceStatus.PENDING);
         resource = resourceRepository.save(resource);
 
+        Teacher reqTeacher1 = null;
+        if (request.getRequestedTeacherId1() != null && request.getRequestedTeacherId1() > 0) {
+            reqTeacher1 = teacherRepository.findById(request.getRequestedTeacherId1()).orElse(null);
+        }
+
+        Teacher reqTeacher2 = null;
+        if (request.getRequestedTeacherId2() != null && request.getRequestedTeacherId2() > 0) {
+            reqTeacher2 = teacherRepository.findById(request.getRequestedTeacherId2()).orElse(null);
+        }
+
         // 2. Create Contribution Request
         ContributionRequest cr = new ContributionRequest();
         cr.setUser(user);
         cr.setUploadedResource(resource);
         cr.setRequestedCourse1(rewardCourse1);
+        cr.setRequestedTeacher1(reqTeacher1);
         cr.setRequestedCourse2(rewardCourse2);
+        cr.setRequestedTeacher2(reqTeacher2);
         cr.setStatus(ResourceStatus.PENDING);
 
         ContributionRequest saved = contributionRequestRepository.save(cr);
@@ -328,34 +340,68 @@ public class ContributionService {
         LocalDateTime rewardExpiresAt = LocalDateTime.now().plusMonths(3);
 
         if (cr.getRequestedCourse1() != null) {
-            Optional<UnlockedCourse> existing1 = unlockedCourseRepository.findByUserIdAndCourseIdAndTeacherIsNull(contributor.getId(), cr.getRequestedCourse1().getId());
-            if (existing1.isPresent()) {
-                UnlockedCourse uc = existing1.get();
-                LocalDateTime base = (uc.getExpiresAt() != null && uc.getExpiresAt().isAfter(LocalDateTime.now())) ? uc.getExpiresAt() : LocalDateTime.now();
-                uc.setExpiresAt(base.plusMonths(3));
-                uc.setSource(UnlockSource.CONTRIBUTION_REWARD);
-                unlockedCourseRepository.save(uc);
+            Teacher t1 = cr.getRequestedTeacher1();
+            if (t1 != null) {
+                Optional<UnlockedCourse> existing1 = unlockedCourseRepository.findByUserIdAndCourseIdAndTeacherId(contributor.getId(), cr.getRequestedCourse1().getId(), t1.getId());
+                if (existing1.isPresent()) {
+                    UnlockedCourse uc = existing1.get();
+                    LocalDateTime base = (uc.getExpiresAt() != null && uc.getExpiresAt().isAfter(LocalDateTime.now())) ? uc.getExpiresAt() : LocalDateTime.now();
+                    uc.setExpiresAt(base.plusMonths(3));
+                    uc.setSource(UnlockSource.CONTRIBUTION_REWARD);
+                    unlockedCourseRepository.save(uc);
+                } else {
+                    unlockedCourseRepository.save(new UnlockedCourse(contributor, cr.getRequestedCourse1(), t1, UnlockSource.CONTRIBUTION_REWARD, rewardExpiresAt));
+                }
             } else {
-                unlockedCourseRepository.save(new UnlockedCourse(contributor, cr.getRequestedCourse1(), UnlockSource.CONTRIBUTION_REWARD, rewardExpiresAt));
+                Optional<UnlockedCourse> existing1 = unlockedCourseRepository.findByUserIdAndCourseIdAndTeacherIsNull(contributor.getId(), cr.getRequestedCourse1().getId());
+                if (existing1.isPresent()) {
+                    UnlockedCourse uc = existing1.get();
+                    LocalDateTime base = (uc.getExpiresAt() != null && uc.getExpiresAt().isAfter(LocalDateTime.now())) ? uc.getExpiresAt() : LocalDateTime.now();
+                    uc.setExpiresAt(base.plusMonths(3));
+                    uc.setSource(UnlockSource.CONTRIBUTION_REWARD);
+                    unlockedCourseRepository.save(uc);
+                } else {
+                    unlockedCourseRepository.save(new UnlockedCourse(contributor, cr.getRequestedCourse1(), UnlockSource.CONTRIBUTION_REWARD, rewardExpiresAt));
+                }
             }
         }
 
         if (cr.getRequestedCourse2() != null) {
-            Optional<UnlockedCourse> existing2 = unlockedCourseRepository.findByUserIdAndCourseIdAndTeacherIsNull(contributor.getId(), cr.getRequestedCourse2().getId());
-            if (existing2.isPresent()) {
-                UnlockedCourse uc = existing2.get();
-                LocalDateTime base = (uc.getExpiresAt() != null && uc.getExpiresAt().isAfter(LocalDateTime.now())) ? uc.getExpiresAt() : LocalDateTime.now();
-                uc.setExpiresAt(base.plusMonths(3));
-                uc.setSource(UnlockSource.CONTRIBUTION_REWARD);
-                unlockedCourseRepository.save(uc);
+            Teacher t2 = cr.getRequestedTeacher2();
+            if (t2 != null) {
+                Optional<UnlockedCourse> existing2 = unlockedCourseRepository.findByUserIdAndCourseIdAndTeacherId(contributor.getId(), cr.getRequestedCourse2().getId(), t2.getId());
+                if (existing2.isPresent()) {
+                    UnlockedCourse uc = existing2.get();
+                    LocalDateTime base = (uc.getExpiresAt() != null && uc.getExpiresAt().isAfter(LocalDateTime.now())) ? uc.getExpiresAt() : LocalDateTime.now();
+                    uc.setExpiresAt(base.plusMonths(3));
+                    uc.setSource(UnlockSource.CONTRIBUTION_REWARD);
+                    unlockedCourseRepository.save(uc);
+                } else {
+                    unlockedCourseRepository.save(new UnlockedCourse(contributor, cr.getRequestedCourse2(), t2, UnlockSource.CONTRIBUTION_REWARD, rewardExpiresAt));
+                }
             } else {
-                unlockedCourseRepository.save(new UnlockedCourse(contributor, cr.getRequestedCourse2(), UnlockSource.CONTRIBUTION_REWARD, rewardExpiresAt));
+                Optional<UnlockedCourse> existing2 = unlockedCourseRepository.findByUserIdAndCourseIdAndTeacherIsNull(contributor.getId(), cr.getRequestedCourse2().getId());
+                if (existing2.isPresent()) {
+                    UnlockedCourse uc = existing2.get();
+                    LocalDateTime base = (uc.getExpiresAt() != null && uc.getExpiresAt().isAfter(LocalDateTime.now())) ? uc.getExpiresAt() : LocalDateTime.now();
+                    uc.setExpiresAt(base.plusMonths(3));
+                    uc.setSource(UnlockSource.CONTRIBUTION_REWARD);
+                    unlockedCourseRepository.save(uc);
+                } else {
+                    unlockedCourseRepository.save(new UnlockedCourse(contributor, cr.getRequestedCourse2(), UnlockSource.CONTRIBUTION_REWARD, rewardExpiresAt));
+                }
             }
         }
 
         // 3. Update contribution request
         String c1Code = cr.getRequestedCourse1() != null ? cr.getRequestedCourse1().getCode() : "Course 1";
+        if (cr.getRequestedTeacher1() != null) {
+            c1Code += " (" + (cr.getRequestedTeacher1().getInitial() != null ? cr.getRequestedTeacher1().getInitial() : cr.getRequestedTeacher1().getName()) + ")";
+        }
         String c2Code = cr.getRequestedCourse2() != null ? cr.getRequestedCourse2().getCode() : "Course 2";
+        if (cr.getRequestedTeacher2() != null) {
+            c2Code += " (" + (cr.getRequestedTeacher2().getInitial() != null ? cr.getRequestedTeacher2().getInitial() : cr.getRequestedTeacher2().getName()) + ")";
+        }
         cr.setStatus(ResourceStatus.APPROVED);
         cr.setAdminFeedback(feedback != null && !feedback.trim().isEmpty() ? feedback.trim() : "Verified and approved! Your 2 requested reward courses (" + c1Code + ", " + c2Code + ") have been unlocked for 3 months (1 Full Semester) free.");
         cr.setReviewedAt(LocalDateTime.now());
