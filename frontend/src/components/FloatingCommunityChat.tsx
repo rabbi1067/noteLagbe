@@ -89,6 +89,58 @@ function playIncomingChime() {
 const PROFANITY_REGEX =
   /(?:bc|mc|chutiya|harami|bapok|sala|magi|khanki|kutta|shor|bitch|bastard|fuck|shit|asshole|fucker|dick|pussy)/i;
 
+// Custom Modern Vector Logo Emblem specifically crafted for SEU Campus Live
+function CampusLiveLogo({ className = "w-full h-full" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      <defs>
+        <linearGradient id="scl-grad-bg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#06b6d4" />
+          <stop offset="50%" stopColor="#3b82f6" />
+          <stop offset="100%" stopColor="#8b5cf6" />
+        </linearGradient>
+        <linearGradient id="scl-grad-bars" x1="12" y1="12" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="100%" stopColor="#e0e7ff" />
+        </linearGradient>
+      </defs>
+
+      {/* Rounded Squircle Background with Cyber Neon Gradient */}
+      <rect width="40" height="40" rx="12" fill="url(#scl-grad-bg)" />
+      <rect x="0.5" y="0.5" width="39" height="39" rx="11.5" stroke="white" strokeOpacity="0.32" />
+
+      {/* Modern Speech Bubble Silhouette */}
+      <path
+        d="M11 11C8.238 11 6 13.238 6 16V23C6 25.762 8.238 28 11 28H14L18 32V28H29C31.762 28 34 25.762 34 23V16C34 13.238 31.762 11 29 11H11Z"
+        fill="black"
+        fillOpacity="0.22"
+      />
+
+      {/* Live Equalizer / Audio Frequency Wave Bars */}
+      <rect x="12" y="17.5" width="2.2" height="7" rx="1.1" fill="url(#scl-grad-bars)" />
+      <rect x="16" y="14.5" width="2.2" height="13" rx="1.1" fill="url(#scl-grad-bars)" />
+      <rect x="20" y="12.5" width="2.4" height="17" rx="1.2" fill="#ffffff" />
+      <rect x="24.2" y="14.5" width="2.2" height="13" rx="1.1" fill="url(#scl-grad-bars)" />
+      <rect x="28.2" y="17.5" width="2.2" height="7" rx="1.1" fill="url(#scl-grad-bars)" />
+
+      {/* Live Broadcast Waves & Beacon Ping */}
+      <path
+        d="M15 10C17.5 8.5 22.5 8.5 25 10"
+        stroke="#ffffff"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeOpacity="0.9"
+      />
+      <circle cx="20" cy="8" r="1.5" fill="#22d3ee" />
+    </svg>
+  );
+}
+
 export default function FloatingCommunityChat() {
   const pathname = usePathname() || "";
   const { user, isAuthenticated, isAdmin, isSuperAdmin, setShowAuthModal } = useAuth();
@@ -1648,7 +1700,7 @@ export default function FloatingCommunityChat() {
                     ? "bg-[#090d16] text-slate-100"
                     : "bg-slate-50 text-slate-800"
                 }`
-              : `w-[380px] h-[600px] flex flex-col rounded-3xl backdrop-blur-md sm:backdrop-blur-2xl transition-colors duration-200 overflow-hidden animate-in fade-in zoom-in-95 select-none ${
+              : `w-[410px] h-[610px] flex flex-col rounded-3xl backdrop-blur-md sm:backdrop-blur-2xl transition-colors duration-200 overflow-hidden animate-in fade-in zoom-in-95 select-none ${
                   isDark
                     ? "bg-[#090d16]/98 border border-white/15 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.85),0_0_35px_rgba(34,211,238,0.12)] text-slate-100"
                     : "bg-white/98 border border-slate-200/90 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.18),0_0_25px_rgba(59,130,246,0.12)] text-slate-800"
@@ -1677,25 +1729,21 @@ export default function FloatingCommunityChat() {
                 : undefined
             }
           >
-            {/* Left: SEU Official Logo Emblem + Title + Integrated Online Status */}
-            <div className="flex items-center gap-2.5 min-w-0">
+            {/* Left: Custom Campus Live Vector Logo + Title + Integrated Online Status */}
+            <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
               <div className="relative shrink-0 select-none">
                 <div
-                  className={`w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-xl flex items-center justify-center p-1 border shadow-xs transition-transform duration-200 ${
+                  className={`w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-xl flex items-center justify-center p-0.5 border shadow-sm transition-transform duration-200 ${
                     isDark
-                      ? "bg-slate-800/90 border-slate-700/80 shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
-                      : "bg-white border-slate-200 shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
+                      ? "bg-slate-900 border-white/10 shadow-[0_2px_10px_rgba(6,182,212,0.25)]"
+                      : "bg-white border-slate-200 shadow-[0_2px_8px_rgba(59,130,246,0.15)]"
                   }`}
                 >
-                  <img
-                    src="/images/seu-logo.png"
-                    alt="SEU Logo"
-                    className="w-full h-full object-contain drop-shadow-xs"
-                  />
+                  <CampusLiveLogo className="w-full h-full" />
                 </div>
                 {/* Live Pulse Dot on bottom-right of logo */}
                 <span
-                  className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 ${
+                  className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 ${
                     isDark ? "border-slate-900" : "border-white"
                   } ${
                     activeUsersCount > 0
@@ -1705,19 +1753,19 @@ export default function FloatingCommunityChat() {
                 />
               </div>
 
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <h3 className={`text-sm sm:text-base font-bold tracking-wide flex items-center gap-1 truncate ${
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1">
+                  <h3 className={`text-sm sm:text-base font-extrabold tracking-tight flex items-center gap-1 truncate ${
                     isDark ? "text-white" : "text-slate-900"
                   }`}>
-                    {isBn ? "SEU ক্যাম্পাস লাইভ" : "SEU Campus Live"}
+                    <span className="truncate">{isBn ? "SEU ক্যাম্পাস লাইভ" : "SEU Campus Live"}</span>
                     <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                   </h3>
                 </div>
                 {/* Clean, Non-intrusive Online Pill */}
                 <div className="flex items-center gap-1.5 text-[11px]">
-                  <span className={`h-2 w-2 rounded-full shrink-0 ${activeUsersCount > 0 ? "bg-emerald-400 animate-pulse" : "bg-slate-400"}`} />
-                  <span className={`${activeUsersCount > 0 ? "text-emerald-500" : "text-slate-400"} font-semibold truncate`}>
+                  <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${activeUsersCount > 0 ? "bg-emerald-400 animate-pulse" : "bg-slate-400"}`} />
+                  <span className={`${activeUsersCount > 0 ? "text-emerald-400" : "text-slate-400"} font-semibold truncate`}>
                     {activeUsersCount > 0
                       ? (isBn
                           ? `${formatNumber(activeUsersCount)} জন শিক্ষার্থী লাইভ`
@@ -1729,12 +1777,12 @@ export default function FloatingCommunityChat() {
             </div>
 
             {/* Right: Sound Toggle + Notification Toggle + Reset Position (Desktop) + Close Button */}
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
               {/* 1. Quick Mute / Sound Toggle */}
               <button
                 type="button"
                 onClick={handleToggleSound}
-                className={`w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 ${
+                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 ${
                   soundEnabled
                     ? isDark
                       ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25"
@@ -1750,14 +1798,14 @@ export default function FloatingCommunityChat() {
                 }
                 aria-label="Toggle chat sound"
               >
-                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
               </button>
 
               {/* 2. Notification Toggle */}
               <button
                 type="button"
                 onClick={handleToggleNotifications}
-                className={`w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 ${
+                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 ${
                   notificationsEnabled
                     ? isDark
                       ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
@@ -1773,7 +1821,7 @@ export default function FloatingCommunityChat() {
                 }
                 aria-label="Toggle chat notifications"
               >
-                {notificationsEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+                {notificationsEnabled ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
               </button>
 
               {/* 3. On desktop only: reset position */}
@@ -1781,7 +1829,7 @@ export default function FloatingCommunityChat() {
                 <button
                   type="button"
                   onClick={handleResetPosition}
-                  className={`w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 ${
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 ${
                     isDark ? "bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-white" : "bg-slate-100 border-slate-200 text-slate-500 hover:text-slate-900"
                   }`}
                   title={isBn ? "ডিফল্ট কর্নারে রিসেট করুন" : "Reset window to corner"}
@@ -1794,7 +1842,7 @@ export default function FloatingCommunityChat() {
               <button
                 type="button"
                 onClick={() => handleToggleOpen(false)}
-                className={`w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 group ${
+                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 group ${
                   isDark
                     ? "bg-slate-800/80 border-slate-700/80 text-slate-400 hover:bg-rose-500/20 hover:border-rose-500/40 hover:text-rose-300"
                     : "bg-white border-slate-200 text-slate-600 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600"
@@ -1802,7 +1850,7 @@ export default function FloatingCommunityChat() {
                 title={isBn ? "চ্যাট বন্ধ করুন" : "Close Chat"}
                 aria-label={isBn ? "চ্যাট বন্ধ করুন" : "Close Chat"}
               >
-                <X className="w-4 h-4 sm:w-4.5 sm:h-4.5 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-90" />
+                <X className="w-4 h-4 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-90" />
               </button>
             </div>
           </div>
