@@ -30,7 +30,6 @@ import {
   Play,
   Pause,
   AlertTriangle,
-  RotateCcw,
   MoreVertical,
   Loader2,
   Users,
@@ -1700,7 +1699,7 @@ export default function FloatingCommunityChat() {
                     ? "bg-[#090d16] text-slate-100"
                     : "bg-slate-50 text-slate-800"
                 }`
-              : `w-[410px] h-[610px] flex flex-col rounded-3xl backdrop-blur-md sm:backdrop-blur-2xl transition-colors duration-200 overflow-hidden animate-in fade-in zoom-in-95 select-none ${
+              : `w-[425px] h-[610px] flex flex-col rounded-3xl backdrop-blur-md sm:backdrop-blur-2xl transition-colors duration-200 overflow-hidden animate-in fade-in zoom-in-95 select-none ${
                   isDark
                     ? "bg-[#090d16]/98 border border-white/15 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.85),0_0_35px_rgba(34,211,238,0.12)] text-slate-100"
                     : "bg-white/98 border border-slate-200/90 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.18),0_0_25px_rgba(59,130,246,0.12)] text-slate-800"
@@ -1754,18 +1753,18 @@ export default function FloatingCommunityChat() {
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1">
-                  <h3 className={`text-sm sm:text-base font-extrabold tracking-tight flex items-center gap-1 truncate ${
+                <div className="flex items-center gap-1.5">
+                  <h3 className={`text-sm sm:text-base font-extrabold tracking-tight flex items-center gap-1.5 whitespace-nowrap ${
                     isDark ? "text-white" : "text-slate-900"
                   }`}>
-                    <span className="truncate">{isBn ? "SEU ক্যাম্পাস লাইভ" : "SEU Campus Live"}</span>
+                    <span className="whitespace-nowrap">{isBn ? "SEU ক্যাম্পাস লাইভ" : "SEU Campus Live"}</span>
                     <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                   </h3>
                 </div>
                 {/* Clean, Non-intrusive Online Pill */}
                 <div className="flex items-center gap-1.5 text-[11px]">
                   <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${activeUsersCount > 0 ? "bg-emerald-400 animate-pulse" : "bg-slate-400"}`} />
-                  <span className={`${activeUsersCount > 0 ? "text-emerald-400" : "text-slate-400"} font-semibold truncate`}>
+                  <span className={`${activeUsersCount > 0 ? "text-emerald-400" : "text-slate-400"} font-semibold whitespace-nowrap`}>
                     {activeUsersCount > 0
                       ? (isBn
                           ? `${formatNumber(activeUsersCount)} জন শিক্ষার্থী লাইভ`
@@ -1776,8 +1775,8 @@ export default function FloatingCommunityChat() {
               </div>
             </div>
 
-            {/* Right: Sound Toggle + Notification Toggle + Reset Position (Desktop) + Close Button */}
-            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            {/* Right: Sound Toggle + Notification Toggle + Close Button */}
+            <div className="flex items-center gap-1.5 shrink-0">
               {/* 1. Quick Mute / Sound Toggle */}
               <button
                 type="button"
@@ -1824,21 +1823,7 @@ export default function FloatingCommunityChat() {
                 {notificationsEnabled ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
               </button>
 
-              {/* 3. On desktop only: reset position */}
-              {!isMobileScreen && (
-                <button
-                  type="button"
-                  onClick={handleResetPosition}
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer border shadow-xs active:scale-95 ${
-                    isDark ? "bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-white" : "bg-slate-100 border-slate-200 text-slate-500 hover:text-slate-900"
-                  }`}
-                  title={isBn ? "ডিফল্ট কর্নারে রিসেট করুন" : "Reset window to corner"}
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-              )}
-
-              {/* 4. Close Button (Right Corner) */}
+              {/* 3. Close Button (Right Corner) */}
               <button
                 type="button"
                 onClick={() => handleToggleOpen(false)}
