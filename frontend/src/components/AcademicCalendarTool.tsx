@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { toPng } from "html-to-image";
 import jsPDF from "jspdf";
 import { useLanguage } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
 import academicCalendarsData from "@/data/academic_calendars.json";
 
 interface CalendarItem {
@@ -322,6 +323,20 @@ const getInitialSemesters = (year: string): SemesterData[] => {
 
 export default function AcademicCalendarTool() {
   const { language } = useLanguage();
+  const { isAuthenticated, setShowAuthModal } = useAuth();
+
+  const requireAuthForDownload = (fileTypeLabel: string = "file"): boolean => {
+    if (!isAuthenticated) {
+      toast.error(
+        language === "bn"
+          ? `${fileTypeLabel} ডাউনলোড করতে অনুগ্রহ করে প্রথমে আপনার স্টুডেন্ট অ্যাকাউন্টে লগইন করুন।`
+          : `Please log in to your account to download ${fileTypeLabel}.`
+      );
+      setShowAuthModal(true);
+      return false;
+    }
+    return true;
+  };
 
   const [selectedYear, setSelectedYear] = useState<string>("2026");
   const [availableYears, setAvailableYears] = useState<string[]>(["2026", "2025", "2024", "2023"]);
@@ -544,6 +559,7 @@ export default function AcademicCalendarTool() {
 
   // Download entire 3-semester calendar as PNG
   const downloadAllAsPng = async () => {
+    if (!requireAuthForDownload(language === "bn" ? "ক্যালেন্ডার ইমেজ (PNG)" : "Academic Calendar image (PNG)")) return;
     if (!fullCalendarRef.current) return;
     try {
       setIsDownloading(true);
@@ -587,6 +603,7 @@ export default function AcademicCalendarTool() {
 
   // Download entire 3-semester calendar as PDF
   const downloadAllAsPdf = async () => {
+    if (!requireAuthForDownload(language === "bn" ? "ক্যালেন্ডার PDF" : "Academic Calendar PDF")) return;
     if (!fullCalendarRef.current) return;
     try {
       setIsDownloading(true);
@@ -637,6 +654,7 @@ export default function AcademicCalendarTool() {
 
   // Single Semester Download (PNG) with NoteLagbe & University Header
   const downloadSingleSemesterPng = async (sem: SemesterData) => {
+    if (!requireAuthForDownload(language === "bn" ? "সেমিস্টার ক্যালেন্ডার PNG" : "Semester Calendar PNG")) return;
     setSingleExportSemester(sem);
     try {
       setIsDownloading(true);
@@ -682,6 +700,7 @@ export default function AcademicCalendarTool() {
 
   // Single Semester Download (PDF) with NoteLagbe & University Header
   const downloadSingleSemesterPdf = async (sem: SemesterData) => {
+    if (!requireAuthForDownload(language === "bn" ? "সেমিস্টার ক্যালেন্ডার PDF" : "Semester Calendar PDF")) return;
     setSingleExportSemester(sem);
     try {
       setIsDownloading(true);

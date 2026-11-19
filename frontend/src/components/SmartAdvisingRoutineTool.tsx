@@ -225,8 +225,21 @@ const TIME_12_AXIS = [
 ];
 
 export default function SmartAdvisingRoutineTool() {
-  const { user, isAdmin, isSuperAdmin } = useAuth();
+  const { user, isAdmin, isSuperAdmin, isAuthenticated, setShowAuthModal } = useAuth();
   const { language } = useLanguage();
+
+  const requireAuthForDownload = (fileTypeLabel: string = "file"): boolean => {
+    if (!isAuthenticated) {
+      toast.error(
+        language === "bn"
+          ? `${fileTypeLabel} ডাউনলোড করতে অনুগ্রহ করে প্রথমে আপনার স্টুডেন্ট অ্যাকাউন্টে লগইন করুন।`
+          : `Please log in to your account to download ${fileTypeLabel}.`
+      );
+      setShowAuthModal(true);
+      return false;
+    }
+    return true;
+  };
 
   // State: Sections loaded from verified backend or student sandbox session
   const [sections, setSections] = useState<OfferedSectionItem[]>([]);
@@ -1122,6 +1135,7 @@ export default function SmartAdvisingRoutineTool() {
   };
 
   const handleDownloadPNG = async () => {
+    if (!requireAuthForDownload(language === "bn" ? "ক্লাস রুটিন ইমেজ (PNG)" : "Class Routine image (PNG)")) return;
     if (!routineContainerRef.current) return;
     setIsExporting(true);
     const toastId = toast.loading(language === "bn" ? "রুটিন ইমেজ (PNG) তৈরি হচ্ছে..." : "Exporting Class Routine as PNG image...");
@@ -1153,6 +1167,7 @@ export default function SmartAdvisingRoutineTool() {
   };
 
   const handleDownloadPDF = async () => {
+    if (!requireAuthForDownload(language === "bn" ? "ক্লাস রুটিন PDF" : "Class Routine PDF")) return;
     if (!routineContainerRef.current) return;
     setIsExporting(true);
     const toastId = toast.loading(language === "bn" ? "রুটিন PDF তৈরি হচ্ছে..." : "Generating landscape PDF document...");

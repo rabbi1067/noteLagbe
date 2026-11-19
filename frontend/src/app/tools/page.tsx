@@ -791,8 +791,21 @@ export const SEU_20_TEMPLATES: SEUCoverTemplate[] = [
 ];
 
 export default function StudentToolsPage() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, setShowAuthModal } = useAuth();
   const { language, t } = useLanguage();
+
+  const requireAuthForDownload = (fileTypeLabel: string = "file"): boolean => {
+    if (!isAuthenticated) {
+      toast.error(
+        language === "bn"
+          ? `${fileTypeLabel} ডাউনলোড করতে অনুগ্রহ করে প্রথমে আপনার স্টুডেন্ট অ্যাকাউন্টে লগইন করুন।`
+          : `Please log in to your account to download ${fileTypeLabel}.`
+      );
+      setShowAuthModal(true);
+      return false;
+    }
+    return true;
+  };
 
   // Active Tool Tab: 'cgpa' | 'tuition' | 'cover' | 'certificate' | 'routine' | 'calendar' | 'pdfmaker' | 'resume' | 'sections' | 'advising'
   const [activeTab, setActiveTab] = useState<"cgpa" | "tuition" | "cover" | "certificate" | "routine" | "calendar" | "pdfmaker" | "resume" | "sections" | "advising">("cgpa");
@@ -1718,6 +1731,7 @@ export default function StudentToolsPage() {
 
   // DIRECT HIGH-QUALITY A4 PDF GENERATION & DOWNLOAD (Zero popups, 100% crash-proof, works on mobile & desktop)
   const handleDirectPdfDownload = async () => {
+    if (!requireAuthForDownload(language === "bn" ? "PDF ফাইল" : "PDF files")) return;
     saveCoverDetailsLocally();
 
     const previewEl = document.getElementById("seu-cover-preview");
@@ -1804,6 +1818,7 @@ export default function StudentToolsPage() {
 
   // Safe Browser Print View using standard Blob URL (Strictly 1 page, zero CDN dependency, zero tab crashes)
   const handlePrintCoverPage = () => {
+    if (!requireAuthForDownload(language === "bn" ? "PDF ফাইল" : "PDF files")) return;
     saveCoverDetailsLocally();
 
     const previewEl = document.getElementById("seu-cover-preview");
@@ -1853,6 +1868,7 @@ export default function StudentToolsPage() {
 
   // Customized Native Microsoft Word (.docx) Generation using JSZip
   const handleDownloadDocFile = async () => {
+    if (!requireAuthForDownload(language === "bn" ? "Word (.docx) ফাইল" : "Word (.docx) documents")) return;
     saveCoverDetailsLocally();
     const activeTpl = SEU_20_TEMPLATES.find(t => t.id === selectedTemplateId) || SEU_20_TEMPLATES[0];
 
@@ -1981,6 +1997,7 @@ export default function StudentToolsPage() {
 
   // Word (.doc with Exact Theme): Exports an authentic Microsoft Word document preserving the selected theme and layout
   const handleDownloadWordDocExactTheme = () => {
+    if (!requireAuthForDownload(language === "bn" ? "Word (.doc) ফাইল" : "Word (.doc) documents")) return;
     saveCoverDetailsLocally();
     const activeTpl = SEU_20_TEMPLATES.find(t => t.id === selectedTemplateId) || SEU_20_TEMPLATES[0];
     const isColor = activeTpl.style === "Color";
@@ -2228,6 +2245,7 @@ export default function StudentToolsPage() {
   };
 
   const handleDownloadGoogleDocs = () => {
+    if (!requireAuthForDownload(language === "bn" ? "ডকুমেন্ট ফাইল" : "documents")) return;
     handleDownloadDocFile();
     toast.info(
       language === "bn"
@@ -2497,6 +2515,7 @@ export default function StudentToolsPage() {
 
   // Print/PDF: Isolates ONLY the 8 AM - 8 PM Timeline Grid schedule
   const handlePrintRoutineOnly = () => {
+    if (!requireAuthForDownload(language === "bn" ? "ক্লাস রুটিন PDF" : "Class Routine PDF")) return;
     const printWindow = window.open("", "_blank", "width=1200,height=800");
     if (!printWindow) {
       window.print();
@@ -2633,6 +2652,7 @@ export default function StudentToolsPage() {
 
   // Download High-Resolution PNG Image
   const handleDownloadPngRoutine = async () => {
+    if (!requireAuthForDownload(language === "bn" ? "ক্লাস রুটিন ইমেজ (PNG)" : "Class Routine image (PNG)")) return;
     if (!routineContainerRef.current) return;
     try {
       setIsDownloadingPng(true);
@@ -7336,6 +7356,11 @@ export default function StudentToolsPage() {
                     <a
                       href={`/cover_templates/${activeTpl.file}`}
                       download={`SEU_${activeTpl.id}.docx`}
+                      onClick={(e) => {
+                        if (!requireAuthForDownload(language === "bn" ? "অফিসিয়াল Word টেমপ্লেট" : "Official Word template")) {
+                          e.preventDefault();
+                        }
+                      }}
                       className="py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/80 dark:hover:bg-slate-800 text-[11px] font-bold text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-[0.99] text-center"
                       title="Download the unaltered official institutional SEU Word template"
                     >

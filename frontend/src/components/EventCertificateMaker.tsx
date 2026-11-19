@@ -4,6 +4,7 @@ import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useAuth } from "@/context/AuthContext";
 import {
   Award,
   Download,
@@ -195,7 +196,21 @@ const INITIAL_FORM_STATE: CertificateFormState = {
 };
 
 export default function EventCertificateMaker({ language = "en" }: EventCertificateMakerProps) {
+  const { isAuthenticated, setShowAuthModal } = useAuth();
   const [certData, setCertData] = useState<CertificateFormState>(INITIAL_FORM_STATE);
+
+  const requireAuthForDownload = (fileTypeLabel: string = "file"): boolean => {
+    if (!isAuthenticated) {
+      toast.error(
+        language === "bn"
+          ? `${fileTypeLabel} ডাউনলোড করতে অনুগ্রহ করে প্রথমে আপনার স্টুডেন্ট অ্যাকাউন্টে লগইন করুন।`
+          : `Please log in to your account to download ${fileTypeLabel}.`
+      );
+      setShowAuthModal(true);
+      return false;
+    }
+    return true;
+  };
   const [zoom, setZoom] = useState<number>(75);
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
@@ -455,6 +470,7 @@ export default function EventCertificateMaker({ language = "en" }: EventCertific
   };
 
   const handlePrint = () => {
+    if (!requireAuthForDownload(language === "bn" ? "সার্টিফিকেট PDF" : "Certificate PDF")) return;
     if (!certificateRef.current) return;
 
     // Get certificate HTML
@@ -546,6 +562,7 @@ export default function EventCertificateMaker({ language = "en" }: EventCertific
   };
 
   const handleDownloadPng = async () => {
+    if (!requireAuthForDownload(language === "bn" ? "সার্টিফিকেট ইমেজ (PNG)" : "Certificate image (PNG)")) return;
     if (!certificateRef.current) return;
     setIsExporting(true);
     const toastId = toast.loading(language === "bn" ? "আল্ট্রা-এইচডি PNG সার্টিফিকেট তৈরি হচ্ছে..." : "Generating Ultra-HD PNG certificate...");
@@ -567,6 +584,7 @@ export default function EventCertificateMaker({ language = "en" }: EventCertific
   };
 
   const handleDownloadPdf = async () => {
+    if (!requireAuthForDownload(language === "bn" ? "সার্টিফিকেট PDF" : "Certificate PDF")) return;
     if (!certificateRef.current) return;
     setIsExporting(true);
     const toastId = toast.loading(language === "bn" ? "প্রফেশনাল সার্টিফিকেট PDF রেন্ডার হচ্ছে..." : "Rendering standard certificate PDF...");

@@ -36,6 +36,7 @@ import {
   Target,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 import {
   CropRect,
   DEFAULT_CROP,
@@ -135,7 +136,21 @@ function PageThumbnailCanvas({
 }
 
 export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
+  const { isAuthenticated, setShowAuthModal } = useAuth();
   const [pages, setPages] = useState<PdfMakerPage[]>([]);
+
+  const requireAuthForDownload = (fileTypeLabel: string = "file"): boolean => {
+    if (!isAuthenticated) {
+      toast.error(
+        language === "bn"
+          ? `${fileTypeLabel} ডাউনলোড করতে অনুগ্রহ করে প্রথমে আপনার স্টুডেন্ট অ্যাকাউন্টে লগইন করুন।`
+          : `Please log in to your account to download ${fileTypeLabel}.`
+      );
+      setShowAuthModal(true);
+      return false;
+    }
+    return true;
+  };
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>("NoteLagbe_Document");
   const [isDropActive, setIsDropActive] = useState(false);
@@ -577,6 +592,7 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
 
   // Exports
   const handleDownloadPdf = async () => {
+    if (!requireAuthForDownload(bn ? "PDF ফাইল" : "PDF files")) return;
     if (pages.length === 0 || exportStatus) return;
     try {
       setExportStatus(bn ? "PDF তৈরি হচ্ছে..." : "Building PDF...");
@@ -608,6 +624,7 @@ export default function PdfMakerTool({ language = "en" }: PdfMakerToolProps) {
   };
 
   const handleDownloadDocx = async () => {
+    if (!requireAuthForDownload(bn ? "Word (.docx) ফাইল" : "Word (.docx) documents")) return;
     if (pages.length === 0 || exportStatus) return;
     try {
       setExportStatus(bn ? "DOCX তৈরি হচ্ছে..." : "Building Word (.docx)...");

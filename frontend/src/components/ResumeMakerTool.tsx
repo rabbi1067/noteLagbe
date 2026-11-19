@@ -25,6 +25,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 import ResumeSheetRenderer from "./ResumeSheetRenderer";
 import {
   DEFAULT_DESIGN_CONFIG,
@@ -112,7 +113,21 @@ function normalizeResumeDraft(
 }
 
 export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProps) {
+  const { isAuthenticated, setShowAuthModal } = useAuth();
   const bn = language === "bn";
+
+  const requireAuthForDownload = (fileTypeLabel: string = "file"): boolean => {
+    if (!isAuthenticated) {
+      toast.error(
+        bn
+          ? `${fileTypeLabel} ডাউনলোড করতে অনুগ্রহ করে প্রথমে আপনার স্টুডেন্ট অ্যাকাউন্টে লগইন করুন।`
+          : `Please log in to your account to download ${fileTypeLabel}.`
+      );
+      setShowAuthModal(true);
+      return false;
+    }
+    return true;
+  };
 
   const [data, setData] = useState<ResumeData>(() => createSampleStudentResume());
   const [design, setDesign] = useState<ResumeDesignConfig>(() => ({
@@ -221,6 +236,7 @@ export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProp
 
   // JSON Export & Import
   const handleExportJson = () => {
+    if (!requireAuthForDownload(bn ? "রেজুমে ব্যাকআপ ফাইল" : "Resume backup file")) return;
     const blob = new Blob([JSON.stringify({ data, design }, null, 2)], {
       type: "application/json",
     });
@@ -246,6 +262,7 @@ export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProp
   };
 
   const handleDownloadPdf = async () => {
+    if (!requireAuthForDownload(bn ? "রেজুমে PDF" : "Resume PDF")) return;
     if (isExporting) return;
     setIsExporting("pdf");
     try {
@@ -266,6 +283,7 @@ export default function ResumeMakerTool({ language = "en" }: ResumeMakerToolProp
   };
 
   const handleDownloadDocx = async () => {
+    if (!requireAuthForDownload(bn ? "Word (.docx) রেজুমে" : "Word (.docx) resume")) return;
     if (isExporting) return;
     setIsExporting("docx");
     try {
