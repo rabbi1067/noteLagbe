@@ -64,7 +64,7 @@ function formatRelativeTime(dateString?: string): string {
 }
 
 export default function NotificationBell({ onOpenChange }: NotificationBellProps = {}) {
-  const { isAuthenticated, setShowAuthModal } = useAuth();
+  const { user, isAuthenticated, setShowAuthModal } = useAuth();
   const router = useRouter();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -74,6 +74,10 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
   const [loading, setLoading] = useState<boolean>(false);
   const [filterTab, setFilterTab] = useState<"all" | "unread">("all");
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Storage key scoped to current user
+  const getCampusNoticeStorageKey = () =>
+    user?.id ? `notelagbe_read_campus_notices_${user.id}` : "notelagbe_read_campus_notices";
 
   // Notify parent component about open state changes safely
   const onOpenChangeRef = useRef(onOpenChange);
@@ -138,11 +142,17 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
     }
   };
 
-  // Initial load: campus notices & read IDs (only for authenticated users)
+  // Initial load: campus notices & read IDs (scoped to authenticated user)
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      setNotifications([]);
+      setUnreadCount(0);
+      setReadCampusNoticeIds([]);
+      return;
+    }
     try {
-      const storedRead = localStorage.getItem("notelagbe_read_campus_notices");
+      const storageKey = getCampusNoticeStorageKey();
+      const storedRead = localStorage.getItem(storageKey);
       if (storedRead) {
         setReadCampusNoticeIds(JSON.parse(storedRead));
       }
@@ -164,7 +174,7 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
       }
     }, 60000);
     return () => clearInterval(noticeInterval);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.id]);
 
   // Poll for personal notifications when authenticated
   useEffect(() => {
@@ -240,6 +250,26 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
         fetchCampusNotices();
         if (isAuthenticated) {
           fetchNotifications();
+
+          // Auto-mark active campus notices as read in localStorage
+          if (activeCampusNotices.length > 0) {
+            const activeIds = activeCampusNotices.map((n) => n.id);
+            setReadCampusNoticeIds((current) => {
+              const merged = Array.from(new Set([...current, ...activeIds]));
+              try {
+                const storageKey = getCampusNoticeStorageKey();
+                localStorage.setItem(storageKey, JSON.stringify(merged));
+              } catch {}
+              return merged;
+            });
+          }
+
+          // Auto-mark unread personal notifications as read locally & on backend
+          if (unreadCount > 0) {
+            setUnreadCount(0);
+            setNotifications((curr) => curr.map((n) => ({ ...n, read: true, isRead: true })));
+            api.notifications.markAllAsRead().catch(() => {});
+          }
         }
       }
       return next;
@@ -256,8 +286,11 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
     return true;
   });
 
-  const unreadCampusCount = activeCampusNotices.filter((n) => !readCampusNoticeIds.includes(n.id)).length;
-  const totalBadgeCount = unreadCount + unreadCampusCount;
+  // STRICT RULE: If not authenticated, badge count is ALWAYS 0!
+  const unreadCampusCount = isAuthenticated
+    ? activeCampusNotices.filter((n) => !readCampusNoticeIds.includes(n.id)).length
+    : 0;
+  const totalBadgeCount = isAuthenticated ? (unreadCount + unreadCampusCount) : 0;
 
   const handleCampusNoticeClick = (notice: CampusNoticeItem) => {
     // Mark as read
@@ -265,7 +298,8 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
       const updated = [...readCampusNoticeIds, notice.id];
       setReadCampusNoticeIds(updated);
       try {
-        localStorage.setItem("notelagbe_read_campus_notices", JSON.stringify(updated));
+        const storageKey = getCampusNoticeStorageKey();
+        localStorage.setItem(storageKey, JSON.stringify(updated));
       } catch {}
     }
 
@@ -321,10 +355,11 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
   const handleMarkAllRead = async () => {
     // Mark campus notices as read
     const allNoticeIds = activeCampusNotices.map((n) => n.id);
+    const storageKey = getCampusNoticeStorageKey();
     const merged = Array.from(new Set([...readCampusNoticeIds, ...allNoticeIds]));
     setReadCampusNoticeIds(merged);
     try {
-      localStorage.setItem("notelagbe_read_campus_notices", JSON.stringify(merged));
+      localStorage.setItem(storageKey, JSON.stringify(merged));
     } catch {}
 
     // Mark personal notifications as read
@@ -378,15 +413,15 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
         className={`relative z-50 p-2 rounded-xl border transition-all cursor-pointer ${
           isOpen
             ? "bg-blue-50 dark:bg-blue-950/60 border-blue-400 text-blue-600 dark:text-blue-400 shadow-sm ring-2 ring-blue-500/20"
-            : totalBadgeCount > 0
+            : isAuthenticated && totalBadgeCount > 0
             ? "border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:border-blue-500 shadow-sm"
             : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:border-blue-400 hover:text-blue-600"
         }`}
-        title={totalBadgeCount > 0 ? `${totalBadgeCount} unread notification(s)` : "Notifications"}
+        title={isAuthenticated && totalBadgeCount > 0 ? `${totalBadgeCount} unread notification(s)` : "Notifications"}
         aria-label="View notifications"
       >
         <Bell className="w-4 h-4" />
-        {totalBadgeCount > 0 && (
+        {isAuthenticated && totalBadgeCount > 0 && (
           <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-red-600 text-[10px] font-black text-white shadow-md animate-pulse">
             {totalBadgeCount > 9 ? "9+" : totalBadgeCount}
           </span>
@@ -417,14 +452,14 @@ export default function NotificationBell({ onOpenChange }: NotificationBellProps
                 <Bell className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 Notifications
               </span>
-              {totalBadgeCount > 0 && (
+              {isAuthenticated && totalBadgeCount > 0 && (
                 <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                   {totalBadgeCount} new
                 </span>
               )}
             </div>
 
-            {totalBadgeCount > 0 && (
+            {isAuthenticated && totalBadgeCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
                 className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors"
