@@ -251,18 +251,32 @@ public class PaymentService {
         }
 
         pr.setStatus(PaymentStatus.REJECTED);
-        pr.setAdminNotes(adminNotes);
+        String cleanNotes = adminNotes != null && !adminNotes.trim().isEmpty() ? adminNotes.trim() : "Unable to verify transaction details in official ledger.";
+        pr.setAdminNotes(cleanNotes);
         pr.setReviewedAt(LocalDateTime.now());
 
         // Send In-App Notification
         notificationService.createNotification(
                 pr.getUser(),
                 "Payment Request Declined ⚠️",
-                "Your payment request (TrxID: " + pr.getTransactionId() + ") could not be verified." +
-                        (adminNotes != null && !adminNotes.trim().isEmpty() ? " Admin note: " + adminNotes : " Please verify details and resubmit."),
+                "Your payment request (TrxID: " + pr.getTransactionId() + ") could not be verified. Note: " + cleanNotes,
                 "PAYMENT_REJECTED",
                 "/pricing"
         );
+
+        // Send Email Notification with Rejection Note
+        try {
+            emailService.sendPaymentRejectionEmail(
+                    pr.getUser(),
+                    pr.getPlanType(),
+                    pr.getAmount(),
+                    pr.getTransactionId(),
+                    pr.getMethod(),
+                    cleanNotes
+            );
+        } catch (Exception e) {
+            log.warn("Failed to dispatch payment rejection email: {}", e.getMessage());
+        }
 
         PaymentRequest saved = paymentRequestRepository.save(pr);
         liveSyncService.broadcast("payment", "rejected", pr.getId());

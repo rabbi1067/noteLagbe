@@ -831,6 +831,107 @@ export default function AdminDashboardPage() {
     source?: string;
   } | null>(null);
 
+  // Reject Subscription Payment Modal State with AI Assist
+  const [rejectingPayment, setRejectingPayment] = useState<any | null>(null);
+  const [rejectPaymentNotes, setRejectPaymentNotes] = useState("");
+  const [rejectPaymentAiSuggestCount, setRejectPaymentAiSuggestCount] = useState(0);
+  const [isAiGeneratingPaymentReject, setIsAiGeneratingPaymentReject] = useState(false);
+
+  const handleOpenRejectPaymentModal = (payment: any) => {
+    setRejectingPayment(payment);
+    setRejectPaymentNotes("");
+    setRejectPaymentAiSuggestCount(0);
+  };
+
+  const handleAiSuggestPaymentRejectReason = async () => {
+    if (!rejectingPayment) return;
+    setIsAiGeneratingPaymentReject(true);
+    try {
+      const token = getToken();
+      const res = await fetch("/api/ai/suggest-reject-note", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          kind: "PAYMENT",
+          planName: rejectingPayment.planType || "Subscription Plan",
+          amount: rejectingPayment.amount || 0,
+          method: rejectingPayment.method || "bKash",
+          trxId: rejectingPayment.transactionId || "",
+          senderPhone: rejectingPayment.senderPhone || rejectingPayment.senderNumber || "",
+          studentName: rejectingPayment.user?.name || "Student",
+          cycleIndex: rejectPaymentAiSuggestCount,
+          language: language || "en",
+        }),
+      });
+      const data = await res.json();
+      if (data?.success && data?.suggestion) {
+        setRejectPaymentNotes(data.suggestion);
+        setRejectPaymentAiSuggestCount((prev) => prev + 1);
+        toast.success(
+          language === "bn"
+            ? `✨ AI রিজেকশন কারণ প্রস্তাবিত (অপশন #${(rejectPaymentAiSuggestCount % 5) + 1} / 5)`
+            : `✨ AI Rejection feedback suggested (Option #${(rejectPaymentAiSuggestCount % 5) + 1} of 5)`
+        );
+      } else {
+        toast.error(
+          language === "bn"
+            ? "AI সাজেশন তৈরি করা সম্ভব হয়নি"
+            : "Failed to generate AI suggestion"
+        );
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Failed to generate AI reject note");
+    } finally {
+      setIsAiGeneratingPaymentReject(false);
+    }
+  };
+
+  const handleConfirmRejectPaymentModal = async () => {
+    if (!rejectingPayment) return;
+    const id = rejectingPayment.id;
+    const prevPayments = payments;
+    const feedback = rejectPaymentNotes.trim() || "Payment could not be verified in mobile banking statement.";
+
+    // 1. Instantly close modal and optimistically update UI (0ms delay)
+    setRejectingPayment(null);
+    setProcessingQueueKey(`payment-${id}`);
+    markSelfQueueMutation();
+
+    setPayments((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              status: "REJECTED" as const,
+              adminNotes: feedback,
+              reviewedAt: new Date().toISOString(),
+            }
+          : p
+      )
+    );
+
+    toast.success(
+      language === "bn"
+        ? "পেমেন্ট বাতিল ও শিক্ষার্থীকে নোট পাঠানো হয়েছে!"
+        : "Payment declined and rejection note sent to student!"
+    );
+
+    // 2. Background persistence to server
+    try {
+      const updated = await api.admin.rejectPayment(id, feedback);
+      applyStatusUpdate(setPayments, id, updated, "REJECTED");
+      notifyDataChanged("payment", "rejected", id);
+    } catch (err: any) {
+      setPayments(prevPayments);
+      toast.error(err.message || "Failed to reject payment on server. Restored to pending.");
+    } finally {
+      setProcessingQueueKey(null);
+    }
+  };
+
   const handleOpenRejectModal = (contribution: any) => {
     setRejectingContribution(contribution);
     setRejectFeedback("");
@@ -2971,36 +3072,12 @@ export default function AdminDashboardPage() {
 
   const handleRejectPayment = (id: number) => {
     if (processingQueueKey) return;
-    openDeleteConfirm({
-      title: "Reject Payment Request",
-      itemType: "Payment",
-      itemName: `Payment Transaction #${id}`,
-      warningText: "Are you sure you want to decline this subscription payment request? The student will be notified and subscription will remain inactive.",
-      confirmButtonText: "Reject Payment",
-      onConfirm: async () => {
-        const prevPayments = payments;
-        setProcessingQueueKey(`payment-${id}`);
-        markSelfQueueMutation();
-
-        // Instant optimistic update
-        setPayments((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, status: "REJECTED" as const } : p))
-        );
-        toast.success("Payment rejected");
-
-        try {
-          const updated = await api.admin.rejectPayment(id);
-          applyStatusUpdate(setPayments, id, updated, "REJECTED");
-          notifyDataChanged("payment", "rejected", id);
-        } catch (err: any) {
-          setPayments(prevPayments);
-          toast.error(err.message || "Failed to reject payment. Restored to pending.");
-          throw err;
-        } finally {
-          setProcessingQueueKey(null);
-        }
-      },
-    });
+    const found = payments.find((p) => p.id === id);
+    if (found) {
+      handleOpenRejectPaymentModal(found);
+    } else {
+      handleOpenRejectPaymentModal({ id });
+    }
   };
 
   const handleApproveContribution = async (id: number) => {
@@ -7276,7 +7353,7 @@ export default function AdminDashboardPage() {
                                 <button
                                   type="button"
                                   disabled={Boolean(processingQueueKey)}
-                                  onClick={() => handleRejectPayment(p.id)}
+                                  onClick={() => handleOpenRejectPaymentModal(p)}
                                   className="px-4 py-2.5 rounded-xl font-bold text-xs bg-rose-950/40 hover:bg-rose-900/60 disabled:opacity-50 text-rose-400 border border-rose-800/60 cursor-pointer"
                                 >
                                   Reject
@@ -13338,6 +13415,144 @@ export default function AdminDashboardPage() {
                   <>
                     <Ban className="w-3.5 h-3.5" />
                     <span>{language === "bn" ? "বাতিল নিশ্চিত করুন ও নোট পাঠান" : "Confirm Reject & Send Note"}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REJECT SUBSCRIPTION PAYMENT MODAL WITH AI ASSIST & MANUAL NOTE */}
+      {rejectingPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-[#0d1527] border border-rose-500/30 p-6 sm:p-7 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold border border-rose-500/20">
+                  <Ban className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>{language === "bn" ? "পেমেন্ট ভেরিফিকেশন বাতিল করুন" : "Decline Payment Verification"}</span>
+                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                      #{rejectingPayment.id}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {language === "bn" ? "শিক্ষার্থী:" : "Student:"} <span className="font-bold text-slate-700 dark:text-slate-300">{rejectingPayment.user?.name || "Student"}</span> ({rejectingPayment.user?.email || "SEU"})
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setRejectingPayment(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Payment Quick Summary Card */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between font-mono text-[11px]">
+                <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-500 font-bold uppercase">
+                  {rejectingPayment.method || "bKash"}
+                </span>
+                <span className="font-bold text-slate-900 dark:text-white">
+                  BDT {Math.round(rejectingPayment.amount || 0)} • {rejectingPayment.planType || "Subscription Plan"}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/60 font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                <div>
+                  <span className="text-slate-400 block text-[10px] uppercase">Transaction ID</span>
+                  <span className="font-bold text-blue-600 dark:text-blue-400 select-all">{rejectingPayment.transactionId || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[10px] uppercase">Sender Phone</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">{rejectingPayment.senderPhone || rejectingPayment.senderNumber || "N/A"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Rejection Note Field with AI Suggest Button */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                  {language === "bn" ? "প্রত্যাখ্যানের সুনির্দিষ্ট কারণ / নোট" : "Rejection Reason / Note to Student"} <span className="text-rose-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAiSuggestPaymentRejectReason}
+                  disabled={isAiGeneratingPaymentReject}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[11px] font-black text-amber-500 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+                  title={language === "bn" ? "AI কারণ জেনারেট করতে ক্লিক করুন। ভিন্ন কারণ পেতে পুনরায় ক্লিক করুন!" : "Click to generate AI rejection note. Click again for different reasons!"}
+                >
+                  {isAiGeneratingPaymentReject ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>{language === "bn" ? "নোট তৈরি হচ্ছে..." : "Generating Note..."}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 fill-amber-500" />
+                      <span>
+                        {rejectPaymentNotes
+                          ? (language === "bn" ? "✨ AI কারণ পরিবর্তন" : "✨ Change AI Reason")
+                          : (language === "bn" ? "✨ AI সাজেস্টেড কারণ" : "✨ AI Suggest Reason")}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <textarea
+                rows={4}
+                value={rejectPaymentNotes}
+                onChange={(e) => setRejectPaymentNotes(e.target.value)}
+                placeholder={
+                  language === "bn"
+                    ? "পেমেন্ট বাতিলের সুনির্দিষ্ট কারণ লিখুন অথবা উপরের 'AI সাজেস্টেড কারণ' বাটনে ক্লিক করুন। এটি শিক্ষার্থীর ইমেইল ও নোটিফিকেশনে পাঠানো হবে..."
+                    : "Write specific reason why payment could not be verified, or click 'AI Suggest Reason' above. This note will be sent in email and notification to the student..."
+                }
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-rose-500 leading-relaxed font-medium"
+              />
+
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                💡 <span className="font-semibold">{language === "bn" ? "নোট:" : "Note:"}</span>{" "}
+                {language === "bn"
+                  ? "এই কারণটি শিক্ষার্থীর কাছে অফিসিয়াল ইমেইল এবং ইন-অ্যাপ নোটিফিকেশনে পাঠানো হবে, যাতে সে TrxID বা প্রেরক নম্বর যাচাই করে সঠিক তথ্যসহ পুনরায় পেমেন্ট সাবমিট করতে পারে।"
+                  : "This note will be dispatched via official email and notification directly to the student so they understand why verification failed and can correct their TrxID or phone number."}
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setRejectingPayment(null)}
+                className="px-4 py-2.5 rounded-xl font-bold text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+              >
+                {language === "bn" ? "বাতিল" : "Cancel"}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmRejectPaymentModal}
+                disabled={Boolean(processingQueueKey)}
+                className="px-5 py-2.5 rounded-xl font-black text-xs text-white bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 shadow-md shadow-rose-600/25 disabled:opacity-50 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                {processingQueueKey === `payment-${rejectingPayment.id}` ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>{language === "bn" ? "বাতিল ও জানানো হচ্ছে..." : "Rejecting & Notifying..."}</span>
+                  </>
+                ) : (
+                  <>
+                    <Ban className="w-3.5 h-3.5" />
+                    <span>{language === "bn" ? "পেমেন্ট বাতিল নিশ্চিত করুন ও নোট পাঠান" : "Confirm Reject & Send Note"}</span>
                   </>
                 )}
               </button>

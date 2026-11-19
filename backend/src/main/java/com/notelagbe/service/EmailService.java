@@ -1088,6 +1088,91 @@ public class EmailService {
         }
     }
 
+    @Async
+    public void sendPaymentRejectionEmail(User user, PlanType planType, double amount, String trxId, PaymentMethod method, String adminNotes) {
+        if (!isEmailNotificationsEnabled()) {
+            log.info("Skipping email notification: Email notifications are disabled by admin.");
+            return;
+        }
+        if (user == null || !hasText(user.getEmail())) {
+            return;
+        }
+        if (!isSmtpConfigured()) {
+            log.info("Email delivery not configured. Skipping payment rejection email for {} - simulation mode.", user.getEmail());
+            return;
+        }
+
+        String pricingUrl = resolveFrontendBaseUrl() + "/pricing";
+        String methodLabel = method != null ? method.name() : "Mobile Banking";
+        String safeNotes = hasText(adminNotes) ? adminNotes.trim() : "Unable to verify transaction details against our official payment ledger.";
+
+        String html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
+                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+                    .badge { display: inline-block; padding: 4px 12px; background: #fee2e2; color: #b91c1c; border-radius: 999px; font-size: 12px; font-weight: bold; }
+                    .title { font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 8px; margin-bottom: 8px; }
+                    .box { background: #f1f5f9; border-radius: 14px; padding: 18px; margin: 20px 0; }
+                    .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+                    .label { color: #64748b; font-weight: 500; }
+                    .val { color: #0f172a; font-weight: 700; font-family: monospace; }
+                    .rejection-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 16px; margin: 18px 0; font-size: 13px; color: #991b1b; line-height: 1.6; }
+                    .btn { display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: bold; font-size: 14px; margin-top: 16px; }
+                    .footer { margin-top: 28px; font-size: 12px; color: #94a3b8; text-align: center; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <span class="badge">NoteLagbe • Payment Verification Declined</span>
+                    <div class="title">Payment Verification Update ⚠️</div>
+                    <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+                        Dear <strong>%s</strong>,<br>
+                        We have reviewed your recent payment verification request on NoteLagbe. Unfortunately, our administration team was unable to verify this transaction with our mobile banking records.
+                    </p>
+                    <div class="box">
+                        <div class="row"><span class="label">Plan Selected:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Amount Paid:</span><span class="val">BDT %.0f</span></div>
+                        <div class="row"><span class="label">Payment Method:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Transaction ID:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Verification Status:</span><span class="val" style="color: #dc2626;">Declined / Unverified</span></div>
+                    </div>
+                    <div class="rejection-box">
+                        <strong>📌 Reason for Rejection / Admin Note:</strong><br>
+                        %s
+                    </div>
+                    <p style="font-size: 13px; color: #64748b; line-height: 1.6;">
+                        If you made a typographical error in your Transaction ID or sender phone number, please review your bKash/Nagad SMS receipt and re-submit your verification on the Pricing page.
+                    </p>
+                    <div style="text-align: center;">
+                        <a href="%s" class="btn">Re-submit Payment Verification →</a>
+                    </div>
+                    %s
+                </div>
+            </body>
+            </html>
+            """.formatted(
+                HtmlUtils.htmlEscape(user.getName()),
+                HtmlUtils.htmlEscape(planType != null ? planType.getDisplayName() : "Subscription Plan"),
+                amount,
+                HtmlUtils.htmlEscape(methodLabel),
+                HtmlUtils.htmlEscape(trxId),
+                HtmlUtils.htmlEscape(safeNotes),
+                HtmlUtils.htmlEscape(pricingUrl),
+                buildEmailSocialFooterHtml()
+        );
+
+        try {
+            dispatchHtmlEmail(user.getEmail(), "⚠️ NoteLagbe: Payment Verification Declined (" + trxId + ")", html);
+            log.info("Payment rejection email sent successfully to: {}", user.getEmail());
+        } catch (Exception e) {
+            log.warn("Failed to send payment rejection email to {}: {}", user.getEmail(), e.getMessage());
+        }
+    }
+
     /**
      * Synchronously sends a 6-digit password reset OTP email.
      * Bypasses promotional notification opt-outs because account security verification is mandatory.

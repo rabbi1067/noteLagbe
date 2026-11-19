@@ -136,6 +136,91 @@ export async function POST(req: NextRequest) {
       process.env.GOOGLE_API_KEY ||
       process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
+    // 🛡️ Handle Subscription Payment Rejection Note generation
+    if (body.kind === "PAYMENT" || resourceType === "PAYMENT") {
+      const planName = body.planName || "Subscription Plan";
+      const amount = body.amount || 0;
+      const method = body.method || "bKash";
+      const trxId = body.trxId || "";
+      const senderPhone = body.senderPhone || "";
+      const studentName = body.studentName || "Student";
+      const cycleIndex = Number(body.cycleIndex || 0);
+
+      if (apiKey) {
+        try {
+          const prompt = `You are the lead academic billing auditor for NoteLagbe Southeast University student archive platform.
+A subscription payment verification request was declined:
+- Student Name: ${studentName}
+- Plan: ${planName}
+- Amount: BDT ${amount}
+- Payment Method: ${method}
+- Sender Phone: ${senderPhone || "N/A"}
+- Submitted Transaction ID: ${trxId || "N/A"}
+- Cycle Option: #${(cycleIndex % 5) + 1}
+
+Generate a concise, polite, professional, and actionable rejection feedback note in ${isBangla ? "Bengali" : "English"} explaining why the transaction could not be approved and what the student should do next.
+Focus on variation #${(cycleIndex % 5) + 1} (e.g. TrxID not found in statement, incorrect paid amount, wrong sender phone number, duplicate transaction ID, or unconfirmed gateway status).
+Keep it under 35 words. Return JSON strictly: { "suggestion": "..." }`;
+
+          const geminiRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${apiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                  responseMimeType: "application/json",
+                  temperature: 0.3,
+                  maxOutputTokens: 250,
+                },
+              }),
+              signal: AbortSignal.timeout(8000),
+            }
+          );
+          if (geminiRes.ok) {
+            const aiData = await geminiRes.json();
+            const rawJson = aiData?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (rawJson) {
+              const parsed = JSON.parse(rawJson);
+              if (parsed.suggestion && typeof parsed.suggestion === "string") {
+                return NextResponse.json({
+                  success: true,
+                  suggestion: parsed.suggestion.trim(),
+                  category: "PAYMENT_VERIFICATION",
+                  source: "gemini_billing_auditor",
+                });
+              }
+            }
+          }
+        } catch (err) {
+          console.warn("[AI Payment Reject Note] Gemini call fallback:", err);
+        }
+      }
+
+      const variationsEn = [
+        `Transaction ID '${trxId || "provided"}' could not be verified in our official ${method} merchant statement. Please check your SMS receipt and re-submit with the exact TrxID.`,
+        `Payment amount mismatch: The transaction for TrxID '${trxId || "provided"}' does not match the chosen plan fee (BDT ${amount}). Please transfer the accurate fee and submit again.`,
+        `The sender phone number (${senderPhone || "provided"}) does not match the account record for TrxID '${trxId || "provided"}'. Please verify your wallet number and re-submit.`,
+        `This Transaction ID ('${trxId || "provided"}') has already been claimed or logged in our system. If this is an error, please contact support with a transaction screenshot.`,
+        `Transaction was not confirmed in our wallet ledger or was cancelled/reversed. Please check your mobile banking balance and submit a valid transaction.`,
+      ];
+      const variationsBn = [
+        `আপনার প্রদত্ত ট্রানজেকশন আইডি (${trxId || ""}) আমাদের অফিশিয়াল ${method} স্টেটমেন্টে পাওয়া যায়নি। অনুগ্রহ করে আপনার ফিরতি SMS চেক করে সঠিক TrxID দিয়ে পুনরায় সাবমিট করুন।`,
+        `পেমেন্ট অংকের অসঙ্গতি: নির্বাচিত প্ল্যানের জন্য নির্ধারিত ফির (৳${amount}) সাথে স্টেটমেন্টের পরিমাণ মেলেনি। অনুগ্রহ করে সঠিক পরিমাণ টাকা পাঠিয়ে পুনরায় তথ্য জমা দিন।`,
+        `প্রেরক মোবাইল নম্বর (${senderPhone || ""}) এবং ট্রানজেকশন আইডির তথ্যে গরমিল দেখা গেছে। অনুগ্রহ করে সঠিক নম্বর দিয়ে পুনরায় যাচাইয়ের জন্য পাঠান।`,
+        `এই ট্রানজেকশন আইডিটি (${trxId || ""}) ইতোমধ্যে অন্য একটি রিকোয়েস্টে ব্যবহৃত বা ভেরিফাই করা হয়েছে। কোনো সমস্যা হলে সাপোর্টে যোগাযোগ করুন।`,
+        `আমাদের একাউন্টে পেমেন্ট সফলভাবে জমা হয়নি বা রিভার্স হয়েছে। অনুগ্রহ করে আপনার ব্যাংক/ওয়ালেট ব্যালেন্স চেক করে পুনরায় সাবমিট করুন।`,
+      ];
+      const idx = Math.abs(cycleIndex) % variationsEn.length;
+      return NextResponse.json({
+        success: true,
+        suggestion: isBangla ? variationsBn[idx] : variationsEn[idx],
+        category: "PAYMENT_VERIFICATION",
+        source: "notelagbe_billing_auditor",
+      });
+    }
+
     const typeLabel = TYPE_NAMES[resourceType]?.[isBangla ? "bn" : "en"] || resourceType;
     const cleanCourse = (courseCode || "Course").toUpperCase().trim();
     const cleanSem = semester || (isBangla ? "উক্ত সেমিস্টার" : "Current Semester");
