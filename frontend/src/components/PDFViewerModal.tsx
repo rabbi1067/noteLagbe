@@ -288,17 +288,24 @@ export default function PDFViewerModal({
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const activeBlobUrlRef = useRef<string | null>(null);
   const justSavedUrlRef = useRef<string | null>(null);
+  const justSavedResourceIdRef = useRef<number | string | null>(null);
+  const justSavedTimeRef = useRef<number>(0);
   const [detectedKind, setDetectedKind] = useState<ViewerDocKind>("pdf");
   const [embedUrl, setEmbedUrl] = useState<string>("");
   const [useGoogleDocsEmbed, setUseGoogleDocsEmbed] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
 
   const replaceBlobUrl = useCallback((nextUrl: string | null) => {
-    if (activeBlobUrlRef.current && activeBlobUrlRef.current !== nextUrl) {
-      URL.revokeObjectURL(activeBlobUrlRef.current);
-    }
+    const prevUrl = activeBlobUrlRef.current;
     activeBlobUrlRef.current = nextUrl;
     setBlobUrl(nextUrl);
+    if (prevUrl && prevUrl !== nextUrl) {
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(prevUrl);
+        } catch {}
+      }, 5000);
+    }
   }, []);
 
   const drivePreviewUrl = useMemo(
@@ -381,16 +388,17 @@ export default function PDFViewerModal({
       // If this re-render was triggered by saving the currently active PDF/image in this modal,
       // the newly normalized/rotated PDF or image is ALREADY active in memory.
       // Do NOT wipe the state or re-fetch stale data from disk cache!
-      if (
-        justSavedUrlRef.current &&
-        resource.fileUrl &&
-        (resource.fileUrl === justSavedUrlRef.current || resource.fileUrl.includes(justSavedUrlRef.current))
-      ) {
-        justSavedUrlRef.current = null;
+      const isJustSaved =
+        justSavedResourceIdRef.current &&
+        String(justSavedResourceIdRef.current) === String(resource.id) &&
+        Date.now() - justSavedTimeRef.current < 15000;
+
+      if (isJustSaved) {
         setDocLoading(false);
         return;
       }
       justSavedUrlRef.current = null;
+      justSavedResourceIdRef.current = null;
 
       setDocLoading(true);
       setDocError(null);
@@ -768,6 +776,11 @@ export default function PDFViewerModal({
       setSavingFixedFile(true);
       try {
         const uploadRes = await api.admin.uploadMaterialFile(fixedFile);
+        // Mark just-saved BEFORE updating resource or notifying parent
+        justSavedUrlRef.current = uploadRes.url;
+        justSavedResourceIdRef.current = resource.id;
+        justSavedTimeRef.current = Date.now();
+
         await api.admin.updateResourceFile(resource.id, uploadRes.url);
         if (resource) {
           (resource as any).fileUrl = uploadRes.url;
@@ -804,21 +817,29 @@ export default function PDFViewerModal({
       const fixedFile = new File([res.bytes as any], `${safeTitle}.pdf`, {
         type: "application/pdf",
       });
+
+      // 1. Immediately update local state with rotated/normalized PDF bytes and object URL
+      setRawPdfBytes(res.bytes);
+      setActivePdfBytes(res.bytes);
+      setPageOrder(Array.from({ length: (pageOrder.length || pdfPageCount) }, (_, i) => i + 1));
+      setPageExtraRotations({});
+      setAutoAlignedPagesList([]);
+      setPdfChangedFromRaw(false);
+      setPageOrganizerOpen(false);
+      const updatedBlob = new Blob([res.bytes as any], { type: "application/pdf" });
+      replaceBlobUrl(URL.createObjectURL(updatedBlob));
+
+      // 2. Mark resource ID and timestamp BEFORE upload
+      justSavedResourceIdRef.current = resource.id;
+      justSavedTimeRef.current = Date.now();
+
+      // 3. Upload & persist to server
       const savedUrl = await persistFixedFileToResource(
         fixedFile,
         "Fixed document with updated page positions & rotations saved permanently!"
       );
       if (savedUrl) {
         justSavedUrlRef.current = savedUrl;
-        setRawPdfBytes(res.bytes);
-        setActivePdfBytes(res.bytes);
-        setPageOrder(Array.from({ length: (pageOrder.length || pdfPageCount) }, (_, i) => i + 1));
-        setPageExtraRotations({});
-        setAutoAlignedPagesList([]);
-        setPdfChangedFromRaw(false);
-        setPageOrganizerOpen(false);
-        const updatedBlob = new Blob([res.bytes as any], { type: "application/pdf" });
-        replaceBlobUrl(URL.createObjectURL(updatedBlob));
         confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
       }
     } catch (err: any) {
@@ -845,30 +866,34 @@ export default function PDFViewerModal({
             pageRotations: { 0: rotation },
             forcePortraitA4: true,
           });
-          setSavingFixedFile(false);
+          const pdfBytes = new Uint8Array(await pdfFile.arrayBuffer());
+          setRotation(0);
+          setActiveImageBytes(null);
+          setRawImageBlob(null);
+          setDetectedKind("pdf");
+          setRawPdfBytes(pdfBytes);
+          setActivePdfBytes(pdfBytes);
+          setPdfPageCount(1);
+          setPageOrder([1]);
+          setPageExtraRotations({});
+          const newBlob = new Blob([pdfBytes as any], { type: "application/pdf" });
+          replaceBlobUrl(URL.createObjectURL(newBlob));
+
+          justSavedResourceIdRef.current = resource.id;
+          justSavedTimeRef.current = Date.now();
+
           const savedUrl = await persistFixedFileToResource(
             pdfFile,
             "Image converted to Portrait A4 PDF and saved!"
           );
           if (savedUrl) {
             justSavedUrlRef.current = savedUrl;
-            setRotation(0);
-            setActiveImageBytes(null);
-            setRawImageBlob(null);
-            const pdfBytes = new Uint8Array(await pdfFile.arrayBuffer());
-            setDetectedKind("pdf");
-            setRawPdfBytes(pdfBytes);
-            setActivePdfBytes(pdfBytes);
-            setPdfPageCount(1);
-            setPageOrder([1]);
-            setPageExtraRotations({});
-            const newBlob = new Blob([pdfBytes as any], { type: "application/pdf" });
-            replaceBlobUrl(URL.createObjectURL(newBlob));
             confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
           }
         } catch (err: any) {
-          setSavingFixedFile(false);
           toast.error(err?.message || "Failed to convert image to Portrait A4 PDF");
+        } finally {
+          setSavingFixedFile(false);
         }
         return;
       }
@@ -879,18 +904,22 @@ export default function PDFViewerModal({
         const fixedImgFile = new File([converted.bytes as any], `${safeTitle}.jpg`, {
           type: "image/jpeg",
         });
+        const nextRawBlob = new Blob([converted.bytes as any], { type: "image/jpeg" });
+        setRawImageBlob(nextRawBlob);
+        setActiveImageBytes(null);
+        setImageCssFallback(false);
+        setRotation(0);
+        replaceBlobUrl(URL.createObjectURL(nextRawBlob));
+
+        justSavedResourceIdRef.current = resource.id;
+        justSavedTimeRef.current = Date.now();
+
         const savedUrl = await persistFixedFileToResource(
           fixedImgFile,
           "Upright image saved permanently!"
         );
         if (savedUrl) {
           justSavedUrlRef.current = savedUrl;
-          const nextRawBlob = new Blob([converted.bytes as any], { type: "image/jpeg" });
-          setRawImageBlob(nextRawBlob);
-          setActiveImageBytes(null);
-          setImageCssFallback(false);
-          setRotation(0);
-          replaceBlobUrl(URL.createObjectURL(nextRawBlob));
           confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
         }
       } catch (err: any) {

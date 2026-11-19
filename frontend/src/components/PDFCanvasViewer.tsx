@@ -98,8 +98,10 @@ export default function PDFCanvasViewer({
   useEffect(() => {
     if (!pdfBytes && !blobUrl) return;
 
-    // Signature to identify if the file actually changed
-    const sourceSignature = blobUrl || (pdfBytes ? `bytes_${pdfBytes.length}_${pdfBytes[0] || 0}` : null);
+    // Signature to identify if the file actually changed: prioritize in-memory bytes length & sample points
+    const sourceSignature = pdfBytes
+      ? `bytes_${pdfBytes.byteLength}_${pdfBytes[0] || 0}_${pdfBytes[pdfBytes.byteLength - 1] || 0}`
+      : (blobUrl || null);
     if (!sourceSignature) return;
 
     // If document is already loaded for this source, do NOT reload it!
@@ -127,17 +129,32 @@ export default function PDFCanvasViewer({
         renderTasksRef.current.clear();
 
         // Senior Engineer Fix:
-        // 1. Prefer blobUrl if available so the browser worker handles data via HTTP/blob streaming without transferring ArrayBuffer.
-        // 2. If using pdfBytes, MUST clone with .slice(0) so the original Uint8Array buffer in React state is NEVER detached!
+        // Always prefer direct binary data (pdfBytes) when available!
+        // Direct memory transfer via Uint8Array clone is instant, zero network overhead,
+        // and immune to blob URL revocation / worker fetch sandbox errors!
+        let docData: Uint8Array | null = null;
+        if (pdfBytes && pdfBytes.length > 0) {
+          docData = pdfBytes.slice(0);
+        } else if (blobUrl) {
+          try {
+            // Read blob into memory on main thread first to avoid worker fetch(blob:) status 0 errors
+            const blobRes = await fetch(blobUrl);
+            const buf = await blobRes.arrayBuffer();
+            docData = new Uint8Array(buf);
+          } catch (e) {
+            console.warn("Main thread blobUrl read failed, will pass url directly:", e);
+          }
+        }
+
         const loadingTask = pdfjs.getDocument(
-          blobUrl
+          docData
             ? {
-                url: blobUrl,
+                data: docData,
                 cMapUrl: "https://unpkg.com/pdfjs-dist@4.10.38/cmaps/",
                 cMapPacked: true,
               }
             : {
-                data: pdfBytes!.slice(0),
+                url: blobUrl,
                 cMapUrl: "https://unpkg.com/pdfjs-dist@4.10.38/cmaps/",
                 cMapPacked: true,
               }
