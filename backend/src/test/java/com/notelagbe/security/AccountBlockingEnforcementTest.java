@@ -205,6 +205,42 @@ class AccountBlockingEnforcementTest {
     }
 
     @Test
+    void firstAndSecondFailedLoginAttempts_showGenericInvalidCredentialsMessage() {
+        User student = makeBlockedStudent();
+        student.setEnabled(true);
+        student.setFailedLoginAttempts(0); // 1st failed attempt
+        when(userRepository.findByEmail("blocked@seu.edu.bd")).thenReturn(Optional.of(student));
+        when(authenticationManager.authenticate(any())).thenThrow(new org.springframework.security.authentication.BadCredentialsException("Bad credentials"));
+
+        AuthRequest req = new AuthRequest();
+        req.setEmail("blocked@seu.edu.bd");
+        req.setPassword("wrong-password");
+
+        ApiException ex = assertThrows(ApiException.class, () -> authService.login(req));
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatus());
+        assertEquals("Invalid email or password.", ex.getMessage());
+        assertEquals("ইমেইল অথবা পাসওয়ার্ড সঠিক নয়।", ex.getBengaliMessage());
+    }
+
+    @Test
+    void thirdAndFourthFailedLoginAttempts_warnAboutLockout() {
+        User student = makeBlockedStudent();
+        student.setEnabled(true);
+        student.setFailedLoginAttempts(2); // 3rd failed attempt
+        when(userRepository.findByEmail("blocked@seu.edu.bd")).thenReturn(Optional.of(student));
+        when(authenticationManager.authenticate(any())).thenThrow(new org.springframework.security.authentication.BadCredentialsException("Bad credentials"));
+
+        AuthRequest req = new AuthRequest();
+        req.setEmail("blocked@seu.edu.bd");
+        req.setPassword("wrong-password");
+
+        ApiException ex = assertThrows(ApiException.class, () -> authService.login(req));
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatus());
+        assertTrue(ex.getMessage().contains("2 attempts remaining before a 30-minute lockout"));
+        assertTrue(ex.getBengaliMessage().contains("আর 2 বার ভুল হলে"));
+    }
+
+    @Test
     void consecutiveFiveFailedLoginAttempts_locksAccountFor30Minutes() {
         User student = makeBlockedStudent();
         student.setEnabled(true);

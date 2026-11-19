@@ -299,8 +299,22 @@ export function localizeErrorMessage(rawMessage?: string | null, targetLang?: La
     if (clean.includes("ইমেইল অথবা পাসওয়ার্ড সঠিক নয়")) {
       const matchAttempts = clean.match(/(\d+)\s*বার ভুল হলে/);
       if (matchAttempts) {
-        const remaining = matchAttempts[1];
-        return `Invalid credentials. ${remaining} attempt${Number(remaining) > 1 ? "s" : ""} remaining before a 30-minute lockout.`;
+        const remaining = Number(matchAttempts[1]);
+        if (remaining <= 2) {
+          return `Invalid credentials. ${remaining} attempt${remaining > 1 ? "s" : ""} remaining before a 30-minute lockout.`;
+        }
+        return "Invalid email or password.";
+      }
+      return "Invalid email or password.";
+    }
+    if (/remaining before a 30-minute lockout/i.test(clean)) {
+      const m = clean.match(/(\d+)\s*attempt/i);
+      if (m) {
+        const remaining = Number(m[1]);
+        if (remaining <= 2) {
+          return `Invalid credentials. ${remaining} attempt${remaining > 1 ? "s" : ""} remaining before a 30-minute lockout.`;
+        }
+        return "Invalid email or password.";
       }
       return "Invalid email or password.";
     }
@@ -348,9 +362,24 @@ export function localizeErrorMessage(rawMessage?: string | null, targetLang?: La
     if (/remaining before a 30-minute lockout/i.test(clean)) {
       const m = clean.match(/(\d+)\s*attempt/i);
       if (m) {
-        return `ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। আর ${m[1]} বার ভুল হলে অ্যাকাউন্ট ৩০ মিনিটের জন্য লক হয়ে যাবে।`;
+        const remaining = Number(m[1]);
+        if (remaining <= 2) {
+          return `ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। আর ${remaining} বার ভুল হলে অ্যাকাউন্ট ৩০ মিনিটের জন্য লক হয়ে যাবে।`;
+        }
+        return "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়।";
       }
-      return "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। অতিরিক্ত ভুল হলে অ্যাকাউন্ট ৩০ মিনিটের জন্য লক হয়ে যাবে।";
+      return "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়।";
+    }
+    if (clean.includes("ইমেইল অথবা পাসওয়ার্ড সঠিক নয়")) {
+      const matchAttempts = clean.match(/আর\s*(\d+)\s*বার ভুল হলে/);
+      if (matchAttempts) {
+        const remaining = Number(matchAttempts[1]);
+        if (remaining <= 2) {
+          return `ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। আর ${remaining} বার ভুল হলে অ্যাকাউন্ট ৩০ মিনিটের জন্য লক হয়ে যাবে।`;
+        }
+        return "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়।";
+      }
+      return "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়।";
     }
     if (/temporarily locked due to multiple failed login attempts/i.test(clean)) {
       const m = clean.match(/after\s+(\d+)\s+minute/i);

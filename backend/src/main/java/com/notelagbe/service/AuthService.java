@@ -222,11 +222,20 @@ public class AuthService {
                     userRepository.save(u);
                     evictCachedUser(cleanEmail);
                     int remaining = 5 - attempts;
-                    throw new ApiException(
-                            "Invalid credentials. " + remaining + " attempt" + (remaining > 1 ? "s" : "") + " remaining before a 30-minute lockout.",
-                            "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। আর " + remaining + " বার ভুল হলে অ্যাকাউন্ট ৩০ মিনিটের জন্য লক হয়ে যাবে।",
-                            HttpStatus.UNAUTHORIZED
-                    );
+                    // Only warn about 30-minute lockout after 2-3 failed attempts (attempts >= 3, i.e., remaining <= 2)
+                    if (attempts >= 3) {
+                        throw new ApiException(
+                                "Invalid credentials. " + remaining + " attempt" + (remaining > 1 ? "s" : "") + " remaining before a 30-minute lockout.",
+                                "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়। আর " + remaining + " বার ভুল হলে অ্যাকাউন্ট ৩০ মিনিটের জন্য লক হয়ে যাবে।",
+                                HttpStatus.UNAUTHORIZED
+                        );
+                    } else {
+                        throw new ApiException(
+                                "Invalid email or password.",
+                                "ইমেইল অথবা পাসওয়ার্ড সঠিক নয়।",
+                                HttpStatus.UNAUTHORIZED
+                        );
+                    }
                 }
             }
             throw new ApiException(
