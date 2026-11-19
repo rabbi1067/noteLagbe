@@ -41,7 +41,10 @@ const NORMALIZED_PUBLIC_BACKEND_API_URL =
  * and by EventSource to avoid pinning serverless lambdas.
  */
 export function resolveDirectBackendApiUrl(): string | null {
-  if (API_BASE_URL.startsWith("http://") || API_BASE_URL.startsWith("https://")) {
+  if (
+    (API_BASE_URL.startsWith("http://") || API_BASE_URL.startsWith("https://")) &&
+    !API_BASE_URL.includes("vercel.app")
+  ) {
     return API_BASE_URL.replace(/\/+$/, "");
   }
   if (!NORMALIZED_PUBLIC_BACKEND_API_URL) {
@@ -54,12 +57,6 @@ export function resolveDirectBackendApiUrl(): string | null {
       NORMALIZED_PUBLIC_BACKEND_API_URL.includes("localhost") ||
       NORMALIZED_PUBLIC_BACKEND_API_URL.includes("127.0.0.1");
     if (isLocalPage && !pointsLocal) {
-      return null;
-    }
-    const explicitPublicBackend = Boolean(process.env.NEXT_PUBLIC_BACKEND_URL?.trim());
-    const isTrustedCorsHost =
-      hostname.endsWith(".vercel.app") || hostname.endsWith(".onrender.com");
-    if (!explicitPublicBackend && !isTrustedCorsHost) {
       return null;
     }
   }
@@ -361,9 +358,13 @@ async function executeFetch<T>(endpoint: string, options: RequestInit = {}): Pro
     !token &&
     method === "GET" &&
     (endpointPath === "/courses" || endpointPath === "/teachers");
-  // On deployed origins using "/api" rewrites, target the direct CORS backend origin first
+  // On deployed origins, target the direct CORS backend origin first for auth, admin, and API calls
   // so login/admin/authenticated requests bypass serverless proxy hops and reuse the warmed connection.
-  const useDirectFirst = Boolean(directBase && primaryBase === "/api" && !hasFastNextFallbackRoute);
+  const useDirectFirst = Boolean(
+    directBase &&
+    (primaryBase === "/api" || primaryBase.includes("vercel.app") || isAuthEndpoint || isAdminEndpoint) &&
+    !hasFastNextFallbackRoute
+  );
   const requestPrimaryBase = useDirectFirst ? directBase! : primaryBase;
   const requestFallbackBase = useDirectFirst
     ? primaryBase

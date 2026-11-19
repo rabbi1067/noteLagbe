@@ -484,6 +484,12 @@ export default function MobileBottomNav() {
                   onTouchStart={() => {
                     void warmupBackend();
                     router.prefetch("/dashboard");
+                    router.prefetch("/admin");
+                  }}
+                  onPointerEnter={() => {
+                    void warmupBackend();
+                    router.prefetch("/dashboard");
+                    router.prefetch("/admin");
                   }}
                   onClick={() => {
                     setDrawerOpen(false);

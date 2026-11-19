@@ -40,6 +40,7 @@ export default function Navbar() {
     if (!isAuthenticated) {
       void warmupBackend();
       router.prefetch("/dashboard");
+      router.prefetch("/admin");
     }
   }, [isAuthenticated, router]);
 

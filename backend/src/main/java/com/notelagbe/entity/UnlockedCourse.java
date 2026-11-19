@@ -6,6 +6,8 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "unlocked_courses", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"user_id", "course_id", "teacher_id"})
+}, indexes = {
+    @Index(name = "idx_unlocked_user_id", columnList = "user_id")
 })
 public class UnlockedCourse {
 

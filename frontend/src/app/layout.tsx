@@ -12,6 +12,7 @@ import Footer from "@/components/Footer";
 import SpotlightModal from "@/components/SpotlightModal";
 import AuthModal from "@/components/AuthModal";
 import FloatingCommunityChat from "@/components/FloatingCommunityChat";
+import BackendKeepAlive from "@/components/BackendKeepAlive";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -75,6 +76,7 @@ export default function RootLayout({
               <SpotlightModal />
               <AuthModal />
               <FloatingCommunityChat />
+              <BackendKeepAlive />
               <Toaster position="top-right" richColors closeButton />
             </AuthProvider>
           </LanguageProvider>
