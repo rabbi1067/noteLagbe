@@ -580,26 +580,26 @@ public class EmailService {
         String subColor = darkTheme ? "#64748b" : "#94a3b8";
 
         return """
-            <div style="margin-top: 28px; padding-top: 20px; border-top: 1px solid %s; text-align: center;">
-                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: %s; margin-bottom: 12px;">
-                    Connect with Developer &amp; Founder
+            <div style="margin-top: 32px; padding-top: 22px; border-top: 1px solid %s; text-align: center;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: %s; margin-bottom: 12px;">
+                    Connect with Developer &amp; Founder — Fazle Rabbi
                 </div>
-                <div style="margin-bottom: 14px; text-align: center;">
-                    <a href="https://www.facebook.com/fazleyrabbi1067/" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin: 3px 4px; padding: 6px 14px; background: #1877F2; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-size: 11px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                <div style="margin-bottom: 16px; text-align: center;">
+                    <a href="https://www.facebook.com/fazleyrabbi1067/" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin: 3px 4px; padding: 7px 15px; background: #1877F2; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-size: 11px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                         Facebook
                     </a>
-                    <a href="https://x.com/FazleRabbi56251" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin: 3px 4px; padding: 6px 14px; background: #0f1419; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-size: 11px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; border: 1px solid rgba(255,255,255,0.2);">
+                    <a href="https://x.com/FazleRabbi56251" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin: 3px 4px; padding: 7px 15px; background: #0f1419; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-size: 11px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; border: 1px solid rgba(255,255,255,0.25);">
                         X (Twitter)
                     </a>
-                    <a href="https://github.com/rabbi1067" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin: 3px 4px; padding: 6px 14px; background: #24292e; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-size: 11px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; border: 1px solid rgba(255,255,255,0.2);">
+                    <a href="https://github.com/rabbi1067" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin: 3px 4px; padding: 7px 15px; background: #24292e; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-size: 11px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; border: 1px solid rgba(255,255,255,0.25);">
                         GitHub
                     </a>
-                    <a href="https://www.linkedin.com/in/fazleyrabbi1067/" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin: 3px 4px; padding: 6px 14px; background: #0A66C2; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-size: 11px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    <a href="https://www.linkedin.com/in/fazleyrabbi1067/" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin: 3px 4px; padding: 7px 15px; background: #0A66C2; color: #ffffff !important; text-decoration: none; border-radius: 8px; font-size: 11px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                         LinkedIn
                     </a>
                 </div>
-                <div style="font-size: 12px; color: %s; line-height: 1.5;">
-                    NoteLagbe — Southeast University Academic Resource Archive<br>
+                <div style="font-size: 12px; color: %s; line-height: 1.6;">
+                    <strong>NoteLagbe</strong> — Southeast University Academic Resource &amp; Question Archive<br>
                     Permanent Campus: 251/A and 252, Tejgaon I/A, Dhaka-1208, Bangladesh
                 </div>
             </div>
@@ -656,7 +656,7 @@ public class EmailService {
                     </p>
                     <div class="box">
                         <div class="row"><span class="label">Plan Purchased:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Amount Paid:</span><span class="val">৳%.0f</span></div>
+                        <div class="row"><span class="label">Amount Paid:</span><span class="val">BDT %.0f</span></div>
                         <div class="row"><span class="label">Transaction ID:</span><span class="val">%s</span></div>
                         <div class="row"><span class="label">Unlock Access:</span><span class="val" style="color: #16a34a;">%s</span></div>
                     </div>
@@ -724,16 +724,16 @@ public class EmailService {
             <body>
                 <div class="card">
                     <span class="badge">Southeast University • Financial Aid Waiver</span>
-                    <div class="title">Waiver Approved & ৳99 Package Granted! 🎉</div>
+                    <div class="title">Waiver Approved &amp; 1-Semester Access Granted! 🎉</div>
                     <p style="font-size: 14px; color: #475569; line-height: 1.6;">
                         Dear <strong>%s</strong>,<br>
-                        Your financial aid application has been approved by NoteLagbe administration. You have received the <strong>৳99 (1-Semester Plan)</strong> with <strong>%d course unlocks</strong> valid for 3 months!
+                        Your financial aid application has been approved by NoteLagbe administration. You have received the <strong>1-Semester Student Plan</strong> with <strong>%d course unlocks</strong> valid for 3 months!
                     </p>
                     <div class="box">
-                        <div class="row"><span class="label">Granted Package:</span><span class="val">৳99 Plan (1-Semester)</span></div>
+                        <div class="row"><span class="label">Granted Package:</span><span class="val">1-Semester Plan (6 Courses)</span></div>
                         <div class="row"><span class="label">Course Unlock Quota:</span><span class="val" style="color: #16a34a;">%d Courses</span></div>
                         <div class="row"><span class="label">Validity:</span><span class="val">3 Months</span></div>
-                        <div class="row"><span class="label">Fee:</span><span class="val" style="color: #7e22ce;">100%% Free Waiver</span></div>
+                        <div class="row"><span class="label">Fee:</span><span class="val" style="color: #7e22ce;">100%% Free Academic Waiver</span></div>
                     </div>
                     <p style="font-size: 13px; color: #64748b;">
                         You can immediately browse any Southeast University CSE course and click <strong>"Unlock Course Using Quota"</strong> to view handwritten lecture notes, midterm questionnaires, and final exam papers.
@@ -832,7 +832,7 @@ public class EmailService {
                 </div>
             </body>
             </html>
-            """.formatted(safeName, safeCode, safeTitle, safeFaculty, HtmlUtils.htmlEscape(validityStr), noteBlock, safeFaculty, safeCode, targetUrl, safeCode, buildEmailSocialFooterHtml());
+            """.formatted(safeName, safeCode, safeTitle, safeFaculty, HtmlUtils.htmlEscape(validityStr), noteBlock, safeFaculty, safeCode, targetUrl, safeCode, buildEmailSocialFooterHtml(true));
 
         try {
             dispatchHtmlEmail(user.getEmail(), "🎁 NoteLagbe: Gift Access Unlocked for " + courseCode + " (" + teacherLabel + ")", html);
@@ -1052,15 +1052,15 @@ public class EmailService {
                     </p>
                     <div class="box">
                         <div class="row"><span class="label">Plan Selected:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Amount:</span><span class="val">৳%.0f</span></div>
+                        <div class="row"><span class="label">Amount Paid:</span><span class="val">BDT %.0f</span></div>
                         <div class="row"><span class="label">Payment Method:</span><span class="val">%s</span></div>
                         <div class="row"><span class="label">Sender Number:</span><span class="val">%s</span></div>
                         <div class="row"><span class="label">Transaction ID:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Verification Status:</span><span class="val" style="color: #b45309;">Under Admin Review (যাচাই চলছে)</span></div>
+                        <div class="row"><span class="label">Verification Status:</span><span class="val" style="color: #b45309;">Under Administrative Review</span></div>
                     </div>
                     <div class="instruction-box">
-                        <strong>📌 পরবর্তী পদক্ষেপ / What to do next:</strong><br>
-                        অ্যাডমিনিস্ট্রেটর আপনার Transaction ID মোবাইল ব্যাংকিং লেজারের সাথে যাচাই করছেন। সাধারণত <strong>১৫ থেকে ৩০ মিনিটের</strong> মধ্যে ভেরিফিকেশন সম্পন্ন হয়। অ্যাডমিন অনুমোদন (Accept) দেওয়ার সাথে সাথে আপনার কোর্স আনলক কোটা স্বয়ংক্রিয়ভাবে সক্রিয় হয়ে যাবে এবং আপনি আরেকটি কনফার্মেশন ইমেইল পাবেন।
+                        <strong>📌 Next Steps / Verification Process:</strong><br>
+                        Our administration team is currently verifying your Transaction ID with our official mobile banking ledger. Verification is typically completed within <strong>15 to 30 minutes</strong>. As soon as your payment is verified and accepted, your course unlock quota will be automatically activated, and you will receive an immediate confirmation email.
                     </div>
                     <div style="text-align: center;">
                         <a href="%s" class="btn">Check Verification Status on NoteLagbe →</a>
@@ -1081,7 +1081,7 @@ public class EmailService {
         );
 
         try {
-            dispatchHtmlEmail(user.getEmail(), "⏳ NoteLagbe: Payment Received — Under Admin Verification (" + trxId + ")", html);
+            dispatchHtmlEmail(user.getEmail(), "⏳ NoteLagbe: Payment Received — Under Administrative Verification (" + trxId + ")", html);
             log.info("Payment submission pending email sent successfully to: {}", user.getEmail());
         } catch (Exception e) {
             log.warn("Failed to send payment submission pending email to {}: {}", user.getEmail(), e.getMessage());
