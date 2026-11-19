@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyApiAuth } from "@/lib/authVerification";
+import { checkSlidingWindowRateLimit, getClientIdentifier } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -1739,6 +1740,39 @@ export async function POST(req: NextRequest) {
           message: authCheck.error || "Authentication required. Please sign in to access NoteLagbe AI.",
         },
         { status: 401 }
+      );
+    }
+
+    // 🛡️ Sliding Window Rate Limiter: Max 5 AI queries per minute per user/IP
+    // Prevents automated script abuse and protects Google Gemini API quotas.
+    const userRole = authCheck.user?.role;
+    const isStaff = userRole === "ROLE_SUPER_ADMIN" || userRole === "ROLE_ADMIN" || userRole === "ROLE_MANAGER";
+    const maxAllowedRequests = isStaff ? 25 : 5; // 25 queries/min for staff testing, strict 5 queries/min for students
+
+    const userIdentifier = authCheck.user?.id || authCheck.user?.email;
+    const clientKey = getClientIdentifier(req, userIdentifier);
+    const rateCheck = checkSlidingWindowRateLimit(clientKey, {
+      windowMs: 60_000,
+      maxRequests: maxAllowedRequests,
+      keyPrefix: "ai-exam-chat",
+    });
+
+    if (!rateCheck.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: rateCheck.message,
+          retryAfter: rateCheck.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateCheck.retryAfterSeconds),
+            "X-RateLimit-Limit": String(rateCheck.limit),
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": String(rateCheck.resetSeconds),
+          },
+        }
       );
     }
 
