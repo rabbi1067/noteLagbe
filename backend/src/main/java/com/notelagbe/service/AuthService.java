@@ -500,6 +500,7 @@ public class AuthService {
         if (subOpt.isPresent()) {
             Subscription sub = subOpt.get();
             response.setHasActiveSubscription(true);
+            response.setSubscriptionPaused(sub.isPaused());
             response.setPlanName(sub.getPlanType().getDisplayName());
             response.setMaxCoursesAllowed(sub.getMaxCoursesAllowed());
             response.setUsedCoursesCount(sub.getUsedCoursesCount());
@@ -508,6 +509,7 @@ public class AuthService {
             response.setSubscriptionExpiresAt(sub.getEndDate());
         } else {
             response.setHasActiveSubscription(false);
+            response.setSubscriptionPaused(false);
             response.setPlanName("Free Preview / Expired");
             response.setMaxCoursesAllowed(0);
             response.setUsedCoursesCount(0);

@@ -26,6 +26,7 @@ import {
   Sparkles,
   Lock,
   Phone,
+  Hash,
   MapPin,
   Plus,
   Trash2,
@@ -929,6 +930,52 @@ export default function AdminDashboardPage() {
       toast.error(err.message || "Failed to reject payment on server. Restored to pending.");
     } finally {
       setProcessingQueueKey(null);
+    }
+  };
+
+  const [pausingSubId, setPausingSubId] = useState<number | null>(null);
+
+  const handleToggleSubscriptionPause = async (id: number, nextPaused: boolean) => {
+    if (!isSuperAdmin) {
+      toast.error(
+        language === "bn"
+          ? "শুধুমাত্র সুপার অ্যাডমিন সাবস্ক্রিপশন পজ বা রিজিউম করতে পারেন।"
+          : "Only Super Admin can pause or resume student subscriptions."
+      );
+      return;
+    }
+
+    setPausingSubId(id);
+
+    // Optimistic UI update (0ms delay)
+    setActiveSubscribers((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, paused: nextPaused } : s))
+    );
+
+    toast.success(
+      nextPaused
+        ? (language === "bn"
+            ? "শিক্ষার্থীর প্রিমিয়াম সাবস্ক্রিপশন পজ করা হয়েছে! (কোটায় কোর্স আনলক বন্ধ থাকবে)"
+            : "Student premium subscription paused! (Quota unlocks disabled)")
+        : (language === "bn"
+            ? "শিক্ষার্থীর প্রিমিয়াম সাবস্ক্রিপশন পুনরায় চালু করা হয়েছে!"
+            : "Student premium subscription resumed! (Quota unlocks restored)")
+    );
+
+    try {
+      const updated = await api.admin.toggleSubscriptionPause(id);
+      setActiveSubscribers((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, ...updated } : s))
+      );
+      notifyDataChanged("subscription", nextPaused ? "paused" : "resumed", id);
+    } catch (err: any) {
+      // Rollback on failure
+      setActiveSubscribers((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, paused: !nextPaused } : s))
+      );
+      toast.error(err.message || "Failed to update subscription pause status on server");
+    } finally {
+      setPausingSubId(null);
     }
   };
 
@@ -7175,26 +7222,54 @@ export default function AdminDashboardPage() {
                           : 0;
                         const isExpiringSoon = daysLeft <= 7;
 
+                        // Payment Details extraction
+                        const senderPhone = sub.senderPhone || sub.paymentRequest?.senderPhone || sub.user?.phone || "N/A";
+                        const trxId = sub.transactionId || sub.paymentRequest?.transactionId || "N/A";
+                        const paymentMethod = sub.paymentMethod || sub.paymentRequest?.paymentMethod || "bKash";
+                        const submittedAt = sub.paymentSubmittedAt || sub.paymentRequest?.createdAt || sub.startDate;
+                        const amount = sub.paymentAmount || sub.paymentRequest?.amount;
+
+                        // Quota extraction
+                        const usedCount = sub.usedCoursesCount ?? (sub.unlockedCourseCodes ? sub.unlockedCourseCodes.length : (sub.courseAccessCount || 0));
+                        const maxQuotaLabel = sub.isUnlimited ? "Unlimited" : (sub.maxCoursesAllowed ?? sub.maxCourseLimit ?? 6);
+                        const isPaused = Boolean(sub.paused);
+
                         return (
                           <div
                             key={sub.id}
-                            className="p-5 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 space-y-3 relative overflow-hidden group hover:border-purple-500/40 transition-all shadow-xs"
+                            className={`p-5 rounded-2xl bg-white dark:bg-[#0d1527] border space-y-3 relative overflow-hidden group transition-all shadow-xs ${
+                              isPaused
+                                ? "border-amber-500/50 bg-amber-500/5"
+                                : "border-slate-200 dark:border-slate-800 hover:border-purple-500/40"
+                            }`}
                           >
+                            {/* Card Header: Plan & Badges */}
                             <div className="flex items-start justify-between gap-2">
                               <div>
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-black bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                                  <Crown className="w-3 h-3 text-amber-400" />
-                                  <span>{sub.planType || "PREMIUM_6_COURSES"}</span>
-                                </span>
-                                <h4 className="font-bold text-sm text-slate-900 dark:text-white mt-1">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-black bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                                    <Crown className="w-3 h-3 text-amber-400" />
+                                    <span>{sub.planType || "PREMIUM_6_COURSES"}</span>
+                                  </span>
+
+                                  {isPaused && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/15 text-rose-500 border border-rose-500/30 animate-pulse">
+                                      <Pause className="w-2.5 h-2.5" />
+                                      <span>Paused</span>
+                                    </span>
+                                  )}
+                                </div>
+
+                                <h4 className="font-bold text-sm text-slate-900 dark:text-white mt-1.5">
                                   {sub.user?.name || "Student User"}
                                 </h4>
                                 <p className="text-xs text-slate-500 dark:text-slate-400">
                                   {sub.user?.email}
                                 </p>
                               </div>
+
                               <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
                                   isExpiringSoon
                                     ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                                     : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
@@ -7204,19 +7279,132 @@ export default function AdminDashboardPage() {
                               </span>
                             </div>
 
-                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs space-y-1">
-                              {sub.user?.studentId && (
-                                <p className="text-slate-600 dark:text-slate-300">
-                                  Student ID: <strong className="font-mono text-slate-900 dark:text-white">{sub.user.studentId}</strong>
-                                </p>
-                              )}
-                              <p className="text-slate-600 dark:text-slate-300">
-                                Valid Until: <strong className="font-mono text-slate-900 dark:text-white">{new Date(sub.endDate).toLocaleDateString()}</strong>
-                              </p>
-                              <p className="text-slate-600 dark:text-slate-300">
-                                Course Quota: <strong className="text-emerald-500">{sub.courseAccessCount || 0}</strong> / {sub.maxCourseLimit || 6} courses used
-                              </p>
+                            {/* Section 1: Payment Verification Metadata */}
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                  <Phone className="w-3 h-3 text-emerald-500" /> Mobile Number:
+                                </span>
+                                <strong className="font-mono text-slate-900 dark:text-white">{senderPhone}</strong>
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                  <CreditCard className="w-3 h-3 text-purple-500" /> Method:
+                                </span>
+                                <span className="font-bold flex items-center gap-1.5">
+                                  <span className={`px-2 py-0.2 rounded text-[10px] font-black uppercase ${
+                                    String(paymentMethod).toUpperCase() === "BKASH"
+                                      ? "bg-pink-500/15 text-pink-500 border border-pink-500/25"
+                                      : "bg-orange-500/15 text-orange-500 border border-orange-500/25"
+                                  }`}>
+                                    {paymentMethod}
+                                  </span>
+                                  {amount ? <span className="font-mono text-slate-700 dark:text-slate-300 font-bold">৳{Math.round(amount)}</span> : null}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                  <Hash className="w-3 h-3 text-cyan-500" /> TrxID:
+                                </span>
+                                <strong className="font-mono text-cyan-500 dark:text-cyan-400 font-bold select-all">{trxId}</strong>
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-amber-500" /> Submitted:
+                                </span>
+                                <span className="font-mono text-[10px] text-slate-600 dark:text-slate-300">
+                                  {submittedAt ? new Date(submittedAt).toLocaleString() : "N/A"}
+                                </span>
+                              </div>
                             </div>
+
+                            {/* Section 2: Quota & Unlocked Courses */}
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+                              {sub.user?.studentId && (
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-slate-500 dark:text-slate-400">Student ID:</span>
+                                  <strong className="font-mono text-slate-900 dark:text-white">{sub.user.studentId}</strong>
+                                </div>
+                              )}
+
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-500 dark:text-slate-400">Valid Until:</span>
+                                <strong className="font-mono text-slate-900 dark:text-white">
+                                  {sub.endDate ? new Date(sub.endDate).toLocaleDateString() : "N/A"}
+                                </strong>
+                              </div>
+
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-500 dark:text-slate-400">Course Quota:</span>
+                                <span className="text-slate-800 dark:text-slate-200 font-medium">
+                                  <strong className="text-emerald-500 font-black">{usedCount}</strong> / {maxQuotaLabel} courses used
+                                </span>
+                              </div>
+
+                              {sub.unlockedCourseCodes && sub.unlockedCourseCodes.length > 0 && (
+                                <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800/60">
+                                  <p className="text-[10px] font-bold text-slate-400 mb-1 flex items-center gap-1">
+                                    <BookOpen className="w-3 h-3 text-blue-400" /> Unlocked Courses ({sub.unlockedCourseCodes.length}):
+                                  </p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {sub.unlockedCourseCodes.map((code: string) => (
+                                      <span
+                                        key={code}
+                                        className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                                      >
+                                        {code}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Section 3: Super Admin Pause / Resume Action Footer */}
+                            {isSuperAdmin && (
+                              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                                <div className="text-[11px]">
+                                  {isPaused ? (
+                                    <span className="text-rose-500 dark:text-rose-400 font-bold flex items-center gap-1">
+                                      <Pause className="w-3 h-3" /> Quota Paused
+                                    </span>
+                                  ) : (
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                                      <CheckCircle2 className="w-3 h-3" /> Active
+                                    </span>
+                                  )}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleSubscriptionPause(sub.id, !isPaused)}
+                                  disabled={pausingSubId === sub.id}
+                                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                                    isPaused
+                                      ? "bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-xs"
+                                      : "bg-amber-600/15 hover:bg-amber-600/25 text-amber-600 dark:text-amber-400 border border-amber-500/30 shadow-xs"
+                                  }`}
+                                  title={isPaused ? "Resume student premium access and course unlock quota" : "Pause student premium quota unlock"}
+                                >
+                                  {pausingSubId === sub.id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : isPaused ? (
+                                    <>
+                                      <Play className="w-3 h-3 fill-current" />
+                                      <span>{language === "bn" ? "রিজিউম করুন" : "Resume Premium"}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Pause className="w-3 h-3" />
+                                      <span>{language === "bn" ? "পজ করুন" : "Pause Premium"}</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         );
                       })}

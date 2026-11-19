@@ -188,6 +188,10 @@ public class CourseService {
             throw new ApiException("Your subscription plan is no longer active. Please renew to unlock courses!");
         }
 
+        if (sub.isPaused()) {
+            throw new ApiException("Your premium subscription has been paused by administrator. You cannot unlock courses using premium quota while paused. (Note: You can still unlock courses for free by contributing verified lecture notes!)");
+        }
+
         // Re-check inside locked critical section for idempotency
         if (unlockedCourseRepository.existsByUserIdAndCourseIdAndTeacherIsNull(user.getId(), course.getId())) {
             return true;

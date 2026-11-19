@@ -1,6 +1,7 @@
 package com.notelagbe.service;
 
 import java.util.Optional;
+import java.util.Objects;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -142,10 +143,82 @@ public class PaymentService {
 
     public List<Subscription> getSubscriptions(Boolean activeOnly) {
         List<Subscription> list = subscriptionRepository.findAll(Sort.by(Sort.Direction.DESC, "startDate"));
-        if (Boolean.TRUE.equals(activeOnly)) {
-            return list.stream().filter(s -> s.isActive() && !s.isExpired()).toList();
+        List<Subscription> filtered = Boolean.TRUE.equals(activeOnly)
+                ? list.stream().filter(s -> s.isActive() && !s.isExpired()).toList()
+                : list;
+
+        LocalDateTime now = LocalDateTime.now();
+        for (Subscription s : filtered) {
+            if (s.getUser() == null || s.getUser().getId() == null) continue;
+            Long userId = s.getUser().getId();
+
+            // Link payment request if missing (e.g. for existing records)
+            if (s.getPaymentRequest() == null) {
+                List<PaymentRequest> userPayments = paymentRequestRepository.findByUserIdOrderByCreatedAtDesc(userId);
+                for (PaymentRequest pr : userPayments) {
+                    if (pr.getStatus() == PaymentStatus.APPROVED) {
+                        s.setPaymentRequest(pr);
+                        break;
+                    }
+                }
+            }
+
+            // Enrich with active unlocked course codes and synchronize quota used count
+            List<UnlockedCourse> userUnlocks = unlockedCourseRepository.findByUserId(userId);
+            List<String> validCodes = userUnlocks.stream()
+                    .filter(u -> u.getCourse() != null && (u.getExpiresAt() == null || u.getExpiresAt().isAfter(now)))
+                    .map(u -> u.getCourse().getCode())
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+            s.setUnlockedCourseCodes(validCodes);
+
+            int actualQuotaUsed = (int) userUnlocks.stream()
+                    .filter(u -> u.getCourse() != null && (u.getExpiresAt() == null || u.getExpiresAt().isAfter(now)))
+                    .filter(u -> u.getSource() == UnlockSource.PURCHASED_QUOTA || u.getSource() == UnlockSource.YEAR_UNLIMITED)
+                    .map(u -> u.getCourse().getId())
+                    .distinct()
+                    .count();
+            if (actualQuotaUsed > s.getUsedCoursesCount()) {
+                s.setUsedCoursesCount(actualQuotaUsed);
+            }
         }
-        return list;
+        return filtered;
+    }
+
+    @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "admin_analytics", "admin_stats"}, allEntries = true)
+    @Transactional
+    public Subscription toggleSubscriptionPause(Long subscriptionId, User actor) {
+        Subscription sub = subscriptionRepository.findById(subscriptionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription not found: " + subscriptionId));
+
+        boolean newPausedState = !sub.isPaused();
+        sub.setPaused(newPausedState);
+        if (newPausedState) {
+            sub.setPausedAt(LocalDateTime.now());
+            sub.setPausedBy(actor);
+            notificationService.createNotification(
+                    sub.getUser(),
+                    "Premium Subscription Paused ⏸️",
+                    "Your premium subscription has been paused by administrator. You cannot unlock new courses with premium quota while paused. (Note: You can still unlock courses by contributing lecture notes!)",
+                    "SUBSCRIPTION_PAUSED",
+                    "/courses"
+            );
+        } else {
+            sub.setPausedAt(null);
+            sub.setPausedBy(null);
+            notificationService.createNotification(
+                    sub.getUser(),
+                    "Premium Subscription Resumed ▶️",
+                    "Your premium subscription has been unpaused. Your course unlock quota and premium access have been restored!",
+                    "SUBSCRIPTION_RESUMED",
+                    "/courses"
+            );
+        }
+
+        Subscription saved = subscriptionRepository.save(sub);
+        liveSyncService.broadcast("subscription", newPausedState ? "paused" : "resumed", sub.getId());
+        return saved;
     }
 
     @CacheEvict(value = {"courses", "course_details", "course_resources", "teacher_resources", "admin_analytics", "admin_stats"}, allEntries = true)
@@ -172,6 +245,7 @@ public class PaymentService {
 
         // Create new Subscription for user
         Subscription sub = new Subscription(pr.getUser(), pr.getPlanType());
+        sub.setPaymentRequest(pr);
         subscriptionRepository.save(sub);
 
         // Auto-unlock selected courses if provided (legacy support)

@@ -160,7 +160,7 @@ public class SubscriptionService {
         if (isStaffUser(user)) return true;
 
         Optional<Subscription> validSub = getValidActiveSubscription(user.getId());
-        if (validSub.isPresent() && validSub.get().isUnlimited()) {
+        if (validSub.isPresent() && !validSub.get().isPaused() && validSub.get().isUnlimited()) {
             return true;
         }
 
@@ -211,7 +211,7 @@ public class SubscriptionService {
         if (isStaffUser(user)) return Collections.emptySet();
 
         Optional<Subscription> validSub = getValidActiveSubscription(user.getId());
-        if (validSub.isPresent() && validSub.get().isUnlimited()) {
+        if (validSub.isPresent() && !validSub.get().isPaused() && validSub.get().isUnlimited()) {
             return Collections.emptySet();
         }
 

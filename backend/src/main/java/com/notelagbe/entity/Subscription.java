@@ -33,6 +33,21 @@ public class Subscription {
 
     private LocalDateTime endDate;
 
+    private boolean paused = false;
+
+    private LocalDateTime pausedAt;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "paused_by_user_id")
+    private User pausedBy;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "payment_request_id")
+    private PaymentRequest paymentRequest;
+
+    @Transient
+    private java.util.List<String> unlockedCourseCodes = new java.util.ArrayList<>();
+
     public Subscription() {}
 
     public Subscription(User user, PlanType planType) {
@@ -82,4 +97,47 @@ public class Subscription {
 
     public LocalDateTime getEndDate() { return endDate; }
     public void setEndDate(LocalDateTime endDate) { this.endDate = endDate; }
+
+    public boolean isPaused() { return paused; }
+    public void setPaused(boolean paused) { this.paused = paused; }
+
+    public LocalDateTime getPausedAt() { return pausedAt; }
+    public void setPausedAt(LocalDateTime pausedAt) { this.pausedAt = pausedAt; }
+
+    public User getPausedBy() { return pausedBy; }
+    public void setPausedBy(User pausedBy) { this.pausedBy = pausedBy; }
+
+    public PaymentRequest getPaymentRequest() { return paymentRequest; }
+    public void setPaymentRequest(PaymentRequest paymentRequest) { this.paymentRequest = paymentRequest; }
+
+    public java.util.List<String> getUnlockedCourseCodes() { return unlockedCourseCodes; }
+    public void setUnlockedCourseCodes(java.util.List<String> unlockedCourseCodes) { this.unlockedCourseCodes = unlockedCourseCodes; }
+
+    @Transient
+    public String getSenderPhone() {
+        if (paymentRequest != null && paymentRequest.getSenderPhone() != null && !paymentRequest.getSenderPhone().isBlank()) {
+            return paymentRequest.getSenderPhone();
+        }
+        return user != null ? user.getPhone() : null;
+    }
+
+    @Transient
+    public String getTransactionId() {
+        return paymentRequest != null ? paymentRequest.getTransactionId() : null;
+    }
+
+    @Transient
+    public PaymentMethod getPaymentMethod() {
+        return paymentRequest != null ? paymentRequest.getPaymentMethod() : null;
+    }
+
+    @Transient
+    public LocalDateTime getPaymentSubmittedAt() {
+        return paymentRequest != null ? paymentRequest.getCreatedAt() : null;
+    }
+
+    @Transient
+    public Double getPaymentAmount() {
+        return paymentRequest != null ? paymentRequest.getAmount() : null;
+    }
 }

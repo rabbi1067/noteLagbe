@@ -35,6 +35,7 @@ export interface UserProfile {
   role: "ROLE_STUDENT" | "ROLE_ADMIN" | "ROLE_MANAGER" | "ROLE_SUPER_ADMIN";
   avatarUrl?: string;
   hasActiveSubscription: boolean;
+  subscriptionPaused?: boolean;
   planName?: string;
   maxCoursesAllowed: number;
   usedCoursesCount: number;

@@ -18,6 +18,7 @@ import {
   Sparkles, 
   Lock, 
   Unlock, 
+  Pause,
   Eye, 
   Download, 
   User, 
@@ -1024,6 +1025,21 @@ function sortMaterialsBySemesterDesc(materials: any[]): any[] {
                     <span className="text-[10px] font-normal opacity-90">
                       {language === "bn" ? "শুধুমাত্র নির্দিষ্ট শিক্ষকের নোট আনলকড" : "Only selected faculty materials unlocked"}
                     </span>
+                  </div>
+                )}
+                {user?.subscriptionPaused && (
+                  <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs flex items-start gap-2">
+                    <Pause className="w-4 h-4 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="block font-bold">
+                        {language === "bn" ? "প্রিমিয়াম সাবস্ক্রিপশন পজ রয়েছে" : "Premium Subscription Paused"}
+                      </strong>
+                      <span className="text-[11px] text-slate-400">
+                        {language === "bn"
+                          ? "আপনার প্রিমিয়াম কোটায় নতুন কোর্স আনলক সাময়িকভাবে বন্ধ রয়েছে। তবে লেকচার নোট কন্ট্রিবিউট করে ফ্রিতে যেকোনো কোর্স আনলক করতে পারবেন!"
+                          : "New quota unlocks are temporarily disabled while paused. However, you can still unlock any course for free by contributing verified lecture notes!"}
+                      </span>
+                    </div>
                   </div>
                 )}
                 <button

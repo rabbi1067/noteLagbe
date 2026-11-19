@@ -995,6 +995,8 @@ export const api = {
       request<any>(`/admin/payments/${id}/reject`, { method: "POST", body: JSON.stringify({ notes }) }),
     getSubscriptions: (active?: boolean) =>
       request<any[]>(`/admin/subscriptions${active !== undefined ? `?active=${active}` : ""}`),
+    toggleSubscriptionPause: (id: number) =>
+      request<any>(`/admin/subscriptions/${id}/toggle-pause`, { method: "POST" }),
 
     // Contributions
     getContributions: (status?: string) => request<any[]>(`/admin/contributions${status ? `?status=${status}` : ""}`),

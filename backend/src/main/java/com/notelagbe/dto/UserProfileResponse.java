@@ -21,6 +21,7 @@ public class UserProfileResponse {
     private int usedCoursesCount;
     private int remainingCoursesCount;
     private boolean isUnlimited;
+    private boolean subscriptionPaused;
     private LocalDateTime subscriptionExpiresAt;
 
     // List of unlocked course codes
@@ -157,6 +158,9 @@ public class UserProfileResponse {
 
     public boolean isUnlimited() { return isUnlimited; }
     public void setUnlimited(boolean unlimited) { isUnlimited = unlimited; }
+
+    public boolean isSubscriptionPaused() { return subscriptionPaused; }
+    public void setSubscriptionPaused(boolean subscriptionPaused) { this.subscriptionPaused = subscriptionPaused; }
 
     public LocalDateTime getSubscriptionExpiresAt() { return subscriptionExpiresAt; }
     public void setSubscriptionExpiresAt(LocalDateTime subscriptionExpiresAt) { this.subscriptionExpiresAt = subscriptionExpiresAt; }

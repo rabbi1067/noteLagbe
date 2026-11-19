@@ -619,6 +619,22 @@ public class AdminController {
     }
 
     @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PostMapping("/subscriptions/{id}/toggle-pause")
+    public ResponseEntity<Subscription> toggleSubscriptionPause(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
+        Subscription sub = paymentService.toggleSubscriptionPause(id, actor);
+        String actionLabel = sub.isPaused() ? "SUBSCRIPTION_PAUSE" : "SUBSCRIPTION_RESUME";
+        String statusLabel = sub.isPaused() ? "PAUSED" : "RESUMED";
+        logAdminAction(actor, actionLabel, "BILLING",
+                formatActorPrefix(actor) + " " + statusLabel.toLowerCase() + " Subscription #" + id + " ["
+                        + sub.getPlanType() + "] for " + formatStudentLabel(sub.getUser()));
+        evictAnalyticsCache();
+        return ResponseEntity.ok(sub);
+    }
+
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @PostMapping("/payments/{id}/approve")
     public ResponseEntity<PaymentRequest> approvePayment(
             @PathVariable Long id,
