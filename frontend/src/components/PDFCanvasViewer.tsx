@@ -12,6 +12,7 @@ interface PDFCanvasViewerProps {
   zoom: number; // 50 to 300
   rotation: number; // global rotation delta
   pageExtraRotations?: Record<number, number>; // per-page extra rotation
+  pageOrder?: number[];
   viewMode?: "single" | "scroll"; // single page flip vs continuous scroll
   watermarkText?: string;
   onFallbackRequested?: () => void;
@@ -48,6 +49,7 @@ export default function PDFCanvasViewer({
   zoom,
   rotation,
   pageExtraRotations = {},
+  pageOrder,
   viewMode = "scroll",
   watermarkText,
   onFallbackRequested,
@@ -260,20 +262,28 @@ export default function PDFCanvasViewer({
     if (!pdfDoc || numPages === 0) return;
 
     if (viewMode === "single") {
-      const canvas = canvasRefs.current.get(activePage);
+      const pageToRender =
+        pageOrder && pageOrder[activePage - 1] !== undefined
+          ? pageOrder[activePage - 1]
+          : activePage;
+      const canvas = canvasRefs.current.get(pageToRender);
       if (canvas) {
-        void renderPage(activePage, canvas);
+        void renderPage(pageToRender, canvas);
       }
     } else {
-      // Continuous scroll mode: render visible pages
-      for (let p = 1; p <= numPages; p++) {
+      // Continuous scroll mode: render visible pages in order
+      const orderList =
+        pageOrder && pageOrder.length === numPages
+          ? pageOrder
+          : Array.from({ length: numPages }, (_, i) => i + 1);
+      for (const p of orderList) {
         const canvas = canvasRefs.current.get(p);
         if (canvas) {
           void renderPage(p, canvas);
         }
       }
     }
-  }, [pdfDoc, numPages, activePage, viewMode, renderPage]);
+  }, [pdfDoc, numPages, activePage, viewMode, pageOrder, renderPage]);
 
   // Touch Swipe navigation support for mobile single-page flip
   const touchStartXRef = useRef<number | null>(null);
@@ -345,8 +355,12 @@ export default function PDFCanvasViewer({
           >
             <canvas
               ref={(el) => {
-                if (el) canvasRefs.current.set(activePage, el);
-                else canvasRefs.current.delete(activePage);
+                const targetPage =
+                  pageOrder && pageOrder[activePage - 1] !== undefined
+                    ? pageOrder[activePage - 1]
+                    : activePage;
+                if (el) canvasRefs.current.set(targetPage, el);
+                else canvasRefs.current.delete(targetPage);
               }}
               className="block select-none"
             />
@@ -391,17 +405,20 @@ export default function PDFCanvasViewer({
         </div>
       ) : (
         // Continuous Scroll Mode (All pages in a seamless vertical list)
-        Array.from({ length: numPages }).map((_, idx) => {
-          const pageNum = idx + 1;
+        (pageOrder && pageOrder.length === numPages
+          ? pageOrder
+          : Array.from({ length: numPages }, (_, i) => i + 1)
+        ).map((pageNum, idx) => {
+          const displayNum = idx + 1;
           return (
             <div
-              key={pageNum}
-              id={`pdf-page-${pageNum}`}
+              key={`${pageNum}-${displayNum}`}
+              id={`pdf-page-${displayNum}`}
               className="relative flex flex-col items-center w-full max-w-full"
             >
               {/* Page Number Badge */}
               <div className="mb-2 self-center px-3 py-0.5 rounded-full bg-slate-800/80 border border-slate-700/60 text-[10px] font-mono font-bold text-slate-300 shadow-xs">
-                Page {pageNum} of {numPages}
+                Page {displayNum} of {numPages}
               </div>
 
               {/* Page Canvas Container with Strict Aspect Ratio Preservation */}

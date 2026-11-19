@@ -189,7 +189,7 @@ function PageThumbnail({
         const doc = await loadingTask.promise;
         const page = await doc.getPage(pageNum);
         if (!active) return;
-        const viewport = page.getViewport({ scale: 0.22 });
+        const viewport = page.getViewport({ scale: 0.22, rotation });
         const canvas = canvasRef.current;
         if (!canvas) return;
         canvas.width = Math.floor(viewport.width);
@@ -206,7 +206,7 @@ function PageThumbnail({
     return () => {
       active = false;
     };
-  }, [pdfBytes, blobUrl, pageNum]);
+  }, [pdfBytes, blobUrl, pageNum, rotation]);
 
   return (
     <div className="relative w-full h-44 flex items-center justify-center bg-slate-900/60 rounded-xl overflow-hidden border border-slate-700/60 p-2">
@@ -219,8 +219,6 @@ function PageThumbnail({
       <canvas
         ref={canvasRef}
         style={{
-          transform: rotation ? `rotate(${rotation}deg)` : undefined,
-          transition: "transform 0.2s ease",
           maxWidth: "100%",
           maxHeight: "100%",
           objectFit: "contain",
@@ -624,85 +622,52 @@ export default function PDFViewerModal({
     };
   }, [isOpen, resource?.id, resource?.fileUrl, isUnlocked, isAdminMode, drivePreviewUrl, retryTick, replaceBlobUrl]);
 
-  const rebuildPdfWithRotations = useCallback(
-    async (
-      nextMap: Record<number, number>,
-      nextAutoAlign: boolean,
-      nextOrder?: number[]
-    ) => {
-      if (!rawPdfBytes) return;
-      const orderToUse = nextOrder !== undefined ? nextOrder : pageOrder;
-      try {
-        const res = await normalizeAndRotatePdfBytes(rawPdfBytes, {
-          autoAlignMixed: nextAutoAlign,
-          pageOrder: orderToUse && orderToUse.length > 0 ? orderToUse : undefined,
-          pageExtraRotations: nextMap,
-          targetOrientation: "AUTO_UNIFORM",
-        });
-        setActivePdfBytes(res.bytes);
-        setAutoAlignedPagesList(res.autoAlignedPages);
-        setPdfChangedFromRaw(res.changed);
-        const updatedBlob = new Blob([res.bytes as any], { type: "application/pdf" });
-        replaceBlobUrl(URL.createObjectURL(updatedBlob));
-      } catch (err) {
-        console.error("Failed to normalize/rotate PDF page:", err);
-        toast.error("Unable to rotate this PDF page.");
-      }
-    },
-    [rawPdfBytes, pageOrder, replaceBlobUrl]
-  );
-
   const handleRotateActivePdfPage = useCallback(
-    async (deltaDeg: number) => {
+    (deltaDeg: number) => {
       if (!rawPdfBytes || pdfPageCount === 0) return;
-      const currentEffective =
-        pageExtraRotations[activePdfPage] !== undefined
-          ? pageExtraRotations[activePdfPage]
-          : autoAlignedPagesList.includes(activePdfPage)
-          ? 90
-          : 0;
+      const currentEffective = pageExtraRotations[activePdfPage] ?? 0;
       const nextRot = normalizeRotationDegrees(currentEffective + deltaDeg);
       const nextMap = { ...pageExtraRotations, [activePdfPage]: nextRot };
       setPageExtraRotations(nextMap);
-      await rebuildPdfWithRotations(nextMap, autoAlignMixedPdf);
+      setPdfChangedFromRaw(true);
     },
-    [rawPdfBytes, pdfPageCount, pageExtraRotations, activePdfPage, autoAlignedPagesList, autoAlignMixedPdf, rebuildPdfWithRotations]
+    [rawPdfBytes, pdfPageCount, pageExtraRotations, activePdfPage]
   );
 
-  const handleResetPdfRotations = useCallback(async () => {
+  const handleResetPdfRotations = useCallback(() => {
     setPageExtraRotations({});
     setAutoAlignMixedPdf(false);
-    await rebuildPdfWithRotations({}, false);
-  }, [rebuildPdfWithRotations]);
+    const hasOrderChanged = pageOrder.length > 0 && pageOrder.some((p, i) => p !== i + 1);
+    setPdfChangedFromRaw(hasOrderChanged);
+    toast.info("PDF page rotations reset to 0°.");
+  }, [pageOrder]);
 
-  const handleToggleAutoAlignPdf = useCallback(async () => {
+  const handleToggleAutoAlignPdf = useCallback(() => {
     const nextAuto = !autoAlignMixedPdf;
-    setPageExtraRotations({});
     setAutoAlignMixedPdf(nextAuto);
-    await rebuildPdfWithRotations({}, nextAuto);
-  }, [autoAlignMixedPdf, rebuildPdfWithRotations]);
+    if (!nextAuto) {
+      setPageExtraRotations({});
+      const hasOrderChanged = pageOrder.length > 0 && pageOrder.some((p, i) => p !== i + 1);
+      setPdfChangedFromRaw(hasOrderChanged);
+    }
+  }, [autoAlignMixedPdf, pageOrder]);
 
   const handleRotateAllPdfPages = useCallback(
-    async (deltaDeg: number) => {
+    (deltaDeg: number) => {
       if (!rawPdfBytes || pdfPageCount === 0) return;
       const nextMap: Record<number, number> = {};
       for (let p = 1; p <= pdfPageCount; p++) {
-        const currentEffective =
-          pageExtraRotations[p] !== undefined
-            ? pageExtraRotations[p]
-            : autoAlignedPagesList.includes(p)
-            ? 90
-            : 0;
+        const currentEffective = pageExtraRotations[p] ?? 0;
         nextMap[p] = normalizeRotationDegrees(currentEffective + deltaDeg);
       }
       setPageExtraRotations(nextMap);
-      await rebuildPdfWithRotations(nextMap, autoAlignMixedPdf);
+      setPdfChangedFromRaw(true);
     },
-    [rawPdfBytes, pdfPageCount, pageExtraRotations, autoAlignedPagesList, autoAlignMixedPdf, rebuildPdfWithRotations]
+    [rawPdfBytes, pdfPageCount, pageExtraRotations]
   );
 
   const handleSwapPages = useCallback(
-    async (idxA: number, idxB: number) => {
+    (idxA: number, idxB: number) => {
       if (!rawPdfBytes || pdfPageCount <= 1) return;
       const effectiveOrder =
         pageOrder.length === pdfPageCount && pageOrder.length > 0
@@ -714,14 +679,14 @@ export default function PDFViewerModal({
       nextOrder[idxA] = nextOrder[idxB];
       nextOrder[idxB] = temp;
       setPageOrder(nextOrder);
-      await rebuildPdfWithRotations(pageExtraRotations, autoAlignMixedPdf, nextOrder);
+      setPdfChangedFromRaw(true);
       toast.success(`Position updated: Page ${idxA + 1} ↔ Page ${idxB + 1}`);
     },
-    [rawPdfBytes, pdfPageCount, pageOrder, pageExtraRotations, autoAlignMixedPdf, rebuildPdfWithRotations]
+    [rawPdfBytes, pdfPageCount, pageOrder]
   );
 
   const handleMovePageOrder = useCallback(
-    async (fromIdx: number, toIdx: number) => {
+    (fromIdx: number, toIdx: number) => {
       if (!rawPdfBytes || pdfPageCount <= 1 || fromIdx === toIdx) return;
       const effectiveOrder =
         pageOrder.length === pdfPageCount && pageOrder.length > 0
@@ -734,27 +699,27 @@ export default function PDFViewerModal({
       nextOrder.splice(toIdx, 0, movedItem);
 
       setPageOrder(nextOrder);
-      await rebuildPdfWithRotations(pageExtraRotations, autoAlignMixedPdf, nextOrder);
+      setPdfChangedFromRaw(true);
       toast.success(`Page moved: Page ${fromIdx + 1} ➔ Position ${toIdx + 1}`);
     },
-    [rawPdfBytes, pdfPageCount, pageOrder, pageExtraRotations, autoAlignMixedPdf, rebuildPdfWithRotations]
+    [rawPdfBytes, pdfPageCount, pageOrder]
   );
 
-  const handleMoveActivePageUp = useCallback(async () => {
+  const handleMoveActivePageUp = useCallback(() => {
     if (activePdfPage <= 1) return;
     const currentIdx = activePdfPage - 1;
-    await handleSwapPages(currentIdx, currentIdx - 1);
+    handleSwapPages(currentIdx, currentIdx - 1);
     setActivePdfPage((p) => Math.max(1, p - 1));
   }, [activePdfPage, handleSwapPages]);
 
-  const handleMoveActivePageDown = useCallback(async () => {
+  const handleMoveActivePageDown = useCallback(() => {
     if (activePdfPage >= pdfPageCount) return;
     const currentIdx = activePdfPage - 1;
-    await handleSwapPages(currentIdx, currentIdx + 1);
+    handleSwapPages(currentIdx, currentIdx + 1);
     setActivePdfPage((p) => Math.min(pdfPageCount, p + 1));
   }, [activePdfPage, pdfPageCount, handleSwapPages]);
 
-  const handleReverseAllPages = useCallback(async () => {
+  const handleReverseAllPages = useCallback(() => {
     if (!rawPdfBytes || pdfPageCount <= 1) return;
     const effectiveOrder =
       pageOrder.length === pdfPageCount && pageOrder.length > 0
@@ -762,60 +727,39 @@ export default function PDFViewerModal({
         : Array.from({ length: pdfPageCount }, (_, i) => i + 1);
     const nextOrder = [...effectiveOrder].reverse();
     setPageOrder(nextOrder);
-    await rebuildPdfWithRotations(pageExtraRotations, autoAlignMixedPdf, nextOrder);
+    setPdfChangedFromRaw(true);
     toast.success("All pages reversed! Click 'Save Fixed PDF' to save permanently.");
-  }, [rawPdfBytes, pdfPageCount, pageOrder, pageExtraRotations, autoAlignMixedPdf, rebuildPdfWithRotations]);
+  }, [rawPdfBytes, pdfPageCount, pageOrder]);
 
   const handleRotateSpecificPage = useCallback(
-    async (origPageNum: number, deltaDeg: number) => {
+    (origPageNum: number, deltaDeg: number) => {
       if (!rawPdfBytes) return;
       const current = pageExtraRotations[origPageNum] ?? 0;
       const nextRot = normalizeRotationDegrees(current + deltaDeg);
       const nextMap = { ...pageExtraRotations, [origPageNum]: nextRot };
       setPageExtraRotations(nextMap);
-      await rebuildPdfWithRotations(nextMap, autoAlignMixedPdf, pageOrder);
+      setPdfChangedFromRaw(true);
     },
-    [rawPdfBytes, pageExtraRotations, autoAlignMixedPdf, pageOrder, rebuildPdfWithRotations]
+    [rawPdfBytes, pageExtraRotations]
   );
 
-  const handleResetPageOrderAndRotations = useCallback(async () => {
+  const handleResetPageOrderAndRotations = useCallback(() => {
     if (!rawPdfBytes) return;
     const originalOrder = Array.from({ length: pdfPageCount }, (_, i) => i + 1);
     setPageOrder(originalOrder);
     setPageExtraRotations({});
     setAutoAlignMixedPdf(false);
-    await rebuildPdfWithRotations({}, false, originalOrder);
     setPdfChangedFromRaw(false);
     toast.info("Page order and rotations reset to original.");
-  }, [rawPdfBytes, pdfPageCount, rebuildPdfWithRotations]);
+  }, [rawPdfBytes, pdfPageCount]);
 
   const applyImageRotation = useCallback(
-    async (targetDeg: number) => {
+    (targetDeg: number) => {
       const next = normalizeRotationDegrees(targetDeg);
       setRotation(next);
-      if (detectedKind !== "image" || !rawImageBlob) return;
-
-      if (next === 0) {
-        setActiveImageBytes(null);
-        setImageCssFallback(false);
-        replaceBlobUrl(URL.createObjectURL(rawImageBlob));
-        return;
-      }
-
-      try {
-        const srcFile = new File([rawImageBlob], "material_image.jpg", {
-          type: rawImageBlob.type || "image/jpeg",
-        });
-        const converted = await convertImageToJpegBytes(srcFile, next);
-        setActiveImageBytes(converted.bytes);
-        setImageIsLandscape(converted.width > converted.height);
-        setImageCssFallback(false);
-        replaceBlobUrl(URL.createObjectURL(new Blob([converted.bytes as any], { type: "image/jpeg" })));
-      } catch {
-        setImageCssFallback(true);
-      }
+      setImageCssFallback(false);
     },
-    [detectedKind, rawImageBlob, replaceBlobUrl]
+    []
   );
 
   const persistFixedFileToResource = useCallback(
@@ -845,30 +789,44 @@ export default function PDFViewerModal({
   );
 
   const handleSaveFixedPdfToServer = useCallback(async () => {
-    if (!canDownloadAndOpen || !resource?.id || !activePdfBytes) return;
+    if (!canDownloadAndOpen || !resource?.id || !rawPdfBytes) return;
     const safeTitle = (resource.title || courseCode || "normalized_document")
       .replace(/[^a-z0-9._-]+/gi, "_")
       .replace(/\.pdf$/i, "");
-    const fixedFile = new File([activePdfBytes as any], `${safeTitle}.pdf`, {
-      type: "application/pdf",
-    });
-    const savedUrl = await persistFixedFileToResource(
-      fixedFile,
-      "Fixed document with updated page positions & rotations saved permanently!"
-    );
-    if (savedUrl) {
-      justSavedUrlRef.current = savedUrl;
-      setRawPdfBytes(activePdfBytes);
-      setPageOrder(Array.from({ length: (pageOrder.length || pdfPageCount) }, (_, i) => i + 1));
-      setPageExtraRotations({});
-      setAutoAlignedPagesList([]);
-      setPdfChangedFromRaw(false);
-      setPageOrganizerOpen(false);
-      const updatedBlob = new Blob([activePdfBytes as any], { type: "application/pdf" });
-      replaceBlobUrl(URL.createObjectURL(updatedBlob));
-      confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+    setSavingFixedFile(true);
+    try {
+      const res = await normalizeAndRotatePdfBytes(rawPdfBytes, {
+        autoAlignMixed: false,
+        pageOrder: pageOrder && pageOrder.length > 0 ? pageOrder : undefined,
+        pageExtraRotations,
+        targetOrientation: "AUTO_UNIFORM",
+      });
+      const fixedFile = new File([res.bytes as any], `${safeTitle}.pdf`, {
+        type: "application/pdf",
+      });
+      const savedUrl = await persistFixedFileToResource(
+        fixedFile,
+        "Fixed document with updated page positions & rotations saved permanently!"
+      );
+      if (savedUrl) {
+        justSavedUrlRef.current = savedUrl;
+        setRawPdfBytes(res.bytes);
+        setActivePdfBytes(res.bytes);
+        setPageOrder(Array.from({ length: (pageOrder.length || pdfPageCount) }, (_, i) => i + 1));
+        setPageExtraRotations({});
+        setAutoAlignedPagesList([]);
+        setPdfChangedFromRaw(false);
+        setPageOrganizerOpen(false);
+        const updatedBlob = new Blob([res.bytes as any], { type: "application/pdf" });
+        replaceBlobUrl(URL.createObjectURL(updatedBlob));
+        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to save fixed PDF");
+    } finally {
+      setSavingFixedFile(false);
     }
-  }, [canDownloadAndOpen, resource, courseCode, activePdfBytes, persistFixedFileToResource, pageOrder, pdfPageCount, replaceBlobUrl]);
+  }, [canDownloadAndOpen, resource, courseCode, rawPdfBytes, pageOrder, pageExtraRotations, pdfPageCount, persistFixedFileToResource, replaceBlobUrl]);
 
   const handleSaveFixedImageToServer = useCallback(
     async (convertToPortraitPdf: boolean) => {
@@ -915,24 +873,30 @@ export default function PDFViewerModal({
         return;
       }
 
-      const bytesToUpload =
-        activeImageBytes || (await convertImageToJpegBytes(srcFile, rotation)).bytes;
-      const fixedImgFile = new File([bytesToUpload as any], `${safeTitle}.jpg`, {
-        type: "image/jpeg",
-      });
-      const savedUrl = await persistFixedFileToResource(
-        fixedImgFile,
-        "Upright image saved permanently!"
-      );
-      if (savedUrl) {
-        justSavedUrlRef.current = savedUrl;
-        const nextRawBlob = new Blob([bytesToUpload as any], { type: "image/jpeg" });
-        setRawImageBlob(nextRawBlob);
-        setActiveImageBytes(null);
-        setImageCssFallback(false);
-        setRotation(0);
-        replaceBlobUrl(URL.createObjectURL(nextRawBlob));
-        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+      setSavingFixedFile(true);
+      try {
+        const converted = await convertImageToJpegBytes(srcFile, rotation);
+        const fixedImgFile = new File([converted.bytes as any], `${safeTitle}.jpg`, {
+          type: "image/jpeg",
+        });
+        const savedUrl = await persistFixedFileToResource(
+          fixedImgFile,
+          "Upright image saved permanently!"
+        );
+        if (savedUrl) {
+          justSavedUrlRef.current = savedUrl;
+          const nextRawBlob = new Blob([converted.bytes as any], { type: "image/jpeg" });
+          setRawImageBlob(nextRawBlob);
+          setActiveImageBytes(null);
+          setImageCssFallback(false);
+          setRotation(0);
+          replaceBlobUrl(URL.createObjectURL(nextRawBlob));
+          confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+        }
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to save upright image");
+      } finally {
+        setSavingFixedFile(false);
       }
     },
     [
@@ -941,7 +905,6 @@ export default function PDFViewerModal({
       courseCode,
       rawImageBlob,
       rotation,
-      activeImageBytes,
       persistFixedFileToResource,
       replaceBlobUrl,
     ]
@@ -1088,7 +1051,7 @@ export default function PDFViewerModal({
 
   const displayTitle = resource.title || `${courseCode} Academic Document`;
   const applyCssTransformRotation =
-    rotation !== 0 && (detectedKind !== "image" || imageCssFallback);
+    rotation !== 0 && detectedKind !== "image" && detectedKind !== "pdf";
   const cssRotationDeg = applyCssTransformRotation ? rotation : 0;
   const isRotated = applyCssTransformRotation && rotation % 180 !== 0;
 
@@ -1384,9 +1347,13 @@ export default function PDFViewerModal({
                       title={`Rotate Page ${activePdfPage} 90° Clockwise [Key: R]`}
                     >
                       <RotateCw className="w-3.5 h-3.5 text-blue-500" />
-                      <span>Rotate {pdfPageCount > 1 ? `Pg ${activePdfPage}` : "90°"}</span>
+                      <span>
+                        {(pageExtraRotations[activePdfPage] || 0) === 0
+                          ? `Rotate ${pdfPageCount > 1 ? `Pg ${activePdfPage}` : "90°"}`
+                          : `${pageExtraRotations[activePdfPage]}°`}
+                      </span>
                     </button>
-                    {(pdfChangedFromRaw || Object.keys(pageExtraRotations).length > 0) && (
+                    {(pdfChangedFromRaw || (pageExtraRotations[activePdfPage] || 0) !== 0) && (
                       <button
                         type="button"
                         onClick={handleResetPdfRotations}
@@ -1636,9 +1603,11 @@ export default function PDFViewerModal({
                     style={{
                       transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
                       transformOrigin: "center center",
-                      transition: "transform 0.2s cubic-bezier(0.2, 0, 0, 1)",
+                      transition: "transform 0.25s cubic-bezier(0.2, 0, 0, 1)",
+                      maxHeight: rotation % 180 !== 0 ? "75vw" : "80vh",
+                      maxWidth: rotation % 180 !== 0 ? "75vh" : "100%",
                     }}
-                    className="max-w-full max-h-[82vh] w-auto h-auto object-contain rounded-lg shadow-2xl mx-auto block select-none"
+                    className="object-contain rounded-lg shadow-2xl mx-auto block select-none"
                     draggable={false}
                   />
                 </div>
@@ -1663,13 +1632,14 @@ export default function PDFViewerModal({
                   title={displayTitle}
                   allow="autoplay"
                 />
-              ) : detectedKind === "pdf" && (activePdfBytes || rawPdfBytes || blobUrl) ? (
+              ) : detectedKind === "pdf" && (rawPdfBytes || activePdfBytes || blobUrl) ? (
                 /* High-Resolution HTML5 Canvas PDF Renderer (100% Mobile & Desktop Compatibility) */
                 <div className="w-full max-w-full flex justify-center overflow-x-auto">
                   <PDFCanvasViewer
-                    pdfBytes={activePdfBytes || rawPdfBytes}
+                    pdfBytes={rawPdfBytes || activePdfBytes}
                     blobUrl={blobUrl}
                     activePage={activePdfPage}
+                    pageOrder={pageOrder}
                     onPageChange={(p) => {
                       setActivePdfPage(p);
                       if (pdfViewLayout === "scroll") {
@@ -1686,7 +1656,7 @@ export default function PDFViewerModal({
                       );
                     }}
                     zoom={zoom}
-                    rotation={applyCssTransformRotation ? 0 : rotation}
+                    rotation={0}
                     pageExtraRotations={pageExtraRotations}
                     viewMode={pdfViewLayout}
                     watermarkText={user?.email || "Student Academic Portal"}
