@@ -3,9 +3,11 @@
 # Strict Security: No YAML files, No Secrets, No Production Data
 # ===================================================================
 
-# STRICT SECURITY: No YAML/YML files
+# STRICT SECURITY: No YAML/YML files (except GitHub Actions workflows)
 *.yml
 *.yaml
+!/.github/workflows/*.yml
+!/.github/workflows/*.yaml
 
 # Environment Variables & Secrets
 .env

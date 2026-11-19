@@ -189,8 +189,9 @@ export default function CourseDetailPage() {
       // Discover companion course immediately from local catalog in 0ms
       tryFindCompanionCourse(code);
 
-      // Revalidate live data silently in background with fresh fetch
-      loadCourseData(true, true);
+      // SWR (Stale-While-Revalidate): Reuse in-memory clientGetCache if fresh (<30s) or localStorage for 0ms instant display,
+      // and revalidate smoothly in background without blocking the UI
+      loadCourseData(true, false);
 
       if (isAuthenticated) {
         api.reviews.check(code)

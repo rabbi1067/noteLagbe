@@ -1,0 +1,41 @@
+name: NoteLagbe Render Backend 24/7 Keep-Alive
+
+on:
+  schedule:
+    # Runs every 10 minutes to prevent Render Free Tier container from entering sleep hibernation
+    - cron: "*/10 * * * *"
+  workflow_dispatch: # Allows manual trigger from GitHub Actions dashboard
+
+jobs:
+  ping-backend:
+    name: Ping NoteLagbe Backend Keep-Alive
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ping NoteLagbe Render Health Endpoint
+        run: |
+          echo "==========================================================="
+          echo "NoteLagbe 24/7 Automated Keep-Alive Heartbeat"
+          echo "Timestamp (UTC): $(date -u)"
+          echo "==========================================================="
+          
+          URL="https://notelagbe-backend.onrender.com/api/ping"
+          
+          echo "Pinging: $URL"
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$URL" || echo "000")
+          echo "Initial HTTP Response: $HTTP_STATUS"
+          
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 400 ]; then
+            echo "✅ Backend is warm, healthy, and responsive!"
+          else
+            echo "⚠️ Backend might be starting up from cold standby (Status: $HTTP_STATUS). Waking up..."
+            sleep 10
+            RETRY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "$URL" || echo "000")
+            echo "Retry HTTP Response: $RETRY_STATUS"
+            if [ "$RETRY_STATUS" -ge 200 ] && [ "$RETRY_STATUS" -lt 400 ]; then
+              echo "✅ Backend successfully awakened and ready!"
+            else
+              echo "ℹ️ Wake-up request delivered to Render container."
+            fi
+          fi

@@ -3,7 +3,10 @@ package com.notelagbe.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "teacher_courses")
+@Table(name = "teacher_courses", indexes = {
+    @Index(name = "idx_tc_course_id", columnList = "course_id"),
+    @Index(name = "idx_tc_teacher_id", columnList = "teacher_id")
+})
 public class TeacherCourse {
 
     @Id

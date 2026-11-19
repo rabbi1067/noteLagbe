@@ -7,7 +7,10 @@ import java.time.LocalDateTime;
 @Table(
     name = "resources",
     indexes = {
-        @Index(name = "idx_resources_course_status", columnList = "course_id,status")
+        @Index(name = "idx_resources_course_status", columnList = "course_id,status"),
+        @Index(name = "idx_resources_teacher_status", columnList = "teacher_id,status"),
+        @Index(name = "idx_resources_status_created", columnList = "status,createdAt"),
+        @Index(name = "idx_resources_uploader", columnList = "uploader_id")
     }
 )
 public class Resource {
