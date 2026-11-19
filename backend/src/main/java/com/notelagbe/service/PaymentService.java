@@ -13,6 +13,8 @@ import com.notelagbe.repository.CourseRepository;
 import com.notelagbe.repository.PaymentRequestRepository;
 import com.notelagbe.repository.SubscriptionRepository;
 import com.notelagbe.repository.UnlockedCourseRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,8 @@ import java.util.Map;
 
 @Service
 public class PaymentService {
+
+    private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
 
     private final PaymentRequestRepository paymentRequestRepository;
     private final SubscriptionRepository subscriptionRepository;
@@ -345,7 +349,7 @@ public class PaymentService {
                     pr.getPlanType(),
                     pr.getAmount(),
                     pr.getTransactionId(),
-                    pr.getMethod(),
+                    pr.getPaymentMethod(),
                     cleanNotes
             );
         } catch (Exception e) {

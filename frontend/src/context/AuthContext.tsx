@@ -442,18 +442,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Strict Role-Based Redirection
       const isStaff = res.role === "ROLE_ADMIN" || res.role === "ROLE_SUPER_ADMIN" || res.role === "ROLE_MANAGER";
-      if (isStaff) {
-        if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) {
-          window.location.replace("/admin");
+      const targetPath = isStaff ? "/admin" : "/dashboard";
+      if (typeof window !== "undefined") {
+        if (window.location.pathname.startsWith(targetPath)) {
+          window.location.replace(targetPath);
         } else {
-          router.push("/admin");
+          window.location.assign(targetPath);
         }
       } else {
-        if (typeof window !== "undefined" && window.location.pathname.startsWith("/dashboard")) {
-          window.location.replace("/dashboard");
-        } else {
-          router.push("/dashboard");
-        }
+        router.push(targetPath);
       }
     } catch (err: any) {
       if (err?.code === "ACCOUNT_BLOCKED" || err?.blocked) {
@@ -475,7 +472,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setShowAuthModal(false);
     const isBn = getActiveLanguage() === "bn";
     toast.success(isBn ? "স্টুডেন্ট অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে! NoteLagbe-তে স্বাগতম।" : "Student account created successfully! Welcome to NoteLagbe.");
-    router.push("/dashboard");
+    const targetPath = "/dashboard";
+    if (typeof window !== "undefined") {
+      if (window.location.pathname.startsWith(targetPath)) {
+        window.location.replace(targetPath);
+      } else {
+        window.location.assign(targetPath);
+      }
+    } else {
+      router.push(targetPath);
+    }
   };
 
   const logout = (showToast: boolean = true) => {
