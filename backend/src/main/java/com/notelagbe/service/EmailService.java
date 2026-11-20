@@ -677,39 +677,62 @@ public class EmailService {
             <html>
             <head>
                 <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
-                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-                    .badge { display: inline-block; padding: 4px 12px; background: #e0f2fe; color: #0284c7; border-radius: 999px; font-size: 12px; font-weight: bold; }
-                    .title { font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 8px; margin-bottom: 8px; }
-                    .box { background: #f1f5f9; border-radius: 14px; padding: 18px; margin: 20px 0; }
-                    .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
-                    .label { color: #64748b; font-weight: 500; }
-                    .val { color: #0f172a; font-weight: 700; font-family: monospace; }
-                    .btn { display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: bold; font-size: 14px; margin-top: 16px; }
-                    .footer { margin-top: 28px; font-size: 12px; color: #94a3b8; text-align: center; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; -webkit-font-smoothing: antialiased; }
+                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+                    .badge { display: inline-block; padding: 6px 14px; background: #e0f2fe; color: #0369a1; border-radius: 999px; font-size: 12px; font-weight: 800; border: 1px solid #bae6fd; }
+                    .title { font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 8px; line-height: 1.3; }
                 </style>
             </head>
-            <body>
-                <div class="card">
-                    <span class="badge">Southeast University • NoteLagbe</span>
-                    <div class="title">Payment Approved & Plan Active! 🎉</div>
-                    <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px;">
+                <div class="card" style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
+                    <div style="margin-bottom: 8px;">
+                        <span class="badge" style="display: inline-block; padding: 6px 14px; background-color: #e0f2fe; color: #0369a1; border-radius: 999px; font-size: 12px; font-weight: 800; border: 1px solid #bae6fd;">Southeast University • NoteLagbe</span>
+                    </div>
+                    <div class="title" style="font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 8px; line-height: 1.3;">Payment Approved &amp; Plan Active! 🎉</div>
+                    <p style="font-size: 14px; color: #334155; line-height: 1.6; margin: 12px 0 20px 0;">
                         Dear <strong>%s</strong>,<br>
                         Your payment has been verified by the NoteLagbe administration. Your student access pass and course unlocks are now ready to use!
                     </p>
-                    <div class="box">
-                        <div class="row"><span class="label">Plan Purchased:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Amount Paid:</span><span class="val">BDT %.0f</span></div>
-                        <div class="row"><span class="label">Transaction ID:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Unlock Access:</span><span class="val" style="color: #16a34a;">%s</span></div>
-                    </div>
-                    <p style="font-size: 13px; color: #64748b;">
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; border-collapse: separate; overflow: hidden; width: 100%;">
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; width: 38%; vertical-align: middle;">Plan Purchased:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Amount Paid:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #059669; font-size: 15px; font-weight: 800; text-align: right; vertical-align: middle;">BDT %.0f</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Transaction ID:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 3px 10px; background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 6px; font-weight: 800; font-family: 'Courier New', Courier, monospace; font-size: 13px;">%s</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Unlock Access:</td>
+                            <td style="padding: 12px 16px; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 4px 10px; background-color: #dcfce7; color: #14532d; border: 1px solid #86efac; border-radius: 6px; font-weight: 800; font-size: 13px;">%s</span>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 16px 0;">
                         You can now browse any course and unlock full lecture notes and past midterm/final examination papers.
                     </p>
-                    <div style="text-align: center;">
-                        <a href="%s" class="btn">Go to NoteLagbe Dashboard →</a>
-                    </div>
+
+                    <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 26px auto 16px auto;">
+                        <tr>
+                            <td align="center" style="border-radius: 12px; background-color: #2563eb;">
+                                <a href="%s" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #2563eb; color: #ffffff !important; text-decoration: none !important; padding: 15px 32px; border-radius: 12px; font-weight: 800; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; letter-spacing: 0.3px; border: 1px solid #1d4ed8; text-align: center; mso-padding-alt: 0;">
+                                    <span style="color: #ffffff !important; text-decoration: none !important; font-weight: 800; font-size: 15px; line-height: 1;">Go to NoteLagbe Dashboard &rarr;</span>
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+
                     %s
                 </div>
             </body>
@@ -752,39 +775,62 @@ public class EmailService {
             <html>
             <head>
                 <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
-                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-                    .badge { display: inline-block; padding: 4px 12px; background: #f3e8ff; color: #7e22ce; border-radius: 999px; font-size: 12px; font-weight: bold; }
-                    .title { font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 8px; margin-bottom: 8px; }
-                    .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin: 20px 0; }
-                    .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
-                    .label { color: #64748b; font-weight: 500; }
-                    .val { color: #0f172a; font-weight: 700; }
-                    .btn { display: inline-block; background: #7e22ce; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: bold; font-size: 14px; margin-top: 16px; }
-                    .footer { margin-top: 28px; font-size: 12px; color: #94a3b8; text-align: center; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; -webkit-font-smoothing: antialiased; }
+                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+                    .badge { display: inline-block; padding: 6px 14px; background: #f3e8ff; color: #6b21a8; border-radius: 999px; font-size: 12px; font-weight: 800; border: 1px solid #e9d5ff; }
+                    .title { font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 8px; line-height: 1.3; }
                 </style>
             </head>
-            <body>
-                <div class="card">
-                    <span class="badge">Southeast University • Financial Aid Waiver</span>
-                    <div class="title">Waiver Approved &amp; 1-Semester Access Granted! 🎉</div>
-                    <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px;">
+                <div class="card" style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
+                    <div style="margin-bottom: 8px;">
+                        <span class="badge" style="display: inline-block; padding: 6px 14px; background-color: #f3e8ff; color: #6b21a8; border-radius: 999px; font-size: 12px; font-weight: 800; border: 1px solid #e9d5ff;">Southeast University • Financial Aid Waiver</span>
+                    </div>
+                    <div class="title" style="font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 8px; line-height: 1.3;">Waiver Approved &amp; 1-Semester Access Granted! 🎉</div>
+                    <p style="font-size: 14px; color: #334155; line-height: 1.6; margin: 12px 0 20px 0;">
                         Dear <strong>%s</strong>,<br>
                         Your financial aid application has been approved by NoteLagbe administration. You have received the <strong>1-Semester Student Plan</strong> with <strong>%d course unlocks</strong> valid for 3 months!
                     </p>
-                    <div class="box">
-                        <div class="row"><span class="label">Granted Package:</span><span class="val">1-Semester Plan (6 Courses)</span></div>
-                        <div class="row"><span class="label">Course Unlock Quota:</span><span class="val" style="color: #16a34a;">%d Courses</span></div>
-                        <div class="row"><span class="label">Validity:</span><span class="val">3 Months</span></div>
-                        <div class="row"><span class="label">Fee:</span><span class="val" style="color: #7e22ce;">100%% Free Academic Waiver</span></div>
-                    </div>
-                    <p style="font-size: 13px; color: #64748b;">
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; border-collapse: separate; overflow: hidden; width: 100%;">
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; width: 38%; vertical-align: middle;">Granted Package:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">1-Semester Plan (6 Courses)</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Course Unlock Quota:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 4px 10px; background-color: #dcfce7; color: #14532d; border: 1px solid #86efac; border-radius: 6px; font-weight: 800; font-size: 13px;">%d Courses</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Validity:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">3 Months</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Fee:</td>
+                            <td style="padding: 12px 16px; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 4px 10px; background-color: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; border-radius: 6px; font-weight: 800; font-size: 13px;">100%% Free Academic Waiver</span>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 16px 0;">
                         You can immediately browse any Southeast University CSE course and click <strong>"Unlock Course Using Quota"</strong> to view handwritten lecture notes, midterm questionnaires, and final exam papers.
                     </p>
-                    <div style="text-align: center;">
-                        <a href="%s" class="btn">Browse & Unlock Courses →</a>
-                    </div>
+
+                    <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 26px auto 16px auto;">
+                        <tr>
+                            <td align="center" style="border-radius: 12px; background-color: #7e22ce;">
+                                <a href="%s" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #7e22ce; color: #ffffff !important; text-decoration: none !important; padding: 15px 32px; border-radius: 12px; font-weight: 800; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; letter-spacing: 0.3px; border: 1px solid #6b21a8; text-align: center; mso-padding-alt: 0;">
+                                    <span style="color: #ffffff !important; text-decoration: none !important; font-weight: 800; font-size: 15px; line-height: 1;">Browse &amp; Unlock Courses &rarr;</span>
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+
                     %s
                 </div>
             </body>
@@ -838,40 +884,60 @@ public class EmailService {
             <html>
             <head>
                 <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; color: #e2e8f0; margin: 0; padding: 20px; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; color: #e2e8f0; margin: 0; padding: 20px; -webkit-font-smoothing: antialiased; }
                     .card { max-width: 580px; margin: 0 auto; background: #111a2e; border-radius: 20px; padding: 32px; border: 1px solid #1e293b; box-shadow: 0 12px 32px rgba(0,0,0,0.35); }
-                    .badge { display: inline-block; padding: 5px 12px; background: rgba(245, 158, 11, 0.16); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 999px; font-size: 12px; font-weight: bold; }
-                    .title { font-size: 22px; font-weight: 800; color: #ffffff; margin-top: 12px; margin-bottom: 8px; }
-                    .box { background: #0f172a; border: 1px solid #1e293b; border-radius: 14px; padding: 18px; margin: 20px 0; }
-                    .row { margin-bottom: 10px; font-size: 14px; }
-                    .label { color: #94a3b8; font-weight: 500; display: inline-block; min-width: 145px; }
-                    .val { color: #f8fafc; font-weight: 700; }
-                    .btn { display: inline-block; background: linear-gradient(90deg, #f59e0b, #d97706); color: #0f172a; text-decoration: none; padding: 12px 26px; border-radius: 12px; font-weight: 800; font-size: 14px; margin-top: 18px; }
-                    .footer { margin-top: 28px; font-size: 12px; color: #64748b; text-align: center; }
+                    .badge { display: inline-block; padding: 6px 14px; background: rgba(245, 158, 11, 0.16); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 999px; font-size: 12px; font-weight: bold; }
+                    .title { font-size: 24px; font-weight: 900; color: #ffffff; margin-top: 12px; margin-bottom: 8px; line-height: 1.3; }
                 </style>
             </head>
-            <body>
-                <div class="card">
-                    <span class="badge">Southeast University • NoteLagbe Gift Access</span>
-                    <div class="title">Faculty Course Access Gifted! 🎁</div>
-                    <p style="font-size: 14px; color: #cbd5e1; line-height: 1.6;">
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b1120; color: #e2e8f0; margin: 0; padding: 20px;">
+                <div class="card" style="max-width: 580px; margin: 0 auto; background-color: #111a2e; border-radius: 20px; padding: 32px; border: 1px solid #1e293b; box-shadow: 0 12px 32px rgba(0,0,0,0.35);">
+                    <div style="margin-bottom: 8px;">
+                        <span class="badge" style="display: inline-block; padding: 6px 14px; background-color: rgba(245, 158, 11, 0.16); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 999px; font-size: 12px; font-weight: bold;">Southeast University • NoteLagbe Gift Access</span>
+                    </div>
+                    <div class="title" style="font-size: 24px; font-weight: 900; color: #ffffff; margin-top: 12px; margin-bottom: 8px; line-height: 1.3;">Faculty Course Access Gifted! 🎁</div>
+                    <p style="font-size: 14px; color: #cbd5e1; line-height: 1.6; margin: 12px 0 20px 0;">
                         Dear <strong>%s</strong>,<br>
                         NoteLagbe Administration has granted you complimentary gift access to materials for the following course and faculty member:
                     </p>
-                    <div class="box">
-                        <div class="row"><span class="label">Course Code:</span><span class="val" style="color: #60a5fa;">%s</span></div>
-                        <div class="row"><span class="label">Course Title:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Unlocked Faculty:</span><span class="val" style="color: #fbbf24;">%s</span></div>
-                        <div class="row" style="margin-bottom:0;"><span class="label">Validity Period:</span><span class="val" style="color: #34d399;">%s</span></div>
-                    </div>
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0; background-color: #0f172a; border: 1px solid #1e293b; border-radius: 14px; border-collapse: separate; overflow: hidden; width: 100%;">
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #94a3b8; font-size: 13px; font-weight: 600; width: 38%; vertical-align: middle;">Course Code:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #60a5fa; font-size: 14px; font-weight: 800; font-family: monospace; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #94a3b8; font-size: 13px; font-weight: 600; vertical-align: middle;">Course Title:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #f8fafc; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #94a3b8; font-size: 13px; font-weight: 600; vertical-align: middle;">Unlocked Faculty:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #fbbf24; font-size: 14px; font-weight: 800; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; color: #94a3b8; font-size: 13px; font-weight: 600; vertical-align: middle;">Validity Period:</td>
+                            <td style="padding: 12px 16px; color: #34d399; font-size: 14px; font-weight: 800; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                    </table>
+
                     %s
-                    <p style="font-size: 13px; color: #94a3b8; line-height: 1.5;">
+
+                    <p style="font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 16px 0;">
                         You can now open NoteLagbe to preview and study all handwritten notes and past exam questions uploaded under <strong>%s</strong> for <strong>%s</strong>.
                     </p>
-                    <div style="text-align: center;">
-                        <a href="%s" class="btn">Open %s Materials →</a>
-                    </div>
+
+                    <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 26px auto 16px auto;">
+                        <tr>
+                            <td align="center" style="border-radius: 12px; background-color: #f59e0b;">
+                                <a href="%s" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #f59e0b; color: #0f172a !important; text-decoration: none !important; padding: 15px 32px; border-radius: 12px; font-weight: 900; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; letter-spacing: 0.3px; border: 1px solid #d97706; text-align: center; mso-padding-alt: 0;">
+                                    <span style="color: #0f172a !important; text-decoration: none !important; font-weight: 900; font-size: 15px; line-height: 1;">Open %s Materials &rarr;</span>
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+
                     %s
                 </div>
             </body>
@@ -908,44 +974,77 @@ public class EmailService {
             <html>
             <head>
                 <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
-                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-                    .badge { display: inline-block; padding: 4px 12px; background: #e0f2fe; color: #0284c7; border-radius: 999px; font-size: 12px; font-weight: bold; }
-                    .title { font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 8px; margin-bottom: 8px; }
-                    .box { background: #f1f5f9; border-radius: 14px; padding: 18px; margin: 20px 0; }
-                    .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
-                    .label { color: #64748b; font-weight: 500; }
-                    .val { color: #0f172a; font-weight: 700; font-family: monospace; }
-                    .feature-list { list-style: none; padding: 0; margin: 16px 0; }
-                    .feature-item { margin-bottom: 10px; font-size: 14px; color: #334155; line-height: 1.5; }
-                    .btn { display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: bold; font-size: 14px; margin-top: 16px; }
-                    .footer { margin-top: 28px; font-size: 12px; color: #94a3b8; text-align: center; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; -webkit-font-smoothing: antialiased; }
+                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+                    .badge { display: inline-block; padding: 6px 14px; background: #e0f2fe; color: #0369a1; border-radius: 999px; font-size: 12px; font-weight: 800; border: 1px solid #bae6fd; }
+                    .title { font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 8px; line-height: 1.3; }
                 </style>
             </head>
-            <body>
-                <div class="card">
-                    <span class="badge">Southeast University • Official Academic Platform</span>
-                    <div class="title">Welcome to NoteLagbe! 🎓</div>
-                    <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px;">
+                <div class="card" style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
+                    <div style="margin-bottom: 8px;">
+                        <span class="badge" style="display: inline-block; padding: 6px 14px; background-color: #e0f2fe; color: #0369a1; border-radius: 999px; font-size: 12px; font-weight: 800; border: 1px solid #bae6fd;">Southeast University • Official Academic Platform</span>
+                    </div>
+                    <div class="title" style="font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 8px; line-height: 1.3;">Welcome to NoteLagbe! 🎓</div>
+                    <p style="font-size: 14px; color: #334155; line-height: 1.6; margin: 12px 0 20px 0;">
                         Dear <strong>%s</strong>,<br>
                         Welcome to NoteLagbe, the comprehensive academic resource, lecture hand note archive, and exam question bank for Southeast University. Your student profile is active and ready to use!
                     </p>
-                    <div class="box">
-                        <div class="row"><span class="label">Full Name:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Registered Email:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Student ID:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Account Status:</span><span class="val" style="color: #16a34a;">Active Student</span></div>
-                    </div>
-                    <div style="font-size: 14px; font-weight: 700; color: #0f172a; margin-top: 20px;">What You Can Do on NoteLagbe:</div>
-                    <ul class="feature-list">
-                        <li class="feature-item">📚 <strong>Course Archive:</strong> Access lecture hand notes, midterm &amp; final question papers, and lab manuals from all SEU faculty.</li>
-                        <li class="feature-item">🤖 <strong>AI Exam Revision Copilot:</strong> Get concise exam revision cheat sheets, repeated questions breakdown, and faculty-focused preparation tips.</li>
-                        <li class="feature-item">🎁 <strong>Contribute &amp; Unlock Free:</strong> Upload 1 hand note or exam paper and get 2 courses completely unlocked for a full semester (90 days) free!</li>
-                    </ul>
-                    <div style="text-align: center;">
-                        <a href="%s" class="btn">Explore Courses &amp; Notes →</a>
-                    </div>
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; border-collapse: separate; overflow: hidden; width: 100%;">
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; width: 38%; vertical-align: middle;">Full Name:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Registered Email:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Student ID:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 3px 10px; background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 6px; font-weight: 800; font-family: 'Courier New', Courier, monospace; font-size: 13px;">%s</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Account Status:</td>
+                            <td style="padding: 12px 16px; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 4px 10px; background-color: #dcfce7; color: #14532d; border: 1px solid #86efac; border-radius: 6px; font-weight: 800; font-size: 13px;">Active Student</span>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div style="font-size: 15px; font-weight: 800; color: #0f172a; margin: 24px 0 12px 0;">What You Can Do on NoteLagbe:</div>
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px 0; color: #334155; font-size: 14px; line-height: 1.5;">
+                                📚 <strong>Course Archive:</strong> Access lecture hand notes, midterm &amp; final question papers, and lab manuals from all SEU faculty.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #334155; font-size: 14px; line-height: 1.5;">
+                                🤖 <strong>AI Exam Revision Copilot:</strong> Get concise exam revision cheat sheets, repeated questions breakdown, and faculty-focused preparation tips.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #334155; font-size: 14px; line-height: 1.5;">
+                                🎁 <strong>Contribute &amp; Unlock Free:</strong> Upload 1 hand note or exam paper and get 2 courses completely unlocked for a full semester (90 days) free!
+                            </td>
+                        </tr>
+                    </table>
+
+                    <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 26px auto 16px auto;">
+                        <tr>
+                            <td align="center" style="border-radius: 12px; background-color: #2563eb;">
+                                <a href="%s" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #2563eb; color: #ffffff !important; text-decoration: none !important; padding: 15px 32px; border-radius: 12px; font-weight: 800; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; letter-spacing: 0.3px; border: 1px solid #1d4ed8; text-align: center; mso-padding-alt: 0;">
+                                    <span style="color: #ffffff !important; text-decoration: none !important; font-weight: 800; font-size: 15px; line-height: 1;">Explore Courses &amp; Notes &rarr;</span>
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+
                     %s
                 </div>
             </body>
@@ -989,42 +1088,78 @@ public class EmailService {
             <html>
             <head>
                 <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
-                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-                    .badge { display: inline-block; padding: 4px 12px; background: #dcfce7; color: #15803d; border-radius: 999px; font-size: 12px; font-weight: bold; }
-                    .title { font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 8px; margin-bottom: 8px; }
-                    .box { background: #f1f5f9; border-radius: 14px; padding: 18px; margin: 20px 0; }
-                    .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
-                    .label { color: #64748b; font-weight: 500; }
-                    .val { color: #0f172a; font-weight: 700; }
-                    .btn { display: inline-block; background: #16a34a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: bold; font-size: 14px; margin-top: 16px; }
-                    .footer { margin-top: 28px; font-size: 12px; color: #94a3b8; text-align: center; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; -webkit-font-smoothing: antialiased; }
+                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+                    .badge { display: inline-block; padding: 6px 14px; background-color: #dcfce7; color: #166534; border: 1px solid #86efac; border-radius: 999px; font-size: 12px; font-weight: 800; }
+                    .title { font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 8px; line-height: 1.3; }
                 </style>
             </head>
-            <body>
-                <div class="card">
-                    <span class="badge">Academic Contribution Verified &amp; Approved</span>
-                    <div class="title">Your Contribution is Approved! 🎉</div>
-                    <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px;">
+                <div class="card" style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
+                    <div style="margin-bottom: 8px;">
+                        <span class="badge" style="display: inline-block; padding: 6px 14px; background-color: #dcfce7; color: #166534; border: 1px solid #86efac; border-radius: 999px; font-size: 12px; font-weight: 800;">Academic Contribution Verified &amp; Approved</span>
+                    </div>
+                    <div class="title" style="font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 8px; line-height: 1.3;">Your Contribution is Approved! 🎉</div>
+                    <p style="font-size: 14px; color: #334155; line-height: 1.6; margin: 12px 0 20px 0;">
                         Dear <strong>%s</strong>,<br>
                         Thank you for contributing to the Southeast University student community! Your uploaded academic material has been verified by the administration and is now live on NoteLagbe.
                     </p>
-                    <div class="box">
-                        <div class="row"><span class="label">Material Title:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Course Code:</span><span class="val" style="font-family: monospace;">%s</span></div>
-                        <div class="row"><span class="label">Reward Courses:</span><span class="val" style="color: #16a34a; font-family: monospace;">%s &amp; %s</span></div>
-                        <div class="row"><span class="label">Reward Access:</span><span class="val" style="color: #16a34a;">3 Months (90 Days) Free Access</span></div>
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; border-collapse: separate; overflow: hidden; width: 100%;">
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; width: 38%; vertical-align: middle;">
+                                Material Title:
+                            </td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">
+                                %s
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">
+                                Course Code:
+                            </td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 3px 10px; background-color: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 800; font-family: 'Courier New', Courier, monospace; font-size: 13px;">%s</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">
+                                Reward Courses:
+                            </td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 4px 10px; background-color: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; border-radius: 6px; font-weight: 800; font-size: 13px; font-family: 'Courier New', Courier, monospace;">%s &amp; %s</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">
+                                Reward Access:
+                            </td>
+                            <td style="padding: 12px 16px; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 4px 10px; background-color: #dcfce7; color: #14532d; border: 1px solid #86efac; border-radius: 6px; font-weight: 800; font-size: 13px;">3 Months (90 Days) Free Access</span>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-left: 5px solid #16a34a; padding: 14px 18px; border-radius: 8px; margin: 18px 0; font-size: 14px; line-height: 1.6;">
+                        <strong style="color: #14532d;">Admin Feedback:</strong> <span style="color: #166534; font-weight: 600;">%s</span>
                     </div>
-                    <div style="background: #f8fafc; border-left: 4px solid #16a34a; padding: 12px 16px; border-radius: 0 10px 10px 0; margin: 16px 0; font-size: 13px; color: #334155;">
-                        <strong>Admin Feedback:</strong> %s
-                    </div>
-                    <p style="font-size: 13px; color: #64748b; line-height: 1.6;">
+
+                    <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 16px 0;">
                         Your requested reward courses (<strong>%s</strong> and <strong>%s</strong>) have been automatically unlocked on your account with full access to all lecture notes and exam archives.
                     </p>
-                    <div style="text-align: center;">
-                        <a href="%s" class="btn">View Unlocked Courses on Dashboard →</a>
-                    </div>
+
+                    <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 26px auto 16px auto;">
+                        <tr>
+                            <td align="center" style="border-radius: 12px; background-color: #16a34a;">
+                                <a href="%s" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #16a34a; color: #ffffff !important; text-decoration: none !important; padding: 15px 32px; border-radius: 12px; font-weight: 800; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; letter-spacing: 0.3px; border: 1px solid #15803d; text-align: center; mso-padding-alt: 0;">
+                                    <span style="color: #ffffff !important; text-decoration: none !important; font-weight: 800; font-size: 15px; line-height: 1;">View Unlocked Courses on Dashboard &rarr;</span>
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+
                     %s
                 </div>
             </body>
@@ -1086,46 +1221,77 @@ public class EmailService {
             <html>
             <head>
                 <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b132b; color: #1e293b; margin: 0; padding: 24px; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b132b; color: #1e293b; margin: 0; padding: 24px; -webkit-font-smoothing: antialiased; }
                     .card { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-                    .badge { display: inline-block; padding: 6px 14px; background: #dbeafe; color: #1e40af; border-radius: 999px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
-                    .title { font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 6px; }
-                    .subtitle { font-size: 14px; color: #64748b; margin-bottom: 20px; }
-                    .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; margin: 20px 0; }
-                    .row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; font-size: 14px; }
-                    .row:last-child { border-bottom: none; }
-                    .label { color: #64748b; font-weight: 600; }
-                    .val { color: #0f172a; font-weight: 700; text-align: right; }
-                    .trx-val { font-family: 'Courier New', Courier, monospace; font-size: 16px; color: #2563eb; font-weight: 900; background: #eff6ff; padding: 3px 8px; border-radius: 6px; border: 1px solid #bfdbfe; }
-                    .amount-pill { font-size: 18px; color: #059669; font-weight: 900; }
-                    .btn { display: inline-block; background: #2563eb; color: #ffffff !important; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 15px; margin-top: 10px; box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
-                    .btn:hover { background: #1d4ed8; }
+                    .badge { display: inline-block; padding: 6px 14px; background: #dbeafe; color: #1e40af; border-radius: 999px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid #bfdbfe; }
+                    .title { font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 6px; line-height: 1.3; }
+                    .subtitle { font-size: 14px; color: #475569; margin-bottom: 20px; line-height: 1.5; }
                 </style>
             </head>
-            <body>
-                <div class="card">
-                    <span class="badge">Super Admin Alert • Plans & Pricing</span>
-                    <div class="title">New Payment Submitted 💰</div>
-                    <div class="subtitle">A student has just submitted a payment request on NoteLagbe Plans & Pricing. Please verify the transaction.</div>
-                    
-                    <div class="box">
-                        <div class="row"><span class="label">Plan Purchased:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Amount Paid:</span><span class="amount-pill">BDT %s</span></div>
-                        <div class="row"><span class="label">Payment Method:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Sender Phone:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Transaction ID:</span><span class="trx-val">%s</span></div>
-                        <div class="row"><span class="label">Student Name:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Student Email:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Student ID:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Submitted Time:</span><span class="val">%s</span></div>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b132b; color: #1e293b; margin: 0; padding: 24px;">
+                <div class="card" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+                    <div style="margin-bottom: 8px;">
+                        <span class="badge" style="display: inline-block; padding: 6px 14px; background-color: #dbeafe; color: #1e40af; border-radius: 999px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid #bfdbfe;">Super Admin Alert • Plans &amp; Pricing</span>
                     </div>
+                    <div class="title" style="font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 6px; line-height: 1.3;">New Payment Submitted 💰</div>
+                    <div class="subtitle" style="font-size: 14px; color: #475569; margin-bottom: 20px; line-height: 1.5;">A student has just submitted a payment request on NoteLagbe Plans &amp; Pricing. Please verify the transaction.</div>
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; border-collapse: separate; overflow: hidden; width: 100%;">
+                        <tr>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; width: 38%; vertical-align: middle;">Plan Purchased:</td>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Amount Paid:</td>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #059669; font-size: 16px; font-weight: 900; text-align: right; vertical-align: middle;">BDT %s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Payment Method:</td>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Sender Phone:</td>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; font-family: monospace; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Transaction ID:</td>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 4px 10px; background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 6px; font-weight: 900; font-family: 'Courier New', Courier, monospace; font-size: 14px;">%s</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Student Name:</td>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Student Email:</td>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Student ID:</td>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 3px 8px; background-color: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 800; font-family: monospace; font-size: 13px;">%s</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 11px 16px; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Submitted Time:</td>
+                            <td style="padding: 11px 16px; color: #64748b; font-size: 13px; font-weight: 600; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                    </table>
 
-                    <div style="text-align: center; margin: 24px 0 10px;">
-                        <a href="%s" class="btn">Go to Admin Console & Approve →</a>
-                    </div>
+                    <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 26px auto 16px auto;">
+                        <tr>
+                            <td align="center" style="border-radius: 12px; background-color: #2563eb;">
+                                <a href="%s" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #2563eb; color: #ffffff !important; text-decoration: none !important; padding: 15px 32px; border-radius: 12px; font-weight: 800; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; letter-spacing: 0.3px; border: 1px solid #1d4ed8; text-align: center; mso-padding-alt: 0;">
+                                    <span style="color: #ffffff !important; text-decoration: none !important; font-weight: 800; font-size: 15px; line-height: 1;">Go to Admin Console &amp; Approve &rarr;</span>
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
                     
-                    <p style="font-size: 12px; color: #64748b; text-align: center; margin-top: 16px;">
+                    <p style="font-size: 13px; color: #64748b; text-align: center; margin-top: 16px; line-height: 1.5;">
                         ⚡ Quick Tip: Copy the Transaction ID above and check your %s statement to verify.
                     </p>
                     %s
@@ -1178,41 +1344,57 @@ public class EmailService {
             <html>
             <head>
                 <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b132b; color: #1e293b; margin: 0; padding: 24px; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b132b; color: #1e293b; margin: 0; padding: 24px; -webkit-font-smoothing: antialiased; }
                     .card { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-                    .badge { display: inline-block; padding: 6px 14px; background: #fef3c7; color: #b45309; border-radius: 999px; font-size: 12px; font-weight: 800; text-transform: uppercase; }
-                    .title { font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 6px; }
-                    .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; margin: 20px 0; }
-                    .row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; font-size: 14px; }
-                    .row:last-child { border-bottom: none; }
-                    .label { color: #64748b; font-weight: 600; }
-                    .val { color: #0f172a; font-weight: 700; text-align: right; }
-                    .reason-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px; margin: 16px 0; font-size: 13px; color: #92400e; }
-                    .btn { display: inline-block; background: #2563eb; color: #ffffff !important; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 15px; }
+                    .badge { display: inline-block; padding: 6px 14px; background: #fef3c7; color: #92400e; border-radius: 999px; font-size: 12px; font-weight: 800; text-transform: uppercase; border: 1px solid #fde68a; }
+                    .title { font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 6px; line-height: 1.3; }
                 </style>
             </head>
-            <body>
-                <div class="card">
-                    <span class="badge">Super Admin Alert • Financial Aid</span>
-                    <div class="title">New Waiver Application 📝</div>
-                    <div style="font-size: 14px; color: #64748b; margin-bottom: 20px;">A student has applied for a Free Waiver on Plans & Pricing.</div>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b132b; color: #1e293b; margin: 0; padding: 24px;">
+                <div class="card" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+                    <div style="margin-bottom: 8px;">
+                        <span class="badge" style="display: inline-block; padding: 6px 14px; background-color: #fef3c7; color: #92400e; border-radius: 999px; font-size: 12px; font-weight: 800; text-transform: uppercase; border: 1px solid #fde68a;">Super Admin Alert • Financial Aid</span>
+                    </div>
+                    <div class="title" style="font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 6px; line-height: 1.3;">New Waiver Application 📝</div>
+                    <div style="font-size: 14px; color: #475569; margin-bottom: 20px; line-height: 1.5;">A student has applied for a Free Waiver on Plans &amp; Pricing.</div>
                     
-                    <div class="box">
-                        <div class="row"><span class="label">Student Name:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Student Email:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Student ID:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">CGPA:</span><span class="val">%s</span></div>
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; border-collapse: separate; overflow: hidden; width: 100%;">
+                        <tr>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; width: 38%; vertical-align: middle;">Student Name:</td>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Student Email:</td>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Student ID:</td>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 3px 8px; background-color: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 800; font-family: monospace; font-size: 13px;">%s</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 11px 16px; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">CGPA:</td>
+                            <td style="padding: 11px 16px; color: #059669; font-size: 15px; font-weight: 900; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                    </table>
+
+                    <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-left: 5px solid #f59e0b; border-radius: 8px; padding: 14px 18px; margin: 18px 0; font-size: 13px; color: #92400e; line-height: 1.6;">
+                        <strong style="font-size: 13px;">📌 Reason / Hardship Explanation:</strong><br>
+                        <span style="font-size: 14px; font-weight: 500;">%s</span>
                     </div>
 
-                    <div class="reason-box">
-                        <strong>📌 Reason / Hardship Explanation:</strong><br>
-                        %s
-                    </div>
-
-                    <div style="text-align: center; margin: 24px 0 10px;">
-                        <a href="%s" class="btn">Review Waiver in Admin Console →</a>
-                    </div>
+                    <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 26px auto 16px auto;">
+                        <tr>
+                            <td align="center" style="border-radius: 12px; background-color: #2563eb;">
+                                <a href="%s" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #2563eb; color: #ffffff !important; text-decoration: none !important; padding: 15px 32px; border-radius: 12px; font-weight: 800; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; letter-spacing: 0.3px; border: 1px solid #1d4ed8; text-align: center; mso-padding-alt: 0;">
+                                    <span style="color: #ffffff !important; text-decoration: none !important; font-weight: 800; font-size: 15px; line-height: 1;">Review Waiver in Admin Console &rarr;</span>
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
                     %s
                 </div>
             </body>
@@ -1259,43 +1441,71 @@ public class EmailService {
             <html>
             <head>
                 <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
-                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-                    .badge { display: inline-block; padding: 4px 12px; background: #fef3c7; color: #b45309; border-radius: 999px; font-size: 12px; font-weight: bold; }
-                    .title { font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 8px; margin-bottom: 8px; }
-                    .box { background: #f1f5f9; border-radius: 14px; padding: 18px; margin: 20px 0; }
-                    .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
-                    .label { color: #64748b; font-weight: 500; }
-                    .val { color: #0f172a; font-weight: 700; font-family: monospace; }
-                    .instruction-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin: 18px 0; font-size: 13px; color: #92400e; line-height: 1.6; }
-                    .btn { display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: bold; font-size: 14px; margin-top: 16px; }
-                    .footer { margin-top: 28px; font-size: 12px; color: #94a3b8; text-align: center; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; -webkit-font-smoothing: antialiased; }
+                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+                    .badge { display: inline-block; padding: 6px 14px; background: #fef3c7; color: #92400e; border-radius: 999px; font-size: 12px; font-weight: 800; border: 1px solid #fde68a; }
+                    .title { font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 8px; line-height: 1.3; }
                 </style>
             </head>
-            <body>
-                <div class="card">
-                    <span class="badge">NoteLagbe • Payment Verification Pending</span>
-                    <div class="title">Payment Submission Received ⏳</div>
-                    <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px;">
+                <div class="card" style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
+                    <div style="margin-bottom: 8px;">
+                        <span class="badge" style="display: inline-block; padding: 6px 14px; background-color: #fef3c7; color: #92400e; border-radius: 999px; font-size: 12px; font-weight: 800; border: 1px solid #fde68a;">NoteLagbe • Payment Verification Pending</span>
+                    </div>
+                    <div class="title" style="font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 8px; line-height: 1.3;">Payment Submission Received ⏳</div>
+                    <p style="font-size: 14px; color: #334155; line-height: 1.6; margin: 12px 0 20px 0;">
                         Dear <strong>%s</strong>,<br>
                         We have successfully received your payment verification request on NoteLagbe. Your transaction has been logged and queued for administrative review.
                     </p>
-                    <div class="box">
-                        <div class="row"><span class="label">Plan Selected:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Amount Paid:</span><span class="val">BDT %.0f</span></div>
-                        <div class="row"><span class="label">Payment Method:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Sender Number:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Transaction ID:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Verification Status:</span><span class="val" style="color: #b45309;">Under Administrative Review</span></div>
-                    </div>
-                    <div class="instruction-box">
-                        <strong>📌 Next Steps / Verification Process:</strong><br>
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; border-collapse: separate; overflow: hidden; width: 100%;">
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; width: 38%; vertical-align: middle;">Plan Selected:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Amount Paid:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #059669; font-size: 15px; font-weight: 800; text-align: right; vertical-align: middle;">BDT %.0f</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Payment Method:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Sender Number:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; font-family: monospace; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Transaction ID:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 3px 10px; background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 6px; font-weight: 800; font-family: 'Courier New', Courier, monospace; font-size: 13px;">%s</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Verification Status:</td>
+                            <td style="padding: 12px 16px; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 4px 10px; background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; border-radius: 6px; font-weight: 800; font-size: 13px;">Under Administrative Review</span>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-left: 5px solid #f59e0b; border-radius: 8px; padding: 14px 18px; margin: 18px 0; font-size: 13px; color: #92400e; line-height: 1.6;">
+                        <strong style="font-size: 13px;">📌 Next Steps / Verification Process:</strong><br>
                         Our administration team is currently verifying your Transaction ID with our official mobile banking ledger. Verification is typically completed within <strong>15 to 30 minutes</strong>. As soon as your payment is verified and accepted, your course unlock quota will be automatically activated, and you will receive an immediate confirmation email.
                     </div>
-                    <div style="text-align: center;">
-                        <a href="%s" class="btn">Check Verification Status on NoteLagbe →</a>
-                    </div>
+
+                    <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 26px auto 16px auto;">
+                        <tr>
+                            <td align="center" style="border-radius: 12px; background-color: #2563eb;">
+                                <a href="%s" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #2563eb; color: #ffffff !important; text-decoration: none !important; padding: 15px 32px; border-radius: 12px; font-weight: 800; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; letter-spacing: 0.3px; border: 1px solid #1d4ed8; text-align: center; mso-padding-alt: 0;">
+                                    <span style="color: #ffffff !important; text-decoration: none !important; font-weight: 800; font-size: 15px; line-height: 1;">Check Verification Status on NoteLagbe &rarr;</span>
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+
                     %s
                 </div>
             </body>
@@ -1342,45 +1552,71 @@ public class EmailService {
             <html>
             <head>
                 <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; }
-                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-                    .badge { display: inline-block; padding: 4px 12px; background: #fee2e2; color: #b91c1c; border-radius: 999px; font-size: 12px; font-weight: bold; }
-                    .title { font-size: 22px; font-weight: 800; color: #0f172a; margin-top: 8px; margin-bottom: 8px; }
-                    .box { background: #f1f5f9; border-radius: 14px; padding: 18px; margin: 20px 0; }
-                    .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
-                    .label { color: #64748b; font-weight: 500; }
-                    .val { color: #0f172a; font-weight: 700; font-family: monospace; }
-                    .rejection-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 16px; margin: 18px 0; font-size: 13px; color: #991b1b; line-height: 1.6; }
-                    .btn { display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: bold; font-size: 14px; margin-top: 16px; }
-                    .footer { margin-top: 28px; font-size: 12px; color: #94a3b8; text-align: center; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px; -webkit-font-smoothing: antialiased; }
+                    .card { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+                    .badge { display: inline-block; padding: 6px 14px; background: #fee2e2; color: #991b1b; border-radius: 999px; font-size: 12px; font-weight: 800; border: 1px solid #fecaca; }
+                    .title { font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 8px; line-height: 1.3; }
                 </style>
             </head>
-            <body>
-                <div class="card">
-                    <span class="badge">NoteLagbe • Payment Verification Declined</span>
-                    <div class="title">Payment Verification Update ⚠️</div>
-                    <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 20px;">
+                <div class="card" style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 4px 14px rgba(0,0,0,0.06);">
+                    <div style="margin-bottom: 8px;">
+                        <span class="badge" style="display: inline-block; padding: 6px 14px; background-color: #fee2e2; color: #991b1b; border-radius: 999px; font-size: 12px; font-weight: 800; border: 1px solid #fecaca;">NoteLagbe • Payment Verification Declined</span>
+                    </div>
+                    <div class="title" style="font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 8px; line-height: 1.3;">Payment Verification Update ⚠️</div>
+                    <p style="font-size: 14px; color: #334155; line-height: 1.6; margin: 12px 0 20px 0;">
                         Dear <strong>%s</strong>,<br>
                         We have reviewed your recent payment verification request on NoteLagbe. Unfortunately, our administration team was unable to verify this transaction with our mobile banking records.
                     </p>
-                    <div class="box">
-                        <div class="row"><span class="label">Plan Selected:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Amount Paid:</span><span class="val">BDT %.0f</span></div>
-                        <div class="row"><span class="label">Payment Method:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Transaction ID:</span><span class="val">%s</span></div>
-                        <div class="row"><span class="label">Verification Status:</span><span class="val" style="color: #dc2626;">Declined / Unverified</span></div>
+                    
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; border-collapse: separate; overflow: hidden; width: 100%;">
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; width: 38%; vertical-align: middle;">Plan Selected:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Amount Paid:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #059669; font-size: 15px; font-weight: 800; text-align: right; vertical-align: middle;">BDT %.0f</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Payment Method:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Transaction ID:</td>
+                            <td style="padding: 12px 16px; border-bottom: 1px solid #e2e8f0; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 3px 10px; background-color: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 6px; font-weight: 800; font-family: 'Courier New', Courier, monospace; font-size: 13px;">%s</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px 16px; color: #475569; font-size: 13px; font-weight: 600; vertical-align: middle;">Verification Status:</td>
+                            <td style="padding: 12px 16px; text-align: right; vertical-align: middle;">
+                                <span style="display: inline-block; padding: 4px 10px; background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; border-radius: 6px; font-weight: 800; font-size: 13px;">Declined / Unverified</span>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-left: 5px solid #dc2626; border-radius: 8px; padding: 14px 18px; margin: 18px 0; font-size: 13px; color: #991b1b; line-height: 1.6;">
+                        <strong style="font-size: 13px;">📌 Reason for Rejection / Admin Note:</strong><br>
+                        <span style="font-size: 14px; font-weight: 500;">%s</span>
                     </div>
-                    <div class="rejection-box">
-                        <strong>📌 Reason for Rejection / Admin Note:</strong><br>
-                        %s
-                    </div>
-                    <p style="font-size: 13px; color: #64748b; line-height: 1.6;">
+
+                    <p style="font-size: 14px; color: #475569; line-height: 1.6; margin: 16px 0;">
                         If you made a typographical error in your Transaction ID or sender phone number, please review your bKash/Nagad SMS receipt and re-submit your verification on the Pricing page.
                     </p>
-                    <div style="text-align: center;">
-                        <a href="%s" class="btn">Re-submit Payment Verification →</a>
-                    </div>
+
+                    <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 26px auto 16px auto;">
+                        <tr>
+                            <td align="center" style="border-radius: 12px; background-color: #dc2626;">
+                                <a href="%s" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #dc2626; color: #ffffff !important; text-decoration: none !important; padding: 15px 32px; border-radius: 12px; font-weight: 800; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; letter-spacing: 0.3px; border: 1px solid #b91c1c; text-align: center; mso-padding-alt: 0;">
+                                    <span style="color: #ffffff !important; text-decoration: none !important; font-weight: 800; font-size: 15px; line-height: 1;">Re-submit Payment Verification &rarr;</span>
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+
                     %s
                 </div>
             </body>
