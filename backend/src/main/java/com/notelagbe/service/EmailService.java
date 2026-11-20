@@ -126,10 +126,11 @@ public class EmailService {
     private String initialAdminEmail = "";
 
     public EmailService(SystemSettingRepository systemSettingRepository,
-                        @Autowired(required = false) JavaMailSender mailSender) {
+                        JavaMailSender mailSender) {
         this(systemSettingRepository, mailSender, null);
     }
 
+    @Autowired
     public EmailService(SystemSettingRepository systemSettingRepository,
                         @Autowired(required = false) JavaMailSender mailSender,
                         @Autowired(required = false) UserRepository userRepository) {
