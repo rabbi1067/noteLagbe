@@ -375,6 +375,30 @@ const isDeptMatch = (itemDept?: string, targetDept?: string) => {
   return na === nb;
 };
 
+const format12HourDateTime = (dateVal: string | number | Date | null | undefined): string => {
+  if (!dateVal) return "N/A";
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return "N/A";
+
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const day = d.getDate().toString().padStart(2, "0");
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+
+    let hours = d.getHours();
+    const minutes = d.getMinutes().toString().padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const formattedHours = hours.toString().padStart(2, "0");
+
+    return `${day} ${month} ${year}, ${formattedHours}:${minutes} ${ampm}`;
+  } catch {
+    return "N/A";
+  }
+};
+
 export default function AdminDashboardPage() {
   const { user, isAuthenticated, isLoading, logout, refreshProfile, setShowAuthModal } = useAuth();
   const { language, toggleLanguage } = useLanguage();
@@ -7315,9 +7339,9 @@ export default function AdminDashboardPage() {
                                 <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
                                   <Clock className="w-3 h-3 text-amber-500" /> Submitted:
                                 </span>
-                                <span className="font-mono text-[10px] text-slate-600 dark:text-slate-300">
-                                  {submittedAt ? new Date(submittedAt).toLocaleString() : "N/A"}
-                                </span>
+                                <strong className="font-mono text-[11px] text-slate-700 dark:text-slate-200 font-bold">
+                                  {format12HourDateTime(submittedAt)}
+                                </strong>
                               </div>
                             </div>
 
@@ -7487,7 +7511,7 @@ export default function AdminDashboardPage() {
                               <p>
                                 Phone: <strong className="font-mono text-slate-900 dark:text-white">{p.senderPhone}</strong> • TrxID:{" "}
                                 <strong className="font-mono text-blue-600 dark:text-blue-400">{p.transactionId}</strong>
-                                <span className="text-slate-400"> • Submitted: {new Date(p.createdAt).toLocaleString()}</span>
+                                <span className="text-slate-400"> • Submitted: {format12HourDateTime(p.createdAt)}</span>
                               </p>
                             </div>
 
