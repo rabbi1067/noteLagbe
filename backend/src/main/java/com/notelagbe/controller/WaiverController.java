@@ -35,7 +35,7 @@ public class WaiverController {
             activityLogService.logActivity(
                     "WAIVER_SUBMIT",
                     "BILLING",
-                    "Student submitted financial waiver application [Student ID: " + w.getStudentId() + ", CGPA: " + (w.getCgpa() != null ? w.getCgpa() : "N/A") + "]",
+                    "Student submitted financial waiver application [Student ID: " + w.getStudentId() + ", CGPA: " + String.format("%.2f", w.getCgpa()) + "]",
                     userDetails.getUser(),
                     httpRequest
             );

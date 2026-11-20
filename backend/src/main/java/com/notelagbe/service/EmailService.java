@@ -125,6 +125,19 @@ public class EmailService {
     @Value("${app.admin.initial-email:}")
     private String initialAdminEmail = "";
 
+    public EmailService(SystemSettingRepository systemSettingRepository,
+                        @Autowired(required = false) JavaMailSender mailSender) {
+        this(systemSettingRepository, mailSender, null);
+    }
+
+    public EmailService(SystemSettingRepository systemSettingRepository,
+                        @Autowired(required = false) JavaMailSender mailSender,
+                        @Autowired(required = false) UserRepository userRepository) {
+        this.systemSettingRepository = systemSettingRepository;
+        this.injectedMailSender = mailSender;
+        this.userRepository = userRepository;
+    }
+
     public void setUserRepository(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
