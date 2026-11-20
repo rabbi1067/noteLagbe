@@ -10965,10 +10965,12 @@ export default function AdminDashboardPage() {
                     )}
                   </div>
 
-                  {/* Category / Action Type Select */}
+                  {/* Category / Action Type Select - High Contrast Day/Night */}
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
-                      <Filter className="w-3.5 h-3.5 text-slate-400" />
+                    <div className="relative flex items-center bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-300 dark:border-slate-700 shadow-xs hover:border-blue-500 transition-colors">
+                      <div className="pl-3 pointer-events-none text-slate-500 dark:text-slate-400">
+                        <Filter className="w-4 h-4" />
+                      </div>
                       <select
                         value={activityLogCategory}
                         onChange={(e) => {
@@ -10977,19 +10979,72 @@ export default function AdminDashboardPage() {
                           setActivityLogPage(1);
                           loadActivityLogs(1, activityLogSearch, cat);
                         }}
-                        className="bg-transparent text-slate-700 dark:text-slate-300 font-bold focus:outline-none text-xs cursor-pointer"
+                        aria-label="Filter events by category"
+                        className="w-full sm:w-auto bg-transparent text-slate-900 dark:text-slate-100 font-bold text-xs py-2.5 pl-2.5 pr-8 rounded-xl focus:outline-none cursor-pointer appearance-none"
                       >
-                        <option value="ALL">All Event Categories</option>
-                        <option value="AUTH">Authentication & Logins (AUTH)</option>
-                        <option value="CONTENT">Materials & Exams (CONTENT)</option>
-                        <option value="ACADEMIC">Curriculum & Faculty (ACADEMIC)</option>
-                        <option value="STAFF">Staff & User RBAC (STAFF)</option>
-                        <option value="BILLING">Subscription & Payments (BILLING)</option>
-                        <option value="USER_MANAGEMENT">Course Gifts & Revocations (USER_MANAGEMENT)</option>
-                        <option value="SYSTEM">System Notices & Automated (SYSTEM)</option>
+                        <option value="ALL" className="bg-white dark:bg-[#0b132b] text-slate-900 dark:text-slate-100 font-semibold py-2">
+                          🌐 All Event Categories
+                        </option>
+                        <option value="AUTH" className="bg-white dark:bg-[#0b132b] text-slate-900 dark:text-slate-100 font-semibold py-2">
+                          🔐 Authentication & Logins (AUTH)
+                        </option>
+                        <option value="BILLING" className="bg-white dark:bg-[#0b132b] text-slate-900 dark:text-slate-100 font-semibold py-2">
+                          💳 Subscriptions & Payments (BILLING)
+                        </option>
+                        <option value="CONTENT" className="bg-white dark:bg-[#0b132b] text-slate-900 dark:text-slate-100 font-semibold py-2">
+                          📚 Materials & Course Unlocks (CONTENT)
+                        </option>
+                        <option value="ACADEMIC" className="bg-white dark:bg-[#0b132b] text-slate-900 dark:text-slate-100 font-semibold py-2">
+                          🎓 Curriculum & Faculty (ACADEMIC)
+                        </option>
+                        <option value="STAFF" className="bg-white dark:bg-[#0b132b] text-slate-900 dark:text-slate-100 font-semibold py-2">
+                          🛡️ Staff & User RBAC (STAFF)
+                        </option>
+                        <option value="USER_MANAGEMENT" className="bg-white dark:bg-[#0b132b] text-slate-900 dark:text-slate-100 font-semibold py-2">
+                          🎁 Course Gifts & Revocations (USER_MANAGEMENT)
+                        </option>
+                        <option value="SYSTEM" className="bg-white dark:bg-[#0b132b] text-slate-900 dark:text-slate-100 font-semibold py-2">
+                          ⚙️ System Notices & Automated (SYSTEM)
+                        </option>
                       </select>
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-3 pointer-events-none" />
                     </div>
                   </div>
+                </div>
+
+                {/* Quick-Filter Pills for 1-Click Category Switching */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pt-2 pb-0.5 scrollbar-none no-scrollbar">
+                  {[
+                    { id: "ALL", label: "All Logs", icon: "🌐" },
+                    { id: "AUTH", label: "Logins & Auth", icon: "🔐" },
+                    { id: "BILLING", label: "Payments & Waivers", icon: "💳" },
+                    { id: "CONTENT", label: "Materials & Unlocks", icon: "📚" },
+                    { id: "ACADEMIC", label: "Faculty & Courses", icon: "🎓" },
+                    { id: "STAFF", label: "Staff & RBAC", icon: "🛡️" },
+                    { id: "USER_MANAGEMENT", label: "Course Gifts", icon: "🎁" },
+                    { id: "SYSTEM", label: "System", icon: "⚙️" },
+                  ].map((cat) => {
+                    const isActive = activityLogCategory === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setActivityLogCategory(cat.id);
+                          setActivityLogPage(1);
+                          loadActivityLogs(1, activityLogSearch, cat.id);
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border ${
+                          isActive
+                            ? "bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20 scale-[1.02]"
+                            : "bg-slate-50 dark:bg-slate-900/80 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        }`}
+                      >
+                        <span className="text-xs">{cat.icon}</span>
+                        <span>{cat.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -11028,20 +11083,22 @@ export default function AdminDashboardPage() {
                           {/* Row 2: Action Badge & Relative Time */}
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black border ${
-                              log.action === "LOGS_CLEAR_DENIED"
+                              log.action === "LOGS_CLEAR_DENIED" || log.action?.includes("FAILED") || log.action?.includes("BLOCKED") || (log.status || "").toUpperCase() === "FAILED" || (log.status || "").toUpperCase() === "DENIED"
                                 ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25"
-                                : log.actionType === "AUTH"
+                                : log.action?.includes("LOGIN") || log.action === "USER_REGISTER" || log.action?.includes("RESET")
                                 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
-                                : log.actionType === "CONTENT"
-                                ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25"
-                                : log.actionType === "ACADEMIC"
-                                ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25"
-                                : log.actionType === "STAFF"
-                                ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25"
-                                : log.actionType === "BILLING"
-                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
-                                : log.actionType === "USER_MANAGEMENT"
+                                : log.action === "COURSE_UNLOCK" || log.action === "COURSE_LOCK"
                                 ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/25"
+                                : log.actionType === "BILLING" || log.action?.startsWith("PAYMENT_") || log.action?.startsWith("WAIVER_")
+                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
+                                : log.actionType === "CONTENT" || log.action?.startsWith("RESOURCE_")
+                                ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25"
+                                : log.actionType === "ACADEMIC" || log.action?.startsWith("FACULTY_")
+                                ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25"
+                                : log.actionType === "STAFF" || log.action?.startsWith("ADMIN_")
+                                ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25"
+                                : log.actionType === "USER_MANAGEMENT" || log.action?.includes("GIFT") || log.action?.includes("REVOKE")
+                                ? "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/25"
                                 : "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/25"
                             }`}>
                               {log.action}
@@ -11136,20 +11193,22 @@ export default function AdminDashboardPage() {
                               {/* Action Badge */}
                               <td className="px-5 py-3.5 whitespace-nowrap">
                                 <span className={`px-2.5 py-1 rounded-md text-[10px] font-black font-mono border ${
-                                  log.action === "LOGS_CLEAR_DENIED"
+                                  log.action === "LOGS_CLEAR_DENIED" || log.action?.includes("FAILED") || log.action?.includes("BLOCKED") || (log.status || "").toUpperCase() === "FAILED" || (log.status || "").toUpperCase() === "DENIED"
                                     ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25"
-                                    : log.actionType === "AUTH"
+                                    : log.action?.includes("LOGIN") || log.action === "USER_REGISTER" || log.action?.includes("RESET")
                                     ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
-                                    : log.actionType === "CONTENT"
-                                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25"
-                                    : log.actionType === "ACADEMIC"
-                                    ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25"
-                                    : log.actionType === "STAFF"
-                                    ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25"
-                                    : log.actionType === "BILLING"
-                                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
-                                    : log.actionType === "USER_MANAGEMENT"
+                                    : log.action === "COURSE_UNLOCK" || log.action === "COURSE_LOCK"
                                     ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/25"
+                                    : log.actionType === "BILLING" || log.action?.startsWith("PAYMENT_") || log.action?.startsWith("WAIVER_")
+                                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
+                                    : log.actionType === "CONTENT" || log.action?.startsWith("RESOURCE_")
+                                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25"
+                                    : log.actionType === "ACADEMIC" || log.action?.startsWith("FACULTY_")
+                                    ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25"
+                                    : log.actionType === "STAFF" || log.action?.startsWith("ADMIN_")
+                                    ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25"
+                                    : log.actionType === "USER_MANAGEMENT" || log.action?.includes("GIFT") || log.action?.includes("REVOKE")
+                                    ? "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/25"
                                     : "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/25"
                                 }`}>
                                   {log.action}

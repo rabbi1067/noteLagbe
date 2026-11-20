@@ -77,6 +77,17 @@ public class AuthController {
                     "FAILED"
             );
             throw ex;
+        } catch (org.springframework.security.authentication.BadCredentialsException ex) {
+            logAuthAsync(
+                    "USER_LOGIN_FAILED",
+                    "Failed login attempt (invalid credentials) for: " + request.getEmail(),
+                    request.getEmail(),
+                    null,
+                    "ANONYMOUS",
+                    httpRequest,
+                    "FAILED"
+            );
+            throw ex;
         }
     }
 
@@ -201,15 +212,28 @@ public class AuthController {
     @PutMapping("/password")
     public ResponseEntity<Map<String, Object>> changePassword(
             @RequestBody Map<String, String> body,
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            HttpServletRequest httpRequest) {
         if (userDetails == null) {
             return ResponseEntity.status(401).build();
         }
-        return ResponseEntity.ok(authService.changePassword(
+        Map<String, Object> resp = authService.changePassword(
                 userDetails.getUser(),
                 body.get("currentPassword"),
                 body.get("newPassword")
-        ));
+        );
+        try {
+            activityLogService.logAuth(
+                    "PASSWORD_CHANGE",
+                    "User changed account password: " + userDetails.getUser().getEmail(),
+                    userDetails.getUser().getEmail(),
+                    userDetails.getUser().getName(),
+                    userDetails.getUser().getRole() != null ? userDetails.getUser().getRole().name() : "STUDENT",
+                    httpRequest,
+                    "SUCCESS"
+            );
+        } catch (Exception ignored) {}
+        return ResponseEntity.ok(resp);
     }
 
     @PostMapping("/forgot-password")
