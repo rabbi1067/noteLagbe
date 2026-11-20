@@ -118,17 +118,12 @@ public class PaymentService {
             );
         } catch (Exception ignored) {}
 
-        // Trigger Async Email Notification to student confirming submission
+        // Trigger Async Email Notification to ONLY Super Admin (per requirement: only Super Admin receives alert on submission)
         try {
-            emailService.sendPaymentSubmissionPendingEmail(
-                    user,
-                    saved.getPlanType(),
-                    saved.getAmount(),
-                    saved.getTransactionId(),
-                    saved.getPaymentMethod(),
-                    saved.getSenderPhone()
-            );
-        } catch (Exception ignored) {}
+            emailService.notifySuperAdminNewPaymentSubmission(user, saved);
+        } catch (Exception e) {
+            log.warn("Failed to dispatch super admin payment notification: {}", e.getMessage());
+        }
 
         liveSyncService.broadcast("payment", "created", saved.getId());
         return saved;

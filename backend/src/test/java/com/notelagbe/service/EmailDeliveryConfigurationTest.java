@@ -443,4 +443,70 @@ class EmailDeliveryConfigurationTest {
         emailService.sendPasswordResetCodeEmail(student, "445566", 10);
         assertEquals("NoteLagbe \u2022 Southeast University", emailService.lastPayload.get("senderName"));
     }
+
+    @Test
+    void superAdminReceivesExclusivePaymentAndWaiverNotifications() {
+        emailService.saveEmailConfig("BREVO", "noreply@notelagbe.com", "NoteLagbe", "", 587, "", "xkeysib-mock-key-12345", false);
+        emailService.nextStatus = 201;
+        emailService.nextBody = "{\"messageId\":\"<payment-alert-123@brevo>\"}";
+
+        User superAdmin = new User();
+        superAdmin.setId(1L);
+        superAdmin.setName("Super Admin");
+        superAdmin.setEmail("superadmin@notelagbe.com");
+        superAdmin.setRole(Role.ROLE_SUPER_ADMIN);
+        superAdmin.setEnabled(true);
+
+        when(userRepository.findByRoleOrderByIdDesc(Role.ROLE_SUPER_ADMIN))
+                .thenReturn(List.of(superAdmin));
+
+        emailService.setUserRepository(userRepository);
+
+        // Verify getSuperAdminEmails resolves the super admin
+        List<String> adminEmails = emailService.getSuperAdminEmails();
+        assertEquals(1, adminEmails.size());
+        assertEquals("superadmin@notelagbe.com", adminEmails.get(0));
+
+        // 1. Test Payment Notification
+        User student = new User();
+        student.setId(10L);
+        student.setName("Student Buyer");
+        student.setEmail("student@seu.edu.bd");
+        student.setStudentId("2023200000123");
+
+        com.notelagbe.entity.PaymentRequest payment = new com.notelagbe.entity.PaymentRequest();
+        payment.setId(99L);
+        payment.setUser(student);
+        payment.setPlanType(com.notelagbe.entity.PlanType.SEMESTER_1);
+        payment.setAmount(99.0);
+        payment.setPaymentMethod(com.notelagbe.entity.PaymentMethod.BKASH);
+        payment.setSenderPhone("01779326236");
+        payment.setTransactionId("TRX8899AABB");
+        payment.setCreatedAt(java.time.LocalDateTime.now());
+
+        emailService.notifySuperAdminNewPaymentSubmission(student, payment);
+
+        assertEquals("https://api.brevo.com/v3/smtp/email", emailService.lastUrl);
+        assertNotNull(emailService.lastPayload);
+        assertEquals("superadmin@notelagbe.com", ((List<?>) emailService.lastPayload.get("to")).get(0));
+        assertTrue(emailService.lastPayload.get("subject").toString().contains("TRX8899AABB"));
+        assertTrue(emailService.lastPayload.get("subject").toString().contains("99"));
+        assertTrue(emailService.lastPayload.get("htmlContent").toString().contains("01779326236"));
+        assertTrue(emailService.lastPayload.get("htmlContent").toString().contains("Student Buyer"));
+
+        // 2. Test Waiver Notification
+        com.notelagbe.entity.WaiverRequest waiver = new com.notelagbe.entity.WaiverRequest();
+        waiver.setId(55L);
+        waiver.setUser(student);
+        waiver.setStudentId("2023200000123");
+        waiver.setCgpa(3.85);
+        waiver.setReason("Financial difficulty due to medical emergency.");
+        waiver.setCreatedAt(java.time.LocalDateTime.now());
+
+        emailService.notifySuperAdminNewWaiverSubmission(student, waiver);
+
+        assertEquals("superadmin@notelagbe.com", ((List<?>) emailService.lastPayload.get("to")).get(0));
+        assertTrue(emailService.lastPayload.get("subject").toString().contains("3.85"));
+        assertTrue(emailService.lastPayload.get("htmlContent").toString().contains("Financial difficulty"));
+    }
 }

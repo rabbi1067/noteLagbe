@@ -68,6 +68,16 @@ public class WaiverService {
         wr.setGrantedCoursesCount(6);
 
         WaiverRequest saved = waiverRequestRepository.save(wr);
+
+        // Trigger Async Email Notification to ONLY Super Admin
+        try {
+            if (emailService != null) {
+                emailService.notifySuperAdminNewWaiverSubmission(user, saved);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to dispatch super admin waiver notification: {}", e.getMessage());
+        }
+
         liveSyncService.broadcast("waiver", "created", saved.getId());
         return saved;
     }

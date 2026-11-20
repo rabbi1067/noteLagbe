@@ -168,9 +168,10 @@ class StudentEmailFlowsTest {
         verify(notificationService, times(1)).createNotification(
                 eq(student), contains("Payment Under Review"), anyString(), eq("PAYMENT_SUBMITTED"), eq("/pricing")
         );
-        verify(emailService, times(1)).sendPaymentSubmissionPendingEmail(
-                eq(student), eq(PlanType.SEMESTER_1), eq(99.0), eq("TRX12345678"), eq(PaymentMethod.BKASH), eq("01779326236")
+        verify(emailService, times(1)).notifySuperAdminNewPaymentSubmission(
+                eq(student), eq(pr)
         );
+        verify(emailService, never()).sendPaymentSubmissionPendingEmail(any(), any(), anyDouble(), anyString(), any(), any());
     }
 
     @Test

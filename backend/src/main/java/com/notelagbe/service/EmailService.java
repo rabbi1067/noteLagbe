@@ -2,11 +2,15 @@ package com.notelagbe.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.notelagbe.entity.PaymentMethod;
+import com.notelagbe.entity.PaymentRequest;
 import com.notelagbe.entity.PlanType;
+import com.notelagbe.entity.Role;
 import com.notelagbe.entity.SystemSetting;
 import com.notelagbe.entity.User;
+import com.notelagbe.entity.WaiverRequest;
 import com.notelagbe.exception.ApiException;
 import com.notelagbe.repository.SystemSettingRepository;
+import com.notelagbe.repository.UserRepository;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,10 +116,50 @@ public class EmailService {
     @Value("${app.frontend-url:https://note-lagbe-sandy.vercel.app}")
     private String frontendUrl = "https://note-lagbe-sandy.vercel.app";
 
-    public EmailService(SystemSettingRepository systemSettingRepository,
-                        @Autowired(required = false) JavaMailSender mailSender) {
-        this.systemSettingRepository = systemSettingRepository;
-        this.injectedMailSender = mailSender;
+    @Autowired(required = false)
+    private UserRepository userRepository;
+
+    @Value("${app.admin.owner-email:}")
+    private String ownerEmail = "";
+
+    @Value("${app.admin.initial-email:}")
+    private String initialAdminEmail = "";
+
+    public void setUserRepository(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    public List<String> getSuperAdminEmails() {
+        Set<String> emails = new LinkedHashSet<>();
+
+        // 1. Query all active Super Admins from database
+        if (userRepository != null) {
+            try {
+                List<User> superAdmins = userRepository.findByRoleOrderByIdDesc(Role.ROLE_SUPER_ADMIN);
+                for (User admin : superAdmins) {
+                    if (admin != null && admin.isEnabled() && hasText(admin.getEmail())) {
+                        emails.add(admin.getEmail().trim().toLowerCase());
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to fetch super admins from database for email alert: {}", e.getMessage());
+            }
+        }
+
+        // 2. Check explicitly configured owner-email and initial-email
+        if (hasText(ownerEmail)) {
+            emails.add(ownerEmail.trim().toLowerCase());
+        }
+        if (hasText(initialAdminEmail)) {
+            emails.add(initialAdminEmail.trim().toLowerCase());
+        }
+
+        // 3. Fallback safeguard if none found
+        if (emails.isEmpty()) {
+            emails.add("fazlerabbicse65@gmail.com");
+        }
+
+        return new ArrayList<>(emails);
     }
 
     private record RelayAuthorization(String payloadHash, Instant expiresAt) {}
@@ -1003,6 +1047,193 @@ public class EmailService {
             log.info("Contribution approval email sent successfully to: {}", user.getEmail());
         } catch (Exception e) {
             log.warn("Failed to send contribution approval email to {}: {}", user.getEmail(), e.getMessage());
+        }
+    }
+
+    @Async
+    public void notifySuperAdminNewPaymentSubmission(User student, PaymentRequest payment) {
+        if (!isEmailNotificationsEnabled()) {
+            log.info("Skipping super admin payment notification: Email notifications are disabled by admin.");
+            return;
+        }
+        if (payment == null || student == null) {
+            return;
+        }
+        if (!isSmtpConfigured()) {
+            log.info("Email delivery not configured. Skipping super admin payment notification for TrxID {} - simulation mode.", payment.getTransactionId());
+            return;
+        }
+
+        List<String> adminEmails = getSuperAdminEmails();
+        if (adminEmails.isEmpty()) {
+            log.warn("No Super Admin email address found to deliver payment notification.");
+            return;
+        }
+
+        String adminDashboardUrl = resolveFrontendBaseUrl() + "/admin";
+        String methodLabel = payment.getPaymentMethod() != null ? payment.getPaymentMethod().name() : "Mobile Banking";
+        String planName = payment.getPlanType() != null ? payment.getPlanType().getDisplayName() : "Subscription Plan";
+        String amountFormatted = String.format("%.0f", payment.getAmount());
+        String trxId = payment.getTransactionId() != null ? payment.getTransactionId() : "N/A";
+        String senderPhone = payment.getSenderPhone() != null ? payment.getSenderPhone() : "N/A";
+        String studentId = student.getStudentId() != null ? student.getStudentId() : "N/A";
+        String submittedTime = payment.getCreatedAt() != null ? payment.getCreatedAt().toString().replace("T", " ") : "Just now";
+
+        String subject = "🔔 [New Payment ৳" + amountFormatted + "] " + student.getName() + " (" + planName + ") — TrxID: " + trxId;
+
+        String html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b132b; color: #1e293b; margin: 0; padding: 24px; }
+                    .card { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+                    .badge { display: inline-block; padding: 6px 14px; background: #dbeafe; color: #1e40af; border-radius: 999px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+                    .title { font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 6px; }
+                    .subtitle { font-size: 14px; color: #64748b; margin-bottom: 20px; }
+                    .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; margin: 20px 0; }
+                    .row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; font-size: 14px; }
+                    .row:last-child { border-bottom: none; }
+                    .label { color: #64748b; font-weight: 600; }
+                    .val { color: #0f172a; font-weight: 700; text-align: right; }
+                    .trx-val { font-family: 'Courier New', Courier, monospace; font-size: 16px; color: #2563eb; font-weight: 900; background: #eff6ff; padding: 3px 8px; border-radius: 6px; border: 1px solid #bfdbfe; }
+                    .amount-pill { font-size: 18px; color: #059669; font-weight: 900; }
+                    .btn { display: inline-block; background: #2563eb; color: #ffffff !important; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 15px; margin-top: 10px; box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+                    .btn:hover { background: #1d4ed8; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <span class="badge">Super Admin Alert • Plans & Pricing</span>
+                    <div class="title">New Payment Submitted 💰</div>
+                    <div class="subtitle">A student has just submitted a payment request on NoteLagbe Plans & Pricing. Please verify the transaction.</div>
+                    
+                    <div class="box">
+                        <div class="row"><span class="label">Plan Purchased:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Amount Paid:</span><span class="amount-pill">BDT %s</span></div>
+                        <div class="row"><span class="label">Payment Method:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Sender Phone:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Transaction ID:</span><span class="trx-val">%s</span></div>
+                        <div class="row"><span class="label">Student Name:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Student Email:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Student ID:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Submitted Time:</span><span class="val">%s</span></div>
+                    </div>
+
+                    <div style="text-align: center; margin: 24px 0 10px;">
+                        <a href="%s" class="btn">Go to Admin Console & Approve →</a>
+                    </div>
+                    
+                    <p style="font-size: 12px; color: #64748b; text-align: center; margin-top: 16px;">
+                        ⚡ Quick Tip: Copy the Transaction ID above and check your %s statement to verify.
+                    </p>
+                    %s
+                </div>
+            </body>
+            </html>
+            """.formatted(
+                HtmlUtils.htmlEscape(planName),
+                amountFormatted,
+                HtmlUtils.htmlEscape(methodLabel),
+                HtmlUtils.htmlEscape(senderPhone),
+                HtmlUtils.htmlEscape(trxId),
+                HtmlUtils.htmlEscape(student.getName()),
+                HtmlUtils.htmlEscape(student.getEmail()),
+                HtmlUtils.htmlEscape(studentId),
+                HtmlUtils.htmlEscape(submittedTime),
+                HtmlUtils.htmlEscape(adminDashboardUrl),
+                HtmlUtils.htmlEscape(methodLabel),
+                buildEmailSocialFooterHtml()
+        );
+
+        for (String adminEmail : adminEmails) {
+            try {
+                dispatchHtmlEmail(adminEmail, subject, html);
+                log.info("Super Admin payment submission notification sent successfully to: {}", adminEmail);
+            } catch (Exception e) {
+                log.warn("Failed to send Super Admin payment notification to {}: {}", adminEmail, e.getMessage());
+            }
+        }
+    }
+
+    @Async
+    public void notifySuperAdminNewWaiverSubmission(User student, WaiverRequest waiver) {
+        if (!isEmailNotificationsEnabled()) return;
+        if (waiver == null || student == null) return;
+        if (!isSmtpConfigured()) return;
+
+        List<String> adminEmails = getSuperAdminEmails();
+        if (adminEmails.isEmpty()) return;
+
+        String adminDashboardUrl = resolveFrontendBaseUrl() + "/admin";
+        String studentId = waiver.getStudentId() != null ? waiver.getStudentId() : (student.getStudentId() != null ? student.getStudentId() : "N/A");
+        String cgpa = String.format("%.2f", waiver.getCgpa());
+        String reason = waiver.getReason() != null ? waiver.getReason() : "No reason provided";
+
+        String subject = "📝 [New Waiver Application] " + student.getName() + " (" + studentId + ") — CGPA " + cgpa;
+
+        String html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b132b; color: #1e293b; margin: 0; padding: 24px; }
+                    .card { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 20px; padding: 32px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+                    .badge { display: inline-block; padding: 6px 14px; background: #fef3c7; color: #b45309; border-radius: 999px; font-size: 12px; font-weight: 800; text-transform: uppercase; }
+                    .title { font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 6px; }
+                    .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; margin: 20px 0; }
+                    .row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #e2e8f0; font-size: 14px; }
+                    .row:last-child { border-bottom: none; }
+                    .label { color: #64748b; font-weight: 600; }
+                    .val { color: #0f172a; font-weight: 700; text-align: right; }
+                    .reason-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px; margin: 16px 0; font-size: 13px; color: #92400e; }
+                    .btn { display: inline-block; background: #2563eb; color: #ffffff !important; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 15px; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <span class="badge">Super Admin Alert • Financial Aid</span>
+                    <div class="title">New Waiver Application 📝</div>
+                    <div style="font-size: 14px; color: #64748b; margin-bottom: 20px;">A student has applied for a Free Waiver on Plans & Pricing.</div>
+                    
+                    <div class="box">
+                        <div class="row"><span class="label">Student Name:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Student Email:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">Student ID:</span><span class="val">%s</span></div>
+                        <div class="row"><span class="label">CGPA:</span><span class="val">%s</span></div>
+                    </div>
+
+                    <div class="reason-box">
+                        <strong>📌 Reason / Hardship Explanation:</strong><br>
+                        %s
+                    </div>
+
+                    <div style="text-align: center; margin: 24px 0 10px;">
+                        <a href="%s" class="btn">Review Waiver in Admin Console →</a>
+                    </div>
+                    %s
+                </div>
+            </body>
+            </html>
+            """.formatted(
+                HtmlUtils.htmlEscape(student.getName()),
+                HtmlUtils.htmlEscape(student.getEmail()),
+                HtmlUtils.htmlEscape(studentId),
+                cgpa,
+                HtmlUtils.htmlEscape(reason),
+                HtmlUtils.htmlEscape(adminDashboardUrl),
+                buildEmailSocialFooterHtml()
+        );
+
+        for (String adminEmail : adminEmails) {
+            try {
+                dispatchHtmlEmail(adminEmail, subject, html);
+                log.info("Super Admin waiver notification sent successfully to: {}", adminEmail);
+            } catch (Exception e) {
+                log.warn("Failed to send Super Admin waiver notification to {}: {}", adminEmail, e.getMessage());
+            }
         }
     }
 
