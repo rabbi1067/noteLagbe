@@ -786,7 +786,8 @@ export const api = {
         fallbackFilename,
         "Failed to download study material"
       ),
-    trackDownload: (id: number) => request<any>(`/resources/${id}/download`, { method: "POST" }),
+    trackDownload: (id: number) => request<{ success: boolean; downloadsCount?: number }>(`/resources/${id}/download`, { method: "POST" }),
+    trackView: (id: number) => request<{ success: boolean; downloadsCount?: number }>(`/resources/${id}/view`, { method: "POST" }),
     checkAvailability: (courseCode: string, teacherId?: number) => {
       const sp = new URLSearchParams();
       sp.set("courseCode", courseCode);

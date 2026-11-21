@@ -404,6 +404,33 @@ export default function CourseDetailPage() {
   const handleOpenViewer = (res: any) => {
     setSelectedResource(res);
     setViewerOpen(true);
+
+    if (res?.id && isResourceUnlockedForView(res)) {
+      // Optimistically increment downloadsCount on card in local state and persistence cache
+      setResources((prev) => {
+        const next = prev.map((item) =>
+          item.id === res.id
+            ? { ...item, downloadsCount: (item.downloadsCount || 0) + 1 }
+            : item
+        );
+        try {
+          const userKey = user?.id ? String(user.id) : "anon";
+          localStorage.setItem(`notelagbe_res_u${userKey}_${code.toUpperCase()}`, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      // Synchronize with database
+      api.resources.trackView(res.id).then((data) => {
+        if (data?.downloadsCount !== undefined) {
+          setResources((prev) =>
+            prev.map((item) =>
+              item.id === res.id ? { ...item, downloadsCount: data.downloadsCount } : item
+            )
+          );
+        }
+      }).catch(() => {});
+    }
   };
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
@@ -2590,7 +2617,24 @@ function sortMaterialsBySemesterDesc(materials: any[]): any[] {
         resource={selectedResource}
         courseCode={code}
         isUnlocked={Boolean(selectedResource && isResourceUnlockedForView(selectedResource))}
-        onUnlockedSuccess={loadCourseData}
+        onUnlockedSuccess={() => {
+          if (selectedResource?.id) {
+            setResources((prev) => {
+              const next = prev.map((item) =>
+                item.id === selectedResource.id
+                  ? { ...item, downloadsCount: (item.downloadsCount || 0) + 1 }
+                  : item
+              );
+              try {
+                const userKey = user?.id ? String(user.id) : "anon";
+                localStorage.setItem(`notelagbe_res_u${userKey}_${code.toUpperCase()}`, JSON.stringify(next));
+              } catch {}
+              return next;
+            });
+            void api.resources.trackView(selectedResource.id).catch(() => {});
+          }
+          loadCourseData(true, true);
+        }}
         isAdminMode={isAdmin}
         onFileUpdated={(newUrl) => {
           setSelectedResource((prev: any) => (prev ? { ...prev, fileUrl: newUrl, previewUrl: newUrl } : null));
@@ -2684,10 +2728,11 @@ function MaterialCard({
       </div>
 
       {/* Card Footer Actions */}
-      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-slate-400 font-mono">
-          <span>
-            {resource.downloadsCount || 0} {language === "bn" ? "ভিউ" : "views"}
+      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-slate-400 font-mono min-w-0">
+          <span className="inline-flex items-center gap-1 font-semibold text-slate-500 dark:text-slate-400">
+            <Eye className="w-3 h-3 text-slate-400 shrink-0" />
+            <span>{(resource.downloadsCount || 0).toLocaleString()} {language === "bn" ? "ভিউ" : "views"}</span>
           </span>
           {(() => {
             const contributorName =
@@ -2706,10 +2751,10 @@ function MaterialCard({
                         ? `অ্যাকাডেমিক কন্ট্রিবিউটর: ${contributorName} (শীর্ষ ৫০ তালিকায় দেখুন)`
                         : `Contributor: ${contributorName} (View in Top 50 Academic Contributors)`
                     }
-                    className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 hover:underline transition-colors"
+                    className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 hover:underline transition-colors min-w-0"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                    <span className="truncate max-w-[130px]">By {contributorName}</span>
+                    <span className="truncate max-w-[110px] sm:max-w-[140px]">By {contributorName}</span>
                   </Link>
                 </>
               );
@@ -2718,14 +2763,14 @@ function MaterialCard({
           })()}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {isUnlocked ? (
             resource.type === "PROJECT_LINK" || resource.fileUrl?.includes("github.com") ? (
               <a
                 href={resource.fileUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="py-1.5 px-3 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white transition-all flex items-center gap-1.5 shadow-sm"
+                className="py-1.5 px-3 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white transition-all flex items-center gap-1.5 shadow-sm shrink-0"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
                 <span>{language === "bn" ? "প্রজেক্ট লিংক" : "Open Project"}</span>
@@ -2742,7 +2787,7 @@ function MaterialCard({
                       resource.id,
                       resource.fileName || `${safeBase}.${ext}`
                     );
-                    void api.resources.trackDownload(resource.id).catch(() => {});
+                    onOpenViewer(resource);
                   } catch (err: any) {
                     toast.error(
                       err?.message ||
@@ -2750,7 +2795,7 @@ function MaterialCard({
                     );
                   }
                 }}
-                className="py-1.5 px-3 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                className="py-1.5 px-3 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white transition-all flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>{language === "bn" ? "ডক ফাইল" : "Download Doc"}</span>
@@ -2758,7 +2803,7 @@ function MaterialCard({
             ) : (
               <button
                 onClick={() => onOpenViewer(resource)}
-                className="py-1.5 px-3 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white transition-all flex items-center gap-1.5 shadow-sm"
+                className="py-1.5 px-3 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white transition-all flex items-center gap-1.5 shadow-sm shrink-0 cursor-pointer active:scale-95"
               >
                 <Eye className="w-3.5 h-3.5" />
                 <span>{language === "bn" ? "পিডিএফ দেখুন" : "Preview PDF"}</span>
@@ -2767,7 +2812,7 @@ function MaterialCard({
           ) : (
             <button
               onClick={() => onOpenViewer(resource)}
-              className="py-1.5 px-3 rounded-xl font-bold text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-all flex items-center gap-1.5"
+              className="py-1.5 px-3 rounded-xl font-bold text-xs bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 dark:border-amber-500/35 text-amber-800 dark:text-amber-200 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-95"
             >
               <Lock className="w-3.5 h-3.5 text-amber-500" />
               <span>{language === "bn" ? "আনলক" : "Unlock"}</span>

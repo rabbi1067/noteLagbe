@@ -928,7 +928,7 @@ export default function TeacherDetailPage() {
                 return (
                   <div
                     key={tc.id}
-                    className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3 hover:border-blue-300 dark:hover:border-blue-800 transition-all"
+                    className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3 hover:border-blue-300 dark:hover:border-blue-800 transition-all overflow-hidden"
                   >
                     {/* Header Row */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1067,12 +1067,12 @@ export default function TeacherDetailPage() {
                         {displayedCourseResources.map((res) => (
                           <div
                             key={res.id}
-                            className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs hover:border-purple-300 dark:hover:border-purple-800 transition-all"
+                            className="flex items-center justify-between gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs hover:border-purple-300 dark:hover:border-purple-800 transition-all min-w-0"
                           >
-                            <div className="space-y-0.5 pr-2">
-                              <div className="flex items-center gap-2">
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                                 <span
-                                  className={`font-mono text-[9px] font-bold px-2 py-0.5 rounded ${
+                                  className={`shrink-0 font-mono text-[9px] font-bold px-1.5 sm:px-2 py-0.5 rounded ${
                                     res.type === "NOTE" || res.type === "LAB_HAND_NOTE"
                                       ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400"
                                       : res.type === "QUIZ_CT" || res.type === "LAB_QUIZ"
@@ -1098,11 +1098,11 @@ export default function TeacherDetailPage() {
                                     ? (language === "bn" ? "প্রজেক্ট" : "Project")
                                     : (language === "bn" ? "ল্যাব ফাইল" : "Lab Material")}
                                 </span>
-                                <span className="font-bold text-slate-900 dark:text-white truncate">
+                                <span className="font-bold text-slate-900 dark:text-white truncate min-w-0 text-xs sm:text-sm">
                                   {res.title}
                                 </span>
                               </div>
-                              <div className="text-[10px] text-slate-400 flex items-center gap-1.5 flex-wrap">
+                              <div className="text-[10px] text-slate-400 flex items-center gap-1.5 flex-wrap min-w-0">
                                 <span className="font-medium text-slate-600 dark:text-slate-300">
                                   {formatSemesterDisplay(res.semesterName, res.academicYear)}
                                 </span>
@@ -1122,13 +1122,13 @@ export default function TeacherDetailPage() {
                                             ? `অ্যাকাডেমিক কন্ট্রিবিউটর: ${contributorName} (শীর্ষ ৫০ কন্ট্রিবিউটর তালিকায় দেখুন)`
                                             : `Academic Contributor: ${contributorName} (View in Top 50 Academic Contributors)`
                                         }
-                                        className="inline-flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 hover:underline transition-all group"
+                                        className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 hover:underline transition-all group min-w-0"
                                       >
                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse"></span>
-                                        <span className="truncate max-w-[140px] sm:max-w-[200px]">
+                                        <span className="truncate max-w-[90px] sm:max-w-[200px]">
                                           By {contributorName}
                                         </span>
-                                        <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950/90 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-md font-bold border border-emerald-300/50 dark:border-emerald-800/60 shadow-xs group-hover:scale-105 transition-transform">
+                                        <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950/90 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.2 rounded font-bold border border-emerald-300/50 dark:border-emerald-800/60 shadow-xs group-hover:scale-105 transition-transform shrink-0">
                                           {language === "bn" ? "কন্ট্রিবিউটর" : "Contributor"}
                                         </span>
                                       </Link>
@@ -1145,16 +1145,31 @@ export default function TeacherDetailPage() {
                             </div>
 
                             <button
-                              onClick={() => setActiveResource(res)}
-                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl font-bold text-xs shadow-sm transition-all shrink-0 cursor-pointer ${
+                              type="button"
+                              onClick={() => {
+                                setActiveResource(res);
+                                if (res?.fileUrl && res?.id) {
+                                  setResources((prevList: any[]) =>
+                                    Array.isArray(prevList)
+                                      ? prevList.map((item) =>
+                                          item.id === res.id
+                                            ? { ...item, downloadsCount: (item.downloadsCount || 0) + 1 }
+                                            : item
+                                        )
+                                      : prevList
+                                  );
+                                  void api.resources.trackView(res.id).catch(() => {});
+                                }
+                              }}
+                              className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl font-bold text-xs shadow-sm transition-all shrink-0 cursor-pointer active:scale-95 ${
                                 res.fileUrl
-                                  ? "text-white bg-purple-600 hover:bg-purple-700"
-                                  : "text-slate-700 dark:text-slate-200 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
+                                  ? "text-white bg-purple-600 hover:bg-purple-700 shadow-purple-600/25"
+                                  : "text-amber-800 dark:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 dark:border-amber-500/35"
                               }`}
                             >
-                              {!res.fileUrl && <Lock className="w-3 h-3 text-amber-500" />}
-                              <span>{res.fileUrl ? (language === "bn" ? "প্রিভিউ" : "Preview") : (language === "bn" ? "লকড" : "Unlock")}</span>
-                              {res.fileUrl && <ExternalLink className="w-3 h-3" />}
+                              {!res.fileUrl && <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                              <span>{res.fileUrl ? (language === "bn" ? "প্রিভিউ" : "Preview") : (language === "bn" ? "আনলক" : "Unlock")}</span>
+                              {res.fileUrl && <ExternalLink className="w-3.5 h-3.5 shrink-0" />}
                             </button>
                           </div>
                         ))}

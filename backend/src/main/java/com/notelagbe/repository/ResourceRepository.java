@@ -71,4 +71,9 @@ public interface ResourceRepository extends JpaRepository<Resource, Long> {
     List<Resource> findAllByOrderByCreatedAtDesc();
 
     boolean existsByCourseIdAndTypeAndStatus(Long courseId, ResourceType type, ResourceStatus status);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
+    @Query("UPDATE Resource r SET r.downloadsCount = COALESCE(r.downloadsCount, 0) + 1 WHERE r.id = :id")
+    int incrementDownloadCountDirect(@Param("id") Long id);
 }

@@ -95,7 +95,16 @@ public class ResourceController {
             @PathVariable Long id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         User user = userDetails != null ? userDetails.getUser() : null;
-        resourceService.incrementDownloadCount(id, user);
-        return ResponseEntity.ok(Map.of("success", true));
+        int views = resourceService.incrementDownloadCount(id, user);
+        return ResponseEntity.ok(Map.of("success", true, "downloadsCount", views));
+    }
+
+    @PostMapping("/{id}/view")
+    public ResponseEntity<Map<String, Object>> viewResource(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User user = userDetails != null ? userDetails.getUser() : null;
+        int views = resourceService.incrementDownloadCount(id, user);
+        return ResponseEntity.ok(Map.of("success", true, "downloadsCount", views));
     }
 }

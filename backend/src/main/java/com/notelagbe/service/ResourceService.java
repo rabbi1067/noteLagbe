@@ -583,13 +583,11 @@ public class ResourceService {
     }
 
     public void incrementDownloadCount(Long resourceId) {
-        resourceRepository.findById(resourceId).ifPresent(r -> {
-            r.setDownloadsCount(r.getDownloadsCount() + 1);
-            resourceRepository.save(r);
-        });
+        resourceRepository.incrementDownloadCountDirect(resourceId);
+        liveSyncService.broadcast("resource", "view_count", resourceId);
     }
 
-    public void incrementDownloadCount(Long resourceId, User user) {
+    public int incrementDownloadCount(Long resourceId, User user) {
         Resource r = getResourceById(resourceId);
         boolean staff = isStaff(user);
         boolean uploader = isUploader(user, r);
@@ -602,8 +600,10 @@ public class ResourceService {
                     user == null ? HttpStatus.UNAUTHORIZED : HttpStatus.FORBIDDEN
             );
         }
-        r.setDownloadsCount(r.getDownloadsCount() + 1);
-        resourceRepository.save(r);
+        resourceRepository.incrementDownloadCountDirect(resourceId);
+        int newCount = r.getDownloadsCount() + 1;
+        liveSyncService.broadcast("resource", "view_count", resourceId);
+        return newCount;
     }
 
     public ResponseEntity<byte[]> streamResourceFile(Long id, boolean download, User user) {
@@ -630,9 +630,7 @@ public class ResourceService {
             throw new ResourceNotFoundException("No downloadable file associated with this resource.");
         }
 
-        if (download) {
-            incrementDownloadCount(id);
-        }
+        incrementDownloadCount(id);
 
         // Direct Cloudflare R2 Streaming & CDN Delivery (Zero Render Memory Pressure, 100% S3 Authorized, 1-hour secure presigned URL)
         if (r2Service.isConfigured() && (targetUrl.contains(".r2.") || targetUrl.contains("r2.dev") || targetUrl.contains("r2_"))) {
