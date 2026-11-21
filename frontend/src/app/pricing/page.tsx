@@ -591,25 +591,50 @@ export default function PricingPage() {
 
           <div className="pt-8 space-y-2">
             <button
+              type="button"
               onClick={() => handleOpenCheckout("SEMESTER_1")}
-              className={`w-full py-3.5 px-4 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm ${
+              className={`w-full py-3.5 px-4 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer ${
                 isStaff
-                  ? "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                  ? "bg-gradient-to-r from-blue-900/40 via-slate-900 to-cyan-900/40 hover:from-blue-800/50 hover:to-cyan-800/50 text-blue-200 border-2 border-blue-500/40 hover:border-blue-400 shadow-lg shadow-blue-500/15"
                   : "text-slate-900 dark:text-white bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95"
               }`}
             >
-              <span>{isStaff ? (language === "bn" ? "অ্যাডমিন অ্যাক্সেস সক্রিয় ✓" : "Staff Access Active ✓") : (language === "bn" ? `১-সেমিস্টার প্ল্যান নিন (৳${p1.price} / ৩ মাস)` : `Get 1-Semester Plan (৳${p1.price} / 3 Mos)`)}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              {isStaff ? (
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                    <ShieldCheck className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <span className="font-extrabold tracking-wide">
+                      {language === "bn" ? "অ্যাডমিন অ্যাক্সেস সক্রিয়" : "Staff Access Active"}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-500/30 text-blue-200 border border-blue-400/50 shrink-0">
+                    UNLOCKED ✓
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <span>{language === "bn" ? `১-সেমিস্টার প্ল্যান নিন (৳${p1.price} / ৩ মাস)` : `Get 1-Semester Plan (৳${p1.price} / 3 Mos)`}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </>
+              )}
             </button>
-            <div className="text-center pt-1">
-              <a
-                href="#financial-aid"
-                className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 hover:underline inline-flex items-center gap-1"
-              >
-                <HelpCircle className="w-3.5 h-3.5" />
-                <span>{language === "bn" ? "ফাইন্যান্সিয়াল এইড / ফ্রি ওয়েভার প্রয়োজন? নিচে আবেদন করুন ↓" : "Need Financial Aid / Free Waiver? Apply below ↓"}</span>
-              </a>
-            </div>
+            {!isStaff ? (
+              <div className="text-center pt-1">
+                <a
+                  href="#financial-aid"
+                  className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 hover:underline inline-flex items-center gap-1"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  <span>{language === "bn" ? "ফাইন্যান্সিয়াল এইড / ফ্রি ওয়েভার প্রয়োজন? নিচে আবেদন করুন ↓" : "Need Financial Aid / Free Waiver? Apply below ↓"}</span>
+                </a>
+              </div>
+            ) : (
+              <p className="text-[10px] text-center text-slate-400 dark:text-slate-500 pt-1 font-medium flex items-center justify-center gap-1">
+                <ShieldCheck className="w-3 h-3 text-cyan-400" />
+                <span>{language === "bn" ? "সকল কোর্স উন্মুক্ত • প্রিভিউ দেখতে ক্লিক করুন" : "Full staff clearance active • Click to preview"}</span>
+              </p>
+            )}
           </div>
         </div>
 
@@ -705,18 +730,42 @@ export default function PricingPage() {
             </ul>
           </div>
 
-          <div className="pt-8">
+          <div className="pt-8 space-y-2">
             <button
+              type="button"
               onClick={() => handleOpenCheckout("SEMESTER_2")}
-              className={`w-full py-4 px-4 rounded-2xl font-black text-xs text-white transition-all flex items-center justify-center gap-2 shadow-lg ${
+              className={`w-full py-4 px-4 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer ${
                 isStaff
-                  ? "bg-slate-700 hover:bg-slate-600 text-slate-200"
-                  : "bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-blue-500/25"
+                  ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-500 text-white border-2 border-blue-300/60 shadow-xl shadow-blue-500/30"
+                  : "bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-blue-500/25 text-white"
               }`}
             >
-              <Sparkles className="w-4 h-4" />
-              <span>{isStaff ? (language === "bn" ? "অ্যাডমিন অ্যাক্সেস সক্রিয় ✓" : "Staff Access Active ✓") : (language === "bn" ? `২-সেমিস্টার প্ল্যান নিন (৳${p2.price} / ৬ মাস)` : `Get 2-Semesters Plan (৳${p2.price} / 6 Mos)`)}</span>
+              {isStaff ? (
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse shrink-0" />
+                    <ShieldCheck className="w-4 h-4 text-emerald-300 shrink-0" />
+                    <span className="font-black tracking-wide text-white">
+                      {language === "bn" ? "অ্যাডমিন অ্যাক্সেস সক্রিয়" : "Staff Access Active"}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20 text-white border border-white/40 shadow-xs shrink-0">
+                    UNLOCKED ✓
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  <span>{language === "bn" ? `২-সেমিস্টার প্ল্যান নিন (৳${p2.price} / ৬ মাস)` : `Get 2-Semesters Plan (৳${p2.price} / 6 Mos)`}</span>
+                </>
+              )}
             </button>
+            {isStaff && (
+              <p className="text-[10px] text-center text-slate-400 dark:text-slate-500 pt-1 font-medium flex items-center justify-center gap-1">
+                <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                <span>{language === "bn" ? "সর্বাধিক জনপ্রিয় প্ল্যান • অ্যাডমিন ক্লিয়ারেন্স সক্রিয়" : "Most popular plan • Full clearance active"}</span>
+              </p>
+            )}
           </div>
         </div>
 
@@ -807,18 +856,42 @@ export default function PricingPage() {
             </ul>
           </div>
 
-          <div className="pt-8">
+          <div className="pt-8 space-y-2">
             <button
+              type="button"
               onClick={() => handleOpenCheckout("YEAR_1_UNLIMITED")}
-              className={`w-full py-3.5 px-4 rounded-2xl font-black text-xs text-white transition-all flex items-center justify-center gap-2 shadow-md ${
+              className={`w-full py-3.5 px-4 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer ${
                 isStaff
-                  ? "bg-slate-700 hover:bg-slate-600 text-slate-200"
-                  : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95 shadow-purple-500/25"
+                  ? "bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-700 hover:from-purple-600 hover:via-indigo-600 hover:to-purple-600 text-white border-2 border-purple-400/60 shadow-xl shadow-purple-500/30"
+                  : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95 shadow-purple-500/25 text-white"
               }`}
             >
-              <Sparkles className="w-4 h-4" />
-              <span>{isStaff ? (language === "bn" ? "অ্যাডমিন অ্যাক্সেস সক্রিয় ✓" : "Staff Access Active ✓") : (language === "bn" ? `১-বছরের পাস নিন (৳${p3.price} / ১ বছর)` : `Get 1-Year Pass (৳${p3.price} / 1 Year)`)}</span>
+              {isStaff ? (
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-300 animate-pulse shrink-0" />
+                    <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
+                    <span className="font-black tracking-wide text-white">
+                      {language === "bn" ? "অ্যাডমিন অ্যাক্সেস সক্রিয়" : "Staff Access Active"}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-200 border border-amber-300/40 shadow-xs shrink-0">
+                    VIP ALL ✓
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  <span>{language === "bn" ? `১-বছরের পাস নিন (৳${p3.price} / ১ বছর)` : `Get 1-Year Pass (৳${p3.price} / 1 Year)`}</span>
+                </>
+              )}
             </button>
+            {isStaff && (
+              <p className="text-[10px] text-center text-slate-400 dark:text-slate-500 pt-1 font-medium flex items-center justify-center gap-1">
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span>{language === "bn" ? "সম্পূর্ণ ১ বছরের ভিআইপি অ্যাক্সেস সক্রিয়" : "Full 1-year unrestricted VIP clearance active"}</span>
+              </p>
+            )}
           </div>
         </div>
       </div>
