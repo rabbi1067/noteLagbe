@@ -452,6 +452,12 @@ export default function CoursesPage() {
                       <span>{course.unlockCount} {language === "bn" ? "আনলক" : "Unlocks"}</span>
                     </span>
                   )}
+                  {course.videoUrl && (
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 flex items-center gap-1 shadow-xs">
+                      <span className="text-[9px]">▶</span>
+                      <span>{language === "bn" ? "ভিডিও" : "Video"}</span>
+                    </span>
+                  )}
                   {course.isLab && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900">
                       {language === "bn" ? "ল্যাব" : "Lab"}

@@ -32,10 +32,16 @@ public class Course {
     @Column(length = 50)
     private String department = "CSE";
 
+    @Column(name = "video_url", length = 1000)
+    private String videoUrl;
+
     public Course() {}
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public String getVideoUrl() { return videoUrl; }
+    public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
 
     public String getCode() { return code; }
     public void setCode(String code) { this.code = code; }

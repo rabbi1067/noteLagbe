@@ -272,6 +272,9 @@ public class AdminController {
         if (payload.get("isLab") != null) {
             course.setLab(Boolean.parseBoolean(payload.get("isLab").toString()));
         }
+        if (payload.get("videoUrl") != null && !payload.get("videoUrl").toString().trim().isEmpty()) {
+            course.setVideoUrl(payload.get("videoUrl").toString().trim());
+        }
         Long initialTeacherId = null;
         if (payload.get("teacherId") != null && !payload.get("teacherId").toString().isEmpty()) {
             initialTeacherId = Long.parseLong(payload.get("teacherId").toString());

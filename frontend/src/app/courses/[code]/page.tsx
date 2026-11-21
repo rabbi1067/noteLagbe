@@ -947,6 +947,21 @@ function sortMaterialsBySemesterDesc(materials: any[]): any[] {
 
           {/* Action CTAs */}
           <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
+            {/* Official Course Video Lecture CTA */}
+            {course?.videoUrl && (
+              <a
+                href={course.videoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="py-3 px-5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-md shadow-red-600/25 transition-all flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 cursor-pointer"
+                title={language === "bn" ? "কোর্স ভিডিও লেকচার / প্লেলিস্ট দেখুন" : "Watch Official Course Video Lecture / Playlist"}
+              >
+                <span className="text-sm font-black">▶</span>
+                <span>{language === "bn" ? "ভিডিও লেকচার" : "Watch Video Lecture"}</span>
+                <ExternalLink className="w-3.5 h-3.5 ml-0.5 opacity-80" />
+              </a>
+            )}
+
             {/* AI Revision CheatSheet Button */}
             <button
               onClick={() => {
@@ -2704,19 +2719,6 @@ function MaterialCard({
         </div>
 
         <div className="flex items-center gap-2">
-          {resource.videoUrl && (
-            <a
-              href={resource.videoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="py-1.5 px-2.5 rounded-xl font-bold text-xs bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white dark:bg-red-500/15 dark:hover:bg-red-600 dark:text-red-400 dark:hover:text-white border border-red-500/25 transition-all flex items-center gap-1.5 shadow-2xs"
-              title={language === "bn" ? "ইউটিউব ভিডিও লেকচার দেখুন" : "Watch YouTube Video Lecture / Walkthrough"}
-            >
-              <span className="text-[10px] font-black">▶</span>
-              <span>{language === "bn" ? "ভিডিও" : "Video"}</span>
-            </a>
-          )}
           {isUnlocked ? (
             resource.type === "PROJECT_LINK" || resource.fileUrl?.includes("github.com") ? (
               <a

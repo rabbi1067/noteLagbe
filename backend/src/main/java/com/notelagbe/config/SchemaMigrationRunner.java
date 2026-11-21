@@ -109,6 +109,14 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             } catch (Exception ignored) {}
         }
         try {
+            jdbcTemplate.execute("ALTER TABLE courses ADD COLUMN IF NOT EXISTS video_url VARCHAR(1000) NULL");
+            log.info("Ensured courses.video_url column exists");
+        } catch (Exception e) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE courses ADD COLUMN video_url VARCHAR(1000) NULL");
+            } catch (Exception ignored) {}
+        }
+        try {
             jdbcTemplate.execute(
                 "CREATE TABLE IF NOT EXISTS offered_sections (" +
                 "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +

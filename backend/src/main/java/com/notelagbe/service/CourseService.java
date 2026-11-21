@@ -570,6 +570,10 @@ public class CourseService {
         if (payload.containsKey("description") && payload.get("description") != null) {
             course.setDescription(payload.get("description").toString());
         }
+        if (payload.containsKey("videoUrl")) {
+            Object vUrl = payload.get("videoUrl");
+            course.setVideoUrl(vUrl != null && !vUrl.toString().trim().isEmpty() ? vUrl.toString().trim() : null);
+        }
 
         Course updated = courseRepository.save(course);
         liveSyncService.broadcast("course", "updated", code);
