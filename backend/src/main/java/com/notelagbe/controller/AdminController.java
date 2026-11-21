@@ -689,15 +689,15 @@ public class AdminController {
     }
 
     // ==========================================
-    // Pricing Flash Campaigns Management (Super Admin)
+    // Pricing Flash Campaigns Management (Admin & Super Admin)
     // ==========================================
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @GetMapping("/pricing/campaigns")
     public ResponseEntity<List<com.notelagbe.entity.PricingCampaign>> getPricingCampaigns() {
         return ResponseEntity.ok(pricingCampaignService.getAllCampaigns());
     }
 
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PostMapping("/pricing/campaigns")
     public ResponseEntity<com.notelagbe.entity.PricingCampaign> savePricingCampaign(
             @RequestBody Map<String, Object> payload,
@@ -710,7 +710,7 @@ public class AdminController {
         return ResponseEntity.ok(saved);
     }
 
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @PutMapping("/pricing/campaigns/{id}/toggle")
     public ResponseEntity<com.notelagbe.entity.PricingCampaign> togglePricingCampaign(
             @PathVariable Long id,
@@ -723,7 +723,7 @@ public class AdminController {
         return ResponseEntity.ok(toggled);
     }
 
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     @DeleteMapping("/pricing/campaigns/{id}")
     public ResponseEntity<Map<String, Object>> deletePricingCampaign(
             @PathVariable Long id,

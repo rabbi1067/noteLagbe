@@ -53,6 +53,7 @@ public class SecurityConfig {
                     "/api/resources/duplicate-slots",
                     "/api/reviews/public/**",
                     "/api/plans",
+                    "/api/pricing/**",
                     "/api/ping",
                     "/api/sync/**",
                     "/api/stats/**",

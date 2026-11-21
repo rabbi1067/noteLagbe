@@ -3784,14 +3784,20 @@ export default function AdminDashboardPage() {
     });
   };
 
-  // Pricing Flash Campaigns Handlers (Super Admin)
+  // Pricing Flash Campaigns Handlers (Admin & Super Admin)
   const loadPricingCampaigns = async () => {
     setLoadingCampaigns(true);
     try {
       const data = await api.admin.getPricingCampaigns();
       setPricingCampaigns(data || []);
     } catch (err: any) {
-      toast.error(err.message || "Failed to load pricing campaigns");
+      const msg = err?.message || "";
+      if (msg.includes("not found") || msg.includes("404")) {
+        // Backend container deployment completing on Render; handle seamlessly without noisy raw error
+        setPricingCampaigns([]);
+      } else {
+        toast.error(language === "bn" ? "ক্যাম্পেইন ডেটা লোড হতে সমস্যা হয়েছে" : (err.message || "Failed to load pricing campaigns"));
+      }
     } finally {
       setLoadingCampaigns(false);
     }
@@ -3829,18 +3835,18 @@ export default function AdminDashboardPage() {
   const handleSaveCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!campaignName.trim()) {
-      toast.error("Campaign name is required");
+      toast.error(language === "bn" ? "ক্যাম্পেইনের নাম দেওয়া আবশ্যক" : "Campaign name is required");
       return;
     }
 
     if (campaignExpiresAt) {
       const expTime = new Date(campaignExpiresAt).getTime();
       if (expTime <= Date.now()) {
-        toast.error("Auto-expiry date and time must be in the future");
+        toast.error(language === "bn" ? "অটো-এক্সপায়ারি তারিখ ও সময় ভবিষ্যতে হতে হবে" : "Auto-expiry date and time must be in the future");
         return;
       }
       if (campaignStartsAt && expTime <= new Date(campaignStartsAt).getTime()) {
-        toast.error("Expiry date must be after the campaign start time");
+        toast.error(language === "bn" ? "এক্সপায়ারি তারিখ শুরুর সময়ের পরে হতে হবে" : "Expiry date must be after the campaign start time");
         return;
       }
     }
@@ -3860,7 +3866,11 @@ export default function AdminDashboardPage() {
         active: campaignActive,
       });
 
-      toast.success(editingCampaignId ? "Campaign updated successfully!" : "Flash discount campaign created successfully!");
+      toast.success(
+        editingCampaignId
+          ? (language === "bn" ? "ক্যাম্পেইন সফলভাবে আপডেট করা হয়েছে!" : "Campaign updated successfully!")
+          : (language === "bn" ? "নতুন ফ্ল্যাশ ডিসকাউন্ট ক্যাম্পেইন চালু হয়েছে!" : "Flash discount campaign created successfully!")
+      );
       notifyDataChanged("pricing", "campaign_saved");
       setEditingCampaignId(null);
       setCampaignName("");
@@ -3873,7 +3883,7 @@ export default function AdminDashboardPage() {
       setCampaignDescription("");
       await loadPricingCampaigns();
     } catch (err: any) {
-      toast.error(err.message || "Failed to save pricing campaign");
+      toast.error(err.message || (language === "bn" ? "ক্যাম্পেইন সংরক্ষণ ব্যর্থ হয়েছে" : "Failed to save pricing campaign"));
     } finally {
       setSavingCampaign(false);
     }
@@ -3883,29 +3893,39 @@ export default function AdminDashboardPage() {
     try {
       await api.admin.togglePricingCampaign(camp.id);
       notifyDataChanged("pricing", "campaign_toggled", camp.id);
-      toast.success(camp.active ? "Campaign deactivated. Reverted to standard pricing." : "Campaign activated!");
+      toast.success(
+        camp.active
+          ? (language === "bn" ? "ক্যাম্পেইন পজ করা হয়েছে। স্বাভাবিক মূল্যে ফিরে গেছে।" : "Campaign deactivated. Reverted to standard pricing.")
+          : (language === "bn" ? "ক্যাম্পেইন সক্রিয় করা হয়েছে!" : "Campaign activated!")
+      );
       await loadPricingCampaigns();
     } catch (err: any) {
-      toast.error(err.message || "Failed to toggle campaign status");
+      toast.error(err.message || (language === "bn" ? "স্ট্যাটাস পরিবর্তন ব্যর্থ হয়েছে" : "Failed to toggle campaign status"));
     }
   };
 
   const handleDeleteCampaign = (camp: any) => {
     openDeleteConfirm({
-      title: "Delete Pricing Campaign",
-      itemType: "Pricing Campaign",
+      title: language === "bn" ? "প্রাইসিং ক্যাম্পেইন মুছুন" : "Delete Pricing Campaign",
+      itemType: language === "bn" ? "প্রাইসিং ক্যাম্পেইন" : "Pricing Campaign",
       itemName: camp.name,
-      warningText: "Are you sure you want to delete this campaign? If active, live pricing will immediately revert back to standard base prices.",
-      confirmButtonText: "Delete Campaign",
+      warningText: language === "bn"
+        ? "আপনি কি নিশ্চিতভাবে এই ক্যাম্পেইনটি মুছে ফেলতে চান? যদি এটি সক্রিয় থাকে, তবে লাইভ প্রাইসিং অবিলম্বে স্বাভাবিক মূল্যে ফিরে যাবে।"
+        : "Are you sure you want to delete this campaign? If active, live pricing will immediately revert back to standard base prices.",
+      confirmButtonText: language === "bn" ? "ক্যাম্পেইন মুছুন" : "Delete Campaign",
       onConfirm: async () => {
         try {
           await api.admin.deletePricingCampaign(camp.id);
           notifyDataChanged("pricing", "campaign_deleted", camp.id);
-          toast.success("Campaign deleted successfully");
-          showDeleteSuccess("Campaign Deleted!", "The pricing campaign was permanently removed.", camp.name);
+          toast.success(language === "bn" ? "ক্যাম্পেইন সফলভাবে মুছে ফেলা হয়েছে" : "Campaign deleted successfully");
+          showDeleteSuccess(
+            language === "bn" ? "ক্যাম্পেইন মুছে ফেলা হয়েছে!" : "Campaign Deleted!",
+            language === "bn" ? "প্রাইসিং ক্যাম্পেইনটি স্থায়ীভাবে সরিয়ে নেওয়া হয়েছে।" : "The pricing campaign was permanently removed.",
+            camp.name
+          );
           await loadPricingCampaigns();
         } catch (err: any) {
-          toast.error(err.message || "Failed to delete campaign");
+          toast.error(err.message || (language === "bn" ? "ক্যাম্পেইন মুছতে ব্যর্থ হয়েছে" : "Failed to delete campaign"));
           throw err;
         }
       },
@@ -7510,7 +7530,7 @@ export default function AdminDashboardPage() {
                     className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 hover:opacity-90 text-white font-black text-xs shadow-md shadow-amber-500/20 transition-all cursor-pointer"
                   >
                     <Flame className="w-3.5 h-3.5 fill-current" />
-                    <span>Flash Campaigns</span>
+                    <span>{language === "bn" ? "ফ্ল্যাশ ক্যাম্পেইন" : "Flash Campaigns"}</span>
                   </button>
                   <span className="text-xs font-bold text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
                     {pendingPaymentsCount} Pending Action
@@ -14165,7 +14185,7 @@ export default function AdminDashboardPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* FLASH PRICING CAMPAIGN MANAGEMENT MODAL (SUPER ADMIN)                    */}
+      {/* FLASH PRICING CAMPAIGN MANAGEMENT MODAL (ADMIN & SUPER ADMIN)            */}
       {/* ========================================================================= */}
       {showCampaignModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
@@ -14178,20 +14198,22 @@ export default function AdminDashboardPage() {
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
-                    <span>Flash Discount & Pricing Campaigns</span>
+                    <span>{language === "bn" ? "ফ্ল্যাশ ডিসকাউন্ট ও স্পেশাল ক্যাম্পেইন" : "Flash Discount & Pricing Campaigns"}</span>
                     <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                      SUPER ADMIN
+                      ADMIN
                     </span>
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Set time-limited flash discounts. Pricing automatically rolls back to standard base prices upon expiry.
+                    {language === "bn"
+                      ? "নির্দিষ্ট মেয়াদের জন্য বিশেষ ছাড় নির্ধারণ করুন। মেয়াদ শেষ হলে স্বয়ংক্রিয়ভাবে বেস প্রাইসে ফিরে যাবে।"
+                      : "Set time-limited flash discounts. Pricing automatically rolls back to standard base prices upon expiry."}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCampaignModal(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -14204,7 +14226,11 @@ export default function AdminDashboardPage() {
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    <span>{editingCampaignId ? "Edit Campaign" : "Create New Flash Discount Campaign"}</span>
+                    <span>
+                      {editingCampaignId
+                        ? (language === "bn" ? "ক্যাম্পেইন এডিট করুন" : "Edit Campaign")
+                        : (language === "bn" ? "নতুন ফ্ল্যাশ ডিসকাউন্ট ক্যাম্পেইন তৈরি করুন" : "Create New Flash Discount Campaign")}
+                    </span>
                   </h4>
                   {editingCampaignId && (
                     <button
@@ -14223,7 +14249,7 @@ export default function AdminDashboardPage() {
                       }}
                       className="text-[11px] font-bold text-blue-500 hover:underline cursor-pointer"
                     >
-                      + Switch to New Campaign
+                      {language === "bn" ? "+ নতুন ক্যাম্পেইনে যান" : "+ Switch to New Campaign"}
                     </button>
                   )}
                 </div>
@@ -14232,12 +14258,12 @@ export default function AdminDashboardPage() {
                   {/* Campaign Name */}
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      Campaign Title *
+                      {language === "bn" ? "ক্যাম্পেইন টাইটেল *" : "Campaign Title *"}
                     </label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Ramadan Special Discount"
+                      placeholder={language === "bn" ? "যেমন: রমাদান স্পেশাল মেগা ডিসকাউন্ট" : "e.g. Ramadan Special Discount"}
                       value={campaignName}
                       onChange={(e) => setCampaignName(e.target.value)}
                       className="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -14247,11 +14273,11 @@ export default function AdminDashboardPage() {
                   {/* Badge Text */}
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      Header / Card Badge Text
+                      {language === "bn" ? "কার্ড ও ব্যানারের ব্যাজ টেক্সট" : "Header / Card Badge Text"}
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. 🔥 সীমিত সময়ের বিশেষ ছাড়"
+                      placeholder={language === "bn" ? "যেমন: 🔥 সীমিত সময়ের বিশেষ ছাড়" : "e.g. 🔥 Limited Time Flash Offer"}
                       value={campaignBadgeText}
                       onChange={(e) => setCampaignBadgeText(e.target.value)}
                       className="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -14262,18 +14288,18 @@ export default function AdminDashboardPage() {
                 {/* 3 Tier Discount Prices */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-                    Campaign Discount Prices (৳ Taka)
+                    {language === "bn" ? "ক্যাম্পেইনের নির্ধারিত ছাড় মূল্য (৳ টাকা)" : "Campaign Discount Prices (৳ Taka)"}
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
                       <div className="flex justify-between items-center text-[11px]">
-                        <span className="font-bold text-slate-600 dark:text-slate-300">1-Semester Plan</span>
-                        <span className="text-slate-400 line-through">Base: ৳99</span>
+                        <span className="font-bold text-slate-600 dark:text-slate-300">{language === "bn" ? "১-সেমিস্টার প্ল্যান" : "1-Semester Plan"}</span>
+                        <span className="text-slate-400 line-through">{language === "bn" ? "বেস: ৳৯৯" : "Base: ৳99"}</span>
                       </div>
                       <input
                         type="number"
                         min="1"
-                        placeholder="e.g. 79 (or blank for 99)"
+                        placeholder={language === "bn" ? "যেমন: ৭৯ (অথবা ৯৯ এর জন্য ফাঁকা রাখুন)" : "e.g. 79 (or blank for 99)"}
                         value={campaignSem1Price}
                         onChange={(e) => setCampaignSem1Price(e.target.value === "" ? "" : Number(e.target.value))}
                         className="w-full text-xs p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -14282,13 +14308,13 @@ export default function AdminDashboardPage() {
 
                     <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
                       <div className="flex justify-between items-center text-[11px]">
-                        <span className="font-bold text-slate-600 dark:text-slate-300">2-Semesters Plan</span>
-                        <span className="text-slate-400 line-through">Base: ৳149</span>
+                        <span className="font-bold text-slate-600 dark:text-slate-300">{language === "bn" ? "২-সেমিস্টার প্ল্যান" : "2-Semesters Plan"}</span>
+                        <span className="text-slate-400 line-through">{language === "bn" ? "বেস: ৳১৪৯" : "Base: ৳149"}</span>
                       </div>
                       <input
                         type="number"
                         min="1"
-                        placeholder="e.g. 119 (or blank for 149)"
+                        placeholder={language === "bn" ? "যেমন: ১১৯ (অথবা ১৪৯ এর জন্য ফাঁকা রাখুন)" : "e.g. 119 (or blank for 149)"}
                         value={campaignSem2Price}
                         onChange={(e) => setCampaignSem2Price(e.target.value === "" ? "" : Number(e.target.value))}
                         className="w-full text-xs p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -14297,13 +14323,13 @@ export default function AdminDashboardPage() {
 
                     <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
                       <div className="flex justify-between items-center text-[11px]">
-                        <span className="font-bold text-slate-600 dark:text-slate-300">1-Year Annual Pass</span>
-                        <span className="text-slate-400 line-through">Base: ৳499</span>
+                        <span className="font-bold text-slate-600 dark:text-slate-300">{language === "bn" ? "১-বছর অ্যানুয়াল পাস" : "1-Year Annual Pass"}</span>
+                        <span className="text-slate-400 line-through">{language === "bn" ? "বেস: ৳৪৯৯" : "Base: ৳499"}</span>
                       </div>
                       <input
                         type="number"
                         min="1"
-                        placeholder="e.g. 399 (or blank for 499)"
+                        placeholder={language === "bn" ? "যেমন: ৩৯৯ (অথবা ৪৯৯ এর জন্য ফাঁকা রাখুন)" : "e.g. 399 (or blank for 499)"}
                         value={campaignYear1Price}
                         onChange={(e) => setCampaignYear1Price(e.target.value === "" ? "" : Number(e.target.value))}
                         className="w-full text-xs p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -14316,8 +14342,10 @@ export default function AdminDashboardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                      <span>Auto-Expiry Date & Time *</span>
-                      <span className="text-[10px] text-amber-500 font-semibold">Auto reverts upon arrival</span>
+                      <span>{language === "bn" ? "অটো-এক্সপায়ারি তারিখ ও সময় *" : "Auto-Expiry Date & Time *"}</span>
+                      <span className="text-[10px] text-amber-500 font-semibold">
+                        {language === "bn" ? "মেয়াদ শেষে স্বয়ংক্রিয়ভাবে বন্ধ হবে" : "Auto reverts upon arrival"}
+                      </span>
                     </label>
                     <input
                       type="datetime-local"
@@ -14329,7 +14357,7 @@ export default function AdminDashboardPage() {
 
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      Campaign Start Time (Optional)
+                      {language === "bn" ? "ক্যাম্পেইন শুরুর সময় (ঐচ্ছিক)" : "Campaign Start Time (Optional)"}
                     </label>
                     <input
                       type="datetime-local"
@@ -14350,7 +14378,7 @@ export default function AdminDashboardPage() {
                       className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500"
                     />
                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      Set Campaign Active
+                      {language === "bn" ? "ক্যাম্পেইন অবিলম্বে সক্রিয় রাখুন" : "Set Campaign Active"}
                     </span>
                   </label>
 
@@ -14362,7 +14390,11 @@ export default function AdminDashboardPage() {
                     >
                       {savingCampaign && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                       <Flame className="w-3.5 h-3.5 fill-current" />
-                      <span>{editingCampaignId ? "Update Campaign" : "Save & Activate Campaign"}</span>
+                      <span>
+                        {editingCampaignId
+                          ? (language === "bn" ? "পরিবর্তন সংরক্ষণ করুন" : "Update Campaign")
+                          : (language === "bn" ? "ক্যাম্পেইন চালু করুন" : "Save & Activate Campaign")}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -14373,13 +14405,14 @@ export default function AdminDashboardPage() {
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <History className="w-3.5 h-3.5 text-blue-500" />
-                    <span>Campaign History & Active Offer Tracker</span>
+                    <span>{language === "bn" ? "ক্যাম্পেইন হিস্ট্রি ও অ্যাক্টিভ অফার ট্র্যাকার" : "Campaign History & Active Offer Tracker"}</span>
                   </h4>
                   <button
                     type="button"
                     onClick={loadPricingCampaigns}
                     disabled={loadingCampaigns}
-                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                    title={language === "bn" ? "রিফ্রেশ করুন" : "Refresh"}
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${loadingCampaigns ? "animate-spin" : ""}`} />
                   </button>
@@ -14387,7 +14420,9 @@ export default function AdminDashboardPage() {
 
                 {pricingCampaigns.length === 0 ? (
                   <div className="p-8 text-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-xs text-slate-400">
-                    No flash discount campaigns configured yet. Create one above to launch a limited-time offer!
+                    {language === "bn"
+                      ? "এখনো কোনো ফ্ল্যাশ ডিসকাউন্ট ক্যাম্পেইন সেট করা হয়নি। উপরে ফর্ম পূরণ করে নতুন অফার শুরু করুন!"
+                      : "No flash discount campaigns configured yet. Create one above to launch a limited-time offer!"}
                   </div>
                 ) : (
                   <div className="space-y-2.5">
@@ -14412,15 +14447,15 @@ export default function AdminDashboardPage() {
                               {isLive ? (
                                 <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  LIVE NOW
+                                  {language === "bn" ? "লাইভ চলছে" : "LIVE NOW"}
                                 </span>
                               ) : isExpired ? (
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500">
-                                  EXPIRED (Auto-Reverted)
+                                  {language === "bn" ? "মেয়াদোত্তীর্ণ (স্বয়ংক্রিয় রিভার্ট)" : "EXPIRED (Auto-Reverted)"}
                                 </span>
                               ) : (
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-600">
-                                  PAUSED
+                                  {language === "bn" ? "পজ করা" : "PAUSED"}
                                 </span>
                               )}
                               {camp.badgeText && (
@@ -14431,17 +14466,17 @@ export default function AdminDashboardPage() {
                             </div>
 
                             <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
-                              <span>1-Sem: <strong className="text-slate-800 dark:text-slate-200">৳{camp.semester1Price || 99}</strong></span>
+                              <span>{language === "bn" ? "১-সেম:" : "1-Sem:"} <strong className="text-slate-800 dark:text-slate-200">৳{camp.semester1Price || 99}</strong></span>
                               <span>•</span>
-                              <span>2-Sem: <strong className="text-slate-800 dark:text-slate-200">৳{camp.semester2Price || 149}</strong></span>
+                              <span>{language === "bn" ? "২-সেম:" : "2-Sem:"} <strong className="text-slate-800 dark:text-slate-200">৳{camp.semester2Price || 149}</strong></span>
                               <span>•</span>
-                              <span>1-Year: <strong className="text-slate-800 dark:text-slate-200">৳{camp.year1Price || 499}</strong></span>
+                              <span>{language === "bn" ? "১-বছর:" : "1-Year:"} <strong className="text-slate-800 dark:text-slate-200">৳{camp.year1Price || 499}</strong></span>
                               {camp.expiresAt && (
                                 <>
                                   <span>•</span>
                                   <span className="flex items-center gap-1 text-slate-400">
                                     <Clock className="w-3 h-3" />
-                                    <span>Expires: {new Date(camp.expiresAt).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })}</span>
+                                    <span>{language === "bn" ? "মেয়াদ শেষ:" : "Expires:"} {new Date(camp.expiresAt).toLocaleString(language === "bn" ? "bn-BD" : "en-GB", { dateStyle: "short", timeStyle: "short" })}</span>
                                   </span>
                                 </>
                               )}
@@ -14452,27 +14487,27 @@ export default function AdminDashboardPage() {
                             <button
                               type="button"
                               onClick={() => handleToggleCampaign(camp)}
-                              className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-colors ${
+                              className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-colors cursor-pointer ${
                                 camp.active
                                   ? "border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20"
                                   : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100"
                               }`}
                             >
-                              {camp.active ? "Pause" : "Activate"}
+                              {camp.active ? (language === "bn" ? "পজ করুন" : "Pause") : (language === "bn" ? "চালু করুন" : "Activate")}
                             </button>
                             <button
                               type="button"
                               onClick={() => openEditCampaignModal(camp)}
-                              className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors"
-                              title="Edit Campaign"
+                              className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
+                              title={language === "bn" ? "ক্যাম্পেইন এডিট করুন" : "Edit Campaign"}
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDeleteCampaign(camp)}
-                              className="p-1.5 rounded-xl border border-rose-200 dark:border-rose-900/50 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                              title="Delete Campaign"
+                              className="p-1.5 rounded-xl border border-rose-200 dark:border-rose-900/50 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                              title={language === "bn" ? "ক্যাম্পেইন মুছুন" : "Delete Campaign"}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -14492,7 +14527,7 @@ export default function AdminDashboardPage() {
                 onClick={() => setShowCampaignModal(false)}
                 className="px-4 py-2 rounded-xl font-bold text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
               >
-                Close
+                {language === "bn" ? "বন্ধ করুন" : "Close"}
               </button>
             </div>
           </div>
