@@ -543,10 +543,8 @@ public class CourseService {
         }
         TeacherCourse saved = teacherCourseRepository.save(tc);
 
-        if (cleanUrl != null && (course.getVideoUrl() == null || course.getVideoUrl().isEmpty())) {
-            course.setVideoUrl(cleanUrl);
-            courseRepository.save(course);
-        }
+        course.setVideoUrl(cleanUrl);
+        courseRepository.save(course);
 
         liveSyncService.broadcast("teacher_course", "updated", teacherId);
         liveSyncService.broadcast("course", "updated", course.getCode());

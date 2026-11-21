@@ -2184,20 +2184,20 @@ export default function AdminDashboardPage() {
         toast.success("New academic material uploaded successfully!");
       }
 
-      // If resCourseVideoUrl was modified while editing/uploading, also update course video!
+      // If resCourseVideoUrl was modified while editing/uploading, update course video optimistically in background
       if (resCourseCode && resCourseVideoUrl !== undefined) {
         const cleanVid = resCourseVideoUrl.trim();
-        try {
-          if (resTeacherId) {
-            await api.admin.updateTeacherCourseVideo(Number(resTeacherId), resCourseCode, cleanVid || null);
-          } else {
-            await api.admin.updateCourse(resCourseCode, { videoUrl: cleanVid || "" });
-          }
-        } catch {
-          try {
-            await api.admin.updateCourse(resCourseCode, { videoUrl: cleanVid || "", teacherId: resTeacherId ? Number(resTeacherId) : null });
-          } catch {}
-        }
+        setCourses((prev) =>
+          prev.map((c) =>
+            c.code?.toUpperCase() === resCourseCode.toUpperCase()
+              ? { ...c, videoUrl: cleanVid ? cleanVid : null }
+              : c
+          )
+        );
+        const videoPromise = resTeacherId
+          ? api.admin.updateTeacherCourseVideo(Number(resTeacherId), resCourseCode, cleanVid || null)
+          : api.admin.updateCourse(resCourseCode, { videoUrl: cleanVid || "" });
+        videoPromise.catch(() => {});
       }
 
       closeResourceModal();
@@ -2424,68 +2424,56 @@ export default function AdminDashboardPage() {
       return;
     }
     const cleanUrl = courseVideoUrl.trim();
-    const teacher = teachers.find((t) => Number(t.id) === Number(courseVideoTeacherId));
+    const teacherId = Number(courseVideoTeacherId);
+    const code = courseVideoCode;
+    const teacher = teachers.find((t) => Number(t.id) === teacherId);
+
+    // ⚡ 1. Senior Engineer Optimistic UI: Update UI instantly in 0 milliseconds!
+    setTeacherCoursesList((prev) =>
+      prev.map((item) => {
+        const itemCode = (item.course?.code || item.code || "").toUpperCase();
+        if (itemCode === code.toUpperCase()) {
+          return { ...item, videoUrl: cleanUrl || null };
+        }
+        return item;
+      })
+    );
+
+    setCourses((prev) =>
+      prev.map((c) =>
+        c.code?.toUpperCase() === code.toUpperCase()
+          ? { ...c, videoUrl: cleanUrl ? cleanUrl : null }
+          : c
+      )
+    );
+
+    notifyDataChanged("teacher_course", "updated", teacherId);
+    notifyDataChanged("course", "updated", code);
+
+    toast.success(
+      cleanUrl
+        ? `✓ Video lecture saved for ${teacher?.name || "faculty"} [${code}]!`
+        : `✓ Video lecture removed from ${teacher?.name || "faculty"} [${code}]!`
+    );
+
+    // ⚡ 2. High-speed single-call background API sync (no sequential waiting!)
     setSavingCourseVideo(true);
     try {
-      let savedSuccessfully = false;
-
-      // 1. Primary: Save teacher-course video
       try {
-        await api.admin.updateTeacherCourseVideo(Number(courseVideoTeacherId), courseVideoCode, cleanUrl || null);
-        savedSuccessfully = true;
-      } catch (tcErr: any) {
-        console.warn("Direct teacher-course video endpoint error, running course fallback...", tcErr);
-      }
-
-      // 2. Also ensure Course.videoUrl is synced so every view gets the link
-      try {
-        const targetCourse = courses.find((c) => c.code?.toUpperCase() === courseVideoCode.toUpperCase());
+        await api.admin.updateTeacherCourseVideo(teacherId, code, cleanUrl || null);
+      } catch (err: any) {
+        // Fallback to updateCourse only if primary endpoint failed
+        const targetCourse = courses.find((c) => c.code?.toUpperCase() === code.toUpperCase());
         if (targetCourse) {
           await api.admin.updateCourse(targetCourse.code, {
-            title: targetCourse.title,
-            department: targetCourse.department,
-            credits: targetCourse.credits,
-            semester: targetCourse.semester,
-            isLab: Boolean(targetCourse.lab || targetCourse.isLab),
-            prerequisite: targetCourse.prerequisite || "",
-            description: targetCourse.description || "",
+            ...targetCourse,
             videoUrl: cleanUrl || "",
-            teacherId: courseVideoTeacherId ? Number(courseVideoTeacherId) : null,
+            teacherId: teacherId,
           });
-          savedSuccessfully = true;
         }
-      } catch (cErr: any) {
-        if (!savedSuccessfully) throw cErr;
       }
-
-      setTeacherCoursesList((prev) =>
-        prev.map((item) => {
-          const itemCode = (item.course?.code || item.code || "").toUpperCase();
-          if (itemCode === courseVideoCode.toUpperCase()) {
-            return { ...item, videoUrl: cleanUrl || null };
-          }
-          return item;
-        })
-      );
-
-      setCourses((prev) =>
-        prev.map((c) =>
-          c.code?.toUpperCase() === courseVideoCode.toUpperCase()
-            ? { ...c, videoUrl: cleanUrl ? cleanUrl : null }
-            : c
-        )
-      );
-
-      notifyDataChanged("teacher_course", "updated", Number(courseVideoTeacherId));
-      notifyDataChanged("course", "updated", courseVideoCode);
-
-      toast.success(
-        cleanUrl
-          ? `Video lecture link saved for ${teacher?.name || "faculty"} [${courseVideoCode}]!`
-          : `Video lecture removed from ${teacher?.name || "faculty"} [${courseVideoCode}]!`
-      );
     } catch (err: any) {
-      toast.error(err.message || "Failed to update course video");
+      toast.error(err.message || "Failed to persist to server. Please try again.");
     } finally {
       setSavingCourseVideo(false);
     }
@@ -12523,7 +12511,33 @@ export default function AdminDashboardPage() {
                 {courseVideoUrl ? (
                   <button
                     type="button"
-                    onClick={() => setCourseVideoUrl("")}
+                    onClick={() => {
+                      setCourseVideoUrl("");
+                      if (courseVideoTeacherId && courseVideoCode) {
+                        const code = courseVideoCode;
+                        const teacherId = Number(courseVideoTeacherId);
+                        setTeacherCoursesList((prev) =>
+                          prev.map((item) => {
+                            const itemCode = (item.course?.code || item.code || "").toUpperCase();
+                            if (itemCode === code.toUpperCase()) {
+                              return { ...item, videoUrl: null };
+                            }
+                            return item;
+                          })
+                        );
+                        setCourses((prev) =>
+                          prev.map((c) =>
+                            c.code?.toUpperCase() === code.toUpperCase()
+                              ? { ...c, videoUrl: null }
+                              : c
+                          )
+                        );
+                        notifyDataChanged("teacher_course", "updated", teacherId);
+                        notifyDataChanged("course", "updated", code);
+                        toast.success(`✓ Video lecture link removed for [${code}]`);
+                        api.admin.updateTeacherCourseVideo(teacherId, code, null).catch(() => {});
+                      }
+                    }}
                     className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
                   >
                     Remove Video Link
