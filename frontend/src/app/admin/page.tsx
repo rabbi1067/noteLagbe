@@ -11562,10 +11562,6 @@ export default function AdminDashboardPage() {
                     </button>
                   )}
                 </div>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
-                  <span>💡</span>
-                  <span>ক্লাস রেকর্ডিং, লেকচার ভিডিও বা প্রশ্ন সমাধানের ইউটিউব লিংক দিন (যদি থাকে)।</span>
-                </p>
               </div>
 
               {(resType === "QUIZ_CT" || resType === "LAB_QUIZ") && (
