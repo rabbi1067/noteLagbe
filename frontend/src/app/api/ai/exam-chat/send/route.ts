@@ -128,7 +128,6 @@ function isSafeInspectionHost(urlStr: string): boolean {
 
 async function extractTextFromPdfBuffer(pdfBuffer: Buffer): Promise<string> {
   try {
-    // @ts-ignore - pdfjs-dist v4 ESM legacy entrypoint
     const pdfjs: any = await import("pdfjs-dist/legacy/build/pdf.mjs");
     const data = new Uint8Array(pdfBuffer);
     const loadingTask = pdfjs.getDocument({

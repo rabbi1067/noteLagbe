@@ -172,6 +172,10 @@ public class TeacherService {
         if (payload.containsKey("image")) {
             teacher.setImage(payload.get("image") != null ? payload.get("image").toString().trim() : null);
         }
+        if (payload.containsKey("youtubeUrl")) {
+            Object yUrl = payload.get("youtubeUrl");
+            teacher.setYoutubeUrl(yUrl != null && !yUrl.toString().trim().isEmpty() ? yUrl.toString().trim() : null);
+        }
         if (payload.containsKey("onLeave")) {
             teacher.setOnLeave(Boolean.parseBoolean(payload.get("onLeave").toString()));
         }

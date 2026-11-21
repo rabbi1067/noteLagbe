@@ -35,12 +35,18 @@ public class Teacher {
     @Column(nullable = false, length = 64)
     private String department = "CSE";
 
+    @Column(name = "youtube_url", length = 1000)
+    private String youtubeUrl;
+
     private boolean onLeave = false;
 
     public Teacher() {}
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public String getYoutubeUrl() { return youtubeUrl; }
+    public void setYoutubeUrl(String youtubeUrl) { this.youtubeUrl = youtubeUrl; }
 
     public String getDepartment() { return department != null ? department : "CSE"; }
     public void setDepartment(String department) { this.department = department; }

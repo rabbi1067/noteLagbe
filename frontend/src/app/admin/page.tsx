@@ -1347,6 +1347,7 @@ export default function AdminDashboardPage() {
   const [teacherFormEmail, setTeacherFormEmail] = useState("");
   const [teacherFormPhone, setTeacherFormPhone] = useState("");
   const [teacherFormImage, setTeacherFormImage] = useState("");
+  const [teacherFormYoutubeUrl, setTeacherFormYoutubeUrl] = useState("");
   const [teacherFormCategory, setTeacherFormCategory] = useState("FULL_TIME_FACULTY");
   const [teacherFormDept, setTeacherFormDept] = useState("CSE");
   const [teacherFormCustomDept, setTeacherFormCustomDept] = useState("");
@@ -2285,6 +2286,7 @@ export default function AdminDashboardPage() {
     setTeacherFormEmail("");
     setTeacherFormPhone("");
     setTeacherFormImage("");
+    setTeacherFormYoutubeUrl("");
     setTeacherFormCategory("FULL_TIME_FACULTY");
     setTeacherFormDept("CSE");
     setTeacherFormCustomDept("");
@@ -2301,6 +2303,7 @@ export default function AdminDashboardPage() {
     setTeacherFormEmail(teacher.email || "");
     setTeacherFormPhone(teacher.phone || "");
     setTeacherFormImage(teacher.image || "");
+    setTeacherFormYoutubeUrl(teacher.youtubeUrl || "");
     setTeacherFormCategory(teacher.category || "FULL_TIME_FACULTY");
     setTeacherFormDept((teacher.department || "CSE").toUpperCase());
     setTeacherFormCustomDept("");
@@ -2354,6 +2357,7 @@ export default function AdminDashboardPage() {
         email: teacherFormEmail.trim(),
         phone: teacherFormPhone.trim(),
         image: teacherFormImage.trim(),
+        youtubeUrl: teacherFormYoutubeUrl.trim() || null,
         category: teacherFormCategory,
         department: finalDept,
       };
@@ -6970,6 +6974,17 @@ export default function AdminDashboardPage() {
                           </div>
 
                           <div className="flex items-center gap-1">
+                            {t.youtubeUrl && (
+                              <a
+                                href={t.youtubeUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                title={`Faculty YouTube Channel: ${t.youtubeUrl}`}
+                              >
+                                <span className="text-[11px] font-black">▶</span>
+                              </a>
+                            )}
                             <button
                               onClick={() => openEditTeacherModal(t)}
                               className="p-1.5 rounded-lg text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -12133,6 +12148,45 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Faculty YouTube Channel / Lecture Playlist URL */}
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 rounded bg-red-600 text-white font-black text-[9px] tracking-wide inline-flex items-center gap-1 shadow-2xs">
+                      ▶ YouTube
+                    </span>
+                    <span>Official YouTube Channel / Lecture Playlist (Optional)</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">One YouTube link per faculty</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="url"
+                    value={teacherFormYoutubeUrl}
+                    onChange={(e) => setTeacherFormYoutubeUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/@channel or playlist link"
+                    className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-red-500 font-medium text-xs transition-colors"
+                  />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-red-500 pointer-events-none">
+                    <Video className="w-4 h-4" />
+                  </div>
+                  {teacherFormYoutubeUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setTeacherFormYoutubeUrl("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                      title="Clear YouTube link"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
+                  <span>💡</span>
+                  <span>শিক্ষকের নিজস্ব ইউটিউব চ্যানেল বা কোর্স লেকচার প্লেলিস্টের লিংক দিন (শিক্ষার্থীরা প্রোফাইলে দেখতে পাবে)।</span>
+                </p>
               </div>
 
               <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">

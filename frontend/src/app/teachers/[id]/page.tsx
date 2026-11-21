@@ -604,6 +604,38 @@ export default function TeacherDetailPage() {
             </p>
           </div>
         </div>
+
+        {/* Right side: Faculty Official YouTube Channel / Video Lectures */}
+        {teacher.youtubeUrl && (
+          <div className="md:self-center shrink-0 w-full md:w-auto flex flex-col items-center md:items-end">
+            <a
+              href={teacher.youtubeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group relative p-4 rounded-2xl bg-gradient-to-br from-red-500/10 via-red-600/5 to-transparent dark:from-red-500/15 dark:via-red-950/30 dark:to-slate-900 border border-red-500/30 hover:border-red-500 transition-all duration-300 hover:shadow-lg hover:shadow-red-500/15 flex items-center gap-3.5 max-w-xs"
+              title="Open Official YouTube Channel / Lectures"
+            >
+              <div className="w-12 h-12 rounded-xl bg-red-600 group-hover:bg-red-500 text-white flex items-center justify-center shrink-0 shadow-md transition-all group-hover:scale-105">
+                <span className="text-xl font-black">▶</span>
+              </div>
+              <div className="text-left min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-red-600 dark:text-red-400">
+                    Official Channel
+                  </span>
+                  <span className="flex h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+                </div>
+                <h4 className="font-extrabold text-sm text-slate-900 dark:text-white truncate group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
+                  {language === "bn" ? "ইউটিউব লেকচার" : "Watch Lectures"}
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                  {language === "bn" ? "ভিডিও ক্লাস ও সমাধান" : "Class recordings & guides"}
+                </p>
+              </div>
+              <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-red-500 shrink-0 transition-colors ml-1" />
+            </a>
+          </div>
+        )}
       </div>
 
       {/* 2. MAIN TWO-COLUMN LAYOUT (Sticky left column to eliminate blank space) */}
