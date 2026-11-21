@@ -16,6 +16,9 @@ import { api, ChatMessageDto, warmupBackend, getToken } from "@/lib/api";
 import { notifyDataChanged, useDataSync } from "@/lib/sync";
 import {
   Calendar,
+  RotateCcw,
+  Tag,
+  Percent,
   ShieldCheck,
   Crown,
   Gift,
@@ -543,7 +546,7 @@ export default function AdminDashboardPage() {
   const [reviewStatusFilter, setReviewStatusFilter] = useState<"ALL" | "PENDING" | "APPROVED" | "REJECTED">("PENDING");
 
   // Subscription Payments & Active Subscribers States
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState<"PENDING" | "APPROVED" | "REJECTED" | "ALL" | "SUBSCRIBERS">("PENDING");
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<"PENDING" | "APPROVED" | "REJECTED" | "ALL" | "SUBSCRIBERS" | "CAMPAIGNS">("PENDING");
   const [paymentSearch, setPaymentSearch] = useState("");
   const [activeSubscribers, setActiveSubscribers] = useState<any[]>([]);
 
@@ -1755,6 +1758,11 @@ export default function AdminDashboardPage() {
               setActiveSubscribers(subs || []);
             }).catch(() => {})
           : Promise.resolve(),
+        isSuperAdmin
+          ? api.admin.getPricingCampaigns().then((camps) => {
+              if (Array.isArray(camps)) setPricingCampaigns(camps);
+            }).catch(() => {})
+          : Promise.resolve(),
         api.admin.getActivityLogs({ page: 1, size: 15 }).then((logData) => {
           if (logData) setActivityLogsData(logData);
         }).catch(() => {}),
@@ -1844,13 +1852,14 @@ export default function AdminDashboardPage() {
 
       isRefreshingQueuesRef.current = true;
       try {
-        const [pData, cData, wData, revData, resData, subData] = await Promise.all([
+        const [pData, cData, wData, revData, resData, subData, campData] = await Promise.all([
           isSuperAdmin ? api.admin.getPayments().catch(() => null) : Promise.resolve(null),
           api.admin.getContributions().catch(() => null),
           api.admin.getWaivers().catch(() => null),
           api.admin.getReviews().catch(() => null),
           includeResources ? api.admin.getResources().catch(() => null) : Promise.resolve(null),
           includeSubscribers ? api.admin.getSubscriptions(true).catch(() => null) : Promise.resolve(null),
+          isSuperAdmin ? api.admin.getPricingCampaigns().catch(() => null) : Promise.resolve(null),
         ]);
 
         if (Array.isArray(pData)) setPayments(pData);
@@ -1859,6 +1868,7 @@ export default function AdminDashboardPage() {
         if (Array.isArray(revData)) setAdminReviews(revData);
         if (Array.isArray(resData)) setResources(resData);
         if (Array.isArray(subData)) setActiveSubscribers(subData);
+        if (Array.isArray(campData)) setPricingCampaigns(campData);
       } finally {
         isRefreshingQueuesRef.current = false;
         const queued = pendingQueueRefreshOptsRef.current;
@@ -3889,6 +3899,47 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleQuickReactivate = async (camp: any, days = 7) => {
+    try {
+      const now = new Date();
+      const future = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+      const newStartsAt = now.toISOString().slice(0, 16);
+      const newExpiresAt = future.toISOString().slice(0, 16);
+
+      await api.admin.savePricingCampaign({
+        id: camp.id,
+        name: camp.name,
+        badgeText: camp.badgeText,
+        description: camp.description,
+        semester1Price: camp.semester1Price,
+        semester2Price: camp.semester2Price,
+        year1Price: camp.year1Price,
+        startsAt: newStartsAt,
+        expiresAt: newExpiresAt,
+        active: true,
+      });
+
+      notifyDataChanged("pricing", "campaign_reactivated", camp.id);
+      try {
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.7 },
+        });
+      } catch {
+        // ignore
+      }
+      toast.success(
+        language === "bn"
+          ? `ক্যাম্পেইনটি সফলভাবে পুনরায় সক্রিয় (Reactivated) করা হয়েছে (আরও ${days} দিন)!`
+          : `Campaign reactivated successfully (+${days} days)!`
+      );
+      await loadPricingCampaigns();
+    } catch (err: any) {
+      toast.error(err.message || (language === "bn" ? "ক্যাম্পেইন সক্রিয় করতে ব্যর্থ হয়েছে" : "Failed to reactivate campaign"));
+    }
+  };
+
   const handleToggleCampaign = async (camp: any) => {
     try {
       await api.admin.togglePricingCampaign(camp.id);
@@ -4406,8 +4457,9 @@ export default function AdminDashboardPage() {
 
   // Filtered Payments
   const filteredPayments = useMemo(() => {
+    if (paymentStatusFilter === "SUBSCRIBERS" || (paymentStatusFilter as string) === "CAMPAIGNS") return [];
     return payments.filter((p) => {
-      if (paymentStatusFilter !== "ALL" && paymentStatusFilter !== "SUBSCRIBERS") {
+      if (paymentStatusFilter !== "ALL") {
         if (p.status !== paymentStatusFilter) return false;
       }
       if (paymentSearch.trim()) {
@@ -4441,10 +4493,26 @@ export default function AdminDashboardPage() {
     });
   }, [activeSubscribers, paymentSearch]);
 
+  // Filtered Flash Campaigns
+  const filteredCampaigns = useMemo(() => {
+    return pricingCampaigns.filter((camp) => {
+      if (!paymentSearch.trim()) return true;
+      const q = paymentSearch.toLowerCase().trim();
+      const name = (camp.name || "").toLowerCase();
+      const badge = (camp.badgeText || "").toLowerCase();
+      const desc = (camp.description || "").toLowerCase();
+      return name.includes(q) || badge.includes(q) || desc.includes(q);
+    });
+  }, [pricingCampaigns, paymentSearch]);
+
   const totalPaymentPages = Math.max(
     1,
     Math.ceil(
-      (paymentStatusFilter === "SUBSCRIBERS" ? filteredSubscribers.length : filteredPayments.length) / PAYMENT_PAGE_SIZE
+      (paymentStatusFilter === "CAMPAIGNS"
+        ? filteredCampaigns.length
+        : paymentStatusFilter === "SUBSCRIBERS"
+        ? filteredSubscribers.length
+        : filteredPayments.length) / PAYMENT_PAGE_SIZE
     )
   );
 
@@ -4454,6 +4522,11 @@ export default function AdminDashboardPage() {
   );
 
   const paginatedSubscribers = filteredSubscribers.slice(
+    (paymentPage - 1) * PAYMENT_PAGE_SIZE,
+    paymentPage * PAYMENT_PAGE_SIZE
+  );
+
+  const paginatedCampaigns = filteredCampaigns.slice(
     (paymentPage - 1) * PAYMENT_PAGE_SIZE,
     paymentPage * PAYMENT_PAGE_SIZE
   );
@@ -7668,8 +7741,26 @@ export default function AdminDashboardPage() {
                     }`}
                   >
                     <Crown className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Active Subscribers</span>
+                    <span>{language === "bn" ? "অ্যাক্টিভ সাবস্ক্রাইবার" : "Active Subscribers"}</span>
                     <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">{activeSubscribers.length}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentStatusFilter("CAMPAIGNS");
+                      setPaymentPage(1);
+                      loadPricingCampaigns();
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      paymentStatusFilter === "CAMPAIGNS"
+                        ? "bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 text-white shadow-sm shadow-amber-500/25"
+                        : "bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <Flame className="w-3.5 h-3.5 text-amber-300 fill-current" />
+                    <span>{language === "bn" ? "ফ্ল্যাশ ক্যাম্পেইন স্টোরি" : "Flash Campaigns Story"}</span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">{pricingCampaigns.length}</span>
                   </button>
                 </div>
 
@@ -7683,9 +7774,11 @@ export default function AdminDashboardPage() {
                       setPaymentPage(1);
                     }}
                     placeholder={
-                      paymentStatusFilter === "SUBSCRIBERS"
-                        ? "Search subscriber name, email, ID..."
-                        : "Search student, TrxID, phone, plan..."
+                      paymentStatusFilter === "CAMPAIGNS"
+                        ? (language === "bn" ? "ক্যাম্পেইনের নাম, ব্যাজ বা বিবরণ খুঁজুন..." : "Search campaign title, badge text, note...")
+                        : paymentStatusFilter === "SUBSCRIBERS"
+                        ? (language === "bn" ? "সাবস্ক্রাইবারের নাম, ইমেইল, আইডি..." : "Search subscriber name, email, ID...")
+                        : (language === "bn" ? "শিক্ষার্থী, TrxID, ফোন, প্ল্যান..." : "Search student, TrxID, phone, plan...")
                     }
                     className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
@@ -7701,8 +7794,369 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* View 1: Active Subscribers Cards */}
-              {paymentStatusFilter === "SUBSCRIBERS" ? (
+              {/* View 1: Flash Campaigns Story Cards */}
+              {paymentStatusFilter === "CAMPAIGNS" ? (
+                <div className="space-y-4">
+                  {/* Subheader Toolbar: Quick Summary & Create Button */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-rose-500/10 to-purple-500/10 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-rose-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                        <Flame className="w-5 h-5 fill-current" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                          <span>{language === "bn" ? "ফ্ল্যাশ ডিসকাউন্ট ও অফার স্টোরি" : "Flash Discount Campaigns & Offer Story"}</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                            {pricingCampaigns.filter((c) => {
+                              if (!c.active) return false;
+                              const now = renderNowMs > 0 ? renderNowMs : Date.now();
+                              if (c.startsAt && new Date(c.startsAt).getTime() > now) return false;
+                              if (c.expiresAt && new Date(c.expiresAt).getTime() <= now) return false;
+                              return true;
+                            }).length} {language === "bn" ? "সক্রিয় অফার" : "Live Active"}
+                          </span>
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {language === "bn"
+                            ? "সব অতীত ও বর্তমান ক্যাম্পেইনের স্টোরি, শুরু/শেষের সময়, ডিসকাউন্ট এবং ১-ক্লিক রিঅ্যাক্টিভেশন।"
+                            : "Track all past & live campaigns: start/expiry timeline, discount prices, story notes, and 1-click reactivation."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => loadPricingCampaigns()}
+                        disabled={loadingCampaigns}
+                        className="p-2 rounded-xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 transition-all cursor-pointer disabled:opacity-50"
+                        title={language === "bn" ? "রিফ্রেশ করুন" : "Refresh campaigns"}
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${loadingCampaigns ? "animate-spin" : ""}`} />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={openCreateCampaignModal}
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 hover:opacity-90 text-white font-black text-xs shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>{language === "bn" ? "নতুন ক্যাম্পেইন তৈরি করুন" : "New Flash Campaign"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Campaigns Grid */}
+                  {paginatedCampaigns.length > 0 ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {paginatedCampaigns.map((camp: any) => {
+                          const now = renderNowMs > 0 ? renderNowMs : Date.now();
+                          const startsAtMs = camp.startsAt ? new Date(camp.startsAt).getTime() : (camp.createdAt ? new Date(camp.createdAt).getTime() : null);
+                          const expiresAtMs = camp.expiresAt ? new Date(camp.expiresAt).getTime() : null;
+
+                          const isUpcoming = camp.active && startsAtMs && startsAtMs > now;
+                          const isExpired = expiresAtMs && expiresAtMs <= now;
+                          const isLive = Boolean(camp.active) && !isUpcoming && !isExpired;
+                          const isPaused = !camp.active;
+
+                          // Live remaining countdown
+                          let remainingText = "";
+                          if (expiresAtMs) {
+                            const diff = expiresAtMs - now;
+                            if (diff > 0) {
+                              const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                              const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                              const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                              if (days > 0) {
+                                remainingText = language === "bn" ? `${days} দিন ${hours} ঘণ্টা বাকি` : `${days}d ${hours}h remaining`;
+                              } else if (hours > 0) {
+                                remainingText = language === "bn" ? `${hours} ঘণ্টা ${mins} মি. বাকি` : `${hours}h ${mins}m remaining`;
+                              } else {
+                                remainingText = language === "bn" ? `${mins} মিনিট বাকি` : `${mins}m remaining`;
+                              }
+                            } else {
+                              remainingText = language === "bn" ? "মেয়াদ শেষ হয়ে গেছে" : "Offer expired";
+                            }
+                          }
+
+                          const formatDt = (dtStr: string | null) => {
+                            if (!dtStr) return null;
+                            try {
+                              const d = new Date(dtStr);
+                              return d.toLocaleString(language === "bn" ? "bn-BD" : "en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              });
+                            } catch {
+                              return dtStr;
+                            }
+                          };
+
+                          const sem1Discount = camp.semester1Price != null && camp.semester1Price < 99
+                            ? Math.round(((99 - camp.semester1Price) / 99) * 100)
+                            : null;
+                          const sem2Discount = camp.semester2Price != null && camp.semester2Price < 149
+                            ? Math.round(((149 - camp.semester2Price) / 149) * 100)
+                            : null;
+                          const year1Discount = camp.year1Price != null && camp.year1Price < 499
+                            ? Math.round(((499 - camp.year1Price) / 499) * 100)
+                            : null;
+
+                          return (
+                            <div
+                              key={camp.id}
+                              className={`p-5 rounded-2xl bg-white dark:bg-[#0d1527] border transition-all relative overflow-hidden flex flex-col justify-between group shadow-xs ${
+                                isLive
+                                  ? "border-amber-500/40 dark:border-amber-500/30 hover:border-amber-500 shadow-amber-500/5 ring-1 ring-amber-500/20"
+                                  : isUpcoming
+                                  ? "border-blue-500/40 dark:border-blue-500/30 hover:border-blue-500 shadow-blue-500/5"
+                                  : isExpired
+                                  ? "border-slate-200 dark:border-slate-800/80 opacity-90 hover:opacity-100"
+                                  : "border-slate-200 dark:border-slate-800/60 opacity-80"
+                              }`}
+                            >
+                              <div className="space-y-3.5">
+                                {/* Top Bar: Title, Badge Text & Status Pill */}
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="p-1 rounded-md bg-amber-500/10 text-amber-500">
+                                        <Flame className="w-3.5 h-3.5 fill-current" />
+                                      </span>
+                                      <h4 className="text-sm font-black text-slate-900 dark:text-white group-hover:text-amber-500 transition-colors">
+                                        {camp.name}
+                                      </h4>
+                                    </div>
+
+                                    {camp.badgeText && (
+                                      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-gradient-to-r from-amber-500/15 via-rose-500/15 to-purple-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/25">
+                                        <Tag className="w-2.5 h-2.5" />
+                                        <span>{camp.badgeText}</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="shrink-0">
+                                    {isLive && (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 animate-pulse">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                                        <span>{language === "bn" ? "লাইভ সক্রিয়" : "LIVE & ACTIVE"}</span>
+                                      </span>
+                                    )}
+                                    {isUpcoming && (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-500/15 text-blue-500 border border-blue-500/30">
+                                        <Clock className="w-3 h-3" />
+                                        <span>{language === "bn" ? "আসন্ন" : "UPCOMING"}</span>
+                                      </span>
+                                    )}
+                                    {isExpired && (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500/15 text-rose-500 border border-rose-500/30">
+                                        <Ban className="w-3 h-3" />
+                                        <span>{language === "bn" ? "মেয়াদোত্তীর্ণ" : "EXPIRED"}</span>
+                                      </span>
+                                    )}
+                                    {isPaused && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-500/15 text-slate-400 border border-slate-500/30">
+                                        <Pause className="w-3 h-3" />
+                                        <span>{language === "bn" ? "পজ করা" : "PAUSED"}</span>
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Story & Description Box (কি কি লিখেছিলাম) */}
+                                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 space-y-1">
+                                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                                    <FileText className="w-3 h-3 text-blue-400" />
+                                    <span>{language === "bn" ? "ক্যাম্পেইন নোট / কি লিখেছিলাম" : "Campaign Story & Notes"}</span>
+                                  </p>
+                                  <p className="text-xs leading-relaxed italic line-clamp-3">
+                                    {camp.description ? `“${camp.description}”` : (language === "bn" ? "(কোনো অতিরিক্ত নোট বা বিবরণ দেওয়া হয়নি)" : "(No campaign description note provided)")}
+                                  </p>
+                                </div>
+
+                                {/* Timeline (কবে অ্যাক্টিভ হয়েছে ও কবে এক্সপায়ার্ড হবে/হয়েছে) */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] p-2.5 rounded-xl bg-slate-50/50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800/60">
+                                  <div className="space-y-0.5">
+                                    <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                      <Calendar className="w-3 h-3 text-emerald-400" />
+                                      <span>{language === "bn" ? "কবে অ্যাক্টিভ হয়েছে:" : "Active Since:"}</span>
+                                    </p>
+                                    <p className="font-semibold text-slate-800 dark:text-slate-200">
+                                      {formatDt(camp.startsAt || camp.createdAt) || (language === "bn" ? "তাত্ক্ষণিক" : "Immediate")}
+                                    </p>
+                                  </div>
+
+                                  <div className="space-y-0.5">
+                                    <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                      <Clock className="w-3 h-3 text-rose-400" />
+                                      <span>{language === "bn" ? "কবে মেয়াদ শেষ:" : "Expires At:"}</span>
+                                    </p>
+                                    <p className="font-semibold text-slate-800 dark:text-slate-200">
+                                      {formatDt(camp.expiresAt) || (language === "bn" ? "সীমাহীন (ম্যানুয়াল)" : "Unlimited (Manual)")}
+                                    </p>
+                                    {remainingText && (
+                                      <p className={`text-[10px] font-bold ${isLive ? "text-amber-500 dark:text-amber-400" : isExpired ? "text-rose-500" : "text-blue-400"}`}>
+                                        ⏳ {remainingText}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Pricing Breakdown: 1-Sem, 2-Sem, 1-Year */}
+                                <div className="space-y-1">
+                                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                                    <Percent className="w-3 h-3 text-amber-500" />
+                                    <span>{language === "bn" ? "ডিসকাউন্ট মূল্য তালিকা" : "Discounted Price Tier"}</span>
+                                  </p>
+                                  <div className="grid grid-cols-3 gap-1.5 text-center">
+                                    <div className="p-2 rounded-xl bg-slate-100/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase">{language === "bn" ? "১-সেমিস্টার" : "1-Sem"}</p>
+                                      <p className="text-xs font-black text-slate-900 dark:text-white">
+                                        ৳{camp.semester1Price != null ? camp.semester1Price : 99}
+                                      </p>
+                                      {sem1Discount ? (
+                                        <span className="text-[9px] font-extrabold text-emerald-500">-{sem1Discount}%</span>
+                                      ) : (
+                                        <span className="text-[9px] text-slate-500">৳99 Base</span>
+                                      )}
+                                    </div>
+
+                                    <div className="p-2 rounded-xl bg-slate-100/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase">{language === "bn" ? "২-সেমিস্টার" : "2-Sem"}</p>
+                                      <p className="text-xs font-black text-slate-900 dark:text-white">
+                                        ৳{camp.semester2Price != null ? camp.semester2Price : 149}
+                                      </p>
+                                      {sem2Discount ? (
+                                        <span className="text-[9px] font-extrabold text-emerald-500">-{sem2Discount}%</span>
+                                      ) : (
+                                        <span className="text-[9px] text-slate-500">৳149 Base</span>
+                                      )}
+                                    </div>
+
+                                    <div className="p-2 rounded-xl bg-slate-100/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase">{language === "bn" ? "১-বছর পাস" : "1-Year"}</p>
+                                      <p className="text-xs font-black text-slate-900 dark:text-white">
+                                        ৳{camp.year1Price != null ? camp.year1Price : 499}
+                                      </p>
+                                      {year1Discount ? (
+                                        <span className="text-[9px] font-extrabold text-emerald-500">-{year1Discount}%</span>
+                                      ) : (
+                                        <span className="text-[9px] text-slate-500">৳499 Base</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Card Actions Footer: Reactivate, Pause/Play, Edit, Delete */}
+                              <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-1.5 flex-wrap">
+                                <div className="flex items-center gap-1.5">
+                                  {/* Reactivate Button (Prominent for Expired or Inactive) */}
+                                  {(isExpired || !camp.active) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleQuickReactivate(camp, 7)}
+                                      className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-rose-600 hover:opacity-95 text-white transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                                      title={language === "bn" ? "মেয়াদ আরও ৭ দিন বাড়িয়ে সক্রিয় করুন" : "Extend expiry +7 days and activate"}
+                                    >
+                                      <RotateCcw className="w-3 h-3" />
+                                      <span>{language === "bn" ? "রিঅ্যাক্টিভ (+৭ দিন)" : "Reactivate (+7d)"}</span>
+                                    </button>
+                                  )}
+
+                                  {/* Pause / Resume Button (for unexpired campaigns) */}
+                                  {!isExpired && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleCampaign(camp)}
+                                      className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border ${
+                                        camp.active
+                                          ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border-amber-500/20"
+                                          : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border-emerald-500/20"
+                                      }`}
+                                      title={camp.active ? "Pause campaign" : "Resume campaign"}
+                                    >
+                                      {camp.active ? (
+                                        <>
+                                          <Pause className="w-3 h-3" />
+                                          <span>{language === "bn" ? "পজ" : "Pause"}</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Play className="w-3 h-3 fill-current" />
+                                          <span>{language === "bn" ? "চালু" : "Resume"}</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditCampaignModal(camp)}
+                                    className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-500 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
+                                    title={language === "bn" ? "এডিট করুন" : "Edit campaign"}
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteCampaign(camp)}
+                                    className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-rose-500 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
+                                    title={language === "bn" ? "স্থায়ীভাবে মুছুন" : "Delete campaign"}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <TablePagination
+                        currentPage={paymentPage}
+                        totalPages={totalPaymentPages}
+                        totalItems={filteredCampaigns.length}
+                        itemsPerPage={PAYMENT_PAGE_SIZE}
+                        onPageChange={setPaymentPage}
+                        itemName={language === "bn" ? "ক্যাম্পেইন" : "campaigns"}
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-16 text-center rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 text-slate-500 text-xs space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 mx-auto flex items-center justify-center">
+                        <Flame className="w-6 h-6 fill-current" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                        {paymentSearch
+                          ? (language === "bn" ? "অনুসন্ধানের সাথে কোনো ফ্ল্যাশ ক্যাম্পেইন মেলেনি।" : "No flash discount campaigns match your search.")
+                          : (language === "bn" ? "এখনো কোনো ফ্ল্যাশ ডিসকাউন্ট ক্যাম্পেইন চালু করা হয়নি।" : "No flash discount campaigns have been created yet.")}
+                      </p>
+                      <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                        {language === "bn"
+                          ? "লিমিটেড টাইম ছাড় দিয়ে শিক্ষার্থীদের জন্য আকর্ষণীয় ফ্ল্যাশ অফার শুরু করুন।"
+                          : "Launch a limited-time discount offer to boost student subscriptions with automatic expiry."}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={openCreateCampaignModal}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 text-white font-black text-xs shadow-md shadow-amber-500/20 hover:opacity-90 transition-all cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>{language === "bn" ? "প্রথম ফ্ল্যাশ ক্যাম্পেইন তৈরি করুন" : "Create First Flash Campaign"}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : paymentStatusFilter === "SUBSCRIBERS" ? (
                 paginatedSubscribers.length > 0 ? (
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
