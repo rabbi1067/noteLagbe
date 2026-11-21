@@ -739,10 +739,15 @@ export default function AdminDashboardPage() {
   const [resTeacherId, setResTeacherId] = useState<number | "">("");
   const [resTitle, setResTitle] = useState("");
   const [resType, setResType] = useState("NOTE");
-  // Course Video Management State (1 official video/playlist per course)
+  // Faculty Course Video Management State (1 video/playlist per course conducted by a faculty)
   const [showCourseVideoModal, setShowCourseVideoModal] = useState(false);
+  const [courseVideoTeacherId, setCourseVideoTeacherId] = useState<number | "">("");
   const [courseVideoCode, setCourseVideoCode] = useState("");
   const [courseVideoUrl, setCourseVideoUrl] = useState("");
+  const [courseVideoDeptFilter, setCourseVideoDeptFilter] = useState("ALL");
+  const [courseVideoOnlyActive, setCourseVideoOnlyActive] = useState(false);
+  const [teacherCoursesList, setTeacherCoursesList] = useState<any[]>([]);
+  const [loadingTeacherCourses, setLoadingTeacherCourses] = useState(false);
   const [savingCourseVideo, setSavingCourseVideo] = useState(false);
   const [resFileUrl, setResFileUrl] = useState("");
   const [resFileName, setResFileName] = useState("");
@@ -1998,6 +2003,46 @@ export default function AdminDashboardPage() {
     );
   }, [teachers, resDeptFilter]);
 
+  // Map each teacher to the set of courses they conduct (from resources and curriculum)
+  const teacherCourseCountMap = useMemo(() => {
+    const map = new Map<number, Set<string>>();
+    resources.forEach((r) => {
+      if (r.teacher?.id && r.course?.code) {
+        const tid = Number(r.teacher.id);
+        if (!map.has(tid)) map.set(tid, new Set());
+        map.get(tid)!.add(r.course.code.toUpperCase());
+      }
+    });
+    courses.forEach((c) => {
+      (c.teachers || []).forEach((t: any) => {
+        if (t?.id) {
+          const tid = Number(t.id);
+          if (!map.has(tid)) map.set(tid, new Set());
+          map.get(tid)!.add(c.code.toUpperCase());
+        }
+      });
+    });
+    return map;
+  }, [resources, courses]);
+
+  // Teachers filtered by department and sorted by courses conducted
+  const eligibleVideoTeachers = useMemo(() => {
+    let list = teachers;
+    if (courseVideoDeptFilter !== "ALL") {
+      list = list.filter((t) => (t.department || "CSE").trim().toUpperCase() === courseVideoDeptFilter.toUpperCase());
+    }
+    if (courseVideoOnlyActive) {
+      list = list.filter((t) => (teacherCourseCountMap.get(Number(t.id))?.size || 0) > 0);
+    }
+    // Teachers with conducted courses first, then alphabetical
+    return [...list].sort((a, b) => {
+      const countA = teacherCourseCountMap.get(Number(a.id))?.size || 0;
+      const countB = teacherCourseCountMap.get(Number(b.id))?.size || 0;
+      if (countA !== countB) return countB - countA;
+      return (a.name || "").localeCompare(b.name || "");
+    });
+  }, [teachers, courseVideoDeptFilter, courseVideoOnlyActive, teacherCourseCountMap]);
+
   const handleMaterialFileUpload = async (file: File) => {
     if (!file) return;
 
@@ -2243,56 +2288,130 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Course Video Lecture Management (1 link per academic course)
-  const openCourseVideoModal = (preselectedCode?: string) => {
-    const initialCode = preselectedCode || courses[0]?.code || "";
-    setCourseVideoCode(initialCode);
-    const target = courses.find((c) => c.code?.toUpperCase() === initialCode?.toUpperCase());
-    setCourseVideoUrl(target?.videoUrl || "");
+  // Faculty Course Video Lecture Management (Select Faculty -> Select Course -> Assign 1 video per course)
+  const loadTeacherCoursesForVideo = async (teacherId: number, targetCourseCode?: string) => {
+    setLoadingTeacherCourses(true);
+    try {
+      const list = await api.teachers.getCourses(teacherId);
+      setTeacherCoursesList(list || []);
+
+      let selectedTc = null;
+      if (targetCourseCode) {
+        selectedTc = list?.find(
+          (item: any) => (item.course?.code || item.code)?.toUpperCase() === targetCourseCode.toUpperCase()
+        );
+      }
+      if (!selectedTc && list && list.length > 0) {
+        selectedTc = list[0];
+      }
+
+      if (selectedTc) {
+        const cCode = selectedTc.course?.code || selectedTc.code || "";
+        setCourseVideoCode(cCode);
+        setCourseVideoUrl(selectedTc.videoUrl || selectedTc.course?.videoUrl || "");
+      } else {
+        setCourseVideoCode(targetCourseCode || "");
+        setCourseVideoUrl("");
+      }
+    } catch {
+      setTeacherCoursesList([]);
+    } finally {
+      setLoadingTeacherCourses(false);
+    }
+  };
+
+  const openCourseVideoModal = (preselectedTeacherId?: number, preselectedCode?: string) => {
+    let initialTeacherId: number | "" = preselectedTeacherId || "";
+    if (!initialTeacherId) {
+      const firstWithCourses = eligibleVideoTeachers.find(
+        (t) => (teacherCourseCountMap.get(Number(t.id))?.size || 0) > 0
+      );
+      initialTeacherId = firstWithCourses
+        ? Number(firstWithCourses.id)
+        : teachers[0]?.id
+        ? Number(teachers[0].id)
+        : "";
+    }
+    setCourseVideoTeacherId(initialTeacherId);
+    setCourseVideoDeptFilter("ALL");
+    setCourseVideoOnlyActive(false);
     setShowCourseVideoModal(true);
+
+    if (initialTeacherId) {
+      loadTeacherCoursesForVideo(Number(initialTeacherId), preselectedCode);
+    } else {
+      setTeacherCoursesList([]);
+      setCourseVideoCode("");
+      setCourseVideoUrl("");
+    }
+  };
+
+  const handleSelectTeacherForVideo = (teacherId: number | "") => {
+    setCourseVideoTeacherId(teacherId);
+    if (teacherId) {
+      loadTeacherCoursesForVideo(Number(teacherId));
+    } else {
+      setTeacherCoursesList([]);
+      setCourseVideoCode("");
+      setCourseVideoUrl("");
+    }
   };
 
   const handleSelectCourseForVideo = (code: string) => {
     setCourseVideoCode(code);
-    const target = courses.find((c) => c.code?.toUpperCase() === code?.toUpperCase());
-    setCourseVideoUrl(target?.videoUrl || "");
+    const existingTc = teacherCoursesList.find(
+      (item: any) => (item.course?.code || item.code)?.toUpperCase() === code.toUpperCase()
+    );
+    if (existingTc) {
+      setCourseVideoUrl(existingTc.videoUrl || existingTc.course?.videoUrl || "");
+    } else {
+      const globalCourse = courses.find((c) => c.code?.toUpperCase() === code.toUpperCase());
+      setCourseVideoUrl(globalCourse?.videoUrl || "");
+    }
   };
 
   const handleSaveCourseVideo = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!courseVideoTeacherId) {
+      toast.error("Please select a faculty member");
+      return;
+    }
     if (!courseVideoCode) {
-      toast.error("Please select a course");
+      toast.error("Please select a course for this faculty member");
       return;
     }
     const cleanUrl = courseVideoUrl.trim();
-    const target = courses.find((c) => c.code?.toUpperCase() === courseVideoCode?.toUpperCase());
-    if (!target) return;
+    const teacher = teachers.find((t) => Number(t.id) === Number(courseVideoTeacherId));
     setSavingCourseVideo(true);
     try {
-      await api.admin.updateCourse(target.code, {
-        title: target.title,
-        department: target.department,
-        credits: target.credits,
-        semester: target.semester,
-        isLab: Boolean(target.lab || target.isLab),
-        prerequisite: target.prerequisite || "",
-        description: target.description || "",
-        videoUrl: cleanUrl || "",
-      });
+      await api.admin.updateTeacherCourseVideo(Number(courseVideoTeacherId), courseVideoCode, cleanUrl || null);
+
+      setTeacherCoursesList((prev) =>
+        prev.map((item) => {
+          const itemCode = (item.course?.code || item.code || "").toUpperCase();
+          if (itemCode === courseVideoCode.toUpperCase()) {
+            return { ...item, videoUrl: cleanUrl || null };
+          }
+          return item;
+        })
+      );
+
       setCourses((prev) =>
         prev.map((c) =>
-          c.code?.toUpperCase() === target.code?.toUpperCase()
-            ? { ...c, videoUrl: cleanUrl || null }
+          c.code?.toUpperCase() === courseVideoCode.toUpperCase()
+            ? { ...c, videoUrl: cleanUrl || c.videoUrl }
             : c
         )
       );
-      notifyDataChanged("course", "updated", target.code);
+
+      notifyDataChanged("teacher_course", "updated", Number(courseVideoTeacherId));
+      notifyDataChanged("course", "updated", courseVideoCode);
+
       toast.success(
         cleanUrl
-          ? `Video lecture link assigned to ${target.code}!`
-          : `Video lecture removed from ${target.code}!`
+          ? `Video lecture link saved for ${teacher?.name || "faculty"} [${courseVideoCode}]!`
+          : `Video lecture removed from ${teacher?.name || "faculty"} [${courseVideoCode}]!`
       );
-      setShowCourseVideoModal(false);
     } catch (err: any) {
       toast.error(err.message || "Failed to update course video");
     } finally {
@@ -11965,26 +12084,26 @@ export default function AdminDashboardPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 2.5: ASSIGN / UPDATE COURSE VIDEO LECTURE (1 PER COURSE)            */}
+      {/* MODAL 2.5: ASSIGN / UPDATE COURSE VIDEO LECTURE PER FACULTY (1 PER COURSE) */}
       {/* ========================================================================= */}
       {showCourseVideoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-2xl space-y-5">
+          <div className="w-full max-w-xl rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 p-6 sm:p-7 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3.5">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-2xl bg-red-600/10 text-red-600 dark:text-red-400 flex items-center justify-center shadow-xs">
                   <Video className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="font-black text-base text-slate-900 dark:text-white flex items-center gap-2">
-                    <span>Course Video Lecture</span>
+                    <span>Faculty Course Video Lectures</span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900">
-                      1 Per Course
+                      1 Video Per Course
                     </span>
                   </h3>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Assign or update official YouTube playlist or video for any course
+                    Assign YouTube video lecture or playlist for each course taught by faculty members
                   </p>
                 </div>
               </div>
@@ -11998,95 +12117,243 @@ export default function AdminDashboardPage() {
             </div>
 
             <form onSubmit={handleSaveCourseVideo} className="space-y-4 text-xs">
-              {/* Select Target Course */}
-              <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 mb-1.5 block">
-                  Select Academic Course *
-                </label>
-                <select
-                  value={courseVideoCode}
-                  onChange={(e) => handleSelectCourseForVideo(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-red-500 transition-colors"
+              {/* Filter bar: Department filter & Conducted Courses Toggle */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+                    Dept:
+                  </span>
+                  <select
+                    value={courseVideoDeptFilter}
+                    onChange={(e) => setCourseVideoDeptFilter(e.target.value)}
+                    className="px-2 py-1 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold text-xs focus:outline-none"
+                  >
+                    <option value="ALL">All Departments ({teachers.length})</option>
+                    {dynamicDepartments.map((dept) => (
+                      <option key={dept} value={dept}>
+                        {dept} Department
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setCourseVideoOnlyActive(!courseVideoOnlyActive)}
+                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                    courseVideoOnlyActive
+                      ? "bg-purple-600 text-white border-purple-500 shadow-xs"
+                      : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:text-purple-600"
+                  }`}
+                  title="Only show faculty members with minimum 1 conducted course"
                 >
-                  <option value="" disabled>-- Select Course --</option>
-                  {courses.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      [{c.code}] {c.title} ({c.department || "CSE"}) {c.videoUrl ? "▶ Linked" : ""}
-                    </option>
-                  ))}
-                </select>
+                  <span className="text-[10px]">⭐</span>
+                  <span>With Conducted Courses</span>
+                </button>
               </div>
 
-              {/* Course Status Banner */}
+              {/* Step 1: Select Faculty / Instructor */}
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span>Select Faculty Member *</span>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    {eligibleVideoTeachers.length} Faculty Members Available
+                  </span>
+                </label>
+                <SearchableTeacherSelect
+                  value={courseVideoTeacherId ? Number(courseVideoTeacherId) : null}
+                  onChange={handleSelectTeacherForVideo}
+                  teachers={eligibleVideoTeachers.map((t) => {
+                    const cCount = teacherCourseCountMap.get(Number(t.id))?.size || 0;
+                    return {
+                      ...t,
+                      name: `${t.name}${cCount > 0 ? ` (${cCount} Course${cCount > 1 ? "s" : ""})` : ""}`,
+                    };
+                  })}
+                  allowGeneral={false}
+                  placeholder="Search faculty by name or initial (e.g. Sakib, Gazi, Belal)..."
+                />
+              </div>
+
+              {/* Step 2: Show Selected Faculty Info & Conducted Courses */}
               {(() => {
-                const target = courses.find((c) => c.code?.toUpperCase() === courseVideoCode?.toUpperCase());
-                if (!target) return null;
+                const targetTeacher = teachers.find((t) => Number(t.id) === Number(courseVideoTeacherId));
+                if (!targetTeacher) return null;
+
                 return (
-                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-bold text-xs text-slate-900 dark:text-white truncate">
-                        {target.code} — {target.title}
-                      </p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        {target.videoUrl ? "Currently has video lecture assigned" : "No video lecture assigned yet"}
-                      </p>
+                  <div className="space-y-3 pt-1">
+                    {/* Faculty Profile Summary */}
+                    <div className="p-3 rounded-2xl bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-transparent dark:from-blue-950/40 dark:via-purple-950/40 border border-blue-500/20 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <FacultyAvatar
+                          image={targetTeacher.image}
+                          name={targetTeacher.name}
+                          initial={targetTeacher.initial}
+                          designation={targetTeacher.designation}
+                          size="sm"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-extrabold text-xs text-slate-900 dark:text-white truncate">
+                            {targetTeacher.name} {targetTeacher.initial ? `[${targetTeacher.initial}]` : ""}
+                          </p>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                            {targetTeacher.designation || "Faculty"} • {targetTeacher.department || "CSE"} • {targetTeacher.room || "Room 606"}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-extrabold text-[11px] shrink-0 border border-purple-200 dark:border-purple-800">
+                        {teacherCoursesList.length} Courses Conducted
+                      </span>
                     </div>
-                    {target.videoUrl && (
-                      <a
-                        href={target.videoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-2.5 py-1 rounded-xl bg-red-600/10 text-red-600 dark:text-red-400 hover:bg-red-600 hover:text-white font-bold text-[11px] border border-red-500/20 transition-all shrink-0 flex items-center gap-1"
-                      >
-                        <span className="text-[10px]">▶</span>
-                        <span>Preview</span>
-                        <ExternalLink className="w-3 h-3 ml-0.5" />
-                      </a>
+
+                    {/* Conducted Courses Grid */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="font-bold text-slate-700 dark:text-slate-300">
+                          Select Course for Video Lecture:
+                        </label>
+                        <span className="text-[10px] text-slate-400">
+                          Click any course to edit its video
+                        </span>
+                      </div>
+
+                      {loadingTeacherCourses ? (
+                        <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-red-500" />
+                          <span>Loading courses conducted by {targetTeacher.name}...</span>
+                        </div>
+                      ) : teacherCoursesList.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                          {teacherCoursesList.map((item: any) => {
+                            const cCode = item.course?.code || item.code || "";
+                            const cTitle = item.course?.title || item.title || "";
+                            const hasVideo = Boolean(item.videoUrl || item.course?.videoUrl);
+                            const isSelected = cCode.toUpperCase() === courseVideoCode.toUpperCase();
+
+                            return (
+                              <button
+                                key={cCode}
+                                type="button"
+                                onClick={() => handleSelectCourseForVideo(cCode)}
+                                className={`p-2.5 rounded-xl text-left transition-all border flex items-center justify-between gap-2 cursor-pointer ${
+                                  isSelected
+                                    ? "bg-red-50 dark:bg-red-950/40 border-red-500 ring-2 ring-red-500/20 shadow-xs"
+                                    : "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-mono font-black text-[11px] text-blue-600 dark:text-blue-400">
+                                      {cCode}
+                                    </span>
+                                    {isSelected && (
+                                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-red-600 text-white">
+                                        Selected
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="font-bold text-xs text-slate-900 dark:text-white truncate mt-0.5">
+                                    {cTitle}
+                                  </p>
+                                </div>
+                                <div className="shrink-0 flex items-center">
+                                  {hasVideo ? (
+                                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-extrabold text-[10px] border border-emerald-500/20 flex items-center gap-0.5">
+                                      <span>▶</span>
+                                      <span>Video</span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400 font-medium">
+                                      No video
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-400 text-xs">
+                          No courses currently conducted by this faculty. You can pick any course from the catalog below!
+                        </div>
+                      )}
+
+                      {/* Or Pick another course from University Catalog */}
+                      <div className="mt-2.5 flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
+                          Or catalog:
+                        </span>
+                        <select
+                          value={courseVideoCode}
+                          onChange={(e) => handleSelectCourseForVideo(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-semibold text-xs focus:outline-none focus:border-red-500"
+                        >
+                          <option value="" disabled>-- Select Any Course from Catalog --</option>
+                          {courses.map((c) => (
+                            <option key={c.code} value={c.code}>
+                              [{c.code}] {c.title} ({c.department || "CSE"}) {c.videoUrl ? "▶ Has Video" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Step 3: YouTube Video URL Input for Selected Course */}
+                    {courseVideoCode && (
+                      <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                            <span className="px-1.5 py-0.5 rounded bg-red-600 text-white font-black text-[9px] tracking-wide inline-flex items-center gap-1">
+                              ▶ YouTube
+                            </span>
+                            <span>Video URL for <span className="font-mono text-blue-600 dark:text-blue-400">{courseVideoCode}</span></span>
+                          </label>
+                          {courseVideoUrl && (
+                            <a
+                              href={courseVideoUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[11px] font-bold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1"
+                            >
+                              <span>Preview Link</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
+
+                        <div className="relative">
+                          <input
+                            type="url"
+                            value={courseVideoUrl}
+                            onChange={(e) => setCourseVideoUrl(e.target.value)}
+                            placeholder="https://www.youtube.com/playlist?list=... or video link"
+                            className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-xs font-mono focus:outline-none focus:border-red-500 transition-colors"
+                          />
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-red-500 pointer-events-none">
+                            <Video className="w-4 h-4" />
+                          </div>
+                          {courseVideoUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setCourseVideoUrl("")}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                              title="Clear video link"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-400 leading-relaxed">
+                          💡 Enter official YouTube playlist or video for {targetTeacher.name}&apos;s {courseVideoCode} course. This button will show on their profile page and courses list.
+                        </p>
+                      </div>
                     )}
                   </div>
                 );
               })()}
 
-              {/* YouTube Video / Playlist URL */}
-              <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <span className="px-1.5 py-0.5 rounded bg-red-600 text-white font-black text-[9px] tracking-wide inline-flex items-center gap-1 shadow-2xs">
-                      ▶ YouTube
-                    </span>
-                    <span>Video Lecture or Playlist URL</span>
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-medium">Single Video or Playlist</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="url"
-                    value={courseVideoUrl}
-                    onChange={(e) => setCourseVideoUrl(e.target.value)}
-                    placeholder="https://www.youtube.com/playlist?list=... or https://youtu.be/..."
-                    className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-red-500 text-xs font-mono transition-colors"
-                  />
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-red-500 pointer-events-none">
-                    <Video className="w-4 h-4" />
-                  </div>
-                  {courseVideoUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setCourseVideoUrl("")}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                      title="Clear video link"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5 leading-relaxed">
-                  💡 Tip: You can paste a full course playlist link or a topic walkthrough. This video lecture button will appear in the course page and under conducted courses on faculty profile pages.
-                </p>
-              </div>
-
               {/* Actions */}
-              <div className="pt-4 flex items-center justify-between border-t border-slate-200 dark:border-slate-800">
+              <div className="pt-3.5 flex items-center justify-between border-t border-slate-200 dark:border-slate-800">
                 {courseVideoUrl ? (
                   <button
                     type="button"
@@ -12109,7 +12376,7 @@ export default function AdminDashboardPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={savingCourseVideo || !courseVideoCode}
+                    disabled={savingCourseVideo || !courseVideoTeacherId || !courseVideoCode}
                     className="px-5 py-2.5 rounded-xl font-bold text-xs bg-red-600 hover:bg-red-500 text-white shadow-md shadow-red-600/25 disabled:opacity-50 transition-all flex items-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
                   >
                     {savingCourseVideo ? (

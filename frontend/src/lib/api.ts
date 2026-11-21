@@ -945,6 +945,11 @@ export const api = {
       request<any>(`/admin/courses/${code}/teachers/${teacherId}`, { method: "POST" }),
     removeTeacherFromCourse: (code: string, teacherId: number) =>
       request<any>(`/admin/courses/${code}/teachers/${teacherId}`, { method: "DELETE" }),
+    updateTeacherCourseVideo: (teacherId: number, courseCode: string, videoUrl: string | null) =>
+      request<any>(`/admin/teachers/${teacherId}/courses/${encodeURIComponent(courseCode)}/video`, {
+        method: "PUT",
+        body: JSON.stringify({ videoUrl }),
+      }),
 
     // Faculty Directory Management
     createTeacher: (data: any) =>

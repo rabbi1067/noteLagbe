@@ -25,6 +25,9 @@ public class TeacherCourse {
 
     private String scheduleInfo; // e.g., "SUN # 08:30 ~ 09:50 @ SEU527"
 
+    @Column(name = "video_url", length = 1000)
+    private String videoUrl;
+
     public TeacherCourse() {}
 
     public TeacherCourse(Teacher teacher, Course course, String section, String scheduleInfo) {
@@ -48,4 +51,7 @@ public class TeacherCourse {
 
     public String getScheduleInfo() { return scheduleInfo; }
     public void setScheduleInfo(String scheduleInfo) { this.scheduleInfo = scheduleInfo; }
+
+    public String getVideoUrl() { return videoUrl; }
+    public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
 }

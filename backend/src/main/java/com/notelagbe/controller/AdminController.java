@@ -305,6 +305,18 @@ public class AdminController {
         return ResponseEntity.ok(Map.of("success", true, "message", "Teacher removed from course successfully"));
     }
 
+    @PutMapping("/teachers/{teacherId}/courses/{code}/video")
+    public ResponseEntity<Map<String, Object>> updateTeacherCourseVideo(
+            @PathVariable Long teacherId,
+            @PathVariable String code,
+            @RequestBody Map<String, Object> payload) {
+        String videoUrl = payload.get("videoUrl") != null ? payload.get("videoUrl").toString() : null;
+        TeacherCourse tc = courseService.updateTeacherCourseVideo(teacherId, code, videoUrl);
+        logAdminAction("TEACHER_COURSE_VIDEO", "ACADEMIC", "Updated course video lecture for faculty #" + teacherId + " on course " + code);
+        evictAnalyticsCache();
+        return ResponseEntity.ok(Map.of("success", true, "message", "Course video lecture updated successfully", "teacherCourse", tc));
+    }
+
     @PutMapping("/courses/{code}")
     public ResponseEntity<Map<String, Object>> updateCourse(
             @PathVariable String code,

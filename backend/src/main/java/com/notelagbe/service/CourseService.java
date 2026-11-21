@@ -516,6 +516,43 @@ public class CourseService {
         liveSyncService.broadcast("teacher_course", "updated", teacherId);
     }
 
+    @CacheEvict(value = {"courses", "course_details", "teachers", "teacher_details", "teacher_courses"}, allEntries = true)
+    @Transactional
+    public TeacherCourse updateTeacherCourseVideo(Long teacherId, String courseCode, String videoUrl) {
+        Course course = courseRepository.findByCodeIgnoreCase(courseCode.trim())
+                .orElseThrow(() -> new ResourceNotFoundException("Course not found with code: " + courseCode));
+        Teacher teacher = teacherRepository.findById(teacherId)
+                .orElseThrow(() -> new ResourceNotFoundException("Teacher not found with id: " + teacherId));
+
+        String cleanUrl = (videoUrl != null && !videoUrl.trim().isEmpty()) ? videoUrl.trim() : null;
+
+        List<TeacherCourse> existingList = teacherCourseRepository.findAllByCourseIdAndTeacherId(course.getId(), teacher.getId());
+        TeacherCourse tc;
+        if (!existingList.isEmpty()) {
+            tc = existingList.get(0);
+            tc.setVideoUrl(cleanUrl);
+            tc.setScheduleInfo("ADMIN_ASSIGNED");
+            tc.setSection("General");
+        } else {
+            tc = new TeacherCourse();
+            tc.setCourse(course);
+            tc.setTeacher(teacher);
+            tc.setSection("General");
+            tc.setScheduleInfo("ADMIN_ASSIGNED");
+            tc.setVideoUrl(cleanUrl);
+        }
+        TeacherCourse saved = teacherCourseRepository.save(tc);
+
+        if (cleanUrl != null && (course.getVideoUrl() == null || course.getVideoUrl().isEmpty())) {
+            course.setVideoUrl(cleanUrl);
+            courseRepository.save(course);
+        }
+
+        liveSyncService.broadcast("teacher_course", "updated", teacherId);
+        liveSyncService.broadcast("course", "updated", course.getCode());
+        return saved;
+    }
+
     @CacheEvict(value = {"courses", "course_details", "course_codes"}, allEntries = true)
     @Transactional
     public Course createCourse(Course course, Long initialTeacherId) {

@@ -80,9 +80,11 @@ public class TeacherService {
 
     public List<TeacherCourse> getCoursesTaughtByTeacher(Long teacherId) {
         List<TeacherCourse> list = new java.util.ArrayList<>(teacherCourseRepository.findByTeacherId(teacherId));
-        // Strict filter: purge/remove any demo mappings if no real resource exists and not admin assigned
+        // Strict filter: purge/remove any demo mappings if no real resource exists and not admin assigned / no video assigned
         list.removeIf(tc -> {
             if (tc.getCourse() == null) return true;
+            if (tc.getVideoUrl() != null && !tc.getVideoUrl().trim().isEmpty()) return false;
+            if ("ADMIN_ASSIGNED".equals(tc.getScheduleInfo())) return false;
             boolean hasResource = resourceRepository.existsByCourseCodeIgnoreCaseAndTeacherIdAndStatus(
                     tc.getCourse().getCode(), teacherId, com.notelagbe.entity.ResourceStatus.APPROVED);
             return !hasResource;
@@ -96,8 +98,16 @@ public class TeacherService {
                 if (r.getCourse() != null && !existingCourseIds.contains(r.getCourse().getId())) {
                     existingCourseIds.add(r.getCourse().getId());
                     TeacherCourse synthetic = new TeacherCourse(teacher, r.getCourse(), "General", "Course Material Archive");
+                    if (r.getCourse().getVideoUrl() != null) {
+                        synthetic.setVideoUrl(r.getCourse().getVideoUrl());
+                    }
                     list.add(synthetic);
                 }
+            }
+        }
+        for (TeacherCourse tc : list) {
+            if ((tc.getVideoUrl() == null || tc.getVideoUrl().isEmpty()) && tc.getCourse() != null && tc.getCourse().getVideoUrl() != null) {
+                tc.setVideoUrl(tc.getCourse().getVideoUrl());
             }
         }
         return list.stream()

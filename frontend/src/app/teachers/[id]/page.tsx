@@ -945,9 +945,9 @@ export default function TeacherDetailPage() {
 
                       {/* Action Buttons: Direct Course Link, Video Lecture & Materials Accordion */}
                       <div className="flex items-center gap-2 shrink-0">
-                        {tc.course?.videoUrl && (
+                        {(tc.videoUrl || tc.course?.videoUrl) && (
                           <a
-                            href={tc.course.videoUrl}
+                            href={tc.videoUrl || tc.course?.videoUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-500 shadow-sm shadow-red-600/20 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
