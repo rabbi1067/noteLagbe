@@ -631,6 +631,7 @@ public class ResourceService {
         }
 
         incrementDownloadCount(id);
+        r.setDownloadsCount(r.getDownloadsCount() + 1);
 
         // Direct Cloudflare R2 Streaming & CDN Delivery (Zero Render Memory Pressure, 100% S3 Authorized, 1-hour secure presigned URL)
         if (r2Service.isConfigured() && (targetUrl.contains(".r2.") || targetUrl.contains("r2.dev") || targetUrl.contains("r2_"))) {

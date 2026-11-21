@@ -1252,9 +1252,9 @@ public class EmailService {
                     <div class="title" style="font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 6px; line-height: 1.3;">New Payment Submitted 💰</div>
                     <div class="subtitle" style="font-size: 14px; color: #475569; margin-bottom: 20px; line-height: 1.5;">A student has just submitted a payment request on NoteLagbe Plans &amp; Pricing. Please verify the transaction.</div>
                     
-                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; border-collapse: separate; overflow: hidden; width: 100%;">
+                    <table width="100%%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; border-collapse: separate; overflow: hidden; width: 100%%;">
                         <tr>
-                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; width: 38%; vertical-align: middle;">Plan Purchased:</td>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; width: 38%%; vertical-align: middle;">Plan Purchased:</td>
                             <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
                         </tr>
                         <tr>
@@ -1374,9 +1374,9 @@ public class EmailService {
                     <div class="title" style="font-size: 24px; font-weight: 900; color: #0f172a; margin-top: 12px; margin-bottom: 6px; line-height: 1.3;">New Waiver Application 📝</div>
                     <div style="font-size: 14px; color: #475569; margin-bottom: 20px; line-height: 1.5;">A student has applied for a Free Waiver on Plans &amp; Pricing.</div>
                     
-                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; border-collapse: separate; overflow: hidden; width: 100%;">
+                    <table width="100%%" cellpadding="0" cellspacing="0" border="0" style="margin: 20px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; border-collapse: separate; overflow: hidden; width: 100%%;">
                         <tr>
-                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; width: 38%; vertical-align: middle;">Student Name:</td>
+                            <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px; font-weight: 600; width: 38%%; vertical-align: middle;">Student Name:</td>
                             <td style="padding: 11px 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a; font-size: 14px; font-weight: 700; text-align: right; vertical-align: middle;">%s</td>
                         </tr>
                         <tr>

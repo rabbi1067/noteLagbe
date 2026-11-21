@@ -81,7 +81,8 @@ class ChatRetentionAndOrderingTest {
                 resourceService, courseService, teacherService, emailService,
                 reviewModerationService, authService, noticeService, chatServiceMock,
                 activityLogService, seuFacultySyncService, userRepository,
-                cacheManager, httpRequest
+                cacheManager, httpRequest,
+                org.mockito.Mockito.mock(PricingCampaignService.class)
         );
 
         superAdmin = new User();

@@ -66,7 +66,8 @@ class StudentEmailFlowsTest {
         paymentService = new PaymentService(
                 paymentRequestRepository, subscriptionRepository, unlockedCourseRepository,
                 courseRepository, new ObjectMapper(), notificationService, emailService,
-                liveSyncService, inputSanitizationService
+                liveSyncService, inputSanitizationService,
+                org.mockito.Mockito.mock(PricingCampaignService.class)
         );
 
         contributionService = new ContributionService(

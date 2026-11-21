@@ -271,7 +271,8 @@ class EmailDeliveryConfigurationTest {
                 resourceService, courseService, teacherService, emailServiceMock,
                 reviewModerationService, authService, noticeService, chatService,
                 activityLogService, seuFacultySyncService, userRepository,
-                cacheManager, httpRequest
+                cacheManager, httpRequest,
+                org.mockito.Mockito.mock(PricingCampaignService.class)
         );
 
         User superAdmin = new User();
@@ -488,7 +489,7 @@ class EmailDeliveryConfigurationTest {
 
         assertEquals("https://api.brevo.com/v3/smtp/email", emailService.lastUrl);
         assertNotNull(emailService.lastPayload);
-        assertEquals("superadmin@notelagbe.com", ((List<?>) emailService.lastPayload.get("to")).get(0));
+        assertEquals("superadmin@notelagbe.com", ((Map<?, ?>) ((List<?>) emailService.lastPayload.get("to")).get(0)).get("email"));
         assertTrue(emailService.lastPayload.get("subject").toString().contains("TRX8899AABB"));
         assertTrue(emailService.lastPayload.get("subject").toString().contains("99"));
         assertTrue(emailService.lastPayload.get("htmlContent").toString().contains("01779326236"));
@@ -505,7 +506,7 @@ class EmailDeliveryConfigurationTest {
 
         emailService.notifySuperAdminNewWaiverSubmission(student, waiver);
 
-        assertEquals("superadmin@notelagbe.com", ((List<?>) emailService.lastPayload.get("to")).get(0));
+        assertEquals("superadmin@notelagbe.com", ((Map<?, ?>) ((List<?>) emailService.lastPayload.get("to")).get(0)).get("email"));
         assertTrue(emailService.lastPayload.get("subject").toString().contains("3.85"));
         assertTrue(emailService.lastPayload.get("htmlContent").toString().contains("Financial difficulty"));
     }

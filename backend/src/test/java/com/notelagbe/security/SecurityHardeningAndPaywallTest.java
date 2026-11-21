@@ -252,7 +252,8 @@ class SecurityHardeningAndPaywallTest {
         PaymentService paymentService = new PaymentService(
                 paymentRequestRepository, subscriptionRepository, unlockedCourseRepository,
                 courseRepository, new ObjectMapper(), notificationService, emailService,
-                liveSyncService, inputSanitizationService
+                liveSyncService, inputSanitizationService,
+                org.mockito.Mockito.mock(PricingCampaignService.class)
         );
 
         User student = new User("Student", "s1@seu.edu.bd", "hash", "202400002", Role.ROLE_STUDENT);

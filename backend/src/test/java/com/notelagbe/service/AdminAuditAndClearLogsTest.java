@@ -87,7 +87,8 @@ class AdminAuditAndClearLogsTest {
                 resourceService, courseService, teacherService, emailService,
                 reviewModerationService, authService, noticeService, chatService,
                 activityLogService, seuFacultySyncService, userRepository,
-                cacheManager, httpRequest);
+                cacheManager, httpRequest,
+                org.mockito.Mockito.mock(PricingCampaignService.class));
 
         superAdmin = new User();
         superAdmin.setId(1L);

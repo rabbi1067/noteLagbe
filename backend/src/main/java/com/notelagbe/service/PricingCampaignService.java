@@ -178,6 +178,7 @@ public class PricingCampaignService {
         m.put("campaignPrice", campaignPrice);
         m.put("currentPrice", currentPrice);
         m.put("discountPercent", discountPercent);
+        m.put("isDiscounted", campaignPrice != null && campaignPrice < basePrice);
         m.put("courseQuota", courseQuota);
         m.put("durationMonths", durationMonths);
         m.put("isUnlimited", isUnlimited);
