@@ -862,6 +862,12 @@ export const api = {
     getMy: () => request<any[]>("/payments/my"),
   },
 
+  // Pricing & Flash Campaigns API
+  pricing: {
+    getOverview: () => request<any>("/plans"),
+    getCampaign: () => request<any>("/pricing/campaign"),
+  },
+
   // Contributions API
   contributions: {
     submit: (data: any) => request<any>("/contributions/submit", { method: "POST", body: JSON.stringify(data) }),
@@ -1003,6 +1009,15 @@ export const api = {
       request<any[]>(`/admin/subscriptions${active !== undefined ? `?active=${active}` : ""}`),
     toggleSubscriptionPause: (id: number) =>
       request<any>(`/admin/subscriptions/${id}/toggle-pause`, { method: "POST" }),
+
+    // Pricing Flash Campaigns (Super Admin)
+    getPricingCampaigns: () => request<any[]>("/admin/pricing/campaigns"),
+    savePricingCampaign: (data: any) =>
+      request<any>("/admin/pricing/campaigns", { method: "POST", body: JSON.stringify(data) }),
+    togglePricingCampaign: (id: number) =>
+      request<any>(`/admin/pricing/campaigns/${id}/toggle`, { method: "PUT" }),
+    deletePricingCampaign: (id: number) =>
+      request<any>(`/admin/pricing/campaigns/${id}`, { method: "DELETE" }),
 
     // Contributions
     getContributions: (status?: string) => request<any[]>(`/admin/contributions${status ? `?status=${status}` : ""}`),

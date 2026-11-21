@@ -47,6 +47,7 @@ import {
   Mail,
   Laptop,
   Star,
+  Flame,
   EyeOff,
   User,
   ChevronLeft,
@@ -545,6 +546,22 @@ export default function AdminDashboardPage() {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<"PENDING" | "APPROVED" | "REJECTED" | "ALL" | "SUBSCRIBERS">("PENDING");
   const [paymentSearch, setPaymentSearch] = useState("");
   const [activeSubscribers, setActiveSubscribers] = useState<any[]>([]);
+
+  // Flash Pricing Campaigns States (Super Admin)
+  const [showCampaignModal, setShowCampaignModal] = useState(false);
+  const [pricingCampaigns, setPricingCampaigns] = useState<any[]>([]);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
+  const [savingCampaign, setSavingCampaign] = useState(false);
+  const [editingCampaignId, setEditingCampaignId] = useState<number | null>(null);
+  const [campaignName, setCampaignName] = useState("");
+  const [campaignBadgeText, setCampaignBadgeText] = useState("");
+  const [campaignSem1Price, setCampaignSem1Price] = useState<number | "">("");
+  const [campaignSem2Price, setCampaignSem2Price] = useState<number | "">("");
+  const [campaignYear1Price, setCampaignYear1Price] = useState<number | "">("");
+  const [campaignStartsAt, setCampaignStartsAt] = useState<string>("");
+  const [campaignExpiresAt, setCampaignExpiresAt] = useState<string>("");
+  const [campaignActive, setCampaignActive] = useState(true);
+  const [campaignDescription, setCampaignDescription] = useState("");
 
   // Student Submissions States
   const [contributionStatusFilter, setContributionStatusFilter] = useState<"PENDING" | "APPROVED" | "REJECTED" | "ALL">("PENDING");
@@ -3761,6 +3778,134 @@ export default function AdminDashboardPage() {
           await loadAllAdminData();
         } catch (err: any) {
           toast.error(err.message || "Failed to delete notice");
+          throw err;
+        }
+      },
+    });
+  };
+
+  // Pricing Flash Campaigns Handlers (Super Admin)
+  const loadPricingCampaigns = async () => {
+    setLoadingCampaigns(true);
+    try {
+      const data = await api.admin.getPricingCampaigns();
+      setPricingCampaigns(data || []);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load pricing campaigns");
+    } finally {
+      setLoadingCampaigns(false);
+    }
+  };
+
+  const openCreateCampaignModal = () => {
+    setEditingCampaignId(null);
+    setCampaignName("");
+    setCampaignBadgeText("");
+    setCampaignSem1Price("");
+    setCampaignSem2Price("");
+    setCampaignYear1Price("");
+    setCampaignStartsAt("");
+    setCampaignExpiresAt("");
+    setCampaignActive(true);
+    setCampaignDescription("");
+    setShowCampaignModal(true);
+    loadPricingCampaigns();
+  };
+
+  const openEditCampaignModal = (camp: any) => {
+    setEditingCampaignId(camp.id);
+    setCampaignName(camp.name || "");
+    setCampaignBadgeText(camp.badgeText || "");
+    setCampaignSem1Price(camp.semester1Price != null ? camp.semester1Price : "");
+    setCampaignSem2Price(camp.semester2Price != null ? camp.semester2Price : "");
+    setCampaignYear1Price(camp.year1Price != null ? camp.year1Price : "");
+    setCampaignStartsAt(camp.startsAt ? String(camp.startsAt).substring(0, 16) : "");
+    setCampaignExpiresAt(camp.expiresAt ? String(camp.expiresAt).substring(0, 16) : "");
+    setCampaignActive(Boolean(camp.active));
+    setCampaignDescription(camp.description || "");
+    setShowCampaignModal(true);
+  };
+
+  const handleSaveCampaign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!campaignName.trim()) {
+      toast.error("Campaign name is required");
+      return;
+    }
+
+    if (campaignExpiresAt) {
+      const expTime = new Date(campaignExpiresAt).getTime();
+      if (expTime <= Date.now()) {
+        toast.error("Auto-expiry date and time must be in the future");
+        return;
+      }
+      if (campaignStartsAt && expTime <= new Date(campaignStartsAt).getTime()) {
+        toast.error("Expiry date must be after the campaign start time");
+        return;
+      }
+    }
+
+    setSavingCampaign(true);
+    try {
+      await api.admin.savePricingCampaign({
+        id: editingCampaignId,
+        name: campaignName.trim(),
+        badgeText: campaignBadgeText.trim() || null,
+        description: campaignDescription.trim() || null,
+        semester1Price: campaignSem1Price !== "" ? Number(campaignSem1Price) : null,
+        semester2Price: campaignSem2Price !== "" ? Number(campaignSem2Price) : null,
+        year1Price: campaignYear1Price !== "" ? Number(campaignYear1Price) : null,
+        startsAt: campaignStartsAt || null,
+        expiresAt: campaignExpiresAt || null,
+        active: campaignActive,
+      });
+
+      toast.success(editingCampaignId ? "Campaign updated successfully!" : "Flash discount campaign created successfully!");
+      notifyDataChanged("pricing", "campaign_saved");
+      setEditingCampaignId(null);
+      setCampaignName("");
+      setCampaignBadgeText("");
+      setCampaignSem1Price("");
+      setCampaignSem2Price("");
+      setCampaignYear1Price("");
+      setCampaignStartsAt("");
+      setCampaignExpiresAt("");
+      setCampaignDescription("");
+      await loadPricingCampaigns();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save pricing campaign");
+    } finally {
+      setSavingCampaign(false);
+    }
+  };
+
+  const handleToggleCampaign = async (camp: any) => {
+    try {
+      await api.admin.togglePricingCampaign(camp.id);
+      notifyDataChanged("pricing", "campaign_toggled", camp.id);
+      toast.success(camp.active ? "Campaign deactivated. Reverted to standard pricing." : "Campaign activated!");
+      await loadPricingCampaigns();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to toggle campaign status");
+    }
+  };
+
+  const handleDeleteCampaign = (camp: any) => {
+    openDeleteConfirm({
+      title: "Delete Pricing Campaign",
+      itemType: "Pricing Campaign",
+      itemName: camp.name,
+      warningText: "Are you sure you want to delete this campaign? If active, live pricing will immediately revert back to standard base prices.",
+      confirmButtonText: "Delete Campaign",
+      onConfirm: async () => {
+        try {
+          await api.admin.deletePricingCampaign(camp.id);
+          notifyDataChanged("pricing", "campaign_deleted", camp.id);
+          toast.success("Campaign deleted successfully");
+          showDeleteSuccess("Campaign Deleted!", "The pricing campaign was permanently removed.", camp.name);
+          await loadPricingCampaigns();
+        } catch (err: any) {
+          toast.error(err.message || "Failed to delete campaign");
           throw err;
         }
       },
@@ -7358,7 +7503,15 @@ export default function AdminDashboardPage() {
                     Verify manual bKash/Nagad transactions, track verified revenue history, and manage active premium subscribers.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={openCreateCampaignModal}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 hover:opacity-90 text-white font-black text-xs shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+                  >
+                    <Flame className="w-3.5 h-3.5 fill-current" />
+                    <span>Flash Campaigns</span>
+                  </button>
                   <span className="text-xs font-bold text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
                     {pendingPaymentsCount} Pending Action
                   </span>
@@ -14007,6 +14160,341 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* FLASH PRICING CAMPAIGN MANAGEMENT MODAL (SUPER ADMIN)                    */}
+      {/* ========================================================================= */}
+      {showCampaignModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-4xl bg-white dark:bg-[#0d1527] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-slate-900/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-600 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
+                  <Flame className="w-5 h-5 fill-current" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Flash Discount & Pricing Campaigns</span>
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                      SUPER ADMIN
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Set time-limited flash discounts. Pricing automatically rolls back to standard base prices upon expiry.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCampaignModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body: Scrollable */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-6">
+              {/* Form Section */}
+              <form onSubmit={handleSaveCampaign} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>{editingCampaignId ? "Edit Campaign" : "Create New Flash Discount Campaign"}</span>
+                  </h4>
+                  {editingCampaignId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCampaignId(null);
+                        setCampaignName("");
+                        setCampaignBadgeText("");
+                        setCampaignSem1Price("");
+                        setCampaignSem2Price("");
+                        setCampaignYear1Price("");
+                        setCampaignStartsAt("");
+                        setCampaignExpiresAt("");
+                        setCampaignDescription("");
+                        setCampaignActive(true);
+                      }}
+                      className="text-[11px] font-bold text-blue-500 hover:underline cursor-pointer"
+                    >
+                      + Switch to New Campaign
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Campaign Name */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Campaign Title *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Ramadan Special Discount"
+                      value={campaignName}
+                      onChange={(e) => setCampaignName(e.target.value)}
+                      className="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+
+                  {/* Badge Text */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Header / Card Badge Text
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 🔥 সীমিত সময়ের বিশেষ ছাড়"
+                      value={campaignBadgeText}
+                      onChange={(e) => setCampaignBadgeText(e.target.value)}
+                      className="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                {/* 3 Tier Discount Prices */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                    Campaign Discount Prices (৳ Taka)
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="font-bold text-slate-600 dark:text-slate-300">1-Semester Plan</span>
+                        <span className="text-slate-400 line-through">Base: ৳99</span>
+                      </div>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="e.g. 79 (or blank for 99)"
+                        value={campaignSem1Price}
+                        onChange={(e) => setCampaignSem1Price(e.target.value === "" ? "" : Number(e.target.value))}
+                        className="w-full text-xs p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="font-bold text-slate-600 dark:text-slate-300">2-Semesters Plan</span>
+                        <span className="text-slate-400 line-through">Base: ৳149</span>
+                      </div>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="e.g. 119 (or blank for 149)"
+                        value={campaignSem2Price}
+                        onChange={(e) => setCampaignSem2Price(e.target.value === "" ? "" : Number(e.target.value))}
+                        className="w-full text-xs p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="font-bold text-slate-600 dark:text-slate-300">1-Year Annual Pass</span>
+                        <span className="text-slate-400 line-through">Base: ৳499</span>
+                      </div>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="e.g. 399 (or blank for 499)"
+                        value={campaignYear1Price}
+                        onChange={(e) => setCampaignYear1Price(e.target.value === "" ? "" : Number(e.target.value))}
+                        className="w-full text-xs p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Expiry and Start Date Schedule */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                      <span>Auto-Expiry Date & Time *</span>
+                      <span className="text-[10px] text-amber-500 font-semibold">Auto reverts upon arrival</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={campaignExpiresAt}
+                      onChange={(e) => setCampaignExpiresAt(e.target.value)}
+                      className="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Campaign Start Time (Optional)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={campaignStartsAt}
+                      onChange={(e) => setCampaignStartsAt(e.target.value)}
+                      className="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Status Toggle & Submit */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={campaignActive}
+                      onChange={(e) => setCampaignActive(e.target.checked)}
+                      className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500"
+                    />
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Set Campaign Active
+                    </span>
+                  </label>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="submit"
+                      disabled={savingCampaign}
+                      className="px-5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-amber-500 to-rose-600 hover:opacity-90 text-white shadow-md shadow-amber-500/20 flex items-center gap-2 disabled:opacity-50 transition-all cursor-pointer"
+                    >
+                      {savingCampaign && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                      <Flame className="w-3.5 h-3.5 fill-current" />
+                      <span>{editingCampaignId ? "Update Campaign" : "Save & Activate Campaign"}</span>
+                    </button>
+                  </div>
+                </div>
+              </form>
+
+              {/* Campaign History & Active Campaigns List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <History className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Campaign History & Active Offer Tracker</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={loadPricingCampaigns}
+                    disabled={loadingCampaigns}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingCampaigns ? "animate-spin" : ""}`} />
+                  </button>
+                </div>
+
+                {pricingCampaigns.length === 0 ? (
+                  <div className="p-8 text-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-xs text-slate-400">
+                    No flash discount campaigns configured yet. Create one above to launch a limited-time offer!
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {pricingCampaigns.map((camp: any) => {
+                      const isExpired = camp.expiresAt && new Date(camp.expiresAt).getTime() <= Date.now();
+                      const isLive = camp.active && !isExpired && (!camp.startsAt || new Date(camp.startsAt).getTime() <= Date.now());
+
+                      return (
+                        <div
+                          key={camp.id}
+                          className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                            isLive
+                              ? "bg-amber-500/5 border-amber-500/30 dark:bg-amber-500/10"
+                              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 opacity-80"
+                          }`}
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-xs text-slate-900 dark:text-white">
+                                {camp.name}
+                              </span>
+                              {isLive ? (
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  LIVE NOW
+                                </span>
+                              ) : isExpired ? (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500">
+                                  EXPIRED (Auto-Reverted)
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-600">
+                                  PAUSED
+                                </span>
+                              )}
+                              {camp.badgeText && (
+                                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                                  {camp.badgeText}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+                              <span>1-Sem: <strong className="text-slate-800 dark:text-slate-200">৳{camp.semester1Price || 99}</strong></span>
+                              <span>•</span>
+                              <span>2-Sem: <strong className="text-slate-800 dark:text-slate-200">৳{camp.semester2Price || 149}</strong></span>
+                              <span>•</span>
+                              <span>1-Year: <strong className="text-slate-800 dark:text-slate-200">৳{camp.year1Price || 499}</strong></span>
+                              {camp.expiresAt && (
+                                <>
+                                  <span>•</span>
+                                  <span className="flex items-center gap-1 text-slate-400">
+                                    <Clock className="w-3 h-3" />
+                                    <span>Expires: {new Date(camp.expiresAt).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })}</span>
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCampaign(camp)}
+                              className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-colors ${
+                                camp.active
+                                  ? "border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20"
+                                  : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100"
+                              }`}
+                            >
+                              {camp.active ? "Pause" : "Activate"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openEditCampaignModal(camp)}
+                              className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors"
+                              title="Edit Campaign"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCampaign(camp)}
+                              className="p-1.5 rounded-xl border border-rose-200 dark:border-rose-900/50 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                              title="Delete Campaign"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowCampaignModal(false)}
+                className="px-4 py-2 rounded-xl font-bold text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

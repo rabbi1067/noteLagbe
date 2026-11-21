@@ -25,7 +25,9 @@ import {
   Zap,
   GraduationCap,
   Clock,
-  Star
+  Star,
+  Flame,
+  Tag
 } from "lucide-react";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
@@ -38,6 +40,54 @@ export default function PricingPage() {
   // Selected Plan for Checkout
   const [selectedPlan, setSelectedPlan] = useState<"SEMESTER_1" | "SEMESTER_2" | "YEAR_1_UNLIMITED">("SEMESTER_2");
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [pricingOverview, setPricingOverview] = useState<any | null>(null);
+  const [campaignTimeLeft, setCampaignTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
+
+  const fetchPricingData = React.useCallback(async () => {
+    try {
+      const data = await api.pricing.getOverview();
+      if (data && data.plans) {
+        setPricingOverview(data);
+      }
+    } catch {
+      // Non-blocking fallback
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchPricingData();
+  }, [fetchPricingData]);
+
+  useDataSync(() => {
+    fetchPricingData();
+  });
+
+  // Real-time ticking campaign timer
+  React.useEffect(() => {
+    if (!pricingOverview?.expiresAt) {
+      setCampaignTimeLeft(null);
+      return;
+    }
+
+    const updateTimer = () => {
+      const target = new Date(pricingOverview.expiresAt).getTime();
+      const diff = target - Date.now();
+      if (diff <= 0) {
+        setCampaignTimeLeft(null);
+        setPricingOverview((prev: any) => (prev ? { ...prev, campaignActive: false } : null));
+        return;
+      }
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setCampaignTimeLeft({ days, hours, minutes, seconds });
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [pricingOverview?.expiresAt]);
 
   // Payment Form States (bKash & Nagad ONLY)
   const [paymentMethod, setPaymentMethod] = useState<"BKASH" | "NAGAD">("BKASH");
@@ -90,7 +140,31 @@ export default function PricingPage() {
     },
   };
 
-  const currentPlan = planConfig[selectedPlan];
+  const getPlanDetails = (key: "SEMESTER_1" | "SEMESTER_2" | "YEAR_1_UNLIMITED") => {
+    const defaultMeta = planConfig[key];
+    const planFromApi = pricingOverview?.plans?.find((p: any) => p.planType === key);
+    const regularPrice = planFromApi?.regularPrice || (key === "SEMESTER_1" ? 149 : key === "SEMESTER_2" ? 249 : 799);
+    const basePrice = planFromApi?.basePrice || defaultMeta.price;
+    const campaignPrice = planFromApi?.campaignPrice || null;
+    const currentPrice = planFromApi?.currentPrice || basePrice;
+    const discountPercent = planFromApi?.discountPercent || Math.round(((regularPrice - currentPrice) / regularPrice) * 100);
+    const isCampaignDiscount = Boolean(pricingOverview?.campaignActive && campaignPrice != null && campaignPrice < basePrice);
+
+    return {
+      ...defaultMeta,
+      regularPrice,
+      basePrice,
+      campaignPrice,
+      price: currentPrice,
+      discountPercent,
+      isCampaignDiscount,
+    };
+  };
+
+  const currentPlan = getPlanDetails(selectedPlan);
+  const p1 = getPlanDetails("SEMESTER_1");
+  const p2 = getPlanDetails("SEMESTER_2");
+  const p3 = getPlanDetails("YEAR_1_UNLIMITED");
 
   const handleCopyNumber = () => {
     navigator.clipboard.writeText(paymentNumber);
@@ -384,6 +458,47 @@ export default function PricingPage() {
         </div>
       )}
 
+      {/* Flash Campaign Live Countdown & Urgency Showcase */}
+      {pricingOverview?.campaignActive && (
+        <div className="max-w-3xl mx-auto p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-amber-500/15 via-rose-500/15 to-purple-500/15 border-2 border-amber-500/40 text-center space-y-3 shadow-xl mb-6 animate-in fade-in duration-300">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-black text-xs uppercase tracking-wider shadow-xs">
+            <Flame className="w-3.5 h-3.5 fill-current animate-bounce" />
+            <span>{pricingOverview.badgeText || (language === "bn" ? "স্পেশাল ফ্ল্যাশ ক্যাম্পেইন অফার" : "Special Flash Campaign Offer")}</span>
+          </div>
+
+          <h3 className="font-black text-xl sm:text-2xl text-slate-900 dark:text-white">
+            {pricingOverview.campaignName || (language === "bn" ? "সীমিত সময়ের বিশেষ মেগা ডিসকাউন্ট চলছে!" : "Limited Time Mega Discount Active!")}
+          </h3>
+
+          {pricingOverview.description && (
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-xl mx-auto leading-relaxed">
+              {pricingOverview.description}
+            </p>
+          )}
+
+          {campaignTimeLeft && (
+            <div className="pt-1 flex items-center justify-center gap-2 sm:gap-3 text-xs sm:text-sm font-mono font-black">
+              <span className="text-amber-800 dark:text-amber-200 font-sans text-xs">
+                {language === "bn" ? "অফারের মেয়াদ বাকি:" : "Offer ends in:"}
+              </span>
+              <div className="flex items-center gap-1.5 bg-slate-900/90 text-amber-300 px-3 py-1.5 rounded-2xl border border-amber-500/30 shadow-inner">
+                {campaignTimeLeft.days > 0 && (
+                  <>
+                    <span className="text-amber-200">{String(campaignTimeLeft.days).padStart(2, "0")}d</span>
+                    <span className="text-white/40">:</span>
+                  </>
+                )}
+                <span className="text-amber-200">{String(campaignTimeLeft.hours).padStart(2, "0")}h</span>
+                <span className="text-white/40">:</span>
+                <span className="text-amber-200">{String(campaignTimeLeft.minutes).padStart(2, "0")}m</span>
+                <span className="text-white/40">:</span>
+                <span className="text-rose-400 animate-pulse">{String(campaignTimeLeft.seconds).padStart(2, "0")}s</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 3 Main Paid Subscription Plan Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch">
         
@@ -406,9 +521,25 @@ export default function PricingPage() {
               </p>
             </div>
 
-            <div className="flex items-baseline gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-800">
-              <span className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white">৳99</span>
-              <span className="text-xs text-slate-500 font-semibold">{language === "bn" ? "/ ৩ মাস" : "/ 3 months"}</span>
+            <div className="space-y-1 pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-bold text-slate-400 line-through">৳{p1.regularPrice}</span>
+                {p1.isCampaignDiscount && (
+                  <span className="text-xs sm:text-sm font-bold text-slate-400 line-through">৳{p1.basePrice}</span>
+                )}
+                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                  {p1.discountPercent}% {language === "bn" ? "ছাড়" : "OFF"}
+                </span>
+                {p1.isCampaignDiscount && (
+                  <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 animate-pulse">
+                    FLASH
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white">৳{p1.price}</span>
+                <span className="text-xs text-slate-500 font-semibold">{language === "bn" ? "/ ৩ মাস" : "/ 3 months"}</span>
+              </div>
             </div>
 
             {/* Quota Feature Callout with Auto-Lock Policy */}
@@ -467,7 +598,7 @@ export default function PricingPage() {
                   : "text-slate-900 dark:text-white bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 active:scale-95"
               }`}
             >
-              <span>{isStaff ? (language === "bn" ? "অ্যাডমিন অ্যাক্সেস সক্রিয় ✓" : "Staff Access Active ✓") : (language === "bn" ? "১-সেমিস্টার প্ল্যান নিন (৳৯৯ / ৩ মাস)" : "Get 1-Semester Plan (৳99 / 3 Mos)")}</span>
+              <span>{isStaff ? (language === "bn" ? "অ্যাডমিন অ্যাক্সেস সক্রিয় ✓" : "Staff Access Active ✓") : (language === "bn" ? `১-সেমিস্টার প্ল্যান নিন (৳${p1.price} / ৩ মাস)` : `Get 1-Semester Plan (৳${p1.price} / 3 Mos)`)}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
             <div className="text-center pt-1">
@@ -506,9 +637,25 @@ export default function PricingPage() {
               </p>
             </div>
 
-            <div className="flex items-baseline gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-800">
-              <span className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white">৳149</span>
-              <span className="text-xs text-slate-500 font-semibold">{language === "bn" ? "/ ৬ মাস" : "/ 6 months"}</span>
+            <div className="space-y-1 pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-bold text-slate-400 line-through">৳{p2.regularPrice}</span>
+                {p2.isCampaignDiscount && (
+                  <span className="text-xs sm:text-sm font-bold text-slate-400 line-through">৳{p2.basePrice}</span>
+                )}
+                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                  {p2.discountPercent}% {language === "bn" ? "ছাড়" : "OFF"}
+                </span>
+                {p2.isCampaignDiscount && (
+                  <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 animate-pulse">
+                    FLASH
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white">৳{p2.price}</span>
+                <span className="text-xs text-slate-500 font-semibold">{language === "bn" ? "/ ৬ মাস" : "/ 6 months"}</span>
+              </div>
             </div>
 
             {/* Quota Feature Callout with Auto-Lock Policy */}
@@ -568,7 +715,7 @@ export default function PricingPage() {
               }`}
             >
               <Sparkles className="w-4 h-4" />
-              <span>{isStaff ? (language === "bn" ? "অ্যাডমিন অ্যাক্সেস সক্রিয় ✓" : "Staff Access Active ✓") : (language === "bn" ? "২-সেমিস্টার প্ল্যান নিন (৳১৪৯ / ৬ মাস)" : "Get 2-Semesters Plan (৳149 / 6 Mos)")}</span>
+              <span>{isStaff ? (language === "bn" ? "অ্যাডমিন অ্যাক্সেস সক্রিয় ✓" : "Staff Access Active ✓") : (language === "bn" ? `২-সেমিস্টার প্ল্যান নিন (৳${p2.price} / ৬ মাস)` : `Get 2-Semesters Plan (৳${p2.price} / 6 Mos)`)}</span>
             </button>
           </div>
         </div>
@@ -592,9 +739,25 @@ export default function PricingPage() {
               </p>
             </div>
 
-            <div className="flex items-baseline gap-1.5 pb-2 border-b border-slate-100 dark:border-slate-800">
-              <span className="text-4xl sm:text-5xl font-black text-purple-950 dark:text-white">৳499</span>
-              <span className="text-xs text-slate-500 font-semibold">{language === "bn" ? "/ ১ পুরো বছর" : "/ 1 full year"}</span>
+            <div className="space-y-1 pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-bold text-slate-400 line-through">৳{p3.regularPrice}</span>
+                {p3.isCampaignDiscount && (
+                  <span className="text-xs sm:text-sm font-bold text-slate-400 line-through">৳{p3.basePrice}</span>
+                )}
+                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+                  {p3.discountPercent}% {language === "bn" ? "ছাড়" : "OFF"}
+                </span>
+                {p3.isCampaignDiscount && (
+                  <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 animate-pulse">
+                    FLASH
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-4xl sm:text-5xl font-black text-purple-950 dark:text-white">৳{p3.price}</span>
+                <span className="text-xs text-slate-500 font-semibold">{language === "bn" ? "/ ১ পুরো বছর" : "/ 1 full year"}</span>
+              </div>
             </div>
 
             {/* Quota Feature Callout with Auto-Lock Policy */}
@@ -654,7 +817,7 @@ export default function PricingPage() {
               }`}
             >
               <Sparkles className="w-4 h-4" />
-              <span>{isStaff ? (language === "bn" ? "অ্যাডমিন অ্যাক্সেস সক্রিয় ✓" : "Staff Access Active ✓") : (language === "bn" ? "১-বছরের পাস নিন (৳৪৯৯ / ১ বছর)" : "Get 1-Year Pass (৳499 / 1 Year)")}</span>
+              <span>{isStaff ? (language === "bn" ? "অ্যাডমিন অ্যাক্সেস সক্রিয় ✓" : "Staff Access Active ✓") : (language === "bn" ? `১-বছরের পাস নিন (৳${p3.price} / ১ বছর)` : `Get 1-Year Pass (৳${p3.price} / 1 Year)`)}</span>
             </button>
           </div>
         </div>
@@ -750,9 +913,17 @@ export default function PricingPage() {
                   <h3 className="text-base font-black text-slate-900 dark:text-white">
                     {language === "bn" ? "সাবস্ক্রিপশন পেমেন্ট সম্পন্ন করুন" : "Complete Subscription Payment"}
                   </h3>
-                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                    ৳{currentPlan.price}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-slate-400 line-through">৳{currentPlan.regularPrice}</span>
+                    <span className="text-xs font-black px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                      ৳{currentPlan.price}
+                    </span>
+                    {currentPlan.isCampaignDiscount && (
+                      <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 animate-pulse">
+                        FLASH
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <p className="text-[11px] text-slate-500">
                   {currentPlan.name} • {currentPlan.quotaText}

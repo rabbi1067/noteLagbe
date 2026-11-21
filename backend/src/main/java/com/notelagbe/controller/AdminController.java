@@ -54,6 +54,7 @@ public class AdminController {
     private final UserRepository userRepository;
     private final CacheManager cacheManager;
     private final HttpServletRequest httpRequest;
+    private final com.notelagbe.service.PricingCampaignService pricingCampaignService;
 
     @org.springframework.beans.factory.annotation.Value("${app.admin.initial-email:}")
     private String initialAdminEmail;
@@ -77,7 +78,8 @@ public class AdminController {
                            SeuFacultySyncService seuFacultySyncService,
                            UserRepository userRepository,
                            CacheManager cacheManager,
-                           HttpServletRequest httpRequest) {
+                           HttpServletRequest httpRequest,
+                           com.notelagbe.service.PricingCampaignService pricingCampaignService) {
         this.adminService = adminService;
         this.paymentService = paymentService;
         this.contributionService = contributionService;
@@ -95,6 +97,7 @@ public class AdminController {
         this.userRepository = userRepository;
         this.cacheManager = cacheManager;
         this.httpRequest = httpRequest;
+        this.pricingCampaignService = pricingCampaignService;
     }
 
     private User getCurrentAdminUser() {
@@ -683,6 +686,54 @@ public class AdminController {
                         + " • Trx: " + trxLabel + "] for " + formatStudentLabel(p.getUser()) + " (" + notes + ")");
         evictAnalyticsCache();
         return ResponseEntity.ok(p);
+    }
+
+    // ==========================================
+    // Pricing Flash Campaigns Management (Super Admin)
+    // ==========================================
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @GetMapping("/pricing/campaigns")
+    public ResponseEntity<List<com.notelagbe.entity.PricingCampaign>> getPricingCampaigns() {
+        return ResponseEntity.ok(pricingCampaignService.getAllCampaigns());
+    }
+
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PostMapping("/pricing/campaigns")
+    public ResponseEntity<com.notelagbe.entity.PricingCampaign> savePricingCampaign(
+            @RequestBody Map<String, Object> payload,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
+        com.notelagbe.entity.PricingCampaign saved = pricingCampaignService.saveCampaign(payload);
+        logAdminAction(actor, "PRICING_CAMPAIGN_SAVE", "BILLING",
+                formatActorPrefix(actor) + " created/updated pricing campaign: " + saved.getName() + " (Active=" + saved.isActive() + ")");
+        evictAnalyticsCache();
+        return ResponseEntity.ok(saved);
+    }
+
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PutMapping("/pricing/campaigns/{id}/toggle")
+    public ResponseEntity<com.notelagbe.entity.PricingCampaign> togglePricingCampaign(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
+        com.notelagbe.entity.PricingCampaign toggled = pricingCampaignService.toggleCampaign(id);
+        logAdminAction(actor, "PRICING_CAMPAIGN_TOGGLE", "BILLING",
+                formatActorPrefix(actor) + " toggled pricing campaign #" + id + " to active=" + toggled.isActive());
+        evictAnalyticsCache();
+        return ResponseEntity.ok(toggled);
+    }
+
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @DeleteMapping("/pricing/campaigns/{id}")
+    public ResponseEntity<Map<String, Object>> deletePricingCampaign(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        User actor = resolveActor(userDetails);
+        pricingCampaignService.deleteCampaign(id);
+        logAdminAction(actor, "PRICING_CAMPAIGN_DELETE", "BILLING",
+                formatActorPrefix(actor) + " deleted pricing campaign #" + id);
+        evictAnalyticsCache();
+        return ResponseEntity.ok(Map.of("success", true, "message", "Campaign deleted successfully"));
     }
 
     // ==========================================

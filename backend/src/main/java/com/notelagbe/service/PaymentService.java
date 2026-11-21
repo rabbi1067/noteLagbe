@@ -38,6 +38,7 @@ public class PaymentService {
     private final EmailService emailService;
     private final LiveSyncService liveSyncService;
     private final InputSanitizationService inputSanitizationService;
+    private final PricingCampaignService pricingCampaignService;
 
     public PaymentService(PaymentRequestRepository paymentRequestRepository,
                           SubscriptionRepository subscriptionRepository,
@@ -47,7 +48,8 @@ public class PaymentService {
                           NotificationService notificationService,
                           EmailService emailService,
                           LiveSyncService liveSyncService,
-                          InputSanitizationService inputSanitizationService) {
+                          InputSanitizationService inputSanitizationService,
+                          PricingCampaignService pricingCampaignService) {
         this.paymentRequestRepository = paymentRequestRepository;
         this.subscriptionRepository = subscriptionRepository;
         this.unlockedCourseRepository = unlockedCourseRepository;
@@ -57,6 +59,7 @@ public class PaymentService {
         this.emailService = emailService;
         this.liveSyncService = liveSyncService;
         this.inputSanitizationService = inputSanitizationService;
+        this.pricingCampaignService = pricingCampaignService;
     }
 
     @Transactional
@@ -92,7 +95,7 @@ public class PaymentService {
         pr.setPaymentMethod(request.getPaymentMethod());
         pr.setSenderPhone(cleanPhone);
         pr.setTransactionId(cleanTrx);
-        pr.setAmount(request.getPlanType().getPrice());
+        pr.setAmount(pricingCampaignService.calculatePriceFor(request.getPlanType()));
         pr.setSlipUrl(cleanSlip);
         pr.setSelectedCoursesJson(request.getSelectedCoursesJson());
         pr.setStatus(PaymentStatus.PENDING);

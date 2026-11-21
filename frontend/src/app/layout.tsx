@@ -7,6 +7,7 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { Toaster } from "sonner";
 import Navbar from "@/components/Navbar";
+import GlobalCampaignBanner from "@/components/GlobalCampaignBanner";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import Footer from "@/components/Footer";
 import SpotlightModal from "@/components/SpotlightModal";
@@ -67,6 +68,7 @@ export default function RootLayout({
         <ThemeProvider>
           <LanguageProvider>
             <AuthProvider>
+              <GlobalCampaignBanner />
               <Navbar />
               <main className="flex-1 w-full max-w-full min-w-0 overflow-x-hidden pb-20 sm:pb-24 lg:pb-0">
                 {children}

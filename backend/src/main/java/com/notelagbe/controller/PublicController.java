@@ -33,9 +33,12 @@ public class PublicController {
     private static final ConcurrentHashMap<String, Long> activeVisitorSessions = new ConcurrentHashMap<>();
 
     private final SystemSettingRepository systemSettingRepository;
+    private final com.notelagbe.service.PricingCampaignService pricingCampaignService;
 
-    public PublicController(SystemSettingRepository systemSettingRepository) {
+    public PublicController(SystemSettingRepository systemSettingRepository,
+                            com.notelagbe.service.PricingCampaignService pricingCampaignService) {
         this.systemSettingRepository = systemSettingRepository;
+        this.pricingCampaignService = pricingCampaignService;
     }
 
     @PostConstruct
@@ -117,15 +120,12 @@ public class PublicController {
     }
 
     @GetMapping("/plans")
-    public ResponseEntity<List<Map<String, Object>>> getPlans() {
-        List<Map<String, Object>> plans = Arrays.stream(PlanType.values()).map(p -> Map.of(
-                "planType", (Object) p.name(),
-                "displayName", p.getDisplayName(),
-                "price", p.getPrice(),
-                "courseQuota", p.getCourseQuota(),
-                "isUnlimited", p.isUnlimited(),
-                "durationMonths", p.getDurationMonths()
-        )).toList();
-        return ResponseEntity.ok(plans);
+    public ResponseEntity<Map<String, Object>> getPlans() {
+        return ResponseEntity.ok(pricingCampaignService.getPricingOverview());
+    }
+
+    @GetMapping("/pricing/campaign")
+    public ResponseEntity<Map<String, Object>> getPricingCampaign() {
+        return ResponseEntity.ok(pricingCampaignService.getPricingOverview());
     }
 }
