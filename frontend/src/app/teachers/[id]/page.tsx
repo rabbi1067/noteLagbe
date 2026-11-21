@@ -1086,6 +1086,20 @@ export default function TeacherDetailPage() {
                               </div>
                             </div>
 
+                            {res.videoUrl && (
+                              <a
+                                href={res.videoUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl font-bold text-xs bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white dark:bg-red-500/15 dark:hover:bg-red-600 dark:text-red-400 dark:hover:text-white border border-red-500/25 transition-all shrink-0 cursor-pointer shadow-2xs"
+                                title="Watch YouTube Video"
+                              >
+                                <span className="text-[10px] font-black">▶</span>
+                                <span>{language === "bn" ? "ভিডিও" : "Video"}</span>
+                              </a>
+                            )}
+
                             <button
                               onClick={() => setActiveResource(res)}
                               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl font-bold text-xs shadow-sm transition-all shrink-0 cursor-pointer ${

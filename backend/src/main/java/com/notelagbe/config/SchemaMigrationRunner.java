@@ -93,6 +93,14 @@ public class SchemaMigrationRunner implements ApplicationRunner {
             log.debug("file_url NULL migration skipped/completed: {}", e.getMessage());
         }
         try {
+            jdbcTemplate.execute("ALTER TABLE resources ADD COLUMN IF NOT EXISTS video_url VARCHAR(1000) NULL");
+            log.info("Ensured resources.video_url column exists");
+        } catch (Exception e) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE resources ADD COLUMN video_url VARCHAR(1000) NULL");
+            } catch (Exception ignored) {}
+        }
+        try {
             jdbcTemplate.execute(
                 "CREATE TABLE IF NOT EXISTS offered_sections (" +
                 "id BIGINT AUTO_INCREMENT PRIMARY KEY, " +

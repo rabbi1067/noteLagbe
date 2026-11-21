@@ -380,6 +380,9 @@ public class ResourceService {
         r.setType(type);
         r.setFileUrl(req.getFileUrl().trim());
         r.setPreviewUrl(req.getPreviewUrl());
+        if (req.getVideoUrl() != null && !req.getVideoUrl().trim().isEmpty()) {
+            r.setVideoUrl(req.getVideoUrl().trim());
+        }
         r.setSemesterName(canonicalSemester);
         r.setAcademicYear(resourceDuplicateService.resolveAcademicYear(canonicalSemester, req.getAcademicYear()));
         r.setCourse(course);
@@ -419,6 +422,9 @@ public class ResourceService {
         }
         if (req.getPreviewUrl() != null) {
             r.setPreviewUrl(req.getPreviewUrl().trim());
+        }
+        if (req.getVideoUrl() != null) {
+            r.setVideoUrl(req.getVideoUrl().trim().isEmpty() ? null : req.getVideoUrl().trim());
         }
         if (req.getSemesterName() != null && !req.getSemesterName().trim().isEmpty()) {
             String canonicalSemester = resourceDuplicateService.normalizeSemesterName(req.getSemesterName());

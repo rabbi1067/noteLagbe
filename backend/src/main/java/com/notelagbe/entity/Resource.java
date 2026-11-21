@@ -32,6 +32,9 @@ public class Resource {
     @Column(length = 1000)
     private String previewUrl; // 1st page or thumbnail image
 
+    @Column(length = 1000)
+    private String videoUrl; // Optional YouTube / lecture video walkthrough link
+
     private String semesterName; // e.g. "Fall 2024", "Spring 2025"
 
     @Column(name = "academic_year")
@@ -76,6 +79,9 @@ public class Resource {
 
     public String getPreviewUrl() { return previewUrl; }
     public void setPreviewUrl(String previewUrl) { this.previewUrl = previewUrl; }
+
+    public String getVideoUrl() { return videoUrl; }
+    public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
 
     public String getSemesterName() { return semesterName; }
     public void setSemesterName(String semesterName) { this.semesterName = semesterName; }

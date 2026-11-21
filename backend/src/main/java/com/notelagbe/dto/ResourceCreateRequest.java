@@ -27,6 +27,9 @@ public class ResourceCreateRequest {
     @Size(max = 500, message = "Preview URL cannot exceed 500 characters")
     private String previewUrl;
 
+    @Size(max = 1000, message = "Video URL cannot exceed 1000 characters")
+    private String videoUrl;
+
     @Size(max = 50, message = "Semester name cannot exceed 50 characters")
     private String semesterName = "Fall 2026";
 
@@ -51,6 +54,9 @@ public class ResourceCreateRequest {
 
     public String getPreviewUrl() { return previewUrl; }
     public void setPreviewUrl(String previewUrl) { this.previewUrl = previewUrl; }
+
+    public String getVideoUrl() { return videoUrl; }
+    public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
 
     public String getSemesterName() { return semesterName; }
     public void setSemesterName(String semesterName) { this.semesterName = semesterName; }

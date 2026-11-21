@@ -90,6 +90,7 @@ import {
   PinOff,
   Volume2,
   Play,
+  Video,
   UserX,
   Info,
   Loader2,
@@ -738,6 +739,7 @@ export default function AdminDashboardPage() {
   const [resTeacherId, setResTeacherId] = useState<number | "">("");
   const [resTitle, setResTitle] = useState("");
   const [resType, setResType] = useState("NOTE");
+  const [resVideoUrl, setResVideoUrl] = useState("");
   const [resFileUrl, setResFileUrl] = useState("");
   const [resFileName, setResFileName] = useState("");
   const [resFileSize, setResFileSize] = useState("");
@@ -2031,6 +2033,7 @@ export default function AdminDashboardPage() {
     setResTeacherId("");
     setResTitle("");
     setResType("NOTE");
+    setResVideoUrl("");
     setResFileUrl("");
     setResFileName("");
     setResFileSize("");
@@ -2047,6 +2050,7 @@ export default function AdminDashboardPage() {
     setResTeacherId(r.teacher?.id || "");
     setResTitle(r.title || "");
     setResType(r.type || "NOTE");
+    setResVideoUrl(r.videoUrl || "");
     setResFileUrl(r.fileUrl || "");
     const extMatch = r.fileUrl ? r.fileUrl.split("/").pop() : "Existing File";
     setResFileName(extMatch || "Existing File");
@@ -2080,6 +2084,7 @@ export default function AdminDashboardPage() {
         type: resType,
         fileUrl: resolvedFileUrl,
         previewUrl: resolvedFileUrl,
+        videoUrl: resVideoUrl.trim() ? resVideoUrl.trim() : "",
         courseCode: resCourseCode,
         teacherId: resTeacherId ? Number(resTeacherId) : null,
         semesterName: resSemester.trim(),
@@ -6275,6 +6280,18 @@ export default function AdminDashboardPage() {
                                         <Eye className="w-3 h-3" />
                                         <span>View & Fix</span>
                                       </button>
+                                    )}
+                                    {r.videoUrl && (
+                                      <a
+                                        href={r.videoUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-600/10 text-red-600 dark:text-red-400 hover:bg-red-600 hover:text-white transition-colors font-bold text-[10px] border border-red-500/20"
+                                        title={`YouTube Video: ${r.videoUrl}`}
+                                      >
+                                        <span className="text-[9px]">▶</span>
+                                        <span>Video</span>
+                                      </a>
                                     )}
                                   </div>
                                 </div>
@@ -11493,6 +11510,47 @@ export default function AdminDashboardPage() {
                     }`}
                   />
                 </div>
+              </div>
+
+              {/* YouTube Video Lecture / Solution Link (Optional) - Placed directly beneath Material Type & Semester */}
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 rounded bg-red-600 text-white font-black text-[9px] tracking-wide inline-flex items-center gap-1 shadow-2xs">
+                      ▶ YouTube
+                    </span>
+                    <span>Video Lecture / Solution Link (Optional)</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    Optional Video Walkthrough
+                  </span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="url"
+                    value={resVideoUrl}
+                    onChange={(e) => setResVideoUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
+                    className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-red-500 font-medium text-xs transition-colors"
+                  />
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-red-500 pointer-events-none">
+                    <Video className="w-4 h-4" />
+                  </div>
+                  {resVideoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setResVideoUrl("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                      title="Clear video link"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
+                  <span>💡</span>
+                  <span>ক্লাস রেকর্ডিং, লেকচার ভিডিও বা প্রশ্ন সমাধানের ইউটিউব লিংক দিন (যদি থাকে)।</span>
+                </p>
               </div>
 
               {(resType === "QUIZ_CT" || resType === "LAB_QUIZ") && (

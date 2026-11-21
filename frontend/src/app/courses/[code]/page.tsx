@@ -2704,6 +2704,19 @@ function MaterialCard({
         </div>
 
         <div className="flex items-center gap-2">
+          {resource.videoUrl && (
+            <a
+              href={resource.videoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="py-1.5 px-2.5 rounded-xl font-bold text-xs bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white dark:bg-red-500/15 dark:hover:bg-red-600 dark:text-red-400 dark:hover:text-white border border-red-500/25 transition-all flex items-center gap-1.5 shadow-2xs"
+              title={language === "bn" ? "ইউটিউব ভিডিও লেকচার দেখুন" : "Watch YouTube Video Lecture / Walkthrough"}
+            >
+              <span className="text-[10px] font-black">▶</span>
+              <span>{language === "bn" ? "ভিডিও" : "Video"}</span>
+            </a>
+          )}
           {isUnlocked ? (
             resource.type === "PROJECT_LINK" || resource.fileUrl?.includes("github.com") ? (
               <a
