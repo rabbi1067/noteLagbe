@@ -205,11 +205,13 @@ export default function TeacherDetailPage() {
       .then(([tData, cData, rData, revData]) => {
         if (tData) setTeacher(tData);
 
-        // Strict safety filter: only include courses that have authentic uploaded materials in the database
+        // Smart faculty courses filter: include courses with uploaded materials, assigned course videos, or admin assigned
         const realCourses = (cData || []).filter((c: any) => {
           const courseCode = (c.course?.code || c.code || "").toLowerCase();
           const hasResource = (rData || []).some((r: any) => (r.course?.code || "").toLowerCase() === courseCode);
-          return hasResource;
+          const hasVideo = Boolean(c.videoUrl || c.course?.videoUrl);
+          const isAdminAssigned = c.scheduleInfo === "ADMIN_ASSIGNED";
+          return hasResource || hasVideo || isAdminAssigned;
         });
 
         // Also dynamically include courses with approved materials if not already in realCourses
@@ -220,14 +222,25 @@ export default function TeacherDetailPage() {
         });
         (rData || []).forEach((r: any) => {
           const code = (r.course?.code || "").toUpperCase();
-          if (code && !courseMap.has(code) && r.course) {
-            courseMap.set(code, {
-              id: `mat-${r.id}`,
-              course: r.course,
-              teacher: tData || teacher,
-              section: "General",
-              scheduleInfo: null,
-            });
+          if (code) {
+            if (!courseMap.has(code) && r.course) {
+              courseMap.set(code, {
+                id: `mat-${r.id}`,
+                course: r.course,
+                teacher: tData || teacher,
+                section: "General",
+                scheduleInfo: null,
+                videoUrl: r.course?.videoUrl || null,
+              });
+            } else if (courseMap.has(code)) {
+              const existing = courseMap.get(code);
+              if (!existing.videoUrl && r.course?.videoUrl) {
+                existing.videoUrl = r.course.videoUrl;
+              }
+              if (existing.course && !existing.course.videoUrl && r.course?.videoUrl) {
+                existing.course.videoUrl = r.course.videoUrl;
+              }
+            }
           }
         });
 

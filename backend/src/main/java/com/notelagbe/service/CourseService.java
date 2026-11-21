@@ -611,6 +611,26 @@ public class CourseService {
             Object vUrl = payload.get("videoUrl");
             course.setVideoUrl(vUrl != null && !vUrl.toString().trim().isEmpty() ? vUrl.toString().trim() : null);
         }
+        if (payload.containsKey("teacherId") && payload.get("teacherId") != null && !payload.get("teacherId").toString().trim().isEmpty()) {
+            try {
+                Long teacherId = Long.parseLong(payload.get("teacherId").toString().trim());
+                String vUrl = payload.containsKey("videoUrl") && payload.get("videoUrl") != null ? payload.get("videoUrl").toString().trim() : null;
+                List<TeacherCourse> tcs = teacherCourseRepository.findAllByCourseIdAndTeacherId(course.getId(), teacherId);
+                if (!tcs.isEmpty()) {
+                    TeacherCourse tc = tcs.get(0);
+                    tc.setVideoUrl(vUrl != null && !vUrl.isEmpty() ? vUrl : null);
+                    teacherCourseRepository.save(tc);
+                } else {
+                    Teacher teacher = teacherRepository.findById(teacherId).orElse(null);
+                    if (teacher != null) {
+                        TeacherCourse tc = new TeacherCourse(teacher, course, "General", "ADMIN_ASSIGNED");
+                        tc.setVideoUrl(vUrl != null && !vUrl.isEmpty() ? vUrl : null);
+                        teacherCourseRepository.save(tc);
+                    }
+                }
+                liveSyncService.broadcast("teacher_course", "updated", teacherId);
+            } catch (Exception ignored) {}
+        }
 
         Course updated = courseRepository.save(course);
         liveSyncService.broadcast("course", "updated", code);
