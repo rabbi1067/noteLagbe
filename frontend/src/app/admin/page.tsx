@@ -2073,15 +2073,25 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const closeResourceModal = () => {
+    setShowResourceModal(false);
+    setEditingResource(null);
+    setResCourseCode("");
+    setResTeacherId("");
+    setResTitle("");
+    setResType("NOTE");
+    setResFileUrl("");
+    setResFileName("");
+    setResFileSize("");
+    setResCourseVideoUrl("");
+  };
+
   const openNewResourceModal = () => {
     setEditingResource(null);
     const initialDept = departmentFilter !== "ALL" ? departmentFilter : "ALL";
     setResDeptFilter(initialDept);
-    const matchingCourses =
-      initialDept === "ALL"
-        ? courses
-        : courses.filter((c) => c.department?.toUpperCase() === initialDept.toUpperCase());
-    setResCourseCode(matchingCourses[0]?.code || courses[0]?.code || "CSE241");
+    // Zero demo values! Completely clean slate
+    setResCourseCode("");
     setResTeacherId("");
     setResTitle("");
     setResType("NOTE");
@@ -2129,6 +2139,10 @@ export default function AdminDashboardPage() {
 
   const handleSaveResource = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!resCourseCode) {
+      toast.error("Please select a target course for the material");
+      return;
+    }
     if (!resTitle.trim()) {
       toast.error("Please enter a title for the material");
       return;
@@ -2186,7 +2200,7 @@ export default function AdminDashboardPage() {
         }
       }
 
-      setShowResourceModal(false);
+      closeResourceModal();
       loadAllAdminData();
     } catch (err: any) {
       toast.error(err.message || "Failed to save resource");
@@ -2333,10 +2347,7 @@ export default function AdminDashboardPage() {
           (item: any) => (item.course?.code || item.code)?.toUpperCase() === targetCourseCode.toUpperCase()
         );
       }
-      if (!selectedTc && list && list.length > 0) {
-        selectedTc = list[0];
-      }
-
+      // Senior Engineer: Zero demo auto-selection! Only set if targetCourseCode was explicitly provided!
       if (selectedTc) {
         const cCode = selectedTc.course?.code || selectedTc.code || "";
         setCourseVideoCode(cCode);
@@ -2352,40 +2363,40 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const closeCourseVideoModal = () => {
+    setShowCourseVideoModal(false);
+    setCourseVideoTeacherId("");
+    setCourseVideoCode("");
+    setCourseVideoUrl("");
+    setTeacherCoursesList([]);
+    setCourseVideoDeptFilter("ALL");
+    setCourseVideoOnlyActive(false);
+  };
+
   const openCourseVideoModal = (preselectedTeacherId?: number, preselectedCode?: string) => {
-    let initialTeacherId: number | "" = preselectedTeacherId || "";
-    if (!initialTeacherId) {
-      const firstWithCourses = eligibleVideoTeachers.find(
-        (t) => (teacherCourseCountMap.get(Number(t.id))?.size || 0) > 0
-      );
-      initialTeacherId = firstWithCourses
-        ? Number(firstWithCourses.id)
-        : teachers[0]?.id
-        ? Number(teachers[0].id)
-        : "";
-    }
+    // Zero demo values! Never auto-select random faculty or courses!
+    const initialTeacherId: number | "" = preselectedTeacherId ? Number(preselectedTeacherId) : "";
     setCourseVideoTeacherId(initialTeacherId);
     setCourseVideoDeptFilter("ALL");
     setCourseVideoOnlyActive(false);
+    setCourseVideoCode(preselectedCode || "");
+    setCourseVideoUrl("");
+    setTeacherCoursesList([]);
     setShowCourseVideoModal(true);
 
     if (initialTeacherId) {
       loadTeacherCoursesForVideo(Number(initialTeacherId), preselectedCode);
-    } else {
-      setTeacherCoursesList([]);
-      setCourseVideoCode("");
-      setCourseVideoUrl("");
     }
   };
 
   const handleSelectTeacherForVideo = (teacherId: number | "") => {
     setCourseVideoTeacherId(teacherId);
+    setCourseVideoCode("");
+    setCourseVideoUrl("");
     if (teacherId) {
       loadTeacherCoursesForVideo(Number(teacherId));
     } else {
       setTeacherCoursesList([]);
-      setCourseVideoCode("");
-      setCourseVideoUrl("");
     }
   };
 
@@ -11633,8 +11644,14 @@ export default function AdminDashboardPage() {
       {/* MODAL 1: ADD / EDIT MATERIAL                                              */}
       {/* ========================================================================= */}
       {showResourceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+        <div
+          onClick={closeResourceModal}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto"
+          >
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-blue-500/20 text-blue-500">
@@ -11650,8 +11667,9 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
               <button
-                onClick={() => setShowResourceModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                type="button"
+                onClick={closeResourceModal}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -11957,8 +11975,8 @@ export default function AdminDashboardPage() {
               <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setShowResourceModal(false)}
-                  className="px-4 py-2.5 rounded-xl font-bold text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                  onClick={closeResourceModal}
+                  className="px-4 py-2.5 rounded-xl font-bold text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -12207,8 +12225,14 @@ export default function AdminDashboardPage() {
       {/* MODAL 2.5: ASSIGN / UPDATE COURSE VIDEO LECTURE PER FACULTY (1 PER COURSE) */}
       {/* ========================================================================= */}
       {showCourseVideoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-xl rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 p-6 sm:p-7 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div
+          onClick={closeCourseVideoModal}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-xl rounded-3xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 p-6 sm:p-7 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+          >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3.5">
               <div className="flex items-center gap-3">
@@ -12229,7 +12253,7 @@ export default function AdminDashboardPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setShowCourseVideoModal(false)}
+                onClick={closeCourseVideoModal}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -12298,7 +12322,21 @@ export default function AdminDashboardPage() {
               {/* Step 2: Show Selected Faculty Info & Conducted Courses */}
               {(() => {
                 const targetTeacher = teachers.find((t) => Number(t.id) === Number(courseVideoTeacherId));
-                if (!targetTeacher) return null;
+                if (!targetTeacher) {
+                  return (
+                    <div className="p-8 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 text-center space-y-2">
+                      <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center mx-auto">
+                        <GraduationCap className="w-5 h-5" />
+                      </div>
+                      <p className="font-bold text-xs text-slate-700 dark:text-slate-300">
+                        Please select a faculty member above
+                      </p>
+                      <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                        Choose any faculty member to view their conducted courses and assign or update YouTube video lectures.
+                      </p>
+                    </div>
+                  );
+                }
 
                 return (
                   <div className="space-y-3 pt-1">
@@ -12398,6 +12436,14 @@ export default function AdminDashboardPage() {
                         </div>
                       )}
 
+                      {/* Prompt to click a course if none selected yet */}
+                      {!courseVideoCode && teacherCoursesList.length > 0 && (
+                        <div className="mt-2.5 p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-300 text-xs flex items-center gap-2">
+                          <span className="font-bold">👆 Please click a course above</span>
+                          <span>to view or assign its YouTube video lecture URL.</span>
+                        </div>
+                      )}
+
                       {/* Or Pick another course from University Catalog */}
                       <div className="mt-2.5 flex items-center gap-2">
                         <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 shrink-0">
@@ -12489,7 +12535,7 @@ export default function AdminDashboardPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setShowCourseVideoModal(false)}
+                    onClick={closeCourseVideoModal}
                     className="px-4 py-2.5 rounded-xl font-bold text-xs text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
                   >
                     Cancel
